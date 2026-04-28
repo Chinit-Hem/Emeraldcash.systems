@@ -25,6 +25,8 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
       const saved = localStorage.getItem(LANGUAGE_KEY) as Language | null;
       if (saved && (saved === "en" || saved === "km")) {
         setLanguageState(saved);
+        // Sync HTML lang attribute for Khmer font CSS targeting
+        document.documentElement.lang = saved;
       }
     });
     // Ensure LTR direction is always set (Khmer is left-to-right)

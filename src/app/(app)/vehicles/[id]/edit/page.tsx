@@ -16,8 +16,14 @@ import { useVehicles } from "@/lib/useVehicles";
 import { formatVehicleId, formatVehicleTime } from "@/lib/format";
 import type { Vehicle } from "@/lib/types";
 
+import ErrorBoundary from "@/app/components/ErrorBoundary";
+
 export default function EditVehiclePage() {
-  return <EditVehicleInner />;
+  return (
+    <ErrorBoundary>
+      <EditVehicleInner />
+    </ErrorBoundary>
+  );
 }
 
 // Reserved words that cannot be used as vehicle IDs

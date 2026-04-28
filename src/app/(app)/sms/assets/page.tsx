@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertCircle, Edit3, Filter, Loader2, Plus, Search, Trash2 } from 'lucide-react';
+import { AlertCircle, ArrowLeft, Edit3, Eye, Filter, Loader2, Plus, Search, Trash2 } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
@@ -72,13 +72,17 @@ export default function AssetsPage() {
       const data: ApiResponse<SmsAsset[]> = await response.json();
 
       if (data.success) {
-        setAssets(data.data || []);
+        // Ensure data.data is always an array
+        const assetsArray = Array.isArray(data.data) ? data.data : [];
+        setAssets(assetsArray);
         setTotalPages(data.totalPages || 1);
       } else {
         setError(data.error || 'Failed to load assets');
+        setAssets([]); // Reset to empty array on error
       }
-    } catch (_err) {
-      setError('Failed to fetch assets');
+    } catch (err) {
+      setError(`Failed to fetch assets: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      setAssets([]); // Reset to empty array on error
     } finally {
       setLoading(false);
     }
@@ -167,13 +171,22 @@ export default function AssetsPage() {
       {/* Header */}
       <div className="max-w-7xl mx-auto">
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6 mb-8">
-          <div>
-            <h1 className="text-4xl font-bold bg-gradient-to-r from-slate-800 via-slate-700 to-emerald-800 bg-clip-text text-transparent mb-2">
-              Asset Inventory
-            </h1>
-            <p className="text-xl text-slate-600">
-              Manage SMS equipment and resources
-            </p>
+          <div className="flex items-center gap-4">
+            <Link
+              href="/sms"
+              className="group p-3 -m-3 rounded-2xl bg-slate-100/50 hover:bg-slate-200 dark:hover:bg-slate-800 transition-all shadow-sm hover:shadow-md flex items-center gap-2 text-slate-600 hover:text-slate-900"
+              aria-label="Back to SMS Dashboard"
+            >
+              <ArrowLeft className="w-5 h-5 group-hover:-translate-x-0.5 transition-transform" />
+            </Link>
+            <div>
+              <h1 className="text-4xl font-bold bg-gradient-to-r from-slate-800 via-slate-700 to-emerald-800 bg-clip-text text-transparent mb-2">
+                Asset Inventory
+              </h1>
+              <p className="text-xl text-slate-600">
+                Manage SMS equipment and resources
+              </p>
+            </div>
           </div>
 
           <div className="flex flex-col sm:flex-row gap-4">
@@ -274,7 +287,7 @@ export default function AssetsPage() {
                 Retry
               </button>
             </div>
-          ) : assets.length === 0 ? (
+          ) : !Array.isArray(assets) || assets.length === 0 ? (
             <div className="p-20 text-center">
               <div className="w-24 h-24 bg-slate-200 rounded-3xl flex items-center justify-center mx-auto mb-6">
                 <Search className="w-12 h-12 text-slate-500" />
@@ -309,7 +322,7 @@ export default function AssetsPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-200">
-                    {assets.map((asset) => (
+                    {Array.isArray(assets) && assets.map((asset) => (
                       <tr key={asset.id} className="hover:bg-slate-50/50 transition-colors">
                         <td className="px-6 py-6 whitespace-nowrap">
                           <div className="flex items-center gap-4">
@@ -359,6 +372,7 @@ export default function AssetsPage() {
                               className="p-2 text-slate-500 hover:text-slate-900 hover:bg-slate-200 rounded-xl transition-all"
                               title="View details"
                             >
+                              <Eye className="w-4 h-4" />
                               <span className="sr-only">View</span>
                             </Link>
                             <button

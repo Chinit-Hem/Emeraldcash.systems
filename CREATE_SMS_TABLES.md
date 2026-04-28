@@ -37,8 +37,8 @@ CREATE TABLE sms_assets (
 CREATE TABLE sms_transfers (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   asset_id UUID NOT NULL REFERENCES sms_assets(id) ON DELETE CASCADE,
-  sender_id INTEGER NOT NULL,
-  receiver_id INTEGER NOT NULL,
+  sender_id VARCHAR(32) NOT NULL,
+  receiver_id VARCHAR(32) NOT NULL,
   location VARCHAR(128) NOT NULL,
   status VARCHAR(32) NOT NULL DEFAULT 'pending',
   remark TEXT,
@@ -54,7 +54,7 @@ CREATE TABLE sms_transfer_images (
 
 CREATE TABLE sms_audit_logs (
   id SERIAL PRIMARY KEY,
-  user_id INTEGER NOT NULL,
+  user_id VARCHAR(32) NOT NULL,
   action VARCHAR(64) NOT NULL,
   metadata JSONB NOT NULL,
   created_at TIMESTAMP DEFAULT NOW() NOT NULL
@@ -74,7 +74,7 @@ INSERT INTO sms_assets (name, type, category, status, quantity) VALUES
 ON CONFLICT DO NOTHING;
 
 INSERT INTO sms_transfers (asset_id, sender_id, receiver_id, location, status) VALUES
-  ((SELECT id FROM sms_assets WHERE name = 'Laptop Dell XPS' LIMIT 1), 1, 2, 'Warehouse A', 'pending')
+  ((SELECT id FROM sms_assets WHERE name = 'Laptop Dell XPS' LIMIT 1), 'admin', 'staff', 'Warehouse A', 'pending')
 ON CONFLICT DO NOTHING;
 
 SELECT '✅ SMS Tables Created Successfully!' as status;

@@ -19,6 +19,7 @@ import { CATEGORY_COLORS } from "@/lib/categoryColors";
 import { useTranslation } from "@/lib/i18n";
 import type { Vehicle } from "@/lib/types";
 import { useDebouncedValue } from "@/lib/useDebouncedValue";
+import { safeGetMonthKey } from "@/lib/safeDate";
 import {
   Bike,
   Car,
@@ -368,10 +369,12 @@ export default function EnhancedDashboard({
   const [vehicles, setVehicles] = useState<Vehicle[]>(initialVehicles);
   const [meta, setMeta] = useState<DashboardMeta>(initialMeta);
   const [activeFilter, setActiveFilter] = useState<string | null>(null);
-  
+  const [searchResults, setSearchResults] = useState<Vehicle[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+
   const { language } = useLanguage();
   const { t } = useTranslation(language);
-  
+
   const debouncedSearch = useDebouncedValue(searchQuery, 300);
 
   useEffect(() => {
@@ -379,29 +382,70 @@ export default function EnhancedDashboard({
     setMeta(initialMeta);
   }, [initialVehicles, initialMeta]);
 
-  // 🚀 PERF: aggregatedStats now server-side in /api/dashboard/stats
-  // Small initialVehicles (50) doesn't need client computation
+  // Real data search: query API across 100% of database when user types
+  useEffect(() => {
+    if (!debouncedSearch.trim()) {
+      setSearchResults([]);
+      setIsSearching(false);
+      return;
+    }
 
-  // Client-side filtering for search within loaded vehicles
+    async function fetchSearchResults() {
+      setIsSearching(true);
+      try {
+        const url = `/api/vehicles/edge?search=${encodeURIComponent(debouncedSearch)}&limit=2000`;
+        const res = await fetch(url, { cache: "no-store" });
+        if (!res.ok) throw new Error("Search failed");
+        const data = await res.json();
+        if (data.success) {
+          setSearchResults(data.data || []);
+        } else {
+          setSearchResults([]);
+        }
+      } catch (err) {
+        console.error("[EnhancedDashboard] Search error:", err);
+        setSearchResults([]);
+      } finally {
+        setIsSearching(false);
+      }
+    }
+
+    fetchSearchResults();
+  }, [debouncedSearch]);
+
+  // Compute aggregated stats from real vehicle data
+  const aggregatedStats = useMemo(() => {
+    if (!vehicles.length) return null;
+
+    const stats = {
+      byBrand: {} as Record<string, number>,
+      byMonth: {} as Record<string, number>,
+    };
+
+    for (const vehicle of vehicles) {
+      const brand = (vehicle.Brand || "Unknown").toUpperCase();
+      if (!INVALID_BRANDS.includes(brand)) {
+        stats.byBrand[brand] = (stats.byBrand[brand] || 0) + 1;
+      }
+
+      if (vehicle.Time) {
+        const monthKey = safeGetMonthKey(vehicle.Time);
+        if (monthKey) {
+          stats.byMonth[monthKey] = (stats.byMonth[monthKey] || 0) + 1;
+        }
+      }
+    }
+
+    return stats;
+  }, [vehicles]);
+
+  // Use API results for real 100% database search; fallback to all vehicles
   const filteredVehicles = useMemo(() => {
-    if (!debouncedSearch.trim()) return vehicles;
-    
-    const query = debouncedSearch.toLowerCase().trim();
-    
-    return vehicles.filter((v) => {
-      const textMatch = 
-        v.Brand?.toLowerCase().includes(query) ||
-        v.Model?.toLowerCase().includes(query) ||
-        v.Plate?.toLowerCase().includes(query) ||
-        v.Category?.toLowerCase().includes(query) ||
-        v.Condition?.toLowerCase().includes(query) ||
-        v.Color?.toLowerCase().includes(query) ||
-        v.VehicleId?.toString().toLowerCase().includes(query) ||
-        v.Year?.toString().includes(query);
-      
-      return textMatch;
-    });
-  }, [vehicles, debouncedSearch]);
+    if (debouncedSearch.trim()) {
+      return searchResults;
+    }
+    return vehicles;
+  }, [vehicles, debouncedSearch, searchResults]);
 
   // Chart data preparation
   const categoryChartData = useMemo(() => {
@@ -421,34 +465,25 @@ export default function EnhancedDashboard({
     ].filter((item) => item.value > 0);
   }, [meta]);
 
-  // 🚀 PERF: Top brands/monthly static for dashboard (full computation in /vehicles)
-  const brandChartData = [
-    { name: 'TOYOTA', value: 342 },
-    { name: 'HONDA', value: 289 },
-    { name: 'LEXUS', value: 156 },
-    { name: 'FORD', value: 89 },
-    { name: 'HYUNDAI', value: 67 },
-    { name: 'MAZDA', value: 54 },
-    { name: 'NISSAN', value: 43 },
-    { name: 'TOYOTA', value: 32 },
-    { name: 'KIA', value: 28 },
-    { name: 'MITSUBISHI', value: 24 },
-  ];
+  // Real chart data computed from actual vehicle data
+  const brandChartData = useMemo(() => {
+    if (!aggregatedStats) return [];
+    return Object.entries(aggregatedStats.byBrand)
+      .map(([name, value]) => ({ name, value }))
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 10);
+  }, [aggregatedStats]);
 
-  const monthlyChartData = [
-    { name: 'Jan 2024', value: 89 },
-    { name: 'Feb 2024', value: 156 },
-    { name: 'Mar 2024', value: 234 },
-    { name: 'Apr 2024', value: 298 },
-    { name: 'May 2024', value: 345 },
-    { name: 'Jun 2024', value: 412 },
-    { name: 'Jul 2024', value: 389 },
-    { name: 'Aug 2024', value: 456 },
-    { name: 'Sep 2024', value: 523 },
-    { name: 'Oct 2024', value: 598 },
-    { name: 'Nov 2024', value: 634 },
-    { name: 'Dec 2024', value: 712 },
-  ];
+  const monthlyChartData = useMemo(() => {
+    if (!aggregatedStats) return [];
+    return Object.entries(aggregatedStats.byMonth)
+      .sort()
+      .slice(-12)
+      .map(([month, count]) => ({
+        name: month,
+        value: count,
+      }));
+  }, [aggregatedStats]);
 
   // Handlers
   const handleRefresh = useCallback(async () => {
@@ -886,7 +921,7 @@ export default function EnhancedDashboard({
               },
               { 
                 label: "Unique Brands", 
-                value: '42', // Static for perf (from /api/dashboard/stats full data)
+                value: aggregatedStats ? Object.keys(aggregatedStats.byBrand).length.toLocaleString() : '-',
                 icon: Package,
                 color: "text-purple-600",
                 bgColor: "bg-purple-50"

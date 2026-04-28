@@ -1,6 +1,8 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
+import { useLanguage } from "@/lib/LanguageContext";
+import { useTranslation } from "@/lib/i18n";
 import React, { Suspense, useEffect, useState } from "react";
 
 // Safe client-side only hook to prevent hydration mismatches
@@ -20,6 +22,8 @@ function LoginForm() {
   const searchParams = useSearchParams();
   const isMounted = useIsMounted();
   
+  const { language } = useLanguage();
+  const { t } = useTranslation(language);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -181,7 +185,7 @@ function LoginForm() {
                 Emerald Cash
               </h1>
               <p className="text-xs text-slate-500 uppercase tracking-wider mt-1">
-                Vehicle Management System
+                {t.vehicleManagementSystem}
               </p>
             </div>
 
@@ -189,13 +193,13 @@ function LoginForm() {
               {/* Username */}
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">
-                  Username
+                  {t.usernameLabel}
                 </label>
                 <input
                   type="text"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
-                  placeholder="Enter username"
+                  placeholder={t.enterUsername}
                   autoComplete="username"
                   required
                   disabled={loading}
@@ -206,14 +210,14 @@ function LoginForm() {
               {/* Password */}
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">
-                  Password
+                  {t.passwordLabel}
                 </label>
                 <div className="relative">
                   <input
                     type={showPassword ? "text" : "password"}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    placeholder="Enter password"
+                    placeholder={t.enterPassword}
                     autoComplete="current-password"
                     required
                     disabled={loading}
@@ -263,7 +267,7 @@ function LoginForm() {
                 </div>
               </div>
 
-              {/* Remember me */}
+              {/* t.rememberMe */}
               <label className="flex items-center gap-2 cursor-pointer">
                 <input
                   type="checkbox"
@@ -272,7 +276,7 @@ function LoginForm() {
                   disabled={loading}
                   className="w-4 h-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500/20"
                 />
-                <span className="text-sm text-slate-500">Remember me</span>
+                <span className="text-sm text-slate-500">{t.rememberMe}</span>
               </label>
 
               {/* Success message */}
@@ -322,7 +326,7 @@ function LoginForm() {
                 disabled={loading}
                 className="w-full py-3 px-4 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white font-medium rounded-xl hover:from-emerald-600 hover:to-emerald-700 transition-all shadow-lg shadow-emerald-500/25 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {loading ? "Signing in..." : "Sign In"}
+                {loading ? t.signingIn : t.signIn}
               </button>
             </form>
 

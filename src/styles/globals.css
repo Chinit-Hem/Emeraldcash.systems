@@ -77,7 +77,6 @@
   --shadow-elevated: 0 10px 24px rgba(2, 6, 23, 0.5);
 }
 
-html,
 body {
   background-color: var(--bg-primary);
   color: var(--text-primary);
@@ -434,6 +433,44 @@ textarea::placeholder {
   select {
     font-size: 16px !important;
   }
+}
+
+/* ================= KHMER FONT: KANTUMRUY PRO ================= */
+
+/* Base font stack includes Kantumruy Pro as fallback */
+body {
+  font-family: "Inter", "Kantumruy Pro", "Segoe UI", system-ui, -apple-system, sans-serif;
+}
+
+/* When language is set to Khmer, apply Kantumruy Pro to ALL elements */
+html[lang="km"],
+html[lang="km"] *,
+html[lang="km"] *::before,
+html[lang="km"] *::after {
+  font-family: "Kantumruy Pro", "Inter", system-ui, sans-serif !important;
+}
+
+/* Titles and bold text use Kantumruy Pro Bold (weight 700) */
+html[lang="km"] h1,
+html[lang="km"] h2,
+html[lang="km"] h3,
+html[lang="km"] h4,
+html[lang="km"] h5,
+html[lang="km"] h6,
+html[lang="km"] .font-bold,
+html[lang="km"] [class*="font-bold"],
+html[lang="km"] .text-2xl,
+html[lang="km"] .text-3xl,
+html[lang="km"] .text-4xl,
+html[lang="km"] .text-5xl,
+html[lang="km"] .text-xl {
+  font-family: "Kantumruy Pro", "Inter", system-ui, sans-serif !important;
+  font-weight: 700 !important;
+}
+
+/* All headings get bold weight in Khmer */
+html[lang="km"] :is(h1, h2, h3, h4, h5, h6) {
+  font-weight: 700 !important;
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -1,11 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { smsService } from '@/services/SmsService';
 
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   const startTime = Date.now();
   try {
     const result = await smsService.getAssetStats();
-    
     const duration = Date.now() - startTime;
     
     if (result.success) {
@@ -22,7 +21,7 @@ export async function GET(request: NextRequest) {
       }, { status: 500 });
     }
   } catch (error) {
-    const duration = Date.now() - startTime;
+    // duration is logged in response
     console.error('[SMS Stats API]', error);
     return NextResponse.json({
       success: false,

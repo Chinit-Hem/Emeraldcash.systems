@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { smsService } from '@/services/SmsService';
-import type { SmsAsset } from '@/lib/sms-types';
+import { validateAssetForm } from '@/lib/sms-validation';
+import type { SmsAssetDB, SmsFilters } from '@/services/SmsService';
 
 export async function GET(req: NextRequest) {
   try {
@@ -11,7 +12,6 @@ export async function GET(req: NextRequest) {
     const status = searchParams.get('status') || undefined;
     const assigned_to = searchParams.get('assigned_to') || undefined;
 
-    // Note: Service needs pagination - using BaseService getAll with limit/offset
     const filters = { 
       search, 
       status, 
@@ -19,7 +19,7 @@ export async function GET(req: NextRequest) {
       limit: pageSize, 
       offset: (page - 1) * pageSize 
     };
-    const result = await smsService.getAssets(filters as any);
+    const result = await smsService.getAssets(filters as SmsFilters);
     if (!result.success) {
       return NextResponse.json(
         { success: false, error: result.error || 'Failed to fetch assets' },
@@ -43,10 +43,42 @@ export async function GET(req: NextRequest) {
   }
 }
 
+/**
+ * Map camelCase form fields to snake_case DB columns.
+ * Accepts both naming conventions for robustness.
+ */
+function mapToDbPayload(data: Record<string, unknown>): Omit<SmsAssetDB, 'id' | 'created_at' | 'updated_at'> {
+  return {
+    name: String(data.name || ''),
+    item_code: (data.item_code ?? data.itemCode ?? null) as string | null,
+    type: String(data.type || ''),
+    category: (data.category ?? null) as string | null,
+    quantity: data.quantity !== undefined ? Number(data.quantity) : null,
+    location: (data.location ?? null) as string | null,
+    assigned_to: (data.assigned_to ?? data.assignedTo ?? null) as string | null,
+    image_url: (data.image_url ?? data.imageUrl ?? null) as string | null,
+    document_url: (data.document_url ?? data.documentUrl ?? null) as string | null,
+    description: (data.description ?? null) as string | null,
+    ref_id: (data.ref_id ?? data.refId ?? null) as string | null,
+    status: String(data.status || 'Available'),
+  };
+}
+
 export async function POST(req: NextRequest) {
   try {
-    const data = await req.json();
-    const result = await smsService.createAsset(data);
+    const body = await req.json();
+
+    // Validate incoming data
+    const { isValid, errors } = validateAssetForm(body);
+    if (!isValid) {
+      return NextResponse.json(
+        { success: false, error: 'Validation failed', errors },
+        { status: 400 }
+      );
+    }
+
+    const dbPayload = mapToDbPayload(body);
+    const result = await smsService.createAsset(dbPayload);
     if (!result.success) {
       return NextResponse.json(
         { success: false, error: result.error || 'Failed to create asset' },
@@ -59,3 +91,4 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: false, error: (error as Error).message }, { status: 500 });
   }
 }
+

@@ -10,8 +10,9 @@
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-import { NextRequest, NextResponse } from "next/server";
 import { uploadImage } from "@/lib/cloudinary";
+import { generateUUID } from "@/lib/uuid";
+import { NextRequest, NextResponse } from "next/server";
 import { Buffer } from "node:buffer";
 
 // ============================================================================
@@ -179,7 +180,7 @@ function validateFile(file: File): { valid: boolean; error?: string } {
  * Upload an image to Cloudinary
  */
 export async function POST(request: NextRequest): Promise<NextResponse<UploadResponse>> {
-  const requestId = crypto.randomUUID();
+  const requestId = generateUUID();
   const startTime = Date.now();
 
   try {

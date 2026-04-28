@@ -1,5 +1,5 @@
 import { v2 as cloudinary } from 'cloudinary';
-import { dbManager } from './db-singleton';
+// dbManager available if needed for future DB operations
 
 // Configure if not already (assume src/lib/cloudinary.ts exists, extend)
 const uploadToCloudinary = async (file: File, folder: 'sms/assets/images' | 'sms/assets/docs', publicId?: string): Promise<string> => {
@@ -22,7 +22,7 @@ const uploadToCloudinary = async (file: File, folder: 'sms/assets/images' | 'sms
       ).end(buffer);
     });
 
-    return (result as any).secure_url;
+    return (result as {secure_url: string}).secure_url;
   } catch (error) {
     console.error('Cloudinary upload error:', error);
     throw new Error('Upload failed');

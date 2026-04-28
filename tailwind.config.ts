@@ -44,6 +44,10 @@ const config: Config = {
         "glow-green": "0 0 20px var(--accent-green-soft)",
         "glow-red": "0 0 20px var(--accent-red-soft)",
       },
+      fontFamily: {
+        sans: ['"Inter"', '"Kantumruy Pro"', '"Segoe UI"', 'system-ui', '-apple-system', 'sans-serif'],
+        khmer: ['"Kantumruy Pro"', '"Inter"', 'system-ui', 'sans-serif'],
+      },
       transitionDuration: {
         300: "300ms",
       },

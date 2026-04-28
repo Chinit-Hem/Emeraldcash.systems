@@ -1,8 +1,9 @@
 "use client";
 
+import { generateShortUUID } from '@/lib/uuid';
 import { Loader2, Save, Upload, X } from 'lucide-react';
 import Image from 'next/image';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 interface SmsAsset {
   id?: string;
@@ -45,16 +46,56 @@ export default function AssetFormModal({
     ...initialData
   });
   const [loading, setLoading] = useState(false);
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(initialData?.imageUrl || null);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [uploadProgress, setUploadProgress] = useState(0);
+
+  // Sync formData and imagePreview whenever the modal opens or initialData changes
+  useEffect(() => {
+    if (isOpen) {
+      setFormData({
+        name: initialData?.name || '',
+        type: initialData?.type || '',
+        status: initialData?.status || 'Available',
+        quantity: initialData?.quantity ?? 1,
+        itemCode: initialData?.itemCode || undefined,
+        category: initialData?.category || undefined,
+        location: initialData?.location || undefined,
+        assignedTo: initialData?.assignedTo || undefined,
+        imageUrl: initialData?.imageUrl || undefined,
+        documentUrl: initialData?.documentUrl || undefined,
+        description: initialData?.description || undefined,
+        refId: initialData?.refId || undefined,
+      });
+      setImagePreview(initialData?.imageUrl || null);
+      setErrors({});
+      setUploadProgress(0);
+    }
+  }, [isOpen, initialData]);
 
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {};
     
+    // Required fields
     if (!formData.name?.trim()) newErrors.name = 'Asset name is required';
+    if (formData.name && formData.name.length < 2) newErrors.name = 'Name must be at least 2 characters';
+    if (formData.name && formData.name.length > 255) newErrors.name = 'Name too long (max 255 characters)';
+    
     if (!formData.type?.trim()) newErrors.type = 'Type is required';
-    if (formData.quantity! < 0) newErrors.quantity = 'Quantity cannot be negative';
+    if (formData.type && formData.type.length > 64) newErrors.type = 'Type too long (max 64 characters)';
+    
+    // Quantity validation
+    if (!formData.quantity) newErrors.quantity = 'Quantity is required';
+    else if (formData.quantity < 1) newErrors.quantity = 'Quantity must be at least 1';
+    else if (formData.quantity > 999) newErrors.quantity = 'Quantity too high (max 999)';
+    
+    // Optional field max lengths
+    if (formData.itemCode && formData.itemCode.length > 64) newErrors.itemCode = 'Item code too long (max 64 characters)';
+    if (formData.category && formData.category.length > 64) newErrors.category = 'Category too long (max 64 characters)';
+    if (formData.location && formData.location.length > 128) newErrors.location = 'Location too long (max 128 characters)';
+    if (formData.assignedTo && formData.assignedTo.length > 128) newErrors.assignedTo = 'Assigned to too long (max 128 characters)';
+    if (formData.description && formData.description.length > 1000) newErrors.description = 'Description too long (max 1000 characters)';
+    if (formData.refId && formData.refId.length > 128) newErrors.refId = 'Reference ID too long (max 128 characters)';
     
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -75,7 +116,7 @@ export default function AssetFormModal({
     const formDataToSend = new FormData();
     formDataToSend.append('file', file);
     formDataToSend.append('folder', 'sms/assets/images');
-    formDataToSend.append('publicId', `asset-${crypto.randomUUID().slice(0,8)}`);
+    formDataToSend.append('publicId', `asset-${generateShortUUID()}`);
 
     try {
       const response = await fetch('/api/sms/assets/upload', {
@@ -116,7 +157,7 @@ export default function AssetFormModal({
   };
 
   const removeImage = () => {
-    setFormData({ ...formData, imageUrl: '' });
+    setFormData({ ...formData, imageUrl: undefined });
     setImagePreview(null);
   };
 
@@ -183,20 +224,23 @@ export default function AssetFormModal({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
               <label className="block text-sm font-semibold text-slate-700 mb-2">Type *</label>
-              <select
+              <input
+                list="asset-types"
+                type="text"
                 value={formData.type}
-                onChange={(e) => setFormData({ ...formData, type: e.target.value as SmsAsset['type'] | '' })}
+                onChange={(e) => setFormData({ ...formData, type: e.target.value })}
                 className="w-full px-4 py-3 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all bg-white/70 backdrop-blur-sm"
+                placeholder="Select or type a type..."
                 disabled={loading}
-              >
-                <option value="">Select type...</option>
-                <option value="Electronics">Electronics</option>
-                <option value="Furniture">Furniture</option>
-                <option value="Vehicle">Vehicle</option>
-                <option value="Tool">Tool</option>
-                <option value="Office Supply">Office Supply</option>
-                <option value="Other">Other</option>
-              </select>
+              />
+              <datalist id="asset-types">
+                <option value="Electronics" />
+                <option value="Furniture" />
+                <option value="Vehicle" />
+                <option value="Tool" />
+                <option value="Office Supply" />
+                <option value="Other" />
+              </datalist>
               {errors.type && <p className="mt-1 text-xs text-amber-600">{errors.type}</p>}
             </div>
 
@@ -218,8 +262,9 @@ export default function AssetFormModal({
               <label className="block text-sm font-semibold text-slate-700 mb-2">Quantity</label>
               <input
                 type="number"
-                min="0"
-                value={formData.quantity || ''}
+                min="1"
+                max="999"
+                value={formData.quantity || 1}
                 onChange={(e) => setFormData({ ...formData, quantity: parseInt(e.target.value) || 1 })}
                 className="w-full px-4 py-3 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all bg-white/70 backdrop-blur-sm"
                 placeholder="1"
@@ -387,4 +432,3 @@ export default function AssetFormModal({
     </div>
   );
 }
-

@@ -1,5 +1,8 @@
 ﻿"use client";
 
+import { useLanguage } from "@/lib/LanguageContext";
+import { useTranslation } from "@/lib/i18n";
+
 import { NeuInput } from "@/components/ui/neu/NeuInput";
 import { normalizeCambodiaTimeString } from "@/lib/cambodiaTime";
 import { driveThumbnailUrl, extractDriveFileId } from "@/lib/drive";
@@ -11,6 +14,8 @@ import { tokenizeQuery, vehicleSearchText } from "@/lib/vehicleSearch";
 import { useRouter, useSearchParams } from "next/navigation";
 import React, { useEffect, useMemo, useState } from "react";
 import { useAuthUser } from "@/app/components/AuthContext";
+import { getFuzzySuggestions } from "@/lib/fuzzySearch";
+import SearchSuggestions from "@/components/SearchSuggestions";
 
 type VehicleListProps = {
   category?: string;
@@ -271,6 +276,18 @@ export default function VehicleList({ category }: VehicleListProps) {
     return result;
   }, [vehicles, categoryFilter, conditionFilter, brandFilter]);
 
+  // Fuzzy suggestions when search returns no exact matches
+  const fuzzySuggestions = useMemo(() => {
+    if (!vehicles || vehicles.length === 0) return [];
+    if (!debouncedSearch || debouncedSearch.trim().length < 2) return [];
+    if (filteredVehicles.length > 0) return [];
+
+    return getFuzzySuggestions(debouncedSearch, vehicles, {
+      limit: 5,
+      minScore: 0.3,
+    });
+  }, [vehicles, debouncedSearch, filteredVehicles.length]);
+
   const handleDelete = async (vehicle: Vehicle) => {
     if (!isAdmin) return;
     const ok = confirm(`Delete ${vehicle.Brand} ${vehicle.Model}?`);
@@ -469,9 +486,23 @@ export default function VehicleList({ category }: VehicleListProps) {
 
         {/* Empty State */}
         {filteredVehicles.length === 0 && (
-          <div className="bg-white rounded-[30px] shadow-sm p-12 text-center">
-            <p className="text-[#718096] text-xl mb-2">No vehicles found</p>
-            <p className="text-[#718096] text-base">Try adjusting your filters</p>
+          <div className="space-y-6">
+            {/* Fuzzy Suggestions */}
+            {fuzzySuggestions.length > 0 && (
+              <SearchSuggestions
+                suggestions={fuzzySuggestions}
+                searchTerm={debouncedSearch}
+                onSelect={(suggestion) => {
+                  const suggestedSearch = `${suggestion.vehicle.Brand} ${suggestion.vehicle.Model}`.trim();
+                  setSearchQuery(suggestedSearch);
+                }}
+              />
+            )}
+
+            <div className="bg-white rounded-[30px] shadow-sm p-12 text-center">
+              <p className="text-[#718096] text-xl mb-2">No vehicles found</p>
+              <p className="text-[#718096] text-base">Try adjusting your filters</p>
+            </div>
           </div>
         )}
 

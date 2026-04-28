@@ -1,1 +1,43 @@
-# Git Push & Verification TODO - Updated Post-Push\n\n✅ **Git Push Complete** - All changes staged, committed, and pushed to origin/main\n\n## Original TypeScript/ESLint Fixes (Complete ✅)\n### 1. [✅ COMPLETE] Add Next.js Image import to AssetFormModal.tsx\n### 2. [✅ COMPLETE] Add Next.js Image import to assets/page.tsx\n### 3. [✅ COMPLETE] Fix tsconfig.json deprecation (removed baseUrl/paths, ignoreDeprecations: \"6.0\")\n\n## Git Push Details\n- Staged: ~40 modified files + untracked (SMS assets dir, FIX_VERCEL_BUILD_TODO.md, tailwind.config.js)\n- Commit: \"fix: resolve TypeScript/ESLint Image errors, tsconfig.json deprecation, SMS assets updates, and merge resolutions\"\n- Pushed to: origin/main\n\n## Step 4: Post-Push Verification (Do these now)\n- [ ] Reload TypeScript server (Cmd+Shift+P → \"TypeScript: Restart TS Server\")\n- [ ] Check VSCode Problems panel (Image errors + tsconfig warning should be gone)\n- [ ] Run `npm run dev` to test locally\n- [ ] Run `npm run build` to verify Vercel compatibility\n\n**All set! Repo updated on GitHub.**
+# Folder Structure & Duplicate Code Cleanup TODO
+
+## Step 1: Fix Database Circular Exports ✅
+- [x] Remove `src/lib/db/db.ts` (circular re-export)
+- [x] Remove `src/lib/db/index.ts` (circular re-export)
+- [x] Remove `src/lib/db/db-singleton.ts` (circular re-export)
+- [x] Remove empty `src/lib/db/` directory
+- [x] `src/lib/db.ts` already correctly re-exports from `db-singleton.ts`
+
+## Step 2: Consolidate Vehicle Form Hooks ✅
+- [x] `useVehicleForm.ts` was only used for type re-export in `VehicleFormUnified.tsx`
+- [x] `useVehicleFormNeon.ts` had zero imports — removed
+- [x] Updated `VehicleFormUnified.tsx` to import `Vehicle` from `@/lib/types`
+- [x] Removed legacy `src/lib/useVehicleForm.ts` and `src/app/components/vehicles/useVehicleFormNeon.ts`
+
+## Step 3: Deduplicate Vehicle List Components
+- [ ] Check if `VehiclesClient.tsx` is still used
+- [ ] Check if `VehicleList.tsx` is still used
+- [ ] Remove obsolete components if superseded by `VehiclesClientEnhanced.tsx`
+
+## Step 4: Deduplicate Form Components
+- [ ] Remove `VehicleFormNew.tsx` (zero imports found)
+- [ ] Check overlap between `VehicleForm.tsx` and `VehicleFormUnified.tsx`
+- [ ] Consolidate if possible
+
+## Step 5: Remove Duplicate Global CSS
+- [ ] Check which `globals.css` is actively imported in `layout.tsx`
+- [ ] Remove the unused duplicate
+
+## Step 6: Clean Unused UI Components
+- [ ] Search for imports of `Liquid*` components
+- [ ] Search for imports of `Neu*` components
+- [ ] Remove unused design system folders
+
+## Step 7: Reorganize `src/lib/`
+- [ ] Move auth utilities to `src/lib/auth/`
+- [ ] Move DB files to `src/lib/db/`
+- [ ] Move general utilities to `src/lib/utils/`
+
+## Verification
+- [ ] Run `tsc --noEmit` after each step
+- [ ] Run dev server to verify pages render correctly
+

@@ -1,5 +1,9 @@
 {
-  "compilerOptions": {
+    "compilerOptions": {
+      "baseUrl": ".",
+      "paths": {
+        "@/*": ["./src/*"]
+      },
     "target": "es2015",
     "lib": [
       "dom",
@@ -18,7 +22,6 @@
     "isolatedModules": true,
     "jsx": "react-jsx", // ← critical for Next.js
     "incremental": true,
-    "ignoreDeprecations": "6.0",
     "plugins": [
       {
         "name": "next"

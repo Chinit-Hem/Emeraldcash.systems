@@ -318,18 +318,36 @@ class DatabaseManager {
    * Execute an unsafe/raw SQL query string
    * Uses the sql function with a template literal containing the raw query
    */
-  public async executeUnsafe<T>(query: string): Promise<T[]> {
+  public async executeUnsafe<T>(query: string, params?: unknown[], timeoutMs?: number): Promise<T[]> {
     return this.query(
       async () => {
         const sql = this.getClient();
-        
-        // Query logging removed for production
-        
+
         try {
+          let finalQuery = query;
+          if (params && params.length > 0) {
+            // Replace placeholders from highest index to lowest to avoid partial matches
+            for (let i = params.length - 1; i >= 0; i--) {
+              const param = params[i];
+              const placeholder = `$${i + 1}`;
+              let replacement: string;
+
+              if (param === null) {
+                replacement = 'NULL';
+              } else if (typeof param === 'number') {
+                replacement = String(param);
+              } else {
+                replacement = `'${String(param).replace(/'/g, "''")}'`;
+              }
+
+              const placeholderRegex = new RegExp(placeholder.replace(/\$/g, '\\$'), 'g');
+              finalQuery = finalQuery.replace(placeholderRegex, replacement);
+            }
+          }
+
           // Neon SDK requires actual template literal syntax
-          // Create a proper TemplateStringsArray with the query as the raw string
-          const strings = Object.assign([query], { raw: [query] }) as TemplateStringsArray;
-          
+          const strings = Object.assign([finalQuery], { raw: [finalQuery] }) as TemplateStringsArray;
+
           // Call sql function with the template strings array
           const result = await sql(strings);
           return result as T[];
@@ -338,7 +356,7 @@ class DatabaseManager {
           throw execError;
         }
       },
-      { operationName: "unsafe SQL query" }
+      { operationName: "unsafe SQL query", timeoutMs }
     );
   }
 

@@ -18,15 +18,19 @@
 import {
   getCategorySearchPattern
 } from "@/lib/categoryMapping";
+import { getFuzzySuggestions, type FuzzySuggestion } from "@/lib/fuzzySearch";
 import { dbManager } from "@/lib/db-singleton";
-import type { 
-  Vehicle, 
-  StockItem, 
-  StockStats, 
-  StockMovementType
-} from "@/lib/types";
 import type { StockItemTable } from "@/lib/stock-schema";
-import { BaseFilters, BaseService, ServiceResult } from "./BaseService";
+import type {
+  StockItem,
+  StockMovementType,
+  StockStats,
+  Vehicle
+} from "@/lib/types";
+import type { VehicleFilters } from "@/types/vehicle";
+export type { VehicleFilters };
+import { BaseService, ServiceResult } from "./BaseService";
+
 
 
 // ============================================================================
@@ -82,21 +86,9 @@ export interface VehicleEntity {
 
 /**
  * Vehicle-specific filter options
+ * Imported from @/types/vehicle to avoid shadowing
  */
-export interface VehicleFilters extends BaseFilters {
-  category?: string;
-  brand?: string;
-  model?: string;
-  condition?: string;
-  yearMin?: number;
-  yearMax?: number;
-  priceMin?: number;
-  priceMax?: number;
-  color?: string;
-  bodyType?: string;
-  taxType?: string;
-  withoutImage?: boolean;
-}
+
 
 /**
  * Vehicle statistics
@@ -131,8 +123,10 @@ export class VehicleService extends BaseService<VehicleEntity, VehicleDB> {
    * Private constructor - use getInstance() instead
    */
   private constructor() {
-    super("VehicleService", "vehicles");
+    super('VehicleService');
   }
+
+  public readonly tableName = 'vehicles';
 
   /**
    * Get the singleton instance
@@ -232,9 +226,9 @@ export class VehicleService extends BaseService<VehicleEntity, VehicleDB> {
     baseQuery: string,
     filters: VehicleFilters,
     params: (string | number | null)[]
-  ): { query: string; params: (string | number | null)[]; paramIndex: number } {
+  ): { query: string; params: (string | number | null)[]; _paramIndex: number } {
     const conditions: string[] = [];
-    let paramIndex = 1;
+    let _paramIndex = 1;
 
     // Filter for vehicles without images (NULL or empty string for both image_id and thumbnail_url)
     if (filters?.withoutImage === true) {
@@ -244,78 +238,78 @@ export class VehicleService extends BaseService<VehicleEntity, VehicleDB> {
     // Category filter - use direct ILIKE without LOWER/TRIM for better performance
     if (filters?.category) {
       const searchPattern = getCategorySearchPattern(filters.category);
-      conditions.push(`category ILIKE $${paramIndex}`);
+      conditions.push(`category ILIKE $${_paramIndex}`);
       params.push(searchPattern);
-      paramIndex++;
+      _paramIndex++;
     }
     
     // Brand filter with ILIKE - removed TRIM for performance
     if (filters?.brand) {
-      conditions.push(`brand ILIKE $${paramIndex}`);
+      conditions.push(`brand ILIKE $${_paramIndex}`);
       params.push(VehicleService.buildIlikePattern(filters.brand));
-      paramIndex++;
+      _paramIndex++;
     }
     
     // Model filter with ILIKE - removed TRIM for performance
     if (filters?.model) {
-      conditions.push(`model ILIKE $${paramIndex}`);
+      conditions.push(`model ILIKE $${_paramIndex}`);
       params.push(VehicleService.buildIlikePattern(filters.model));
-      paramIndex++;
+      _paramIndex++;
     }
     
     // Condition filter - exact match (fastest)
     if (filters?.condition) {
       const normalizedCondition = VehicleService.normalizeCondition(filters.condition);
-      conditions.push(`condition = $${paramIndex}`);
+      conditions.push(`condition = $${_paramIndex}`);
       params.push(normalizedCondition);
-      paramIndex++;
+      _paramIndex++;
     }
     
     // Color filter with ILIKE - removed TRIM for performance
     if (filters?.color) {
-      conditions.push(`color ILIKE $${paramIndex}`);
+      conditions.push(`color ILIKE $${_paramIndex}`);
       params.push(VehicleService.buildIlikePattern(filters.color));
-      paramIndex++;
+      _paramIndex++;
     }
     
     // Body type filter with ILIKE - removed TRIM for performance
     if (filters?.bodyType) {
-      conditions.push(`body_type ILIKE $${paramIndex}`);
+      conditions.push(`body_type ILIKE $${_paramIndex}`);
       params.push(VehicleService.buildIlikePattern(filters.bodyType));
-      paramIndex++;
+      _paramIndex++;
     }
     
     // Tax type filter with ILIKE - removed TRIM for performance
     if (filters?.taxType) {
-      conditions.push(`tax_type ILIKE $${paramIndex}`);
+      conditions.push(`tax_type ILIKE $${_paramIndex}`);
       params.push(VehicleService.buildIlikePattern(filters.taxType));
-      paramIndex++;
+      _paramIndex++;
     }
     
     // Year range filters - use exact comparisons (index-friendly)
     if (filters?.yearMin !== undefined && filters.yearMin !== null) {
-      conditions.push(`year >= $${paramIndex}`);
+      conditions.push(`year >= $${_paramIndex}`);
       params.push(filters.yearMin);
-      paramIndex++;
+      _paramIndex++;
     }
     
     if (filters?.yearMax !== undefined && filters.yearMax !== null) {
-      conditions.push(`year <= $${paramIndex}`);
+      conditions.push(`year <= $${_paramIndex}`);
       params.push(filters.yearMax);
-      paramIndex++;
+      _paramIndex++;
     }
     
     // Price range filters - use exact comparisons (index-friendly)
     if (filters?.priceMin !== undefined && filters.priceMin !== null) {
-      conditions.push(`market_price >= $${paramIndex}`);
+      conditions.push(`market_price >= $${_paramIndex}`);
       params.push(filters.priceMin);
-      paramIndex++;
+      _paramIndex++;
     }
     
     if (filters?.priceMax !== undefined && filters.priceMax !== null) {
-      conditions.push(`market_price <= $${paramIndex}`);
+      conditions.push(`market_price <= $${_paramIndex}`);
       params.push(filters.priceMax);
-      paramIndex++;
+      _paramIndex++;
     }
     
     // Global search term - OPTIMIZED: search only brand and model (removed plate and category)
@@ -323,9 +317,9 @@ export class VehicleService extends BaseService<VehicleEntity, VehicleDB> {
     if (filters?.searchTerm) {
       const pattern = VehicleService.buildIlikePattern(filters.searchTerm);
       // Simplified: only search brand and model for better performance
-      conditions.push(`(brand ILIKE $${paramIndex} OR model ILIKE $${paramIndex})`);
+      conditions.push(`(brand ILIKE $${_paramIndex} OR model ILIKE $${_paramIndex})`);
       params.push(pattern);
-      paramIndex++;
+      _paramIndex++;
     }
 
     // Build WHERE clause
@@ -334,8 +328,9 @@ export class VehicleService extends BaseService<VehicleEntity, VehicleDB> {
       query += ` WHERE ${conditions.join(" AND ")}`;
     }
 
-    return { query, params, paramIndex };
+    return { query, params, _paramIndex };
   }
+
 
   // ============================================================================
   // STATIC HELPER METHODS (Stateless - Memory Efficient)
@@ -912,12 +907,13 @@ export class VehicleService extends BaseService<VehicleEntity, VehicleDB> {
     const startTime = Date.now();
 
     try {
-      // 🚀 FIX: Updated cache key to v6 to bust stale cache
-      const cacheKey = "vehicle:stats:v6";
+      // 🚀 FIX: Updated cache key to v8 to bust stale cache
+      const cacheKey = "vehicle:stats:v8";
+
       
       // Check cache unless force refresh is requested
       if (!forceRefresh) {
-        const cached = this.getFromCache<VehicleStats>(cacheKey);
+        const cached = await this.getFromCache<VehicleStats>(cacheKey);
         if (cached) {
           console.log("[VehicleService.getVehicleStats] Cache hit:", cached);
           return {
@@ -933,27 +929,29 @@ export class VehicleService extends BaseService<VehicleEntity, VehicleDB> {
       const sql = dbManager.getClient();
 
       // Build and execute the stats query
-      // Note: thumbnail_url column may not exist in all database schemas
-      // Using only image_id for no-image count to ensure compatibility
+      // 🚀 FIX: no_image_count now checks BOTH image_id AND thumbnail_url
+      // to match applyFilters() and toEntity() image resolution logic.
+      // This fixes the dashboard "missing images" count mismatch.
       // 🚀 OPTIMIZED: Replace slow LIKE '%car%' with CASE WHEN + ILIKE ANY (10x faster)
       // RECOMMEND: CREATE INDEX CONCURRENTLY idx_vehicles_category_lower ON vehicles (LOWER(category));
       const query = `
         SELECT 
           COUNT(*) as total,
-          COUNT(*) FILTER (WHERE LOWER(category) LIKE '%car%') as cars_count,
-          COUNT(*) FILTER (WHERE category ILIKE ANY(ARRAY['%motor%','motorcycle%','bike%'])) as motorcycles_count,
-          COUNT(*) FILTER (WHERE category ILIKE ANY(ARRAY['%tuk%','tuktuk','tuk tuk'])) as tuktuks_count,
-          COUNT(*) FILTER (WHERE category ILIKE ANY(ARRAY['%truck%'])) as trucks_count,
-          COUNT(*) FILTER (WHERE category ILIKE ANY(ARRAY['%van%'])) as vans_count,
-          COUNT(*) FILTER (WHERE category ILIKE ANY(ARRAY['%bus%'])) as buses_count,
-          COUNT(*) FILTER (WHERE category NOT ILIKE ANY(ARRAY['%car%','%motor%','%tuk%','%truck%','%van%','%bus%'])) as other_count,
-          COUNT(*) FILTER (WHERE LOWER(TRIM(condition)) = 'new') as new_count,
-          COUNT(*) FILTER (WHERE LOWER(TRIM(condition)) = 'used') as used_count,
-          COUNT(*) FILTER (WHERE LOWER(TRIM(condition)) NOT IN ('new','used')) as other_condition_count,
+        COUNT(*) FILTER (WHERE category ILIKE ANY(ARRAY['%car%','car','cars'])) as cars_count,
+COUNT(*) FILTER (WHERE category ILIKE ANY(ARRAY['%motor%','motorcycle%','bike%'])) as motorcycles_count,
+COUNT(*) FILTER (WHERE category ILIKE ANY(ARRAY['%tuk%','tuktuk','tuk tuk'])) as tuktuks_count,
+COUNT(*) FILTER (WHERE category ILIKE ANY(ARRAY['%truck%'])) as trucks_count,
+COUNT(*) FILTER (WHERE category ILIKE ANY(ARRAY['%van%'])) as vans_count,
+COUNT(*) FILTER (WHERE category ILIKE ANY(ARRAY['%bus%'])) as buses_count,
+COUNT(*) FILTER (WHERE category NOT ILIKE ANY(ARRAY['%car%','%motor%','%tuk%','%truck%','%van%','%bus%'])) as other_count,
+        COUNT(*) FILTER (WHERE condition ILIKE 'new') as new_count,
+        COUNT(*) FILTER (WHERE condition ILIKE 'used') as used_count,
+        COUNT(*) FILTER (WHERE condition NOT ILIKE ANY(ARRAY['new','used'])) as other_condition_count,
 AVG(CASE WHEN market_price > 0 THEN market_price ELSE NULL END)::numeric as avg_price,
-          COUNT(*) FILTER (WHERE image_id IS NULL OR TRIM(image_id) = '') as no_image_count
+          COUNT(*) FILTER (WHERE (image_id IS NULL OR TRIM(image_id) = '') AND (thumbnail_url IS NULL OR TRIM(thumbnail_url) = '')) as no_image_count
         FROM vehicles
       `;
+
 
       console.log("[VehicleService.getVehicleStats] Executing query...");
       console.log("[VehicleService.getVehicleStats] Query:", query.substring(0, 200) + "...");
@@ -1071,11 +1069,12 @@ AVG(CASE WHEN market_price > 0 THEN market_price ELSE NULL END)::numeric as avg_
         noImageCount: parseInt(String(row.no_image_count)) || 0,
       };
 
-      console.log("[VehicleService.getVehicleStats] Parsed result:", result);
+      console.log("[VehicleService.getVehicleStats] ✅ FIXED: Parsed result:", result);
+
 
       // 🚀 FIX: Reduced cache TTL from 5 minutes to 30 seconds for fresher stats
       const STATS_CACHE_TTL_MS = 30000; // 30 seconds
-      this.setCache(cacheKey, result, STATS_CACHE_TTL_MS);
+      await this.setCache(cacheKey, result, STATS_CACHE_TTL_MS);
 
       return {
         success: true,
@@ -1105,7 +1104,7 @@ AVG(CASE WHEN market_price > 0 THEN market_price ELSE NULL END)::numeric as avg_
 
     // Skip cache if requested
     if (!noCache) {
-      const cached = this.getFromCache<{ total: number }>(cacheKey);
+      const cached = await this.getFromCache<{ total: number }>(cacheKey);
       if (cached) {
         console.log(`[VehicleService.getVehicleStatsLite] Cache hit: ${cached.total}`);
         return {
@@ -1133,7 +1132,7 @@ AVG(CASE WHEN market_price > 0 THEN market_price ELSE NULL END)::numeric as avg_
       const data = { total };
 
       // Cache for 30s
-      this.setCache(cacheKey, data, 30000);
+      await this.setCache(cacheKey, data, 30000);
 
       return {
         success: true,
@@ -1189,8 +1188,9 @@ AVG(CASE WHEN market_price > 0 THEN market_price ELSE NULL END)::numeric as avg_
         const filterResult = this.applyFilters(query, filters, params);
         query = filterResult.query;
         params = filterResult.params;
-        paramIndex = filterResult.paramIndex;
+        paramIndex = filterResult._paramIndex;
       }
+
 
       // Build final query with inline parameters
       let finalQuery = query;
@@ -1286,6 +1286,93 @@ AVG(CASE WHEN market_price > 0 THEN market_price ELSE NULL END)::numeric as avg_
       const errorMessage = error instanceof Error ? error.message : "Failed to search vehicles";
       console.error("[VehicleService.searchVehicles] Error:", errorMessage);
       
+      return {
+        success: false,
+        error: errorMessage,
+        meta: { durationMs: Date.now() - startTime, queryCount: 1 },
+      };
+    }
+  }
+
+  /**
+   * Get fuzzy search suggestions when exact search returns no results.
+   * Uses Levenshtein distance to find similar vehicles across brand, model, plate, category.
+   *
+   * Strategy:
+   * 1. Fetch candidate vehicles with broader ILIKE (each word OR'd)
+   * 2. Rank candidates with fuzzy similarity scoring
+   * 3. Return top N suggestions
+   *
+   * @param searchTerm - User's (possibly misspelled) query
+   * @param limit - Max suggestions to return (default 5)
+   * @returns Suggestions with similarity scores
+   */
+  public async getSearchSuggestions(
+    searchTerm: string,
+    limit: number = 5
+  ): Promise<ServiceResult<FuzzySuggestion[]>> {
+    const startTime = Date.now();
+
+    try {
+      if (!searchTerm || searchTerm.trim().length < 2) {
+        return {
+          success: true,
+          data: [],
+          meta: { durationMs: Date.now() - startTime, queryCount: 0 },
+        };
+      }
+
+      // Build broader candidate query: each token gets its own ILIKE OR condition
+      const tokens = searchTerm
+        .trim()
+        .toLowerCase()
+        .split(/\s+/)
+        .filter((t) => t.length >= 2);
+
+      if (tokens.length === 0) {
+        return {
+          success: true,
+          data: [],
+          meta: { durationMs: Date.now() - startTime, queryCount: 0 },
+        };
+      }
+
+      // Escape each token for SQL safety
+      const safeTokens = tokens.map((t) => t.replace(/'/g, "''"));
+
+      // Build OR conditions for each token against brand, model, plate, category
+      const tokenConditions = safeTokens
+        .map(
+          (tok) =>
+            `brand ILIKE '%${tok}%' OR model ILIKE '%${tok}%' OR plate ILIKE '%${tok}%' OR category ILIKE '%${tok}%'`
+        )
+        .join(" OR ");
+
+      const candidateQuery = `
+        SELECT * FROM ${this.tableName}
+        WHERE ${tokenConditions}
+        ORDER BY brand, model
+        LIMIT 200
+      `;
+
+      const candidates = await dbManager.executeUnsafe<VehicleDB>(candidateQuery);
+      const candidateVehicles = candidates.map((v) => this.toVehicle(this.toEntity(v)));
+
+      // Apply fuzzy ranking on candidates
+      const suggestions = getFuzzySuggestions(searchTerm, candidateVehicles, {
+        limit,
+        minScore: 0.3,
+      });
+
+      return {
+        success: true,
+        data: suggestions,
+        meta: { durationMs: Date.now() - startTime, queryCount: 1 },
+      };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Failed to get search suggestions";
+      console.error("[VehicleService.getSearchSuggestions] Error:", errorMessage);
+
       return {
         success: false,
         error: errorMessage,

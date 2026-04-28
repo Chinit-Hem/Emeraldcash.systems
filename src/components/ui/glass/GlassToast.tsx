@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
+
 
 
 
@@ -118,26 +119,32 @@ function ToastItemComponent({ toast, onRemove }: ToastItemProps) {
 export function useToast() {
   const [toasts, setToasts] = useState<Toast[]>([]);
 
-  const addToast = (message: string, type: ToastType = "info", duration?: number) => {
+  const addToast = useCallback((message: string, type: ToastType = "info", duration?: number) => {
     const id = Math.random().toString(36).substring(2, 9);
     setToasts((prev) => [...prev, { id, message, type, duration }]);
     return id;
-  };
+  }, []);
 
-  const removeToast = (id: string) => {
+  const removeToast = useCallback((id: string) => {
     setToasts((prev) => prev.filter((t) => t.id !== id));
-  };
+  }, []);
+
+  const success = useCallback((msg: string, duration?: number) => addToast(msg, "success", duration), [addToast]);
+  const error = useCallback((msg: string, duration?: number) => addToast(msg, "error", duration), [addToast]);
+  const warning = useCallback((msg: string, duration?: number) => addToast(msg, "warning", duration), [addToast]);
+  const info = useCallback((msg: string, duration?: number) => addToast(msg, "info", duration), [addToast]);
 
   return {
     toasts,
     addToast,
     removeToast,
-    success: (msg: string, duration?: number) => addToast(msg, "success", duration),
-    error: (msg: string, duration?: number) => addToast(msg, "error", duration),
-    warning: (msg: string, duration?: number) => addToast(msg, "warning", duration),
-    info: (msg: string, duration?: number) => addToast(msg, "info", duration),
+    success,
+    error,
+    warning,
+    info,
   };
 }
+
 
 // Standalone toast component for simple usage
 export function ToastProvider({ children }: { children: React.ReactNode }) {

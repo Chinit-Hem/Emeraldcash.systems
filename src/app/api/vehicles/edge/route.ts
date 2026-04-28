@@ -5,7 +5,7 @@
 import { vehicleService } from "@/services/VehicleService";
 import { NextRequest, NextResponse } from "next/server";
 import { createErrorResponse, createSuccessResponse, withErrorHandling } from "@/lib/api-error-wrapper";
-import type { VehicleFilters } from "@/services/VehicleService";
+import type { VehicleFilters } from "@/types/vehicle";
 
 // Use edge runtime for faster cold starts
 // Removed edge runtime - Neon deps incompatible
@@ -48,11 +48,35 @@ const getHandler = withErrorHandling(async (req: NextRequest) => {
     return createErrorResponse(result.error!, "edge-vehicles", 0, 500, buildCorsHeaders(req));
   }
 
+  // 🚀 Fuzzy search suggestions: if search term is present but few/no results,
+  // generate suggestions using Levenshtein distance for typo tolerance.
+  let suggestions: unknown[] | undefined;
+  const searchTerm = filters.searchTerm;
+  if (searchTerm && result.data.length < 3) {
+    try {
+      const suggestResult = await vehicleService.getSearchSuggestions(searchTerm, 5);
+      if (suggestResult.success && suggestResult.data.length > 0) {
+        suggestions = suggestResult.data.map((s) => ({
+          vehicleId: s.vehicle.VehicleId,
+          brand: s.vehicle.Brand,
+          model: s.vehicle.Model,
+          category: s.vehicle.Category,
+          plate: s.vehicle.Plate,
+          score: Math.round(s.score * 100) / 100,
+          matchedField: s.matchedField,
+          highlightText: s.highlightText,
+        }));
+      }
+    } catch {
+      // Silently ignore suggestion errors so main request still succeeds
+    }
+  }
+
   return createSuccessResponse(
     result.data,
     "edge-vehicles",
     0,
-    { total: result.data.length, ...filters },
+    { total: result.data.length, ...filters, suggestions },
     buildCorsHeaders(req)
   );
 }, { context: "vehicles-edge" });

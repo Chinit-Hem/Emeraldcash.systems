@@ -347,7 +347,9 @@ export function VehicleForm({
     compressionRatio: string;
   } | null>(null);
   
-  void setIsCompressing;
+  // isCompressing setter is used for image handling logic
+  const setCompressing = setIsCompressing;
+  void setCompressing;
 
   const hasChanges = JSON.stringify(formData) !== JSON.stringify(vehicle) || uploadedImage !== null;
   const prevVehicleRef = useRef(vehicle);

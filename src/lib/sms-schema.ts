@@ -34,8 +34,8 @@ export interface SmsAsset {
 export interface SmsTransfer {
   id: string;
   asset_id: string;
-  sender_id: number;
-  receiver_id: number;
+  sender_id: string;
+  receiver_id: string;
   location: string;
   status: string;
   remark: string | null;
@@ -51,7 +51,7 @@ export interface SmsTransferImage {
 
 export interface SmsAuditLog {
   id: number;
-  user_id: number;
+  user_id: string;
   action: string;
   metadata: Record<string, unknown>;
   created_at: string;

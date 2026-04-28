@@ -13,9 +13,14 @@ import { refreshVehicleCache, writeVehicleCache } from "@/lib/vehicleCache";
 import type { Vehicle } from "@/lib/types";
 import { derivePrices } from "@/lib/pricing";
 import { useMounted } from "@/lib/useMounted";
+import ErrorBoundary from "@/app/components/ErrorBoundary";
 
 export default function VehicleDetailPage() {
-  return <VehicleDetailInner />;
+  return (
+    <ErrorBoundary>
+      <VehicleDetailInner />
+    </ErrorBoundary>
+  );
 }
 
 function VehicleDetailInner() {

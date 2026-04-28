@@ -9,34 +9,34 @@
  * @module LmsService
  */
 
-import { BaseService, ServiceResult, BaseFilters } from "./BaseService";
-import {
-  lmsCategoryRepository,
-  lmsLessonRepository,
-  lmsStaffRepository,
-  lmsCompletionRepository,
-  lmsDashboardRepository,
-} from "@/repositories/LmsRepository";
 import type {
-  LmsCategoryEntity,
-  LmsCategoryDB,
-  LmsLessonEntity,
-  LmsLessonDB,
-  LmsStaffEntity,
-  LmsStaffDB,
   CreateLmsCategoryInput,
   CreateLmsLessonInput,
   CreateLmsStaffInput,
+  LmsCategoryDB,
+  LmsCategoryEntity,
+  LmsLessonDB,
+  LmsLessonEntity,
+  LmsStaffDB,
+  LmsStaffEntity,
+  MarkLessonCompleteInput,
   UpdateLmsCategoryInput,
   UpdateLmsLessonInput,
   UpdateLmsStaffInput,
-  MarkLessonCompleteInput,
 } from "@/lib/lms-entities";
 import {
   calculateCompletionPercentage,
   extractYoutubeVideoId,
 } from "@/lib/lms-schema";
 import type { InitialLmsData, LessonWithStatus } from "@/lib/lms-types";
+import {
+  lmsCategoryRepository,
+  lmsCompletionRepository,
+  lmsDashboardRepository,
+  lmsLessonRepository,
+  lmsStaffRepository,
+} from "@/repositories/LmsRepository";
+import { BaseFilters, BaseService, ServiceResult } from "./BaseService";
 
 // ============================================================================
 // Types & Interfaces
@@ -98,6 +98,8 @@ export interface LmsLessonWithUnlockStatus extends LmsLessonEntity {
 export class LmsService extends BaseService<LmsCategoryEntity, LmsCategoryDB> {
   private static instance: LmsService | null = null;
 
+  public readonly tableName = "lms_categories";
+
   // Repository composition
   private categoryRepo = lmsCategoryRepository;
   private lessonRepo = lmsLessonRepository;
@@ -106,7 +108,7 @@ export class LmsService extends BaseService<LmsCategoryEntity, LmsCategoryDB> {
   private dashboardRepo = lmsDashboardRepository;
 
   private constructor() {
-    super("LmsService", "lms_categories");
+    super("LmsService");
   }
 
   public static getInstance(): LmsService {
@@ -147,22 +149,24 @@ export class LmsService extends BaseService<LmsCategoryEntity, LmsCategoryDB> {
     baseQuery: string,
     filters: BaseFilters,
     params: (string | number | null)[]
-  ): { query: string; params: (string | number | null)[]; paramIndex: number } {
-    let query = baseQuery;
-    let paramIndex = params.length + 1;
+  ): { query: string; params: (string | number | null)[]; _paramIndex: number } {
+    let _query = baseQuery;
+    let _paramIndex = params.length + 1;
     const conditions: string[] = [];
 
+
     if (filters.searchTerm) {
-      conditions.push(`(name ILIKE $${paramIndex} OR description ILIKE $${paramIndex})`);
+      conditions.push(`(name ILIKE $${_paramIndex} OR description ILIKE $${_paramIndex})`);
       params.push(`%${filters.searchTerm}%`);
-      paramIndex++;
+      _paramIndex++;
     }
 
     if (conditions.length > 0) {
-      query += ` WHERE ${conditions.join(" AND ")}`;
+      _query += ` WHERE ${conditions.join(" AND ")}`;
     }
 
-    return { query, params, paramIndex };
+    return { query: _query, params, _paramIndex };
+
   }
 
   // ============================================================================
@@ -959,7 +963,7 @@ export class LmsService extends BaseService<LmsCategoryEntity, LmsCategoryDB> {
       }
       
       const previousLesson = categoryLessons[targetIndex - 1];
-      const isPreviousCompleted = await this.completionRepo.isCompleted(staffId, previousLesson.id);
+      const isPreviousCompleted = await this.completionRepo.isCompleted(staffId, Number(previousLesson.id));
       
       if (!isPreviousCompleted) {
         return {
@@ -1017,7 +1021,7 @@ export class LmsService extends BaseService<LmsCategoryEntity, LmsCategoryDB> {
       if (nextLesson) {
         return {
           success: true,
-          data: { nextLessonId: parseInt(nextLesson.id), allCompleted: false },
+          data: { nextLessonId: Number(nextLesson.id), allCompleted: false },
           meta: {
             durationMs: Date.now() - startTime,
             queryCount: 1,
@@ -1080,7 +1084,7 @@ export class LmsService extends BaseService<LmsCategoryEntity, LmsCategoryDB> {
     };
   }
 
-  private handleError(error: unknown, operation: string): ServiceResult<never> {
+  protected handleError(error: unknown, operation: string): ServiceResult<never> {
     const errorMessage = error instanceof Error ? error.message : `Failed to ${operation}`;
     console.error(`[LmsService.${operation}] Error:`, errorMessage);
     

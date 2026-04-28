@@ -810,6 +810,6 @@ export function VehicleFormUnified({
 
 export default VehicleFormUnified;
 
-// Re-export types from useVehicleForm for convenience
-export type { UseVehicleFormOptions, Vehicle } from "@/lib/useVehicleForm";
+
+export type { Vehicle } from "@/lib/types";
 

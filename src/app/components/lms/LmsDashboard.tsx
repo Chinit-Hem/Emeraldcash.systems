@@ -13,6 +13,9 @@
 
 "use client";
 
+import { useLanguage } from "@/lib/LanguageContext";
+import { useTranslation } from "@/lib/i18n";
+
 import React, { useState, useEffect, useCallback, useMemo, Suspense } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -338,6 +341,8 @@ interface LmsDashboardProps {
 
 function LmsDashboard({ initialData }: LmsDashboardProps) {
   const router = useRouter();
+  const { language } = useLanguage();
+  const { t } = useTranslation(language);
   const [stats, setStats] = useState<LmsDashboardStats | null>(initialData?.stats || null);
   const [categories, setCategories] = useState<LmsCategory[]>(initialData?.categories || []);
   const [lessons, setLessons] = useState<LessonWithStatus[]>(initialData?.lessons || []);
@@ -503,8 +508,8 @@ function LmsDashboard({ initialData }: LmsDashboardProps) {
               <GraduationCap className="w-6 h-6 text-white" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold text-slate-800">Training Portal</h1>
-              <p className="text-sm text-slate-500">Master vehicle valuation skills</p>
+              <h1 className="text-2xl font-bold text-slate-800">{t.trainingPortal}</h1>
+              <p className="text-sm text-slate-500">{t.masterSkills}</p>
             </div>
           </div>
           <div className="flex items-center gap-3">

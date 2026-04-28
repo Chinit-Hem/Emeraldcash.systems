@@ -312,10 +312,10 @@ export default function Sidebar({ user, onNavigate }: SidebarProps) {
           <NavItem
             href="/sms"
             icon={IconSms}
-            label="SMS"
+            label={language === 'km' ? 'គ្រប់គ្រងស្តុក' : 'SMS'}
             active={isSmsActive}
             onClick={() => handleNavigate("/sms")}
-          /> 
+          />
 
 
 

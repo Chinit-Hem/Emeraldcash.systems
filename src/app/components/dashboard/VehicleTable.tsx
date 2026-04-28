@@ -1,5 +1,8 @@
 "use client";
 
+import { useLanguage } from "@/lib/LanguageContext";
+import { useTranslation } from "@/lib/i18n";
+
 import { derivePrices } from "@/lib/pricing";
 import type { Vehicle } from "@/lib/types";
 import { cn, ui } from "@/lib/ui";
@@ -345,6 +348,8 @@ export default function VehicleTable({
   onSort,
 }: VehicleTableProps) {
   const router = useRouter();
+  const { language } = useLanguage();
+  const { t } = useTranslation(language);
 
   // Use optimistic vehicles hook for instant UI updates
   const {
@@ -604,10 +609,10 @@ export default function VehicleTable({
                 <SortHeader field="Category" sortField={sortField} sortDirection={sortDirection} onSort={onSort}>Category</SortHeader>
               )}
               {visibleColumns.includes('brand') && (
-                <SortHeader field="Brand" sortField={sortField} sortDirection={sortDirection} onSort={onSort}>Brand</SortHeader>
+                <SortHeader field="Brand" sortField={sortField} sortDirection={sortDirection} onSort={onSort}>{t.brand}</SortHeader>
               )}
               {visibleColumns.includes('model') && (
-                <SortHeader field="Model" sortField={sortField} sortDirection={sortDirection} onSort={onSort}>Model</SortHeader>
+                <SortHeader field="Model" sortField={sortField} sortDirection={sortDirection} onSort={onSort}>{t.model}</SortHeader>
               )}
               {visibleColumns.includes('year') && (
                 <SortHeader field="Year" sortField={sortField} sortDirection={sortDirection} onSort={onSort}>Year</SortHeader>

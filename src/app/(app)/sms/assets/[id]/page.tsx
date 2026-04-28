@@ -22,8 +22,8 @@ interface SmsAsset {
 interface SmsTransfer {
   id: string;
   assetId: string;
-  senderId: number;
-  receiverId: number;
+  senderId: string;
+  receiverId: string;
   location: string;
   status: "pending" | "accepted" | "rejected";
   remark?: string | null;

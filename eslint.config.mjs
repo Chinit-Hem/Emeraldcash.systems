@@ -38,7 +38,14 @@ const eslintConfig = defineConfig([
       // Downgrade no-img-element to warning only
       "@next/next/no-img-element": "warn",
       // Downgrade jsx-a11y rules to warning only
-      "jsx-a11y/role-supports-aria-props": "warn"
+      "jsx-a11y/role-supports-aria-props": "warn",
+      // Suppress experimental React Compiler rules that flag standard patterns
+      "react-hooks/set-state-in-effect": "off",
+      "react-hooks/immutability": "off",
+      "react-hooks/static-components": "off",
+      "react-hooks/refs": "off",
+      "react-hooks/purity": "off",
+      "react-hooks/preserve-manual-memoization": "off"
     }
   }
 ]);

@@ -13,6 +13,9 @@
 
 "use client";
 
+import { useLanguage } from "@/lib/LanguageContext";
+import { useTranslation } from "@/lib/i18n";
+
 import { useState, useCallback, useMemo, useEffect } from "react";
 import dynamic from "next/dynamic";
 import type { Vehicle } from "@/lib/types";
@@ -339,13 +342,46 @@ export default function Dashboard({
   const [searchQuery, setSearchQuery] = useState("");
   const [vehicles, setVehicles] = useState<Vehicle[]>(initialVehicles);
   const [meta, setMeta] = useState<DashboardMeta>(initialMeta);
-  
+  const [searchResults, setSearchResults] = useState<Vehicle[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+
   const debouncedSearch = useDebouncedValue(searchQuery, 300);
 
   useEffect(() => {
     setVehicles(initialVehicles);
     setMeta(initialMeta);
   }, [initialVehicles, initialMeta]);
+
+  // Real data search: query API across 100% of database when user types
+  useEffect(() => {
+    if (!debouncedSearch.trim()) {
+      setSearchResults([]);
+      setIsSearching(false);
+      return;
+    }
+
+    async function fetchSearchResults() {
+      setIsSearching(true);
+      try {
+        const url = `/api/vehicles/edge?search=${encodeURIComponent(debouncedSearch)}&limit=2000`;
+        const res = await fetch(url, { cache: "no-store" });
+        if (!res.ok) throw new Error("Search failed");
+        const data = await res.json();
+        if (data.success) {
+          setSearchResults(data.data || []);
+        } else {
+          setSearchResults([]);
+        }
+      } catch (err) {
+        console.error("[Dashboard] Search error:", err);
+        setSearchResults([]);
+      } finally {
+        setIsSearching(false);
+      }
+    }
+
+    fetchSearchResults();
+  }, [debouncedSearch]);
 
   const aggregatedStats = useMemo(() => {
     if (!vehicles.length) return null;
@@ -397,51 +433,12 @@ export default function Dashboard({
   }, [vehicles]);
 
   const filteredVehicles = useMemo(() => {
-    let result = vehicles;
-
     if (debouncedSearch.trim()) {
-      const query = debouncedSearch.toLowerCase().trim();
-      const queryNumber = parseFloat(debouncedSearch);
-      
-      const normalizedSearchCategory = normalizeCategoryLabel(query);
-      
-      result = result.filter((v) => {
-        const normalizedVehicleCategory = normalizeCategoryLabel(v.Category);
-        
-        const categoryMatch = 
-          normalizedSearchCategory !== "Other" && normalizedSearchCategory === normalizedVehicleCategory;
-        
-        const categoryRaw = v.Category?.toLowerCase() || "";
-        const categoryPartialMatch = categoryRaw.includes(query);
-        
-        const textMatch = 
-          v.Brand?.toLowerCase().includes(query) ||
-          v.Model?.toLowerCase().includes(query) ||
-          v.Plate?.toLowerCase().includes(query) ||
-          categoryMatch ||
-          categoryPartialMatch ||
-          v.Condition?.toLowerCase().includes(query) ||
-          v.Color?.toLowerCase().includes(query) ||
-          v.TaxType?.toLowerCase().includes(query) ||
-          v.BodyType?.toLowerCase().includes(query) ||
-          v.VehicleId?.toString().toLowerCase().includes(query) ||
-          v.Year?.toString().includes(query);
-        
-        let numberMatch = false;
-        if (!isNaN(queryNumber)) {
-          numberMatch = 
-            v.PriceNew === queryNumber ||
-            v.Price40 === queryNumber ||
-            v.Price70 === queryNumber ||
-            v.Year === queryNumber;
-        }
-        
-        return textMatch || numberMatch;
-      });
+      // Real data search: use API results that query 100% of the database
+      return searchResults;
     }
-
-    return result;
-  }, [vehicles, debouncedSearch]);
+    return vehicles;
+  }, [vehicles, debouncedSearch, searchResults]);
 
   const categoryChartData = useMemo(() => {
     if (!meta) return [];

@@ -1,3 +1,4 @@
+import type { BaseFilters } from '@/types/core';
 import { BaseService, ServiceResult } from './BaseService';
 import type { ICrudService } from './interfaces';
 
@@ -33,8 +34,10 @@ export class SomeService extends BaseService<SomeEntity, SomeDB> {
   private static instance: SomeService | null = null;
 
   private constructor() {
-    super('SomeService', 'some_table'); // Replace 'some_table' with actual table
+    super('SomeService');
   }
+
+  public readonly tableName = 'some_table';
 
   public static getInstance(): SomeService {
     if (!SomeService.instance) {
@@ -63,23 +66,23 @@ export class SomeService extends BaseService<SomeEntity, SomeDB> {
     baseQuery: string,
     filters: Record<string, unknown>,
     params: (string | number | null)[]
-  ): { query: string; params: (string | number | null)[]; paramIndex: number } {
+  ): { query: string; params: (string | number | null)[]; _paramIndex: number } {
     // Minimal implementation - override in subclasses for specific filtering
     const conditions: string[] = [];
-    let paramIndex = 1;
+    let _paramIndex = 1;
 
     // Example: filter by status
     if (filters.status) {
-      conditions.push(`status = $${paramIndex}`);
+      conditions.push(`status = $${_paramIndex}`);
       params.push(filters.status as string);
-      paramIndex++;
+      _paramIndex++;
     }
 
     // Example: filter by name
     if (filters.name) {
-      conditions.push(`name ILIKE $${paramIndex}`);
+      conditions.push(`name ILIKE $${_paramIndex}`);
       params.push(`%${(filters.name as string).replace(/%/g, '\\%').replace(/_/g, '\\_')}%`);
-      paramIndex++;
+      _paramIndex++;
     }
 
     let query = baseQuery;
@@ -87,7 +90,7 @@ export class SomeService extends BaseService<SomeEntity, SomeDB> {
       query += ` WHERE ${conditions.join(' AND ')}`;
     }
 
-    return { query, params, paramIndex };
+    return { query, params, _paramIndex };
   }
 
   // In production: BaseService handles actual DB queries

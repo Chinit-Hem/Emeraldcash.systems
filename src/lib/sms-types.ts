@@ -31,8 +31,8 @@ export type SmsAsset = {
 export type SmsTransfer = {
   id: string;
   assetId: string;
-  senderId: number;
-  receiverId: number;
+  senderId: string;
+  receiverId: string;
   location: string;
   status: TransferStatus;
   remark?: string | null;

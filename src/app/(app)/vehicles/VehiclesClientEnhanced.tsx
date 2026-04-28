@@ -1,5 +1,7 @@
 "use client";
 
+import { useLanguage } from "@/lib/LanguageContext";
+import { useTranslation, type Translations } from "@/lib/i18n";
 import { useAuthUser } from "@/app/components/AuthContext";
 import { getQuickFilterCategory } from "@/lib/categoryMapping";
 import AddVehicleModal from "@/app/components/vehicles/AddVehicleModal";
@@ -12,6 +14,8 @@ import { driveThumbnailUrl, extractDriveFileId } from "@/lib/drive";
 import type { Vehicle } from "@/lib/types";
 import { cn } from "@/lib/ui";
 import { useVehiclesNeon, useVehicleStats } from "@/lib/useVehiclesNeon";
+import { getFuzzySuggestions, type FuzzySuggestion } from "@/lib/fuzzySearch";
+import SearchSuggestions from "@/components/SearchSuggestions";
 import {
   AlertCircle,
   ArrowDown,
@@ -434,10 +438,12 @@ function QuickFilterCard({
 
 function ViewToggle({ 
   view, 
-  onChange 
+  onChange,
+  t
 }: { 
   view: ViewMode; 
   onChange: (view: ViewMode) => void;
+  t: ReturnType<typeof useTranslation>["t"];
 }) {
   return (
     <div className="flex items-center gap-1 p-1 bg-slate-100/80 rounded-xl shadow-[inset_2px_2px_4px_#cbd5e1,inset_-2px_-2px_4px_#ffffff]">
@@ -451,7 +457,7 @@ function ViewToggle({
         )}
       >
         <Grid3X3 className="w-4 h-4" />
-        <span className="hidden sm:inline">Grid</span>
+        <span className="hidden sm:inline">{t.grid}</span>
       </button>
       <button
         onClick={() => onChange("list")}
@@ -463,7 +469,7 @@ function ViewToggle({
         )}
       >
         <List className="w-4 h-4" />
-        <span className="hidden sm:inline">List</span>
+        <span className="hidden sm:inline">{t.list}</span>
       </button>
     </div>
   );
@@ -586,7 +592,8 @@ function VehicleCard({
   onView, 
   onEdit, 
   onDelete,
-  getImageUrl
+  getImageUrl,
+  t
 }: { 
   vehicle: Vehicle; 
   isAdmin: boolean;
@@ -594,6 +601,7 @@ function VehicleCard({
   onEdit: (id: string) => void;
   onDelete: (vehicle: Vehicle) => void;
   getImageUrl: (imageValue: string | undefined) => string | null;
+  t: Translations;
 }) {
   const getCategoryColor = (category: string) => {
     const cat = category?.toLowerCase() || "";
@@ -665,22 +673,22 @@ function VehicleCard({
             <p className="font-bold text-emerald-600 text-lg">
               ${vehicle.PriceNew?.toLocaleString() || "-"}
             </p>
-            <p className="text-slate-400 text-xs">Market Price</p>
+            <p className="text-slate-400 text-xs">{t.marketPrice}</p>
           </div>
         </div>
 
         <div className="grid grid-cols-2 gap-2 mb-4 text-sm">
           <div className="flex items-center gap-2 text-slate-600">
-            <span className="text-slate-400">Year:</span>
+            <span className="text-slate-400">{t.year}:</span>
             <span className="font-medium">{vehicle.Year || "-"}</span>
           </div>
           <div className="flex items-center gap-2 text-slate-600">
-            <span className="text-slate-400">Plate:</span>
+            <span className="text-slate-400">{t.plate}:</span>
             <span className="font-medium font-mono">{vehicle.Plate || "-"}</span>
           </div>
           {vehicle.Color && (
             <div className="flex items-center gap-2 text-slate-600">
-              <span className="text-slate-400">Color:</span>
+              <span className="text-slate-400">{t.color}:</span>
               <span 
                 className="w-4 h-4 rounded-full border border-slate-200"
                 style={{ backgroundColor: vehicle.Color.toLowerCase() }}
@@ -690,7 +698,7 @@ function VehicleCard({
           )}
           {vehicle.TaxType && (
             <div className="flex items-center gap-2 text-slate-600">
-              <span className="text-slate-400">Tax:</span>
+              <span className="text-slate-400">{t.taxType}:</span>
               <span className="font-medium">{vehicle.TaxType}</span>
             </div>
           )}
@@ -701,20 +709,20 @@ function VehicleCard({
           <ActionButton 
             onClick={() => onView(vehicle.VehicleId)} 
             icon={Eye} 
-            label="View" 
+            label={t.view} 
           />
           {isAdmin && (
             <>
               <ActionButton 
                 onClick={() => onEdit(vehicle.VehicleId)} 
                 icon={Pen} 
-                label="Edit" 
+                label={t.edit} 
                 variant="edit"
               />
               <ActionButton 
                 onClick={() => onDelete(vehicle)} 
                 icon={Trash2} 
-                label="Delete" 
+                label={t.delete} 
                 variant="delete"
               />
             </>
@@ -773,6 +781,8 @@ function LoadingSkeleton({ view }: { view: ViewMode }) {
 // ============================================================================
 
 export default function VehiclesClientEnhanced() {
+  const { language } = useLanguage();
+  const { t } = useTranslation(language);
   const router = useRouter();
   const searchParams = useSearchParams();
   const user = useAuthUser();
@@ -917,13 +927,13 @@ case "tuktuks": return "TukTuks";
   // Delete vehicle hook
   const { deleteVehicle, isDeleting } = useDeleteVehicle(
     () => {
-      success("Vehicle deleted successfully");
+      success(t.deleteSuccess);
       setIsDeleteModalOpen(false);
       setVehicleToDelete(null);
       refresh(); // Refresh the vehicle list
     },
     (error) => {
-      showError(error || "Failed to delete vehicle");
+      showError(error || t.deleteError);
     }
   );
 
@@ -1195,6 +1205,21 @@ const isTukTukCategory = useCallback((cat: string | undefined): boolean => {
   }, [vehicles, quickFilter, filters, sortField, sortDirection, isCarCategory, isMotorcycleCategory, isTukTukCategory]);
 
   // ==========================================================================
+  // Fuzzy Suggestions (when search returns no exact matches)
+  // ==========================================================================
+
+  const fuzzySuggestions = useMemo(() => {
+    if (!vehicles || vehicles.length === 0) return [];
+    if (!filters.search || filters.search.trim().length < 2) return [];
+    if (filteredVehicles.length > 0) return [];
+
+    return getFuzzySuggestions(filters.search, vehicles, {
+      limit: 5,
+      minScore: 0.3,
+    });
+  }, [vehicles, filters.search, filteredVehicles.length]);
+
+  // ==========================================================================
   // Stats Calculation
   // ==========================================================================
 
@@ -1232,7 +1257,7 @@ const isTukTukCategory = useCallback((cat: string | undefined): boolean => {
     await refresh();
     setIsRefreshing(false);
     setLastSync(new Date());
-    success("Data refreshed successfully");
+    success(t.syncSuccess);
   }, [refresh, success]);
 
   const handleSort = useCallback((field: keyof Vehicle) => {
@@ -1400,9 +1425,9 @@ const getVehicleImageUrl = useCallback((imageValue: string | undefined): string 
             <div className="w-20 h-20 mx-auto mb-6 rounded-2xl bg-gradient-to-br from-red-100 to-red-50 shadow-[6px_6px_12px_#cbd5e1,-6px_-6px_12px_#ffffff] flex items-center justify-center">
               <AlertCircle className="w-10 h-10 text-red-500" />
             </div>
-            <h2 className="text-2xl font-bold text-slate-800 mb-3">Error Loading Vehicles</h2>
+            <h2 className="text-2xl font-bold text-slate-800 mb-3">{t.errorLoadingVehicles}</h2>
             <p className="text-slate-500 mb-8">{error}</p>
-            <NeuButton onClick={handleRefresh} variant="primary">Retry</NeuButton>
+            <NeuButton onClick={handleRefresh} variant="primary">{t.retry}</NeuButton>
           </NeuCard>
         </div>
       </div>
@@ -1422,7 +1447,7 @@ const getVehicleImageUrl = useCallback((imageValue: string | undefined): string 
               </span>
               Vehicle Inventory
             </h1>
-            <p className="text-slate-500 mt-2 ml-13">Manage and track all your vehicles in one place</p>
+            <p className="text-slate-500 mt-2 ml-13">{t.manageTrackVehicles}</p>
           </div>
           
           <div className="flex flex-wrap items-center gap-3">
@@ -1471,7 +1496,7 @@ const getVehicleImageUrl = useCallback((imageValue: string | undefined): string 
               router.push("/vehicles", { scroll: false });
             }}
             icon={Car}
-            label="Total Vehicles"
+            label={t.totalVehicles}
             count={displayStats.total}
             color="emerald"
             index={0}
@@ -1488,7 +1513,7 @@ const getVehicleImageUrl = useCallback((imageValue: string | undefined): string 
               }
             }}
             icon={Car}
-            label="Cars"
+            label={t.cars}
             count={displayStats.cars}
             color="blue"
             index={1}
@@ -1505,7 +1530,7 @@ const getVehicleImageUrl = useCallback((imageValue: string | undefined): string 
               }
             }}
             icon={Bike}
-            label="Motorcycles"
+            label={t.motorcycles}
             count={displayStats.motorcycles}
             color="purple"
             index={2}
@@ -1522,7 +1547,7 @@ const getVehicleImageUrl = useCallback((imageValue: string | undefined): string 
               }
             }}
             icon={TukTukIcon}
-            label="TukTuks"
+            label={t.tuktuks}
             count={displayStats.tuktuks}
             color="orange"
             index={3}
@@ -1537,7 +1562,7 @@ const getVehicleImageUrl = useCallback((imageValue: string | undefined): string 
                 <NeuInput 
                   value={filters.search} 
                   onChange={(val) => setFilters(prev => ({ ...prev, search: val }))} 
-                  placeholder="Search by brand, model, year, color, plate..." 
+                  placeholder="t.searchByBrandModel" 
                   icon={Search} 
                 />
               </div>
@@ -1561,7 +1586,7 @@ const getVehicleImageUrl = useCallback((imageValue: string | undefined): string 
                     }}
                     className="w-full px-4 py-3 rounded-xl bg-white shadow-[4px_4px_8px_#e2e8f0,-4px_-4px_8px_#ffffff] text-slate-700 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500/30 appearance-none cursor-pointer"
                   >
-                    <option value="all">All Categories</option>
+                    <option value="all">{t.allCategories}</option>
                     <option value="cars">🚗 Cars</option>
                     <option value="motorcycles">🏍️ Motorcycles</option>
                     <option value="tuktuks">🛺 TukTuks</option>
@@ -1609,7 +1634,7 @@ const getVehicleImageUrl = useCallback((imageValue: string | undefined): string 
                 <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
               </div>
               
-              <ViewToggle view={viewMode} onChange={setViewMode} />
+              <ViewToggle view={viewMode} onChange={setViewMode} t={t} />
               
               {/* Columns Dropdown */}
               <div className="relative" ref={columnMenuRef}>
@@ -1633,7 +1658,7 @@ const getVehicleImageUrl = useCallback((imageValue: string | undefined): string 
                   <NeuCard className="absolute right-0 top-full mt-2 p-4 w-64 z-50" hover={false}>
                     <div className="space-y-3">
                       <div className="flex items-center justify-between pb-2 border-b border-slate-200">
-                        <span className="font-semibold text-slate-700">Visible Columns</span>
+                        <span className="font-semibold text-slate-700">{t.visibleColumns}</span>
                         <button 
                           onClick={() => setShowColumnMenu(false)} 
                           className="text-slate-500 hover:text-slate-700"
@@ -1698,7 +1723,7 @@ const getVehicleImageUrl = useCallback((imageValue: string | undefined): string 
               
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6 gap-4">
                 <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1.5">Category</label>
+                  <label className="block text-xs font-medium text-slate-600 mb-1.5">{t.category}</label>
                   <select
                     value={filters.category}
                     onChange={(e) => setFilters(prev => ({ ...prev, category: e.target.value }))}
@@ -1712,7 +1737,7 @@ const getVehicleImageUrl = useCallback((imageValue: string | undefined): string 
                 </div>
                 
                 <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1.5">Condition</label>
+                  <label className="block text-xs font-medium text-slate-600 mb-1.5">{t.condition}</label>
                   <select
                     value={filters.condition}
                     onChange={(e) => setFilters(prev => ({ ...prev, condition: e.target.value }))}
@@ -1727,7 +1752,7 @@ const getVehicleImageUrl = useCallback((imageValue: string | undefined): string 
                 </div>
                 
                 <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1.5">Brand</label>
+                  <label className="block text-xs font-medium text-slate-600 mb-1.5">{t.brand}</label>
                   <input 
                     type="text" 
                     value={filters.brand} 
@@ -1738,7 +1763,7 @@ const getVehicleImageUrl = useCallback((imageValue: string | undefined): string 
                 </div>
                 
                 <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1.5">Model</label>
+                  <label className="block text-xs font-medium text-slate-600 mb-1.5">{t.model}</label>
                   <input 
                     type="text" 
                     value={filters.model} 
@@ -1749,7 +1774,7 @@ const getVehicleImageUrl = useCallback((imageValue: string | undefined): string 
                 </div>
                 
                 <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1.5">Year</label>
+                  <label className="block text-xs font-medium text-slate-600 mb-1.5">{t.year}</label>
                   <input 
                     type="text" 
                     value={filters.year} 
@@ -1760,7 +1785,7 @@ const getVehicleImageUrl = useCallback((imageValue: string | undefined): string 
                 </div>
                 
                 <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1.5">Plate Number</label>
+                  <label className="block text-xs font-medium text-slate-600 mb-1.5">{t.plate}</label>
                   <input 
                     type="text" 
                     value={filters.plate} 
@@ -1771,7 +1796,7 @@ const getVehicleImageUrl = useCallback((imageValue: string | undefined): string 
                 </div>
                 
                 <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1.5">Min Price ($)</label>
+                  <label className="block text-xs font-medium text-slate-600 mb-1.5">{t.minPrice}</label>
                   <input 
                     type="number" 
                     value={filters.minPrice} 
@@ -1782,7 +1807,7 @@ const getVehicleImageUrl = useCallback((imageValue: string | undefined): string 
                 </div>
                 
                 <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1.5">Max Price ($)</label>
+                  <label className="block text-xs font-medium text-slate-600 mb-1.5">{t.maxPrice}</label>
                   <input 
                     type="number" 
                     value={filters.maxPrice} 
@@ -1793,7 +1818,7 @@ const getVehicleImageUrl = useCallback((imageValue: string | undefined): string 
                 </div>
                 
                 <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1.5">Tax Type</label>
+                  <label className="block text-xs font-medium text-slate-600 mb-1.5">{t.taxType}</label>
                   <select
                     value={filters.taxType}
                     onChange={(e) => setFilters(prev => ({ ...prev, taxType: e.target.value }))}
@@ -1808,7 +1833,7 @@ const getVehicleImageUrl = useCallback((imageValue: string | undefined): string 
                 </div>
 
                 <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1.5">Image Status</label>
+                  <label className="block text-xs font-medium text-slate-600 mb-1.5">{t.imageStatus}</label>
                   <button
                     onClick={() => setFilters(prev => ({ 
                       ...prev, 
@@ -1835,7 +1860,7 @@ const getVehicleImageUrl = useCallback((imageValue: string | undefined): string 
           {/* Active Filter Tags */}
           {hasActiveFilters() && (
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-xs text-slate-500 font-medium">Active filters:</span>
+              <span className="text-xs text-slate-500 font-medium">{t.activeFilters}:</span>
               
               {filters.search && (
                 <FilterTag 
@@ -1981,6 +2006,7 @@ const getVehicleImageUrl = useCallback((imageValue: string | undefined): string 
                       onEdit={handleEdit}
                       onDelete={handleDelete}
                       getImageUrl={getVehicleImageUrl}
+                      t={t}
                     />
                   ))}
                 </div>
@@ -2188,12 +2214,27 @@ const getVehicleImageUrl = useCallback((imageValue: string | undefined): string 
             ))}
             
             {filteredVehicles.length === 0 && (
-              <div className="px-6 py-12 text-center bg-white rounded-2xl shadow-[0_4px_20px_rgba(0,0,0,0.08)] border border-slate-100">
-                <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-slate-50 flex items-center justify-center">
-                  <Search className="w-8 h-8 text-slate-300" />
+              <div className="space-y-6">
+                {/* Fuzzy Suggestions */}
+                {fuzzySuggestions.length > 0 && (
+                  <SearchSuggestions
+                    suggestions={fuzzySuggestions}
+                    searchTerm={filters.search}
+                    onSelect={(suggestion) => {
+                      // Apply the suggested vehicle's brand+model as the new search
+                      const suggestedSearch = `${suggestion.vehicle.Brand} ${suggestion.vehicle.Model}`.trim();
+                      setFilters(prev => ({ ...prev, search: suggestedSearch }));
+                    }}
+                  />
+                )}
+
+                <div className="px-6 py-12 text-center bg-white rounded-2xl shadow-[0_4px_20px_rgba(0,0,0,0.08)] border border-slate-100">
+                  <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-slate-50 flex items-center justify-center">
+                    <Search className="w-8 h-8 text-slate-300" />
+                  </div>
+                  <h3 className="text-lg font-semibold text-slate-700 mb-1">{t.noVehiclesFound}</h3>
+                  <p className="text-sm text-slate-500">{t.tryAdjustingFilters}</p>
                 </div>
-                <h3 className="text-lg font-semibold text-slate-700 mb-1">No vehicles found</h3>
-                <p className="text-sm text-slate-500">Try adjusting your filters or search query</p>
               </div>
             )}
           </div>
@@ -2228,7 +2269,7 @@ const getVehicleImageUrl = useCallback((imageValue: string | undefined): string 
                   </select>
                   <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400 pointer-events-none" />
                 </div>
-                <span className="text-sm text-slate-500">per page</span>
+                <span className="text-sm text-slate-500">{t.perPage}</span>
               </div>
             </div>
             

@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { uploadImage } from '@/lib/cloudinary';
-import { nanoid } from 'nanoid';
+import { randomUUID } from 'crypto';
 
 export async function POST(req: NextRequest) {
   try {
     const formData = await req.formData();
     const file = formData.get('file') as File | null;
     const folder = formData.get('folder') as string || 'sms/assets/images';
-    const publicId = formData.get('publicId') as string || `sms-${nanoid(8)}`;
+    const publicId = formData.get('publicId') as string || `sms-${randomUUID().replace(/-/g, '').slice(0, 8)}`;
 
     if (!file) {
       return NextResponse.json({ success: false, error: 'No file provided' }, { status: 400 });

@@ -1,9 +1,40 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { smsService } from '@/services/SmsService';
 
-function parseAssetId(id: string): number | null {
-  const parsed = Number(id);
-  return Number.isFinite(parsed) ? parsed : null;
+function parseAssetId(id: string): string | null {
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  return uuidRegex.test(id) ? id : null;
+}
+
+/**
+ * Map camelCase form fields to snake_case DB columns.
+ * Accepts both naming conventions for robustness.
+ */
+function mapToDbPayload(data: Record<string, unknown>): Record<string, unknown> {
+  const payload: Record<string, unknown> = {};
+  if (data.name !== undefined) payload.name = String(data.name);
+  if (data.item_code !== undefined || data.itemCode !== undefined) {
+    payload.item_code = (data.item_code ?? data.itemCode ?? null) as string | null;
+  }
+  if (data.type !== undefined) payload.type = String(data.type);
+  if (data.category !== undefined) payload.category = (data.category ?? null) as string | null;
+  if (data.quantity !== undefined) payload.quantity = data.quantity !== null ? Number(data.quantity) : null;
+  if (data.location !== undefined) payload.location = (data.location ?? null) as string | null;
+  if (data.assigned_to !== undefined || data.assignedTo !== undefined) {
+    payload.assigned_to = (data.assigned_to ?? data.assignedTo ?? null) as string | null;
+  }
+  if (data.image_url !== undefined || data.imageUrl !== undefined) {
+    payload.image_url = (data.image_url ?? data.imageUrl ?? null) as string | null;
+  }
+  if (data.document_url !== undefined || data.documentUrl !== undefined) {
+    payload.document_url = (data.document_url ?? data.documentUrl ?? null) as string | null;
+  }
+  if (data.description !== undefined) payload.description = (data.description ?? null) as string | null;
+  if (data.ref_id !== undefined || data.refId !== undefined) {
+    payload.ref_id = (data.ref_id ?? data.refId ?? null) as string | null;
+  }
+  if (data.status !== undefined) payload.status = String(data.status);
+  return payload;
 }
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -34,9 +65,10 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     }
 
     const data = await req.json();
-    const result = await smsService.update(assetId, data);
+    const dbPayload = mapToDbPayload(data);
+      const result = await smsService.updateAsset(assetId, dbPayload as Record<string, unknown>);
     if (!result.success || !result.data) {
-      return NextResponse.json({ success: false, error: 'Asset not found' }, { status: 404 });
+      return NextResponse.json({ success: false, error: result.error || 'Asset not found' }, { status: 404 });
     }
 
     return NextResponse.json({ success: true, data: result.data, meta: result.meta });
@@ -53,7 +85,7 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
       return NextResponse.json({ success: false, error: 'Invalid asset id' }, { status: 400 });
     }
 
-    const result = await smsService.delete(assetId);
+    const result = await smsService.deleteAsset(assetId);
     if (!result.success || !result.data) {
       return NextResponse.json({ success: false, error: 'Asset not found' }, { status: 404 });
     }
