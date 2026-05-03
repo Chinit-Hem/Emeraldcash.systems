@@ -14,12 +14,14 @@ class VehiclesLRUCache {
   private cache = new Map<string, CacheEntry>();
   private stats = { hits: 0, misses: 0, evictions: 0, size: 0 };
 
-  set(key: string, data: Vehicle[], filters?: VehicleFilters): void {
+set(key: string, data: Vehicle[], filters?: VehicleFilters): void {
     // Evict LRU if full
     if (this.cache.size >= MAX_CACHE_SIZE) {
       const firstKey = this.cache.keys().next().value;
-      this.cache.delete(firstKey);
-      this.stats.evictions++;
+      if (firstKey) {
+        this.cache.delete(firstKey);
+        this.stats.evictions++;
+      }
     }
 
     const entry: CacheEntry = {

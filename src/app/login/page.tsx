@@ -17,6 +17,19 @@ function useIsMounted() {
   return isMounted;
 }
 
+// Warm up database connection on page load
+function useConnectionWarmer() {
+  useEffect(() => {
+    // Ping serverless function to warm up connection
+    fetch('/api/ping', { 
+      cache: 'no-store',
+      credentials: 'include',
+    }).catch(() => {
+      // Ignore errors - this is just for warming up
+    });
+  }, []);
+}
+
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -31,6 +44,9 @@ function LoginForm() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+
+  // Warm up serverless connection on page load
+  useConnectionWarmer();
 
   // Load remembered username (client-side only)
   useEffect(() => {
@@ -342,6 +358,14 @@ function LoginForm() {
 }
 
 export default function LoginPage() {
+  // Warm up connection in parallel while Suspense resolves
+  useEffect(() => {
+    fetch('/api/ping', { 
+      cache: 'no-store',
+      credentials: 'include',
+    }).catch(() => {});
+  }, []);
+
   return (
     <Suspense fallback={
       <div className="min-h-screen flex items-center justify-center p-4 bg-slate-50 dark:bg-slate-950">
@@ -349,7 +373,7 @@ export default function LoginPage() {
           <div className="relative overflow-hidden rounded-3xl bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 shadow-lg p-8">
             <div className="flex flex-col items-center">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-600 mb-4"></div>
-              <p className="text-gray-600 dark:text-gray-400">Loading...</p>
+              <p className="text-gray-600 dark:text-gray-400">Preparing login...</p>
             </div>
           </div>
         </div>

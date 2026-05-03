@@ -59,7 +59,7 @@ function EditVehicleInner() {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [localVehicle, setLocalVehicle] = useState<Vehicle | null>(null);
   
-  // Sync local vehicle with fetched vehicle when it changes (on initial load or refetch)
+// Sync local vehicle with fetched vehicle when it changes (on initial load or refetch)
   // Using setTimeout to defer state update and avoid the setState-in-effect warning
   const hasInitializedRef = React.useRef(false);
   useEffect(() => {
@@ -72,6 +72,9 @@ function EditVehicleInner() {
       return () => clearTimeout(timeoutId);
     }
   }, [vehicle]);
+
+  // Derived value for safe access - handles both null cases
+  const currentVehicle = localVehicle ?? vehicle ?? null;
   // Fetch all vehicles for navigation - use high limit to ensure current vehicle is included
   const { vehicles: allVehicles } = useVehicles({ noCache: true, limit: 10000 });
   
@@ -138,7 +141,7 @@ function EditVehicleInner() {
 
   // Handle form submission
   const handleSubmit = useCallback(async (formData: Partial<Vehicle>, image: File | string | null) => {
-    const vehicleToUpdate = localVehicle || vehicle;
+const vehicleToUpdate = currentVehicle;
     if (!vehicleToUpdate) return;
     
     setSubmitError(null);
@@ -171,10 +174,10 @@ function EditVehicleInner() {
 
   // Handle delete
   const handleDelete = useCallback(async () => {
-    const vehicleToDelete = localVehicle || vehicle;
+const vehicleToDelete = currentVehicle;
     if (!vehicleToDelete) return;
     await deleteVehicle(vehicleToDelete);
-  }, [localVehicle, vehicle, deleteVehicle]);
+}, [currentVehicle, deleteVehicle]);
 
   // Clear submit error
   const handleClearError = useCallback(() => {
@@ -270,9 +273,9 @@ function EditVehicleInner() {
     );
   }
 
-  // Permission check
+// Permission check
   if (!isAdmin) {
-    const vehicleForView = localVehicle || vehicle;
+    const vehicleForView = currentVehicle;
     return (
       <div className="p-4 sm:p-6 lg:p-8">
         <div className="max-w-2xl mx-auto">
@@ -397,40 +400,40 @@ function EditVehicleInner() {
                 </div>
 
                 <div>
-                  <h1 className="text-xl md:text-2xl font-bold text-gray-900 dark:text-white">
+<h1 className="text-xl md:text-2xl font-bold text-gray-900 dark:text-white">
                     Edit Vehicle
                   </h1>
                   <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
-                    ID: {formatVehicleId((localVehicle || vehicle).VehicleId)}
+                    ID: {formatVehicleId(currentVehicle?.VehicleId ?? "")}
                   </p>
                 </div>
               </div>
               
-              {/* Status Chips */}
+{/* Status Chips */}
               <div className="flex items-center gap-2 flex-wrap">
-                {(localVehicle || vehicle).Category && (
+                {currentVehicle?.Category && (
                   <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400">
-                    {(localVehicle || vehicle).Category}
+                    {currentVehicle.Category}
                   </span>
                 )}
-                {(localVehicle || vehicle).Condition && (
+                {currentVehicle?.Condition && (
                   <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400">
-                    {(localVehicle || vehicle).Condition}
+                    {currentVehicle.Condition}
                   </span>
                 )}
-                {(localVehicle || vehicle).Time && (
+                {currentVehicle?.Time && (
                   <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-400">
-                    Updated: {formatVehicleTime((localVehicle || vehicle).Time)}
+                    Updated: {formatVehicleTime(currentVehicle.Time)}
                   </span>
                 )}
               </div>
             </div>
           </div>
 
-          {/* Form Content */}
+{/* Form Content */}
           <div className="p-4 md:p-6 space-y-6">
             <VehicleForm
-              vehicle={localVehicle || vehicle}
+              vehicle={currentVehicle as Vehicle}
               onSubmit={handleSubmit}
               onCancel={handleCancel}
               isSubmitting={isUpdating}
@@ -479,9 +482,9 @@ function EditVehicleInner() {
         </GlassCard>
       </div>
 
-      {/* Delete Confirmation Modal */}
+{/* Delete Confirmation Modal */}
       <ConfirmDeleteModal
-        vehicle={localVehicle || vehicle}
+        vehicle={currentVehicle as Vehicle}
         isOpen={isDeleteModalOpen}
         isDeleting={isDeleting}
         userRole={userRole}

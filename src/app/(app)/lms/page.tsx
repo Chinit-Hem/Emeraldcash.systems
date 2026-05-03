@@ -30,7 +30,7 @@ async function getInitialLmsData(): Promise<InitialLmsData | null> {
   const { lmsService } = await import('@/services/LmsService');
   try {
     const result = await lmsService.getLmsDashboardInitial();
-    return result.success ? result.data : null;
+return result.success ? result.data ?? null : null;
   } catch (error) {
     console.error('[LmsPage] Initial data fetch error:', error);
     return null;

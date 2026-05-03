@@ -115,11 +115,24 @@ export default function EditAssetPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-emerald-50">
-      <AssetFormModal
+<AssetFormModal
         isOpen={true}
         onClose={handleClose}
         onSave={handleSave}
-        initialData={asset}
+        initialData={asset ? {
+          name: asset.name,
+          type: asset.type,
+          status: asset.status,
+          itemCode: asset.itemCode ?? undefined,
+          category: asset.category ?? undefined,
+          quantity: asset.quantity ?? 1,
+          location: asset.location ?? undefined,
+          assignedTo: asset.assignedTo ?? undefined,
+          imageUrl: asset.imageUrl ?? undefined,
+          documentUrl: asset.documentUrl ?? undefined,
+          description: asset.description ?? undefined,
+          refId: asset.refId ?? undefined,
+        } : undefined}
         title={`Edit ${asset.name}`}
         isEdit={true}
       />

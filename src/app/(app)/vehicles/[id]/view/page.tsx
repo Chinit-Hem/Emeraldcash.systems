@@ -389,7 +389,7 @@ function ViewVehicleInner() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [formData, setFormData] = useState<Partial<Vehicle>>({});
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
+const [imagePreview, setImagePreview] = useState<string | undefined>(undefined);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   // Redirect to vehicles list if ID is a reserved word
@@ -546,7 +546,7 @@ function ViewVehicleInner() {
         Price70: vehicle.Price70 || 0,
         Description: vehicle.Description || "",
       });
-      setImagePreview(getImageUrl(vehicle.Image));
+setImagePreview(getImageUrl(vehicle.Image) ?? undefined);
     }
   }, [vehicle, isEditMode]);
 
@@ -573,8 +573,8 @@ function ViewVehicleInner() {
     }
   };
 
-  const handleImageChange = (value: string | null) => {
-    setImagePreview(value);
+const handleImageChange = (value: string | null) => {
+    setImagePreview(value ?? undefined);
   };
 
   const validateForm = (): boolean => {
@@ -650,7 +650,7 @@ function ViewVehicleInner() {
   const handleCancelEdit = () => {
     setIsEditMode(false);
     setFormData({});
-    setImagePreview(null);
+setImagePreview(undefined);
     setErrors({});
     setSubmitError(null);
   };

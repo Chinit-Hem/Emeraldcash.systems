@@ -1,7 +1,7 @@
 {
-    "compilerOptions": {
-      "baseUrl": ".",
-      "paths": {
+  "compilerOptions": {
+    "ignoreDeprecations": "6.0",
+    "paths": {
         "@/*": ["./src/*"]
       },
     "target": "es2015",
@@ -12,7 +12,7 @@
     ],
     "allowJs": true,
     "skipLibCheck": true,
-    "strict": false, // ← turn off strict to avoid extra errors for now
+"strict": true, // ← strict mode for better type safety
     "forceConsistentCasingInFileNames": true,
     "noEmit": true,
     "esModuleInterop": true,

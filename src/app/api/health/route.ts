@@ -51,7 +51,7 @@ function updateSyncStatus(success: boolean, error?: string) {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-      const { success, error: syncError } = body;
+    const { success, error: syncError } = body;
     
     if (typeof success !== 'boolean') {
       return NextResponse.json(
@@ -117,8 +117,9 @@ const healthHandler = withErrorHandling(async (req, { logger, requestId, startTi
     }
   } catch (error) {
     dbStatus = "error";
-    dbMessage = error instanceof Error ? error.message : "Unknown database error";
-    logger.error("Database health check error", error);
+    const errorMessage = error instanceof Error ? error.message : "Unknown database error";
+    dbMessage = errorMessage;
+    logger.error("Database health check error", error instanceof Error ? error : new Error(errorMessage));
   }
 
   // Get connection pool stats
@@ -147,8 +148,9 @@ const healthHandler = withErrorHandling(async (req, { logger, requestId, startTi
     }
   } catch (error) {
     cloudinaryStatus = "error";
-    cloudinaryMessage = error instanceof Error ? error.message : "Unknown Cloudinary error";
-    logger.error("Cloudinary health check error", error);
+    const cloudinaryErrorMessage = error instanceof Error ? error.message : "Unknown Cloudinary error";
+    cloudinaryMessage = cloudinaryErrorMessage;
+    logger.error("Cloudinary health check error", error instanceof Error ? error : new Error(cloudinaryErrorMessage));
   }
   
   // Determine overall health

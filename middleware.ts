@@ -210,9 +210,10 @@ export function middleware(request: NextRequest) {
     const response = NextResponse.next();
     response.headers.set("X-Request-ID", requestId);
     return response;
-  } catch (error) {
+} catch (err) {
     // Global middleware error handler
     const duration = Date.now() - startTime;
+    const error = err instanceof Error ? err : new Error(String(err));
     
     globalLogger.error("Middleware error", error, {
       pathname,

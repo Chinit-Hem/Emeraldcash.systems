@@ -37,7 +37,7 @@ export default async function DashboardPage() {
   const vehicles = vehiclesResult.success ? vehiclesResult.data || [] : [];
   const stats = statsResult.success ? statsResult.data : null;
 
-  // Build metadata for client
+// Build metadata for client - always provide valid meta, use defaults if stats is unavailable
   const meta = stats
     ? {
         total: stats.total,
@@ -53,7 +53,13 @@ export default async function DashboardPage() {
         noImageCount: stats.noImageCount,
         avgPrice: stats.avgPrice,
       }
-    : null;
+    : {
+        total: 0,
+        countsByCategory: { Cars: 0, Motorcycles: 0, TukTuks: 0 },
+        countsByCondition: { New: 0, Used: 0 },
+        noImageCount: 0,
+        avgPrice: 0,
+      };
 
   return (
     <Dashboard

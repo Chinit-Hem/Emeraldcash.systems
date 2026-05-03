@@ -9,16 +9,14 @@ import AssetFormModal from './components/AssetFormModal';
 interface SmsAsset {
   id: string;
   name: string;
-  itemCode?: string | null;
+  itemCode?: string;
   type: string;
-  category?: string | null;
-  quantity?: number | null;
-  location?: string | null;
-  assignedTo?: string | null;
-  imageUrl?: string | null;
+  category?: string;
+  quantity?: number;
+  location?: string;
+  assignedTo?: string;
+  imageUrl?: string;
   status: 'Available' | 'In Use' | 'Borrowed';
-  createdAt: string;
-  updatedAt?: string;
 }
 
 interface SmsStats {
@@ -91,9 +89,9 @@ export default function AssetsPage() {
   const fetchStats = useCallback(async () => {
     try {
       const response = await fetch('/api/sms/stats');
-      const data: ApiResponse<SmsStats> = await response.json();
+const data: ApiResponse<SmsStats> = await response.json();
       if (data.success) {
-        setStats(data.data);
+        setStats(data.data ?? null);
       }
     } catch (err) {
       console.error('Stats fetch failed:', err);

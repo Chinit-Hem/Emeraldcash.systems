@@ -40,10 +40,10 @@ function toCreateVehicleDB(vehicle: Partial<Vehicle>): Omit<VehicleDB, "id" | "c
     model: vehicle.Model || "",
     category: vehicle.Category || "",
     plate: vehicle.Plate || "",
-    year: vehicle.Year ?? null,
-    market_price: vehicle.PriceNew ?? null,
+year: (vehicle.Year ?? undefined) as number ?? null,
+    market_price: (vehicle.PriceNew ?? undefined) as number ?? null,
     condition: vehicle.Condition || "Used",
-    color: vehicle.Color || null,
+    color: (vehicle.Color ?? undefined) as string ?? null,
     body_type: vehicle.BodyType || null,
     tax_type: vehicle.TaxType || null,
     image_id: vehicle.Image || null,
@@ -187,7 +187,7 @@ const limit = parseInt(searchParams.get("limit") || "500"); // Increased for pag
     // Get accurate total count with no-cache (force fresh data)
     console.log('[API/cleaned-vehicles] Fetching fresh total count...');
     const totalResult = await vehicleService.getTotalCount(true); // noCache=true
-    const total = totalResult.success ? totalResult.data : 0;
+const total = totalResult.success ? totalResult.data ?? 0 : 0;
     console.log(`[API/cleaned-vehicles] DB total: ${total} (filters: category=${category}, brand=${brand})`);
 
     // Add performance headers for monitoring + total debug header

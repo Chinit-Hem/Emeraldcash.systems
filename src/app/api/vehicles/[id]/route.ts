@@ -120,19 +120,19 @@ const putHandler = withErrorHandling(async (req: NextRequest, { logger, requestI
     }
   }
 
-  // Convert to DB format for service
+// Convert to DB format for service
   const dbPayload = {
     category: payload.Category as string,
     brand: payload.Brand as string,
     model: payload.Model as string,
-    year: payload.Year as number | null,
+    year: payload.Year ?? undefined,
     plate: payload.Plate as string,
     market_price: payload.PriceNew as number,
-    tax_type: payload.TaxType as string || null,
+    tax_type: payload.TaxType || undefined,
     condition: payload.Condition as string,
-    body_type: payload.BodyType as string || null,
-    color: payload.Color as string || null,
-    image_id: payload.Image as string || null,
+    body_type: payload.BodyType || undefined,
+    color: payload.Color || undefined,
+    image_id: payload.Image || undefined,
   };
 
   logger.debug("[UPDATE]", { vehicleId: id, plate: payload.Plate });

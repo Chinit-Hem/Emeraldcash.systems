@@ -8,9 +8,9 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const modelKey = searchParams.get('modelKey');
     
-    // Mock empty data
+// Mock empty data
     const stats = { total_items: 0, total_quantity: 0, low_stock_items: 0, locations: [] };
-    const items = [];
+    const items: StockItem[] = [];
     
     return NextResponse.json({ success: true, data: items, stats });
   } catch (error) {

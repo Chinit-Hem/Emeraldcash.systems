@@ -28,6 +28,7 @@ import type {
   Vehicle
 } from "@/lib/types";
 import type { VehicleFilters } from "@/types/vehicle";
+// Re-export VehicleFilters for backwards compatibility
 export type { VehicleFilters };
 import { BaseService, ServiceResult } from "./BaseService";
 

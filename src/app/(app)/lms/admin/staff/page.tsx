@@ -593,7 +593,7 @@ export default function StaffAdminPage() {
             </div>
           ) : (
             filteredUsers.map((managedUser) => {
-              const lmsProgress = getLMSProgress(managedUser.email);
+const lmsProgress = getLMSProgress(managedUser.email ?? null);
               const isSynced = !!lmsProgress;
               
               return (

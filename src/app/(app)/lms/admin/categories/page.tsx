@@ -167,9 +167,9 @@ export default function CategoriesAdminPage() {
 
   const startEdit = (category: LmsCategory) => {
     setEditingId(category.id);
-    setFormName(category.name);
+setFormName(category.name);
     setFormDescription(category.description || "");
-    setFormColor(category.color);
+    setFormColor(category.color || "");
     setFormOrder(category.order_index);
     setShowAddForm(true);
   };

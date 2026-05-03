@@ -25,8 +25,9 @@ export async function GET(request: NextRequest) {
     );
   }
   
-  const year = yearStr ? parseInt(yearStr, 10) : null;
-  const isValidYear = yearStr ? !isNaN(year) : true;
+const parsedYear = yearStr ? parseInt(yearStr, 10) : null;
+  const year = parsedYear !== null && !isNaN(parsedYear) ? parsedYear : null;
+  const isValidYear = year !== null && !isNaN(year);
   
   try {
     // Check for fallback mode (use estimated prices instead of fetching)
