@@ -141,8 +141,8 @@ function EditVehicleInner() {
   );
 
   // Handle form submission
-  const handleSubmit = useCallback(async (formData: Partial<Vehicle>, imageFile?: File | null) => {
-const vehicleToUpdate = currentVehicle;
+  const handleSubmit = useCallback(async (formData: Partial<Vehicle>, image?: File | null) => {
+    const vehicleToUpdate = currentVehicle;
     if (!vehicleToUpdate) return;
     
     setSubmitError(null);
@@ -158,7 +158,6 @@ const vehicleToUpdate = currentVehicle;
     
     // Extract File from image if it's a File, otherwise pass null
     const imageFile = image instanceof File ? image : undefined;
-    
     // Call updateVehicle with all required parameters: vehicleId, data, originalVehicle, imageFile
     await updateVehicle(
       vehicleToUpdate.VehicleId,
