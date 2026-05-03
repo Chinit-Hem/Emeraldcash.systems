@@ -236,7 +236,7 @@ function StatCard({
   subtitleHref,
   icon: Icon,
   color = "emerald",
-  isLoading = false,
+  isRefreshing = false,
   onClick,
   href,
   trend,
@@ -248,7 +248,7 @@ function StatCard({
   subtitleHref?: string;
   icon: LucideIcon;
   color?: "emerald" | "blue" | "purple" | "orange" | "red" | "amber";
-  isLoading?: boolean;
+  isRefreshing?: boolean;
   onClick?: () => void;
   href?: string;
   trend?: string;
@@ -289,28 +289,29 @@ function StatCard({
       {/* Background gradient accent */}
       <div className={`absolute top-0 right-0 w-32 h-32 bg-gradient-to-br ${colorClasses[color]} opacity-10 rounded-full blur-3xl transform translate-x-16 -translate-y-16 transition-opacity group-hover:opacity-20`} />
       
+      {/* Refresh indicator - Tiny dot */}
+      {isRefreshing && (
+        <div className="absolute -top-2 -right-2 w-4 h-4 bg-emerald-500 rounded-full animate-ping ring-2 ring-emerald-500/50" />
+      )}
+      
       <div className="relative flex items-start justify-between">
         <div className="flex-1 min-w-0">
           <p className="text-sm font-semibold text-slate-500 uppercase tracking-wider">
             {title}
           </p>
           
-          {isLoading ? (
-            <div className="mt-2 h-10 w-24 bg-slate-200 rounded-lg animate-pulse" />
-          ) : (
-            <p className="mt-2 text-3xl font-bold text-slate-800 tracking-tight">
-              {value}
-            </p>
-          )}
+          <p className="mt-2 text-3xl font-bold text-slate-800 tracking-tight">
+            {value}
+          </p>
           
-          {trend && !isLoading && (
+          {trend && (
             <div className={`mt-2 flex items-center gap-1 text-sm font-medium ${trendUp ? 'text-emerald-600' : 'text-red-600'}`}>
               <TrendingUp className={`w-4 h-4 ${trendUp ? '' : 'rotate-180'}`} />
               {trend}
             </div>
           )}
           
-          {subtitle && !isLoading && (
+          {subtitle && (
             subtitleHref ? (
               <span 
                 onClick={handleSubtitleClick}
@@ -347,6 +348,7 @@ function StatCard({
 
   return content;
 }
+
 
 // ============================================================================
 // Main Enhanced Dashboard Component
@@ -739,7 +741,7 @@ export default function EnhancedDashboard({
             {/* Missing Images Alert Card */}
             {noImageCount > 0 && (
               <a
-                href="/vehicles?noImage=1"
+href="/vehicles?withoutImage=true"
                 className="flex items-center gap-4 p-4 rounded-2xl bg-gradient-to-r from-red-50 to-rose-50 border border-red-100 shadow-sm hover:shadow-md transition-all duration-300 group"
               >
                 <div className="p-3 rounded-xl bg-red-100 text-red-600 group-hover:bg-red-200 transition-colors">

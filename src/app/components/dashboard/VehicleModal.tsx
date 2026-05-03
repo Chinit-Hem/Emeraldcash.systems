@@ -1,6 +1,10 @@
 "use client";
 
-import { VehicleForm } from "@/app/components/vehicles/VehicleForm";
+import dynamic from "next/dynamic";
+import BasicForm from "./BasicVehicleForm";
+const HeavyForm = dynamic(() => import("./HeavyVehicleForm"), { 
+  loading: () => <div className="h-12 bg-slate-100 animate-pulse rounded-lg mb-4" /> 
+});
 import { useUI } from "@/app/components/UIContext";
 import { useBodyScrollLock } from "@/lib/useBodyScrollLock";
 import type { Vehicle } from "@/lib/types";
@@ -85,17 +89,26 @@ export default function VehicleModal({ isOpen, vehicle, onClose, onSave, uploadP
 
   if (!isOpen) return null;
 
+
   return (
-    <VehicleForm
-      vehicle={formVehicle}
-      onSubmit={handleSubmit}
-      onCancel={onClose}
-      isSubmitting={isLoading}
-      submitError={error}
-      onClearError={handleClearError}
-      isModal={true}
-      modalTitle={vehicle ? "Edit Vehicle" : "Add New Vehicle"}
-      uploadProgress={uploadProgress}
-    />
+    <>
+      <BasicForm
+        vehicle={formVehicle}
+        onSubmit={handleSubmit}
+        onCancel={onClose}
+        isSubmitting={isLoading}
+        submitError={error}
+        onClearError={handleClearError}
+        modalTitle={vehicle ? "Edit Vehicle" : "Add New Vehicle"}
+      />
+      <Suspense fallback={null}>
+        <HeavyForm 
+          vehicle={formVehicle} 
+          onCancel={onClose}
+          uploadProgress={uploadProgress}
+        />
+      </Suspense>
+    </>
   );
+
 }

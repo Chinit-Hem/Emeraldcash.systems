@@ -324,11 +324,15 @@ function computeVehicleMeta(vehicles: Vehicle[] | undefined | null): VehicleMeta
       ? safeVehicles.reduce((sum, v) => sum + (v?.PriceNew || 0), 0) / safeVehicles.length
       : 0,
     noImageCount: safeVehicles.filter(v => {
-      // Check both Image field and thumbnail_url (if available in the vehicle object)
-      const hasImage = v?.Image && extractDriveFileId(v.Image);
-      // For vehicles with thumbnail_url stored separately, we need to check that too
-      // The vehicle object from API should have Image field populated with thumbnail_url if available
-      return !hasImage;
+// Robust no-image check matching server logic
+      const imageValue = typeof v?.Image === 'string' ? v.Image.trim() : '';
+      const hasValidImage = imageValue && (
+        imageValue.startsWith('http://') || 
+        imageValue.startsWith('https://') || 
+        imageValue.startsWith('data:') ||
+        /^[a-zA-Z0-9_\-]+(\/[a-zA-Z0-9_\-]+)*$/.test(imageValue)  // Cloudinary public ID
+      );
+      return !hasValidImage;
     }).length,
     countsByCondition: {
       New: safeVehicles.filter(v => normalizeConditionLabel(v?.Condition) === "New").length,
@@ -782,12 +786,12 @@ export default function VehiclesClient() {
   // `/vehicles?category=car&condition=new&noImage=1` work).
   const categoryParam = searchParams.get("category");
   const conditionParam = searchParams.get("condition");
-  const noImageParam = searchParams.get("noImage");
+    const withoutImageParam = searchParams.get("withoutImage");\n    const noImageParam = searchParams.get("noImage") || withoutImageParam;
 
   useEffect(() => {
     const nextCategory = categoryParam ? normalizeCategoryLabel(categoryParam) : "All";
     const nextCondition = conditionParam ? normalizeConditionLabel(conditionParam) : "All";
-    const nextWithoutImage = noImageParam === "1";
+    const nextWithoutImage = noImageParam === "1" || noImageParam === "true";
 
     // Use setTimeout to avoid synchronous setState in effect
     const timeoutId = setTimeout(() => {
@@ -1186,34 +1190,127 @@ export default function VehiclesClient() {
           </div>
         ) : null}
 
-        {/* Data Status Bar - Neumorphism Style */}
-        {!loading && !error && (
-          <div className="relative z-[1] flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-6 p-5 bg-[#e0e5ec] rounded-[20px] shadow-[8px_8px_16px_#a3b1c6,-8px_-8px_16px_#ffffff]">
-            {/* Left Section - Info & Controls */}
-            <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-3 sm:gap-6 text-sm">
-              {/* Last Sync */}
-              <div className="flex items-center gap-2 text-gray-600 dark:text-gray-300">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                  className="h-4 w-4 text-emerald-500"
-                >
-                  <circle cx="12" cy="12" r="10" />
-                  <polyline points="12,6 12,12 16,14" />
-                </svg>
-                <span>
-                  Last sync: <span className="font-medium text-gray-900 dark:text-gray-100">{lastSyncTime ? lastSyncTime.toLocaleString() : "Never"}</span>
+        {/* Data Status Bar - Neumorphism Style - ALWAYS SHOW */}
+        <div className="relative z-[1] flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-6 p-5 bg-[#e0e5ec] rounded-[20px] shadow-[8px_8px_16px_#a3b1c6,-8px_-8px_16px_#ffffff]">
+          {/* Left Section - Info & Controls */}
+          <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-3 sm:gap-6 text-sm">
+            {/* Last Sync */}
+            <div className="flex items-center gap-2 text-gray-600 dark:text-gray-300">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={2}
+                className="h-4 w-4 text-emerald-500"
+              >
+                <circle cx="12" cy="12" r="10" />
+                <polyline points="12,6 12,12 16,14" />
+              </svg>
+              <span>
+                Last sync: <span className="font-medium text-gray-900 dark:text-gray-100">{lastSyncTime ? lastSyncTime.toLocaleString() : "Never"}</span>
+              </span>
+            </div>
+
+            {/* NEW: Tiny Background Refresh Indicator */}
+            {loading && (
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 bg-emerald-500 rounded-full animate-ping" />
+                <span className="text-xs text-emerald-600 font-medium">background refresh</span>
+              </div>
+            )}
+
+            {/* Refresh Button */}
+            <button
+              onClick={() => void refetch()}
+              disabled={loading}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-medium hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors w-fit"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={2}
+                className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`}
+              >
+                <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+                <path d="M3 3v5h5" />
+                <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16" />
+                <path d="M16 21h5v-5" />
+              </svg>
+              {loading ? 'Refreshing...' : 'Refresh'}
+            </button>
+
+            {/* Active Filters Count */}
+            {isFiltered && (
+              <div className="flex items-center gap-2">
+                <span className="inline-flex items-center justify-center px-2 py-0.5 text-xs font-medium bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400 rounded-full">
+                  {[
+                    filters.search,
+                    filters.category !== "All" ? filters.category : null,
+                    filters.brand !== "All" ? filters.brand : null,
+                    filters.condition !== "All" ? filters.condition : null,
+                    filters.color !== "All" ? filters.color : null,
+                    filters.yearMin || filters.yearMax ? "Year" : null,
+                    filters.priceMin || filters.priceMax ? "Price" : null,
+                    filters.dateFrom || filters.dateTo ? "Date" : null,
+                    filters.withoutImage ? "No Image" : null,
+                  ].filter(Boolean).length} active
                 </span>
               </div>
+            )}
+          </div>
 
-              {/* Refresh Button */}
+          {/* Center/Right Section - View Mode Toggle & Clear Filters */}
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
+            {/* View Mode Toggle - Mobile-First Responsive */}
+            <div className="ec-status-toggle flex flex-col sm:flex-row items-stretch sm:items-center gap-2 bg-gray-100/80 dark:bg-gray-700/50 rounded-lg p-1 w-full sm:w-auto">
               <button
-                onClick={() => void refetch()}
-                disabled={loading}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-medium hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors w-fit"
+                onClick={() => setViewMode("all-time")}
+                className={`ec-status-btn flex-1 sm:flex-initial min-h-[44px] px-4 py-2 rounded-md text-xs font-medium transition-all whitespace-nowrap ${
+                  viewMode === "all-time"
+                    ? "ec-status-btn-active bg-white dark:bg-gray-600 text-gray-900 dark:text-gray-100 shadow-sm"
+                    : "ec-status-btn-inactive text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100"
+                }`}
+              >
+                All-time Totals
+              </button>
+              <button
+                onClick={() => setViewMode("filtered")}
+                disabled={!isFiltered}
+                className={`ec-status-btn flex-1 sm:flex-initial min-h-[44px] px-4 py-2 rounded-md text-xs font-medium transition-all whitespace-nowrap ${
+                  viewMode === "filtered"
+                    ? "ec-status-btn-active bg-white dark:bg-gray-600 text-gray-900 dark:text-gray-100 shadow-sm"
+                    : "ec-status-btn-inactive text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 disabled:opacity-40 disabled:cursor-not-allowed"
+                }`}
+              >
+                Filtered Results
+              </button>
+            </div>
+
+            {/* Clear Filters Button */}
+            {isFiltered && (
+              <GlassButton
+                onClick={() => {
+                  setFilters({
+                    search: "",
+                    category: "All",
+                    brand: "All",
+                    yearMin: "",
+                    yearMax: "",
+                    priceMin: "",
+                    priceMax: "",
+                    condition: "All",
+                    color: "All",
+                    dateFrom: "",
+                    dateTo: "",
+                    withoutImage: false,
+                  });
+                  setViewMode("all-time");
+                }}
+                className="text-sm w-full sm:w-auto justify-center"
+                variant="outline"
               >
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
@@ -1221,103 +1318,17 @@ export default function VehiclesClient() {
                   fill="none"
                   stroke="currentColor"
                   strokeWidth={2}
-                  className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`}
+                  className="h-4 w-4 mr-1"
                 >
-                  <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
-                  <path d="M3 3v5h5" />
-                  <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16" />
-                  <path d="M16 21h5v-5" />
+                  <path d="M18 6 6 18" />
+                  <path d="m6 6 12 12" />
                 </svg>
-                {loading ? 'Refreshing...' : 'Refresh'}
-              </button>
-
-              {/* Active Filters Count */}
-              {isFiltered && (
-                <div className="flex items-center gap-2">
-                  <span className="inline-flex items-center justify-center px-2 py-0.5 text-xs font-medium bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400 rounded-full">
-                    {[
-                      filters.search,
-                      filters.category !== "All" ? filters.category : null,
-                      filters.brand !== "All" ? filters.brand : null,
-                      filters.condition !== "All" ? filters.condition : null,
-                      filters.color !== "All" ? filters.color : null,
-                      filters.yearMin || filters.yearMax ? "Year" : null,
-                      filters.priceMin || filters.priceMax ? "Price" : null,
-                      filters.dateFrom || filters.dateTo ? "Date" : null,
-                      filters.withoutImage ? "No Image" : null,
-                    ].filter(Boolean).length} active
-                  </span>
-                </div>
-              )}
-            </div>
-
-            {/* Center/Right Section - View Mode Toggle & Clear Filters */}
-            <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
-              {/* View Mode Toggle - Mobile-First Responsive */}
-              <div className="ec-status-toggle flex flex-col sm:flex-row items-stretch sm:items-center gap-2 bg-gray-100/80 dark:bg-gray-700/50 rounded-lg p-1 w-full sm:w-auto">
-                <button
-                  onClick={() => setViewMode("all-time")}
-                  className={`ec-status-btn flex-1 sm:flex-initial min-h-[44px] px-4 py-2 rounded-md text-xs font-medium transition-all whitespace-nowrap ${
-                    viewMode === "all-time"
-                      ? "ec-status-btn-active bg-white dark:bg-gray-600 text-gray-900 dark:text-gray-100 shadow-sm"
-                      : "ec-status-btn-inactive text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100"
-                  }`}
-                >
-                  All-time Totals
-                </button>
-                <button
-                  onClick={() => setViewMode("filtered")}
-                  disabled={!isFiltered}
-                  className={`ec-status-btn flex-1 sm:flex-initial min-h-[44px] px-4 py-2 rounded-md text-xs font-medium transition-all whitespace-nowrap ${
-                    viewMode === "filtered"
-                      ? "ec-status-btn-active bg-white dark:bg-gray-600 text-gray-900 dark:text-gray-100 shadow-sm"
-                      : "ec-status-btn-inactive text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 disabled:opacity-40 disabled:cursor-not-allowed"
-                  }`}
-                >
-                  Filtered Results
-                </button>
-              </div>
-
-              {/* Clear Filters Button */}
-              {isFiltered && (
-                <GlassButton
-                  onClick={() => {
-                    setFilters({
-                      search: "",
-                      category: "All",
-                      brand: "All",
-                      yearMin: "",
-                      yearMax: "",
-                      priceMin: "",
-                      priceMax: "",
-                      condition: "All",
-                      color: "All",
-                      dateFrom: "",
-                      dateTo: "",
-                      withoutImage: false,
-                    });
-                    setViewMode("all-time");
-                  }}
-                  className="text-sm w-full sm:w-auto justify-center"
-                  variant="outline"
-                >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth={2}
-                    className="h-4 w-4 mr-1"
-                  >
-                    <path d="M18 6 6 18" />
-                    <path d="m6 6 12 12" />
-                  </svg>
-                  Clear Filters
-                </GlassButton>
-              )}
-            </div>
+                Clear Filters
+              </GlassButton>
+            )}
           </div>
-        )}
+        </div>
+
 
 
         {/* KPI Cards - Professional Neumorphism Design */}
@@ -1429,75 +1440,85 @@ export default function VehiclesClient() {
           />
         </div>
 
-        {/* Content Section - Neumorphism Style */}
-        <div className="rounded-[20px] overflow-hidden bg-[#e0e5ec] shadow-[8px_8px_16px_#a3b1c6,-8px_-8px_16px_#ffffff]">
-          {/* Error State - Show immediately without waiting for loading */}
-          {error && (
-            <div className="p-8 text-center">
-              <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-red-100 dark:bg-red-900/30 mb-4">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                  className="h-8 w-8 text-red-600 dark:text-red-400"
-                >
-                  <circle cx="12" cy="12" r="10" />
-                  <line x1="12" x2="12" y1="8" y2="12" />
-                  <line x1="12" x2="12.01" y1="16" y2="16" />
-                </svg>
-              </div>
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-                Failed to load vehicles
-              </h3>
-              <div className="text-sm text-gray-600 dark:text-gray-400 mb-4 max-w-2xl mx-auto">
-                <p className="whitespace-pre-line">{error}</p>
-                
-                {/* Dev mode: Show detailed error information */}
-                {process.env.NODE_ENV === 'development' && (
-                  <div className="mt-4 p-3 bg-red-50 dark:bg-red-900/20 rounded-lg text-left">
-                    <p className="text-xs font-semibold text-red-700 dark:text-red-400 mb-1">
-                      Development Mode - Error Details:
-                    </p>
-                    <p className="text-xs text-red-600 dark:text-red-400 font-mono">
-                      Check browser console for full error stack trace
-                    </p>
-                  </div>
-                )}
-                
-                {/* Config error: Show setup instructions */}
-                {isConfigError(error) && (
-                  <div className="mt-4 p-4 bg-amber-50 dark:bg-amber-900/20 rounded-lg text-left border border-amber-200 dark:border-amber-800">
-                    <p className="text-sm font-semibold text-amber-800 dark:text-amber-400 mb-2">
-                      Setup Instructions:
-                    </p>
-                    <ol className="text-xs text-amber-700 dark:text-amber-300 list-decimal list-inside space-y-1">
-                      <li>Create a <code className="bg-amber-100 dark:bg-amber-800 px-1 rounded">.env.local</code> file in your project root</li>
-                      <li>Add: <code className="bg-amber-100 dark:bg-amber-800 px-1 rounded">NEXT_PUBLIC_API_URL=https://script.google.com/macros/s/YOUR_SCRIPT_ID/exec</code></li>
-                      <li>Replace with your actual Google Apps Script URL</li>
-                      <li>Restart the development server</li>
-                    </ol>
-                  </div>
-                )}
-              </div>
-              <div className="flex flex-col sm:flex-row gap-3 justify-center">
-                <GlassButton onClick={() => refetch()}>Try Again</GlassButton>
-                {process.env.NODE_ENV === 'development' && (
-                  <GlassButton 
-                    onClick={() => window.location.reload()} 
-                    variant="outline"
+          {/* Content Section - Neumorphism Style */}
+          <div className="rounded-[20px] overflow-hidden bg-[#e0e5ec] shadow-[8px_8px_16px_#a3b1c6,-8px_-8px_16px_#ffffff]">
+            {/* Error State - Show immediately */}
+            {error && (
+              <div className="p-8 text-center">
+                <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-red-100 dark:bg-red-900/30 mb-4">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                    className="h-8 w-8 text-red-600 dark:text-red-400"
                   >
-                    Reload Page
-                  </GlassButton>
-                )}
+                    <circle cx="12" cy="12" r="10" />
+                    <line x1="12" x2="12" y1="8" y2="12" />
+                    <line x1="12" x2="12.01" y1="16" y2="16" />
+                  </svg>
+                </div>
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+                  Failed to load vehicles
+                </h3>
+                <div className="text-sm text-gray-600 dark:text-gray-400 mb-4 max-w-2xl mx-auto">
+                  <p className="whitespace-pre-line">{error}</p>
+                  
+                  {/* Dev mode: Show detailed error information */}
+                  {process.env.NODE_ENV === 'development' && (
+                    <div className="mt-4 p-3 bg-red-50 dark:bg-red-900/20 rounded-lg text-left">
+                      <p className="text-xs font-semibold text-red-700 dark:text-red-400 mb-1">
+                        Development Mode - Error Details:
+                      </p>
+                      <p className="text-xs text-red-600 dark:text-red-400 font-mono">
+                        Check browser console for full error stack trace
+                      </p>
+                    </div>
+                  )}
+                  
+                  {/* Config error: Show setup instructions */}
+                  {isConfigError(error) && (
+                    <div className="mt-4 p-4 bg-amber-50 dark:bg-amber-900/20 rounded-lg text-left border border-amber-200 dark:border-amber-800">
+                      <p className="text-sm font-semibold text-amber-800 dark:text-amber-400 mb-2">
+                        Setup Instructions:
+                      </p>
+                      <ol className="text-xs text-amber-700 dark:text-amber-300 list-decimal list-inside space-y-1">
+                        <li>Create a <code className="bg-amber-100 dark:bg-amber-800 px-1 rounded">.env.local</code> file in your project root</li>
+                        <li>Add: <code className="bg-amber-100 dark:bg-amber-800 px-1 rounded">NEXT_PUBLIC_API_URL=https://script.google.com/macros/s/YOUR_SCRIPT_ID/exec</code></li>
+                        <li>Replace with your actual Google Apps Script URL</li>
+                        <li>Restart the development server</li>
+                      </ol>
+                    </div>
+                  )}
+                </div>
+                <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                  <GlassButton onClick={() => refetch()}>Try Again</GlassButton>
+                  {process.env.NODE_ENV === 'development' && (
+                    <GlassButton 
+                      onClick={() => window.location.reload()} 
+                      variant="outline"
+                    >
+                      Reload Page
+                    </GlassButton>
+                  )}
+                </div>
               </div>
-            </div>
-          )}
+            )}
 
+            {/* NEW: Background Refresh Indicator - Tiny dot only */}
+            {loading && (
+              <div className="flex items-center justify-center p-12">
+                <div className="flex flex-col items-center gap-3">
+                  <div className="w-6 h-6 border-3 border-emerald-500/30 border-t-emerald-500 rounded-full animate-spin" />
+                  <span className="text-sm text-slate-500 font-medium">Refreshing data...</span>
+                </div>
+              </div>
+            )}
 
-          {/* Empty State */}
-          {!loading && !error && filteredVehicles.length === 0 && (
+            {/* Empty State - Show when no data (not loading) */}
+            {!loading && !error && filteredVehicles.length === 0 && (
+
             <div className="p-12 text-center">
               <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gray-100 dark:bg-gray-800 mb-4">
                 <svg
@@ -1528,22 +1549,25 @@ export default function VehiclesClient() {
           {/* Data Display */}
           {!loading && !error && filteredVehicles.length > 0 && (
             <>
-              {/* Desktop Table */}
+              {/* NEW: VirtualTable - 60fps Infinite Scrolling */}
               {!isIOSSafari ? (
-                <VehicleTable
-                  vehicles={paginatedVehicles}
-                  isAdmin={isAdmin}
-                  disableImages={false}
-                  onEdit={handleEditClick}
-                  onDelete={handleDeleteClick}
-                  sortField={sortField}
-                  sortDirection={sortDirection}
-                  onSort={handleSort}
-                />
+                <div className="h-[70vh] min-h-[400px]">
+                  <VirtualTable
+                    vehicles={filteredVehicles}
+                    height={70 * 16} // 70vh in pixels (16px base)
+                    itemSize={80}
+                    isAdmin={isAdmin}
+                    onEdit={handleEditClick}
+                    onDelete={handleDeleteClick}
+                    sortField={sortField}
+                    sortDirection={sortDirection}
+                    onSort={handleSort}
+                  />
+                </div>
               ) : null}
 
 
-              {/* Mobile Cards */}
+              {/* Mobile Cards - Keep pagination for iOS */}
               <div className={isIOSSafari ? "space-y-3 p-4" : "lg:hidden space-y-3 p-4"}>
                 {paginatedVehicles.map((vehicle, index) => (
                   <VehicleCardMobile
@@ -1558,16 +1582,18 @@ export default function VehiclesClient() {
                 ))}
               </div>
 
+              {/* Mobile Pagination Only */}
+              {isIOSSafari && (
+                <Pagination
+                  currentPage={currentPage}
+                  totalPages={totalPages}
+                  pageSize={pageSize}
+                  totalItems={filteredVehicles.length}
+                  onPageChange={setCurrentPage}
+                  onPageSizeChange={setPageSize}
+                />
+              )}
 
-              {/* Pagination - Fixed to show correct totals */}
-              <Pagination
-                currentPage={currentPage}
-                totalPages={totalPages}
-                pageSize={pageSize}
-                totalItems={filteredVehicles.length}
-                onPageChange={setCurrentPage}
-                onPageSizeChange={setPageSize}
-              />
 
             </>
           )}

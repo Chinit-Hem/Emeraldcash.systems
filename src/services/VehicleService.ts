@@ -233,7 +233,7 @@ export class VehicleService extends BaseService<VehicleEntity, VehicleDB> {
 
     // Filter for vehicles without images (NULL or empty string for both image_id and thumbnail_url)
     if (filters?.withoutImage === true) {
-      conditions.push(`((image_id IS NULL OR image_id = '') AND (thumbnail_url IS NULL OR thumbnail_url = ''))`);
+conditions.push(`(NULLIF(TRIM(COALESCE(image_id, '')), '') IS NULL AND NULLIF(TRIM(COALESCE(thumbnail_url, '')), '') IS NULL)`);
     }
 
     // Category filter - use direct ILIKE without LOWER/TRIM for better performance
@@ -949,7 +949,7 @@ COUNT(*) FILTER (WHERE category NOT ILIKE ANY(ARRAY['%car%','%motor%','%tuk%','%
         COUNT(*) FILTER (WHERE condition ILIKE 'used') as used_count,
         COUNT(*) FILTER (WHERE condition NOT ILIKE ANY(ARRAY['new','used'])) as other_condition_count,
 AVG(CASE WHEN market_price > 0 THEN market_price ELSE NULL END)::numeric as avg_price,
-          COUNT(*) FILTER (WHERE (image_id IS NULL OR TRIM(image_id) = '') AND (thumbnail_url IS NULL OR TRIM(thumbnail_url) = '')) as no_image_count
+          COUNT(*) FILTER (WHERE NULLIF(TRIM(COALESCE(image_id, '')), '') IS NULL AND NULLIF(TRIM(COALESCE(thumbnail_url, '')), '') IS NULL) as no_image_count
         FROM vehicles
       `;
 

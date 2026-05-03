@@ -7,7 +7,7 @@ import { useToast } from "@/components/ui/glass/GlassToast";
 import { GlassCard } from "@/components/ui/glass/GlassCard";
 import { GlassButton } from "@/components/ui/glass/GlassButton";
 import { CardSkeleton } from "@/app/components/LoadingSkeleton";
-import { VehicleForm } from "@/app/components/vehicles/VehicleForm";
+
 import { ConfirmDeleteModal } from "@/app/components/vehicles/ConfirmDeleteModal";
 import { useVehicle } from "@/app/components/vehicles/useVehicle";
 import { useUpdateVehicleOptimistic } from "@/app/components/vehicles/useUpdateVehicleOptimistic";

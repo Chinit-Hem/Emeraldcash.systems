@@ -1,0 +1,328 @@
+"use client";
+
+import { useLanguage } from "@/lib/LanguageContext";
+import { useTranslation } from "@/lib/i18n";
+import { derivePrices } from "@/lib/pricing";
+import type { Vehicle } from "@/lib/types";
+import { cn } from "@/lib/ui";
+import { useRouter } from "next/navigation";
+import { useState, useCallback } from "react";
+import { formatPrice, getVehicleThumbnailUrl } from "@/lib/vehicle-helpers";
+import { OptimizedImage } from "@/app/components/OptimizedImage";
+import { useOptimisticVehicles } from "@/lib/useOptimisticVehicles";
+
+// Color name to hex mapping for visual indicators
+const getColorHex = (colorName: string): string => {
+  const colorMap: Record<string, string> = {
+    "red": "#ef4444",
+    "blue": "#3b82f6",
+    "green": "#10b981",
+    "yellow": "#f59e0b",
+    "orange": "#f97316",
+    "purple": "#8b5cf6",
+    "pink": "#ec4899",
+    "black": "#1a1a2e",
+    "white": "#f8fafc",
+    "gray": "#6b7280",
+    "grey": "#6b7280",
+    "silver": "#9ca3af",
+    "gold": "#fbbf24",
+    "brown": "#92400e",
+    "beige": "#d4c5b0",
+    "navy": "#1e3a8a",
+    "teal": "#14b8a6",
+    "cyan": "#06b6d4",
+    "lime": "#84cc16",
+    "maroon": "#991b1b",
+    "olive": "#65a30d",
+    "coral": "#f87171",
+    "ivory": "#fffff0",
+    "khaki": "#c3b091",
+    "lavender": "#c4b5fd",
+    "magenta": "#d946ef",
+    "mint": "#6ee7b7",
+    "peach": "#fdba74",
+    "plum": "#a855f7",
+    "tan": "#d2b48c",
+    "turquoise": "#40e0d0",
+    "violet": "#8b5cf6",
+    "indigo": "#6366f1",
+    "emerald": "#10b981",
+  };
+  
+  const normalizedColor = colorName.toLowerCase().trim();
+  if (colorMap[normalizedColor]) return colorMap[normalizedColor];
+  
+  // Fallback hash color
+  let hash = 0;
+  for (let i = 0; i < colorName.length; i++) {
+    hash = colorName.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const hue = Math.abs(hash % 360);
+  return `hsl(${hue}, 70%, 50%)`;
+};
+
+interface VehicleRowProps {
+  vehicle: Vehicle;
+  index: number;
+  style: React.CSSProperties;
+  isAdmin: boolean;
+  visibleColumns: string[];
+  sortField: keyof Vehicle | null;
+  sortDirection: "asc" | "desc";
+  onSort: (field: keyof Vehicle) => void;
+  onEdit: (vehicle: Vehicle) => void;
+  onDelete: (vehicle: Vehicle) => void;
+  imageErrors: Set<string>;
+  setImageErrors: (errors: Set<string>) => void;
+  deletingId: string | null;
+  handleOptimisticDelete: (vehicle: Vehicle) => Promise<void>;
+  router: any;
+}
+
+export default function VehicleRow({
+  vehicle,
+  index,
+  style,
+  isAdmin,
+  visibleColumns,
+  sortField,
+  sortDirection,
+  onSort,
+  onEdit,
+  onDelete,
+  imageErrors,
+  setImageErrors,
+  deletingId,
+  handleOptimisticDelete,
+  router,
+}: VehicleRowProps) {
+  const { language } = useLanguage();
+  const { t } = useTranslation(language);
+  const [imageError, setImageError] = useState(false);
+  const vehicleId = vehicle.VehicleId;
+  
+  const derived = derivePrices(vehicle.PriceNew);
+  const price40 = vehicle.Price40 ?? derived.Price40;
+  const price70 = vehicle.Price70 ?? derived.Price70;
+  
+  const thumbUrl = !imageError 
+    ? getVehicleThumbnailUrl(vehicle.Image)
+    : null;
+
+  const handleImageError = useCallback(() => {
+    setImageError(true);
+    setImageErrors((prev) => new Set(prev).add(vehicleId));
+  }, [vehicleId, setImageErrors]);
+
+  return (
+    <div 
+      className={cn(
+        "flex border-b border-slate-200 last:border-b-0 hover:bg-slate-50 active:bg-slate-100 transition-colors",
+        index % 2 === 0 ? "bg-white" : "bg-slate-50"
+      )}
+      style={style}
+      onClick={() => router.push(`/vehicles/${encodeURIComponent(vehicleId)}/view`)}
+    >
+      {visibleColumns.includes('id') && (
+        <div className="px-4 py-3 whitespace-nowrap text-sm font-mono text-[#4a4a5a] w-20 flex-shrink-0">
+          {vehicle.VehicleId || "-"}
+        </div>
+      )}
+
+      {visibleColumns.includes('image') && (
+        <div className="px-4 py-3 w-20 flex-shrink-0">
+          {thumbUrl ? (
+            <OptimizedImage
+              src={thumbUrl}
+              alt={`${vehicle.Brand} ${vehicle.Model}`}
+              width={48}
+              height={48}
+              className="h-12 w-12 rounded-lg object-cover shadow-sm bg-slate-100"
+              onError={handleImageError}
+              loading="lazy"
+            />
+          ) : (
+            <div className="flex h-12 w-12 items-center justify-center rounded-lg shadow-sm bg-slate-100">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={1.5}
+                className="h-5 w-5 text-[#4a4a5a]"
+              >
+                <rect width="18" height="18" x="3" y="3" rx="2" />
+                <circle cx="9" cy="9" r="2" />
+                <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" />
+              </svg>
+            </div>
+          )}
+        </div>
+      )}
+
+      {visibleColumns.includes('category') && (
+        <div className="px-4 py-3 whitespace-nowrap text-sm text-[#4a4a5a] w-24 flex-shrink-0">
+          {vehicle.Category || "-"}
+        </div>
+      )}
+
+      {visibleColumns.includes('brand') && (
+        <div className="px-4 py-3 whitespace-nowrap text-sm font-medium text-[#1a1a2e] w-32 flex-shrink-0">
+          {vehicle.Brand || "-"}
+        </div>
+      )}
+
+      {visibleColumns.includes('model') && (
+        <div className="px-4 py-3 text-sm text-[#4a4a5a] min-w-[120px] flex-1">
+          {vehicle.Model || "-"}
+        </div>
+      )}
+
+      {visibleColumns.includes('year') && (
+        <div className="px-4 py-3 whitespace-nowrap text-sm text-[#4a4a5a] w-20 flex-shrink-0">
+          {vehicle.Year || "-"}
+        </div>
+      )}
+
+      {visibleColumns.includes('plate') && (
+        <div className="px-4 py-3 whitespace-nowrap text-sm font-mono text-[#4a4a5a] w-24 flex-shrink-0">
+          {vehicle.Plate || "-"}
+        </div>
+      )}
+
+      {visibleColumns.includes('priceNew') && (
+        <div className="px-4 py-3 whitespace-nowrap text-right text-sm font-semibold text-[#10b981] w-32 flex-shrink-0">
+          {formatPrice(vehicle.PriceNew)}
+        </div>
+      )}
+
+      {visibleColumns.includes('price40') && (
+        <div className="px-4 py-3 whitespace-nowrap text-right text-sm font-semibold text-[#ef4444] w-28 flex-shrink-0">
+          {formatPrice(price40)}
+        </div>
+      )}
+
+      {visibleColumns.includes('price70') && (
+        <div className="px-4 py-3 whitespace-nowrap text-right text-sm font-semibold text-[#10b981] w-32 flex-shrink-0">
+          {formatPrice(price70)}
+        </div>
+      )}
+
+      {visibleColumns.includes('taxType') && (
+        <div className="px-4 py-3 whitespace-nowrap text-sm text-[#4a4a5a] w-28 flex-shrink-0">
+          {vehicle.TaxType || "-"}
+        </div>
+      )}
+
+      {visibleColumns.includes('condition') && (
+        <div className="px-4 py-3 whitespace-nowrap w-24 flex-shrink-0">
+          <span
+            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium shadow-sm ${
+              vehicle.Condition === "New"
+                ? "bg-slate-100 text-[#10b981]"
+                : vehicle.Condition === "Used"
+                ? "bg-slate-100 text-[#ef4444]"
+                : "bg-slate-100 text-[#4a4a5a]"
+            }`}
+          >
+            {vehicle.Condition || "Unknown"}
+          </span>
+        </div>
+      )}
+
+      {visibleColumns.includes('bodyType') && (
+        <div className="px-4 py-3 whitespace-nowrap text-sm text-[#4a4a5a] w-32 flex-shrink-0">
+          {vehicle.BodyType || "-"}
+        </div>
+      )}
+
+      {visibleColumns.includes('color') && (
+        <div className="px-4 py-3 w-32 flex-shrink-0">
+          <div className="flex items-center gap-2">
+            {vehicle.Color ? (
+              <>
+                <div 
+                  className="w-4 h-4 rounded-full shadow-sm border-2 border-slate-200"
+                  style={{ 
+                    backgroundColor: getColorHex(vehicle.Color),
+                  }}
+                  title={vehicle.Color}
+                />
+                <span className="text-sm text-[#4a4a5a] font-medium">
+                  {vehicle.Color}
+                </span>
+              </>
+            ) : (
+              <span className="text-sm text-[#4a4a5a]">-</span>
+            )}
+          </div>
+        </div>
+      )}
+
+      {visibleColumns.includes('actions') && (
+        <div className="px-4 py-3 w-32 flex-shrink-0">
+          <div className="flex items-center justify-center gap-1">
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                router.push(`/vehicles/${encodeURIComponent(vehicleId)}/view`);
+              }}
+              className="rounded-lg p-1.5 text-[#4a4a5a] hover:bg-slate-100 transition-colors"
+              title="View"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-4 w-4">
+                <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
+                <circle cx="12" cy="12" r="3" />
+              </svg>
+            </button>
+            {isAdmin && (
+              <>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onEdit(vehicle);
+                  }}
+                  className="rounded-lg p-1.5 text-[#10b981] hover:bg-slate-100 transition-colors"
+                  title="Edit"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-4 w-4">
+                    <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3Z" />
+                  </svg>
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleOptimisticDelete(vehicle);
+                  }}
+                  disabled={deletingId === vehicleId}
+                  className={cn(
+                    "rounded-lg p-1.5 transition-colors",
+                    deletingId === vehicleId
+                      ? "text-slate-400 cursor-not-allowed"
+                      : "text-red-500 hover:bg-slate-100"
+                  )}
+                  title={deletingId === vehicleId ? "Deleting..." : "Delete"}
+                >
+                  {deletingId === vehicleId ? (
+                    <svg className="h-4 w-4 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                    </svg>
+                  ) : (
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-4 w-4">
+                      <path d="M3 6h18" />
+                      <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
+                      <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
+                    </svg>
+                  )}
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+

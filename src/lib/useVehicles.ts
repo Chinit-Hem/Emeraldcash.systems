@@ -19,11 +19,13 @@ interface UseVehiclesReturn {
   vehicles: Vehicle[];
   meta: VehicleMeta | null;
   loading: boolean;
+  isFetching: boolean;
   error: string | null;
   refetch: (options?: { noCache?: boolean }) => Promise<void>;
   lastSyncTime: Date | null;
   isFiltering: boolean;
 }
+
 
 interface UseVehiclesOptions {
   /** Force fresh data fetch - only use true for manual refresh button */
@@ -60,7 +62,9 @@ export function useVehicles(options: UseVehiclesOptions = {}): UseVehiclesReturn
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [meta, setMeta] = useState<VehicleMeta | null>(null);
   const [loading, setLoading] = useState(autoFetch);
+  const [isFetching, setIsFetching] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
   const [lastSyncTime, setLastSyncTime] = useState<Date | null>(null);
   const [isFiltering, setIsFiltering] = useState(false);
   
@@ -101,7 +105,11 @@ export function useVehicles(options: UseVehiclesOptions = {}): UseVehiclesReturn
     
     // Create new AbortController for this request
     abortControllerRef.current = new AbortController();
-    setLoading(true);
+    if (!hasInitialFetchRef.current) {
+      setLoading(true);
+    } else {
+      setIsFetching(true);
+    }
     setError(null);
     
     // Set filtering state if filters are active
@@ -244,6 +252,7 @@ export function useVehicles(options: UseVehiclesOptions = {}): UseVehiclesReturn
       
     } finally {
       setLoading(false);
+      setIsFetching(false);
       setIsFiltering(false);
     }
     // Only depend on customLimit - noCache is handled via ref
@@ -364,11 +373,13 @@ export function useVehicles(options: UseVehiclesOptions = {}): UseVehiclesReturn
     vehicles: memoizedVehicles,
     meta: memoizedMeta,
     loading,
+    isFetching,
     error,
     refetch,
     lastSyncTime,
     isFiltering,
   };
+
 }
 
 /**
