@@ -9,6 +9,7 @@ import { GlassButton } from "@/components/ui/glass/GlassButton";
 import { CardSkeleton } from "@/app/components/LoadingSkeleton";
 
 import { ConfirmDeleteModal } from "@/app/components/vehicles/ConfirmDeleteModal";
+import BasicVehicleForm from "@/app/components/dashboard/BasicVehicleForm";
 import { useVehicle } from "@/app/components/vehicles/useVehicle";
 import { useUpdateVehicleOptimistic } from "@/app/components/vehicles/useUpdateVehicleOptimistic";
 import { useDeleteVehicle } from "@/app/components/vehicles/useDeleteVehicle";
@@ -140,7 +141,7 @@ function EditVehicleInner() {
   );
 
   // Handle form submission
-  const handleSubmit = useCallback(async (formData: Partial<Vehicle>, image: File | string | null) => {
+  const handleSubmit = useCallback(async (formData: Partial<Vehicle>, imageFile?: File | null) => {
 const vehicleToUpdate = currentVehicle;
     if (!vehicleToUpdate) return;
     
@@ -156,7 +157,7 @@ const vehicleToUpdate = currentVehicle;
     };
     
     // Extract File from image if it's a File, otherwise pass null
-    const imageFile = image instanceof File ? image : null;
+    const imageFile = image instanceof File ? image : undefined;
     
     // Call updateVehicle with all required parameters: vehicleId, data, originalVehicle, imageFile
     await updateVehicle(
@@ -432,7 +433,7 @@ const vehicleToDelete = currentVehicle;
 
 {/* Form Content */}
           <div className="p-4 md:p-6 space-y-6">
-            <VehicleForm
+            <BasicVehicleForm
               vehicle={currentVehicle as Vehicle}
               onSubmit={handleSubmit}
               onCancel={handleCancel}

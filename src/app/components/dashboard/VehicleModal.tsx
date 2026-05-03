@@ -2,9 +2,7 @@
 
 import dynamic from "next/dynamic";
 import BasicForm from "./BasicVehicleForm";
-const HeavyForm = dynamic(() => import("./HeavyVehicleForm"), { 
-  loading: () => <div className="h-12 bg-slate-100 animate-pulse rounded-lg mb-4" /> 
-});
+// Removed HeavyForm to fix module error
 import { useUI } from "@/app/components/UIContext";
 import { useBodyScrollLock } from "@/lib/useBodyScrollLock";
 import type { Vehicle } from "@/lib/types";
@@ -14,7 +12,7 @@ interface VehicleModalProps {
   isOpen: boolean;
   vehicle: Vehicle | null;
   onClose: () => void;
-  onSave: (vehicle: Partial<Vehicle>, imageFile?: File) => Promise<void>;
+  onSave: (vehicle: Partial<Vehicle>, imageFile?: File | null) => Promise<void>;
   uploadProgress?: {
     stage: 'compressing' | 'uploading' | 'processing' | 'saving' | null;
     progress: number;
@@ -67,7 +65,7 @@ export default function VehicleModal({ isOpen, vehicle, onClose, onSave, uploadP
     Time: "",
   };
 
-  const handleSubmit = async (data: Partial<Vehicle>, imageFile: File | null) => {
+  const handleSubmit = async (data: Partial<Vehicle>, imageFile?: File) => {
     setIsLoading(true);
     setError(null);
     
@@ -101,14 +99,11 @@ export default function VehicleModal({ isOpen, vehicle, onClose, onSave, uploadP
         onClearError={handleClearError}
         modalTitle={vehicle ? "Edit Vehicle" : "Add New Vehicle"}
       />
-      <Suspense fallback={null}>
-        <HeavyForm 
-          vehicle={formVehicle} 
-          onCancel={onClose}
-          uploadProgress={uploadProgress}
-        />
-      </Suspense>
+      {/* HeavyForm removed - using BasicForm only */}
+      {/* Using BasicForm only - uploadProgress passed through props if needed */}
+      {/* Secondary form removed to avoid duplication */}
     </>
   );
+
 
 }

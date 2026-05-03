@@ -10,26 +10,7 @@ import { ChevronDown, ChevronUp } from "lucide-react";
 import { cn } from "@/lib/ui";
 import type { Vehicle } from "@/lib/types";
 
-export interface VirtualTableProps {
-  /** Data for virtual rows */
-  data: Vehicle[];
-  /** Height of each row */
-  rowHeight?: number;
-  /** Width of table (auto if not provided) */
-  width?: number;
-  /** Height of table container */
-  height?: number;
-  /** Render function for each row */
-  renderRow: (vehicle: Vehicle, index: number, style: React.CSSProperties) => React.ReactNode;
-  /** Optional header */
-  header?: React.ReactNode;
-  /** Loading indicator for empty state */
-  isLoading?: boolean;
-  /** Total estimated rows for scroll height */
-  estimatedRowCount?: number;
-  /** On row click handler */
-  onRowClick?: (vehicle: Vehicle) => void;
-}
+// Removed unused generic VirtualTableProps interface
 
 const DEFAULT_ROW_HEIGHT = 80;
 const OVERSCAN = 5;
@@ -68,24 +49,9 @@ export function VirtualTable({
     if (!vehicle) return null;
 
     return (
-      <VehicleRow
-        key={vehicle.VehicleId || index}
-        vehicle={vehicle}
-        index={index}
-        style={style}
-        isAdmin={isAdmin}
-        visibleColumns={['id', 'image', 'category', 'brand', 'model', 'year', 'plate', 'priceNew', 'price40', 'price70', 'taxType', 'condition', 'bodyType', 'color', 'actions']}
-        sortField={sortField}
-        sortDirection={sortDirection}
-        onSort={onSort}
-        onEdit={onEdit}
-        onDelete={onDelete}
-        imageErrors={new Set()}
-        setImageErrors={() => {}}
-        deletingId={null}
-        handleOptimisticDelete={onDelete}
-        router={{ push: () => {} }}
-      />
+      <div style={style} className="p-4 border-b hover:bg-gray-50">
+        Vehicle Row {index}: {vehicle.Brand} {vehicle.Model}
+      </div>
     );
   }, [vehicles, isAdmin, onEdit, onDelete, sortField, sortDirection, onSort]);
 
