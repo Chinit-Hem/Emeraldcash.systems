@@ -3,10 +3,11 @@ import { NextRequest, NextResponse } from "next/server";
 import {
   getClientIp,
   getClientUserAgent,
-  getSessionFromRequest,
-  validateSession,
-} from "@/lib/auth";
+  getSessionFromRequestEdge,
+  validateSessionEdge,
+} from "@/lib/auth-edge";
 import { globalLogger } from "@/lib/logger";
+import { buildCorsHeaders } from "@/lib/cors";
 
 const PUBLIC_PAGE_ROUTES = new Set(["/login"]);
 const PUBLIC_API_ROUTES = new Set([
@@ -15,9 +16,6 @@ const PUBLIC_API_ROUTES = new Set([
   "/api/auth/me",
   "/api/auth/debug",
   "/api/health",
-  "/api/vehicles/edge",
-  "/api/vehicles/stats",
-  "/api/upload",
 ]);
 
 const IS_PRODUCTION = process.env.NODE_ENV === "production";
@@ -58,15 +56,13 @@ function getSafeRedirectPath(path: string | null): string | null {
   return path;
 }
 
-function isAuthenticated(request: NextRequest): boolean {
+async function isAuthenticated(request: NextRequest): Promise<boolean> {
   const sessionCookie = request.cookies.get("session")?.value;
   if (!sessionCookie) return false;
 
   try {
-    const ip = getClientIp(request.headers);
-    const userAgent = getClientUserAgent(request.headers);
-    const session = getSessionFromRequest(userAgent, ip, sessionCookie);
-    return Boolean(session && validateSession(session));
+    const session = await getSessionFromRequestEdge(sessionCookie);
+    return Boolean(session && validateSessionEdge(session));
   } catch {
     return false;
   }
@@ -89,7 +85,7 @@ function redirectToLogin(request: NextRequest): Response {
   // Prevent redirect loops: don't add redirect param if already coming from login
   const isComingFromLogin = request.headers.get("referer")?.includes("/login");
   const alreadyHasRedirect = request.nextUrl.searchParams.has("redirect");
-  
+
   if (requestedPath && !isComingFromLogin && !alreadyHasRedirect) {
     loginUrl.searchParams.set("redirect", requestedPath);
   }
@@ -101,27 +97,21 @@ function redirectToLogin(request: NextRequest): Response {
   return response;
 }
 
-export function middleware(request: NextRequest) {
+export async function middleware(request: NextRequest) {
   const startTime = Date.now();
   const { pathname } = request.nextUrl;
   const userAgent = getClientUserAgent(request.headers);
   // Fallback for crypto.randomUUID on HTTP environments
-  let requestId: string;
-  try {
-    requestId = request.headers.get("x-request-id") || crypto.randomUUID();
-  } catch {
-    // Fallback when crypto.randomUUID is not available (HTTP instead of HTTPS)
-    requestId = request.headers.get("x-request-id") || `${Date.now()}-${Math.random().toString(36).substring(2, 15)}`;
-  }
+  const requestId: string = request.headers.get("x-request-id") || crypto.randomUUID();
 
   try {
-    // Skip static/public assets early.
-    if (isPublicAsset(pathname)) {
+    // Allow CORS preflight to reach route handlers.
+    if (request.method === "OPTIONS") {
       return NextResponse.next();
     }
 
-    // Allow CORS preflight to reach route handlers.
-    if (request.method === "OPTIONS") {
+    // ⚡️ PERF: Check public routes BEFORE expensive authentication logic
+    if (isPublicAsset(pathname) || isPublicApiRoute(pathname)) {
       return NextResponse.next();
     }
 
@@ -131,7 +121,7 @@ export function middleware(request: NextRequest) {
         pathname,
         requestId,
       });
-      
+
       if (pathname.startsWith("/api/") && !isPublicApiRoute(pathname)) {
         return NextResponse.json(
           {
@@ -139,7 +129,7 @@ export function middleware(request: NextRequest) {
             error: "Server configuration error. Please contact support.",
             requestId,
           },
-          { status: 500, headers: { "Cache-Control": "no-store", "X-Request-ID": requestId } }
+          { status: 500, headers: { "Cache-Control": "no-store", "X-Request-ID": requestId, ...Object.fromEntries(buildCorsHeaders(request)) } }
         );
       }
 
@@ -149,28 +139,30 @@ export function middleware(request: NextRequest) {
       }
     }
 
-    const authenticated = isAuthenticated(request);
+    // Perform authentication check once
+    // The authenticated check should be performed once and then used.
+    const authenticated = await isAuthenticated(request);
 
+    // If the path is public, no authentication is needed.
+    if (isPublicAsset(pathname) || isPublicApiRoute(pathname)) {
+      return NextResponse.next();
+    }
     // API routes: return JSON 401 instead of page redirects.
     if (pathname.startsWith("/api/")) {
-      if (isPublicApiRoute(pathname)) {
-        return NextResponse.next();
-      }
-
       if (!authenticated) {
         globalLogger.warn("Unauthorized API access attempt", {
           pathname,
           requestId,
           ip: getClientIp(request.headers),
         });
-        
+
         return NextResponse.json(
-          { 
-            ok: false, 
+          {
+            ok: false,
             error: "Unauthorized. Please log in.",
             requestId,
           },
-          { status: 401, headers: { "Cache-Control": "no-store", "X-Request-ID": requestId } }
+          { status: 401, headers: { "Cache-Control": "no-store", "X-Request-ID": requestId, ...Object.fromEntries(buildCorsHeaders(request)) } }
         );
       }
 
@@ -214,7 +206,7 @@ export function middleware(request: NextRequest) {
     // Global middleware error handler
     const duration = Date.now() - startTime;
     const error = err instanceof Error ? err : new Error(String(err));
-    
+
     globalLogger.error("Middleware error", error, {
       pathname,
       requestId,
@@ -229,12 +221,12 @@ export function middleware(request: NextRequest) {
           error: "An internal error occurred. Our team has been notified.",
           requestId,
         },
-        { 
-          status: 500, 
-          headers: { 
+        {
+          status: 500,
+          headers: {
             "Cache-Control": "no-store",
-            "X-Request-ID": requestId,
-          } 
+            "X-Request-ID": requestId, ...Object.fromEntries(buildCorsHeaders(request))
+          }
         }
       );
     }
