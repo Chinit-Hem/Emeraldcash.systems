@@ -1,14 +1,14 @@
 /**
  * Form Debugger - Runtime Form Error Capture & Debugging Overlay
- * 
+ *
  * Features:
  * - Console error interception for forms
- * - Form state snapshot on error  
+ * - Form state snapshot on error
  * - Validation overlay toggle
  * - Network request error capture
  * - Form replay for debugging
- * 
- * Usage: 
+ *
+ * Usage:
  * import { FormDebuggerProvider, useFormDebugger } from './formDebugger'
  */
 
@@ -25,7 +25,7 @@ export interface FormError {
   timestamp: number;
   componentStack: string;
   error: string;
-  formState?: any;
+  formState?: unknown;
   validationErrors?: Record<string, string>;
   networkError?: boolean;
   url: string;
@@ -36,9 +36,23 @@ export interface FormDebuggerContextType {
   clearErrors: () => void;
   toggleOverlay: () => void;
   overlayVisible: boolean;
-  captureError: (error: Error, context?: any) => void;
+  captureError: (error: Error, context?: FormDebuggerContext) => void;
   isEnabled: boolean;
 }
+
+type FormDebuggerContext = {
+  componentStack?: string;
+  formState?: unknown;
+  validationErrors?: Record<string, string>;
+  networkError?: boolean;
+  [key: string]: unknown;
+};
+
+type FormDebuggerWindow = Window & {
+  formDebugger?: {
+    captureError: (error: Error, context?: FormDebuggerContext) => void;
+  };
+};
 
 // ============================================================================
 // Context & Provider
@@ -53,16 +67,16 @@ export function FormDebuggerProvider({ children }: { children: ReactNode }) {
 
   // Enable via localStorage or query param
   useEffect(() => {
-    const enabled = localStorage.getItem('formDebugger') === 'true' || 
+    const enabled = localStorage.getItem('formDebugger') === 'true' ||
                    new URLSearchParams(window.location.search).has('debugForms');
     setIsEnabled(enabled);
-    
+
     if (enabled) {
       console.log('[FormDebugger] ✅ Enabled - Use ?debugForms=true or localStorage.setItem("formDebugger", "true")');
     }
   }, []);
 
-  const captureError = useCallback((error: Error, context: any = {}) => {
+  const captureError = useCallback((error: Error, context: FormDebuggerContext = {}) => {
     if (!isEnabled) return;
 
     const newError: FormError = {
@@ -77,10 +91,10 @@ export function FormDebuggerProvider({ children }: { children: ReactNode }) {
     };
 
     setErrors(prev => [newError, ...prev.slice(0, 9)]); // Keep last 10
-    
+
     // Auto-show overlay
     setOverlayVisible(true);
-    
+
     console.groupCollapsed(`[FormDebugger] 🚨 Form Error #${errors.length + 1}`);
     console.error(error);
     console.log('Context:', context);
@@ -119,9 +133,9 @@ export function useFormDebugger(formId?: string) {
     throw new Error('useFormDebugger must be used within FormDebuggerProvider');
   }
 
-  const captureFormError = useCallback((error: Error | string, extraContext?: any) => {
+  const captureFormError = useCallback((error: Error | string, extraContext?: FormDebuggerContext) => {
     if (!context.isEnabled) return;
-    
+
     const errorObj = typeof error === 'string' ? new Error(error) : error;
     context.captureError(errorObj, {
       formId,
@@ -140,44 +154,46 @@ export function useFormDebugger(formId?: string) {
 // Console Interceptor (Auto-capture form errors)
 // ============================================================================
 
-let originalConsoleError: typeof console.error;
-let originalConsoleWarn: typeof console.warn;
+let originalConsoleError: typeof console.error | undefined;
+let originalConsoleWarn: typeof console.warn | undefined;
 
 export function installConsoleInterceptor() {
   if (originalConsoleError) return; // Already installed
-  
+
   originalConsoleError = console.error;
   originalConsoleWarn = console.warn;
+  const consoleError = originalConsoleError;
+  const consoleWarn = originalConsoleWarn;
 
   // Intercept console.error for form-related messages
-  console.error = (...args: any[]) => {
+  console.error = (...args: unknown[]) => {
     const message = args[0];
     if (typeof message === 'string' && (
       message.includes('form') ||
       message.includes('validation') ||
       message.includes('required') ||
       message.includes('error') ||
-      args.some((arg: any) => arg && arg.message && arg.message.includes('form'))
+      args.some((arg) => typeof arg === 'object' && arg !== null && 'message' in arg && String(arg.message).includes('form'))
     )) {
       // Global formDebugger capture (avoid React context in console override)
-      if (typeof (window as any).formDebugger !== 'undefined') {
-        (window as any).formDebugger.captureError(new Error(String(message)), {
+      if (typeof (window as FormDebuggerWindow).formDebugger !== 'undefined') {
+        (window as FormDebuggerWindow).formDebugger?.captureError(new Error(String(message)), {
           fromConsole: true,
           args,
         });
       }
     }
-    originalConsoleError.call(console, ...args);
+    consoleError.call(console, ...args);
   };
 
-  console.warn = (...args: any[]) => {
+  console.warn = (...args: unknown[]) => {
     const message = args[0];
     if (typeof message === 'string' && (
-      message.includes('Form') || 
+      message.includes('Form') ||
       message.includes('validation') ||
       message.includes('required')
     )) {
-      originalConsoleWarn.call(console, ...args);
+      consoleWarn.call(console, ...args);
     }
   };
 
@@ -187,8 +203,6 @@ export function installConsoleInterceptor() {
 // ============================================================================
 // Error Overlay Component
 // ============================================================================
-
-interface ErrorOverlayProps {}
 
 export function ErrorOverlay() {
   const { errors, clearErrors, overlayVisible, toggleOverlay, isEnabled } = useContext(FormDebuggerContext)!;
@@ -205,7 +219,7 @@ export function ErrorOverlay() {
       >
         {errors.length}
       </button>
-      
+
       {/* Overlay Panel */}
       <div className="fixed inset-0 z-[9998] bg-black/50 backdrop-blur-sm flex items-end sm:items-center p-4">
         <div className="bg-white dark:bg-gray-900 w-full max-w-2xl max-h-[90vh] rounded-2xl shadow-2xl overflow-hidden flex flex-col">
@@ -230,7 +244,7 @@ export function ErrorOverlay() {
               </button>
             </div>
           </div>
-          
+
           {/* Errors List */}
           <div className="flex-1 p-6 overflow-y-auto">
             {errors.map((error) => (
@@ -277,15 +291,16 @@ installConsoleInterceptor();
 
 // Global access for ErrorBoundary integration
 if (typeof window !== 'undefined') {
-  (window as any).formDebugger = {
-    captureError: (error: Error, context?: any) => {
-      const provider = document.querySelector('[data-form-debugger]') as HTMLElement;
-      if (provider && typeof (provider as any).captureError === 'function') {
-        (provider as any).captureError(error, context);
+  (window as FormDebuggerWindow).formDebugger = {
+    captureError: (error: Error, context?: FormDebuggerContext) => {
+      const provider = document.querySelector('[data-form-debugger]') as HTMLElement & {
+        captureError?: (error: Error, context?: FormDebuggerContext) => void;
+      };
+      if (provider && typeof provider.captureError === 'function') {
+        provider.captureError(error, context);
       }
     }
   };
 }
 
 export default FormDebuggerProvider;
-

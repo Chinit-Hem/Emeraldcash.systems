@@ -30,13 +30,13 @@ interface AssetFormModalProps {
   isEdit?: boolean;
 }
 
-export default function AssetFormModal({ 
-  isOpen, 
-  onClose, 
-  onSave, 
-  initialData = {}, 
-  title, 
-  isEdit = false 
+export default function AssetFormModal({
+  isOpen,
+  onClose,
+  onSave,
+  initialData = {},
+  title,
+  isEdit = false
 }: AssetFormModalProps) {
   const [formData, setFormData] = useState<Omit<SmsAsset, 'id'>>({
     name: '',
@@ -75,20 +75,20 @@ export default function AssetFormModal({
 
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {};
-    
+
     // Required fields
     if (!formData.name?.trim()) newErrors.name = 'Asset name is required';
     if (formData.name && formData.name.length < 2) newErrors.name = 'Name must be at least 2 characters';
     if (formData.name && formData.name.length > 255) newErrors.name = 'Name too long (max 255 characters)';
-    
+
     if (!formData.type?.trim()) newErrors.type = 'Type is required';
     if (formData.type && formData.type.length > 64) newErrors.type = 'Type too long (max 64 characters)';
-    
+
     // Quantity validation
     if (!formData.quantity) newErrors.quantity = 'Quantity is required';
     else if (formData.quantity < 1) newErrors.quantity = 'Quantity must be at least 1';
     else if (formData.quantity > 999) newErrors.quantity = 'Quantity too high (max 999)';
-    
+
     // Optional field max lengths
     if (formData.itemCode && formData.itemCode.length > 64) newErrors.itemCode = 'Item code too long (max 64 characters)';
     if (formData.category && formData.category.length > 64) newErrors.category = 'Category too long (max 64 characters)';
@@ -96,7 +96,7 @@ export default function AssetFormModal({
     if (formData.assignedTo && formData.assignedTo.length > 128) newErrors.assignedTo = 'Assigned to too long (max 128 characters)';
     if (formData.description && formData.description.length > 1000) newErrors.description = 'Description too long (max 1000 characters)';
     if (formData.refId && formData.refId.length > 128) newErrors.refId = 'Reference ID too long (max 128 characters)';
-    
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -125,7 +125,7 @@ export default function AssetFormModal({
       });
 
       const result = await response.json();
-      
+
       if (result.success) {
         setFormData({ ...formData, imageUrl: result.url });
         setImagePreview(result.url);
@@ -147,7 +147,7 @@ export default function AssetFormModal({
 
     setLoading(true);
     const result = await onSave(formData);
-    
+
     if (result.success) {
       onClose();
     } else {
@@ -172,10 +172,11 @@ export default function AssetFormModal({
             <h2 className="text-2xl font-bold bg-gradient-to-r from-slate-800 to-slate-900 bg-clip-text text-transparent">
               {title}
             </h2>
-            <button
+<button
               onClick={onClose}
               className="p-2 hover:bg-slate-200 rounded-2xl transition-all group"
               disabled={loading}
+              title="Close modal"
             >
               <X className="w-5 h-5 text-slate-500 group-hover:text-slate-700" />
             </button>
@@ -341,11 +342,11 @@ export default function AssetFormModal({
                   <p className="font-semibold text-slate-700">Upload Image</p>
                   <p className="text-xs text-slate-500">PNG, JPG up to 10MB</p>
                 </div>
-                {uploadProgress > 0 && (
-                  <div className="w-full bg-slate-200 rounded-full h-2">
-                    <div 
+{uploadProgress > 0 && (
+                  <div className="w-full bg-slate-200 rounded-full h-2 overflow-hidden">
+                    <div
                       className="bg-emerald-600 h-2 rounded-full transition-all"
-                      style={{ width: `${uploadProgress}%` }}
+                      style={{ width: `${uploadProgress}%`, flexShrink: 0 }}
                     />
                   </div>
                 )}
@@ -353,18 +354,19 @@ export default function AssetFormModal({
             </div>
             {imagePreview && (
               <div className="mt-4 flex items-center gap-3 p-4 bg-slate-50 rounded-2xl">
-                <Image 
-                  src={imagePreview!} 
-                  alt="Asset preview" 
-                  width={80} 
-                  height={80} 
-                  className="object-cover rounded-2xl shadow-md w-20 h-20" 
+                <Image
+                  src={imagePreview!}
+                  alt="Asset preview"
+                  width={80}
+                  height={80}
+                  className="object-cover rounded-2xl shadow-md w-20 h-20"
                 />
                 <div className="flex-1">
                   <p className="font-medium text-slate-800 truncate">{formData.imageUrl}</p>
-                  <button
+<button
                     type="button"
                     onClick={removeImage}
+                    title="Remove image"
                     className="text-xs text-amber-600 hover:text-amber-700 font-medium -mt-1"
                   >
                     Remove

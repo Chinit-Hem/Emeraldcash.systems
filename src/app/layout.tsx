@@ -1,11 +1,9 @@
 import type { Metadata, Viewport } from "next";
-import { headers } from "next/headers";
 import { Suspense } from "react";
 import "../styles/globals.css";
 import { ThemeProvider } from "@/lib/theme-provider";
 import { LanguageProvider } from "@/lib/LanguageContext";
 import { InstantNavigationProvider } from "@/app/components/InstantNavigationProvider";
-import { PrefetchProvider } from "@/app/components/OptimizedLink";
 import { NeuDashboardSkeleton } from "@/app/components/skeletons/NeuDashboardSkeleton";
 
 const themeInitScript = `
@@ -56,15 +54,6 @@ const iosSafariGuardScript = `
   })();
 `;
 
-function isIOSSafariUserAgent(userAgent: string): boolean {
-  const ua = userAgent || "";
-  const isIOSDevice =
-    /iP(hone|ad|od)/i.test(ua) ||
-    (/Macintosh/i.test(ua) && /Mobile/i.test(ua));
-  const isIOSWebKit = /AppleWebKit|WebKit/i.test(ua);
-  return isIOSDevice && isIOSWebKit;
-}
-
 export const metadata: Metadata = {
   title: "Emerald Cash VMS",
   description: "Vehicle Management System by Emerald Cash",
@@ -91,16 +80,24 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const headersList = await headers();
-  const userAgent = headersList.get("user-agent") ?? "";
-  const iosSafariClassName = isIOSSafariUserAgent(userAgent) ? "ios-safari" : "";
-
   return (
-    <html lang="en" dir="ltr" className={iosSafariClassName} suppressHydrationWarning>
+    <html lang="en" dir="ltr" suppressHydrationWarning>
       <head>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link href="https://fonts.googleapis.com/css2?family=Kantumruy+Pro:wght@300;400;700&display=swap" rel="stylesheet" />
+        <link
+          rel="preload"
+          as="style"
+          href="https://fonts.googleapis.com/css2?family=Kantumruy+Pro:wght@300;400;700&display=swap"
+        />
+        <link
+          id="kantumruy-font"
+          href="https://fonts.googleapis.com/css2?family=Kantumruy+Pro:wght@300;400;700&display=swap"
+          rel="stylesheet"
+        />
+        <noscript>
+          <link href="https://fonts.googleapis.com/css2?family=Kantumruy+Pro:wght@300;400;700&display=swap" rel="stylesheet" />
+        </noscript>
         <script id="ios-safari-guard" dangerouslySetInnerHTML={{ __html: iosSafariGuardScript }} />
         <script id="theme-init" dangerouslySetInnerHTML={{ __html: themeInitScript }} />
       </head>
@@ -108,11 +105,9 @@ export default async function RootLayout({
         <ThemeProvider>
           <LanguageProvider>
             <InstantNavigationProvider>
-              <PrefetchProvider>
-                <Suspense fallback={<NeuDashboardSkeleton />}>
-                  {children}
-                </Suspense>
-              </PrefetchProvider>
+              <Suspense fallback={<NeuDashboardSkeleton />}>
+                {children}
+              </Suspense>
             </InstantNavigationProvider>
           </LanguageProvider>
         </ThemeProvider>

@@ -1,13 +1,13 @@
 /**
  * LMS Dashboard - Beautiful, Clean, Professional, Advanced, Standard Design
- * 
+ *
  * Design Philosophy:
  * - Glassmorphism + Neumorphism fusion for modern tactile feel
  * - Professional color palette with emerald accents
  * - Advanced micro-interactions and smooth animations
  * - Clean typography hierarchy
  * - Standard component patterns for maintainability
- * 
+ *
  * @module LmsDashboard
  */
 
@@ -49,7 +49,6 @@ import {
 } from "@/lib/lms-types";
 import { useAuthUser } from "@/app/components/AuthContext";
 import { useDebouncedValue } from "@/lib/useDebouncedValue";
-import { useTransition } from "react";
 import LmsErrorBoundary from "./LmsErrorBoundary";
 
 type TabType = "learning" | "progress" | "achievements" | "my-process";
@@ -63,8 +62,8 @@ class LmsApiService {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), this.TIMEOUT);
     try {
-      const response = await fetch(url, { 
-        ...options, 
+      const response = await fetch(url, {
+        ...options,
         signal: controller.signal,
         credentials: "include"
       });
@@ -74,7 +73,6 @@ class LmsApiService {
       clearTimeout(timeoutId);
       // Don't throw for abort errors (component unmounted or request cancelled)
       if (error instanceof Error && error.name === 'AbortError') {
-        console.log('[LmsDashboard] Request aborted:', url);
         return new Response(null, { status: 499, statusText: 'Client Closed Request' });
       }
       throw error;
@@ -212,7 +210,7 @@ function CategoryCard({
     rose: "from-rose-500 to-rose-600",
   };
 
-  const gradientColor = colorMap[category.color] || colorMap.emerald;
+  const gradientColor = colorMap[category.color || "emerald"] || colorMap.emerald;
 
   return (
     <button
@@ -347,42 +345,46 @@ function LmsDashboard({ initialData }: LmsDashboardProps) {
   const [categories, setCategories] = useState<LmsCategory[]>(initialData?.categories || []);
   const [lessons, setLessons] = useState<LessonWithStatus[]>(initialData?.lessons || []);
   const [loading, setLoading] = useState(!initialData);
-  const [isPending, startTransition] = useTransition();
   const [_activeTab, _setActiveTab] = useState<TabType>("learning");
   const [isExporting, setIsExporting] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const activeTab = _activeTab;
   const setActiveTab = _setActiveTab;
-  
+
   const user = useAuthUser();
   const isAdmin = user?.role === "Admin";
-  
+
   const [searchQuery, setSearchQuery] = useState("");
   const debouncedSearch = useDebouncedValue(searchQuery, 300);
 
-  const loadData = useCallback(async () => {
-    startTransition(async () => {
+  const loadData = useCallback(async ({ showSkeleton = true } = {}) => {
+    if (showSkeleton) {
       setLoading(true);
-      try {
-        const [statsData, categoriesData] = await Promise.all([
-          LmsApiService.fetchDashboardData(),
-          LmsApiService.fetchCategories(),
-        ]);
-        const lessonsData = categoriesData.length > 0 ? await LmsApiService.fetchAllLessons(categoriesData) : [];
-        setStats(statsData);
-        setCategories(categoriesData);
-        setLessons(lessonsData);
-      } catch (error) {
-        console.error("Error loading dashboard data:", error);
-      } finally {
+    }
+
+    try {
+      const [statsData, categoriesData] = await Promise.all([
+        LmsApiService.fetchDashboardData(),
+        LmsApiService.fetchCategories(),
+      ]);
+      const lessonsData = categoriesData.length > 0 ? await LmsApiService.fetchAllLessons(categoriesData) : [];
+      setStats(statsData);
+      setCategories(categoriesData);
+      setLessons(lessonsData);
+    } catch (error) {
+      console.error("Error loading dashboard data:", error);
+    } finally {
+      if (showSkeleton) {
         setLoading(false);
       }
-    });
+    }
   }, []);
 
   useEffect(() => {
-    loadData();
-  }, [loadData]);
+    if (!initialData) {
+      void loadData();
+    }
+  }, [initialData, loadData]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -398,7 +400,7 @@ function LmsDashboard({ initialData }: LmsDashboardProps) {
   const handleRefresh = useCallback(async () => {
     setIsRefreshing(true);
     try {
-      await loadData();
+      await loadData({ showSkeleton: false });
     } finally {
       setIsRefreshing(false);
     }
@@ -435,7 +437,7 @@ function LmsDashboard({ initialData }: LmsDashboardProps) {
 
   // Instant render with skeleton if no initial data or refreshing
   const isSkeleton = loading || !stats || !categories.length;
-  
+
   if (isSkeleton) {
     return (
       <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -463,8 +465,8 @@ function LmsDashboard({ initialData }: LmsDashboardProps) {
           </p>
           {isAdmin ? (
             <div className="space-y-4">
-              <a 
-                href="/lms/admin/categories" 
+              <a
+                href="/lms/admin/categories"
                 className="block w-full max-w-sm mx-auto px-8 py-4 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white font-semibold rounded-2xl shadow-lg hover:shadow-xl hover:from-emerald-600 hover:to-emerald-700 transition-all text-center"
               >
                 🏗️ Add First Training Category
@@ -478,8 +480,8 @@ function LmsDashboard({ initialData }: LmsDashboardProps) {
               <p className="text-slate-500 dark:text-slate-400 text-center">
                 Contact your administrator to set up training modules.
               </p>
-              <button 
-                onClick={handleRefresh} 
+              <button
+                onClick={handleRefresh}
                 className="px-8 py-3 bg-slate-200 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 font-semibold rounded-2xl shadow-sm transition-all hover:bg-slate-300 dark:hover:bg-slate-600 mx-auto block"
               >
                 🔄 Refresh
@@ -758,29 +760,29 @@ function LmsDashboard({ initialData }: LmsDashboardProps) {
 
         {activeTab === "achievements" && (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <AchievementCard 
-              title="First Steps" 
-              description="Complete your first lesson" 
-              icon={Zap} 
-              unlocked={completedLessons > 0} 
-              progress={completedLessons > 0 ? 100 : 0} 
-              color="emerald" 
+            <AchievementCard
+              title="First Steps"
+              description="Complete your first lesson"
+              icon={Zap}
+              unlocked={completedLessons > 0}
+              progress={completedLessons > 0 ? 100 : 0}
+              color="emerald"
             />
-            <AchievementCard 
-              title="Category Master" 
-              description="Complete all lessons in a category" 
-              icon={Target} 
-              unlocked={stats.category_completion?.some((c) => c.completion_rate === 100) ?? false} 
-              progress={stats.category_completion?.length ? Math.max(...stats.category_completion.map((c) => c.completion_rate), 0) : 0} 
-              color="blue" 
+            <AchievementCard
+              title="Category Master"
+              description="Complete all lessons in a category"
+              icon={Target}
+              unlocked={stats.category_completion?.some((c) => c.completion_rate === 100) ?? false}
+              progress={stats.category_completion?.length ? Math.max(...stats.category_completion.map((c) => c.completion_rate), 0) : 0}
+              color="blue"
             />
-            <AchievementCard 
-              title="Training Graduate" 
-              description="Complete all training lessons" 
-              icon={GraduationCap} 
-              unlocked={overallProgress === 100} 
-              progress={overallProgress} 
-              color="purple" 
+            <AchievementCard
+              title="Training Graduate"
+              description="Complete all training lessons"
+              icon={GraduationCap}
+              unlocked={overallProgress === 100}
+              progress={overallProgress}
+              color="purple"
             />
           </div>
         )}
@@ -798,7 +800,7 @@ function LmsDashboard({ initialData }: LmsDashboardProps) {
                   <p className="text-sm text-slate-500">Track your personal learning journey</p>
                 </div>
               </div>
-              
+
               {/* Personal Stats */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
                 <div className="text-center p-4 bg-emerald-50 rounded-2xl">
@@ -852,7 +854,7 @@ function LmsDashboard({ initialData }: LmsDashboardProps) {
                   const completedInCategory = categoryLessons.filter((l) => l.is_completed).length;
                   const totalInCategory = categoryLessons.length;
                   const progress = totalInCategory > 0 ? Math.round((completedInCategory / totalInCategory) * 100) : 0;
-                  
+
                   return (
                     <div key={category.id} className="p-4 bg-slate-50 rounded-2xl">
                       <div className="flex items-center justify-between mb-2">

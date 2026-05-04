@@ -12,6 +12,12 @@ interface SmsAssetOption {
   itemCode?: string | null;
 }
 
+type SmsAssetApiItem = {
+  id: string;
+  name: string;
+  itemCode?: string | null;
+};
+
 interface SettingsUser {
   username: string;
   full_name?: string | null;
@@ -45,7 +51,7 @@ export default function TransferPage() {
       .then((r) => r.json())
       .then((data) => {
         if (data.success && Array.isArray(data.data)) {
-          setAssets(data.data.map((a: any) => ({ id: a.id, name: a.name, itemCode: a.itemCode })));
+          setAssets(data.data.map((a: SmsAssetApiItem) => ({ id: a.id, name: a.name, itemCode: a.itemCode })));
         }
       })
       .catch(() => {
@@ -182,7 +188,8 @@ export default function TransferPage() {
               Loading assets...
             </div>
           ) : assets.length > 0 ? (
-            <select
+<select
+              title="Select asset to transfer"
               value={form.assetId}
               onChange={(e) => handleChange("assetId", e.target.value)}
               className={`w-full border rounded-lg p-3 focus:outline-none focus:ring-2 transition-all bg-white ${
@@ -228,8 +235,9 @@ export default function TransferPage() {
               <Loader2 className="w-4 h-4 animate-spin" />
               Loading users...
             </div>
-          ) : users.length > 0 ? (
+) : users.length > 0 ? (
             <select
+              title="Select sender"
               value={form.senderId}
               onChange={(e) => handleChange("senderId", e.target.value)}
               className={`w-full border rounded-lg p-3 focus:outline-none focus:ring-2 transition-all bg-white ${
@@ -275,8 +283,9 @@ export default function TransferPage() {
               <Loader2 className="w-4 h-4 animate-spin" />
               Loading users...
             </div>
-          ) : users.length > 0 ? (
+) : users.length > 0 ? (
             <select
+              title="Select receiver"
               value={form.receiverId}
               onChange={(e) => handleChange("receiverId", e.target.value)}
               className={`w-full border rounded-lg p-3 focus:outline-none focus:ring-2 transition-all bg-white ${

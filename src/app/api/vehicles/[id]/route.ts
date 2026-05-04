@@ -1,10 +1,11 @@
 /**
  * Single Vehicle API Route - FULL CRUD /api/vehicles/[id]
- * 
+ *
  * GET ✓ PUT ✓ DELETE ✓ - Complete CRUD for individual vehicles
  */
 
 import { createErrorResponse, createSuccessResponse, withErrorHandling } from "@/lib/api-error-wrapper";
+import { requirePermission } from "@/lib/auth-helpers";
 import { vehicleService } from "@/services/VehicleService";
 import { NextRequest, NextResponse } from "next/server";
 import type { Vehicle } from "@/lib/types";
@@ -17,7 +18,7 @@ function buildCorsHeaders(req: NextRequest): Headers {
   const vercelOrigin = vercelUrl
     ? vercelUrl.startsWith("http")
       ? vercelUrl
-      : `https://${vercelUrl}`  
+      : `https://${vercelUrl}`
     : "";
   const requestOrigin = req.headers.get("origin") || "";
   const allowedOrigin = appOrigin || vercelOrigin || requestOrigin || "*";
@@ -47,8 +48,11 @@ export async function OPTIONS(req: NextRequest) {
 // ============================================================================
 // GET Handler - Single Vehicle by ID (EXISTING - WORKING)
 const getHandler = withErrorHandling(async (req: NextRequest, { logger, requestId, startTime }) => {
+  const auth = requirePermission(req, "vehicles:view");
+  if (auth.response) return auth.response;
+
   const idStr = req.nextUrl.pathname.split('/').pop()?.trim() || '';
-  
+
   if (!idStr || idStr === 'undefined' || isNaN(Number(idStr))) {
     logger.warn('Invalid vehicle ID', { idStr, requestId });
     return createErrorResponse(
@@ -61,18 +65,18 @@ const getHandler = withErrorHandling(async (req: NextRequest, { logger, requestI
   }
 
   const id = parseInt(idStr, 10);
-  
+
   logger.debug("Fetching single vehicle", { vehicleId: id, requestId });
 
   const vehicleResult = await vehicleService.getVehicleById(id);
-  
+
   if (!vehicleResult.success) {
-    const errorMsg = vehicleResult.error?.includes('not found') 
-      ? `Vehicle ID ${id} not found` 
+    const errorMsg = vehicleResult.error?.includes('not found')
+      ? `Vehicle ID ${id} not found`
       : vehicleResult.error || 'Vehicle not available';
-    
+
     logger.info(`Vehicle not found: ID ${id}`);
-    
+
     return createErrorResponse(
       errorMsg,
       requestId,
@@ -98,13 +102,16 @@ export { getHandler as GET };
 // ============================================================================
 // PUT Handler - Update Vehicle by ID (CRUD FIX)
 const putHandler = withErrorHandling(async (req: NextRequest, { logger, requestId, startTime }) => {
+  const auth = requirePermission(req, "vehicles:edit");
+  if (auth.response) return auth.response;
+
   const idStr = req.nextUrl.pathname.split('/').pop()?.trim() || '';
   if (!idStr || isNaN(Number(idStr))) {
     return createErrorResponse("Valid numeric vehicle ID required", requestId, Date.now() - startTime, 400, buildCorsHeaders(req));
   }
 
   const id = parseInt(idStr, 10);
-  
+
   let payload;
   try {
     payload = await req.json();
@@ -160,13 +167,16 @@ export { putHandler as PUT };
 // ============================================================================
 // DELETE Handler - Delete Vehicle by ID (CRUD FIX)
 const deleteHandler = withErrorHandling(async (req: NextRequest, { logger, requestId, startTime }) => {
+  const auth = requirePermission(req, "vehicles:delete");
+  if (auth.response) return auth.response;
+
   const idStr = req.nextUrl.pathname.split('/').pop()?.trim() || '';
   if (!idStr || isNaN(Number(idStr))) {
     return createErrorResponse("Valid numeric vehicle ID required", requestId, Date.now() - startTime, 400, buildCorsHeaders(req));
   }
 
   const id = parseInt(idStr, 10);
-  
+
   logger.debug("[DELETE]", { vehicleId: id });
 
   const result = await vehicleService.deleteVehicle(id);
@@ -178,11 +188,10 @@ const deleteHandler = withErrorHandling(async (req: NextRequest, { logger, reque
 
   logger.info("[DELETE OK]", { vehicleId: id });
 
-  return new NextResponse(null, { 
-    status: 204, 
-    headers: buildCorsHeaders(req) 
+  return new NextResponse(null, {
+    status: 204,
+    headers: buildCorsHeaders(req)
   });
 }, { context: "vehicles-delete" });
 
 export { deleteHandler as DELETE };
-

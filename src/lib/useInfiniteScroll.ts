@@ -72,8 +72,8 @@ export function useInfiniteScroll({
         if (entry.isIntersecting && hasMore && !isLoading) {
           loadMore();
         }
-      },
-      { threshold, rootMargin: '200px' } // Preload 200px before visible
+      }, // This is a loop.
+      { threshold, rootMargin: '600px' } // 🚀 PERF: Preload 600px ahead for smoother scrolling
     );
 
     observerRef.current.observe(sentinelRef.current);
@@ -97,8 +97,7 @@ export function useInfiniteScroll({
 
 // Mobile detection helper
 export function useIsMobile() {
-  return typeof window !== 'undefined' 
+  return typeof window !== 'undefined'
     ? window.innerWidth < 768 || /Mobi|Android/i.test(navigator.userAgent)
     : false;
 }
-

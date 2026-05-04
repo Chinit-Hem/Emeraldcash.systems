@@ -26,7 +26,7 @@ interface CleanedVehicleDetail {
   updated_at: string;
 }
 
-interface VehicleFormData extends Omit<CleanedVehicleDetail, 'id' | 'created_at' | 'updated_at'> {}
+type VehicleFormData = Omit<CleanedVehicleDetail, 'id' | 'created_at' | 'updated_at'>;
 
 export default function VehicleDetailEdit() {
   const user = useAuthUser();
@@ -71,7 +71,7 @@ export default function VehicleDetailEdit() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData) return;
-    
+
     setSaving(true);
     try {
       const res = await fetch(`/api/cleaned-vehicles/${id}`, {
@@ -143,8 +143,8 @@ export default function VehicleDetailEdit() {
       <main className="lg:pl-64 pt-16 pb-8">
         <div className="p-6 lg:p-8 max-w-4xl mx-auto">
           <div className="mb-8">
-            <button 
-              onClick={() => router.back()} 
+            <button
+              onClick={() => router.back()}
               className="inline-flex items-center gap-2 text-slate-600 hover:text-slate-900 font-medium mb-4"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

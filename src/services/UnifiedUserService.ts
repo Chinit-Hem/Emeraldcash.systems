@@ -1,15 +1,16 @@
 /**
  * Unified User Service
- * 
+ *
  * Single source of truth for all users across the application.
  * Settings users, LMS staff, and Admin users are all the same entity.
- * 
+ *
  * @module services/UnifiedUserService
  */
 
 import { lmsService } from "./LmsService";
 import type { CreateLmsStaffInput, UpdateLmsStaffInput, LmsStaffEntity } from "@/lib/lms-entities";
 import type { Role } from "@/lib/types";
+import * as userStore from "@/lib/userStore";
 
 // ============================================================================
 // Types - Single Unified User Model
@@ -23,18 +24,18 @@ export interface UnifiedUser {
   full_name: string;
   email: string | null;
   role: UserRole;
-  
+
   // Profile Data
   phone: string | null;
   branch_location: string | null;
   avatar_url: string | null;
-  
+
   // Status
   is_active: boolean;
   created_at: string;
   updated_at: string;
   last_login_at: string | null;
-  
+
   // LMS Specific (null if not enrolled in LMS)
   lms_staff_id?: number;
   lms_enrolled_at?: string;
@@ -107,7 +108,7 @@ export class UnifiedUserService {
 
       // Step 2: Create LMS staff if requested or if role requires it
       let lmsData: { staff_id?: number; enrolled_at?: string } = {};
-      
+
       if (input.enroll_in_lms !== false) {
         // All users get LMS access with unified role system
         const lmsResult = await this.enrollInLMS({
@@ -157,30 +158,22 @@ export class UnifiedUserService {
    */
   async getAllUsers(): Promise<ServiceResponse<UnifiedUser[]>> {
     try {
-      // Get auth users from settings API
-      const authUsersRes = await fetch("/api/auth/users", { cache: "no-store" });
-      const authData = await authUsersRes.json().catch(() => ({}));
-      
-      if (!authUsersRes.ok || !authData.users) {
-        throw new Error(authData.error || "Failed to fetch users");
-      }
+      // Direct library call instead of internal HTTP fetch
+      const authUsers = await userStore.listUsers();
 
       // Get LMS staff data
-      const lmsResult = await lmsService.getStaff();
-      const lmsStaff = lmsResult.success ? lmsResult.data || [] : [];
+      const lmsResult = await lmsService.getStaff(); // Assuming this fetches all staff
+      const lmsStaffMap = new Map<string, LmsStaffEntity>();
+      if (lmsResult.success && lmsResult.data) {
+        lmsResult.data.forEach(s => {
+          lmsStaffMap.set(s.fullName.toLowerCase(), s);
+          if (s.email) lmsStaffMap.set(s.email.toLowerCase(), s);
+        });
+      }
 
       // Merge into unified view
-      const users: UnifiedUser[] = authData.users.map((authUser: { 
-        username: string; 
-        role: string; 
-        createdAt: number; 
-        updatedAt: number;
-      }) => {
-        // Find matching LMS staff by name or email
-        const staff = lmsStaff.find((s) =>
-          s.fullName.toLowerCase() === authUser.username.toLowerCase() ||
-          s.email?.toLowerCase() === authUser.username.toLowerCase()
-        );
+      const users: UnifiedUser[] = authUsers.map((authUser) => {
+        const staff = lmsStaffMap.get(authUser.username.toLowerCase());
 
         return this.mergeUserData(authUser, staff);
       });
@@ -261,19 +254,14 @@ export class UnifiedUserService {
    */
   async deleteUser(id: string): Promise<ServiceResponse<boolean>> {
     try {
-      // Delete from auth system
-      const res = await fetch("/api/auth/users", {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username: id }),
+      const result = await userStore.deleteUser({
+        username: id,
+        requestedBy: "system" // Or the actual user performing the deletion
       });
 
-      if (!res.ok) {
-        const error = await res.json().catch(() => ({}));
-        throw new Error(error.error || "Failed to delete user");
-      }
+      if (!result.ok) throw new Error(result.error);
 
-      // LMS staff record remains for historical data
+      // LMS staff record remains for historical data (soft delete is preferred)
       // Can be deactivated via separate call if needed
 
       return { success: true, data: true };
@@ -323,16 +311,14 @@ export class UnifiedUserService {
   // ============================================================================
 
   private async createAuthUser(data: { username: string; password: string; role: string }): Promise<ServiceResponse<void>> {
-    const res = await fetch("/api/auth/users", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(data),
+    const result = await userStore.createUser({
+      username: data.username,
+      password: data.password,
+      role: data.role as Role,
+      createdBy: "system" // Assuming system is the creator for this flow
     });
 
-    if (!res.ok) {
-      const error = await res.json().catch(() => ({}));
-      return { success: false, error: error.error || "Failed to create auth user" };
-    }
+    if (!result.ok) return { success: false, error: result.error };
 
     return { success: true };
   }
@@ -342,7 +328,7 @@ export class UnifiedUserService {
   }
 
   private mergeUserData(
-    authUser: { username: string; role: string; createdAt: number; updatedAt: number },
+    authUser: userStore.PublicUser, // Use the PublicUser type from userStore
     staff: LmsStaffEntity | undefined
   ): UnifiedUser {
     return {

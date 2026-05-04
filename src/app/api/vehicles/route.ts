@@ -1,6 +1,6 @@
 /**
  * Vehicles API Route - OOAD Service Layer Implementation
- * 
+ *
  * Demonstrates professional API design using VehicleService:
  * - Singleton service for business logic
  * - Case-insensitive ILIKE filtering with TRIM()
@@ -8,16 +8,39 @@
  * - Comprehensive error handling with withErrorHandling wrapper
  * - SQL injection protection via parameterized queries
  * - Defensive programming patterns
- * 
+ *
  * @module api/vehicles
  */
 
 import { createErrorResponse, createSuccessResponse, withErrorHandling } from "@/lib/api-error-wrapper";
-import type { VehicleFilters } from "@/services/VehicleService";
+import { requirePermission } from "@/lib/auth-helpers";
+import type { VehicleFilters, VehicleStats } from "@/services/VehicleService";
 import { vehicleService } from "@/services/VehicleService";
 import { NextRequest, NextResponse } from "next/server";
 import { getCachedVehicles, setCachedVehicles } from "./_cache";
+import { buildCorsHeaders } from "@/lib/cors"; // Import shared CORS utility
+import type { Vehicle } from "@/lib/types";
 
+type VehiclesMeta = {
+  total?: number;
+  queryCount?: number;
+  stats?: VehicleStats;
+  cacheHit?: boolean;
+  [key: string]: unknown;
+};
+
+type VehiclesResult = {
+  success: boolean;
+  data?: Vehicle[];
+  meta?: VehiclesMeta;
+  error?: string;
+};
+
+type StatsResult = {
+  success: boolean;
+  data?: VehicleStats | null;
+  error?: string;
+};
 // ============================================================================
 // CORS Configuration
 // ============================================================================
@@ -25,29 +48,6 @@ import { getCachedVehicles, setCachedVehicles } from "./_cache";
 /**
  * Build CORS headers for cross-origin requests
  */
-function buildCorsHeaders(req: NextRequest): Headers {
-  const appOrigin = process.env.NEXT_PUBLIC_APP_ORIGIN?.trim();
-  const vercelUrl = process.env.NEXT_PUBLIC_VERCEL_URL?.trim();
-  const vercelOrigin = vercelUrl
-    ? vercelUrl.startsWith("http")
-      ? vercelUrl
-      : `https://${vercelUrl}`
-    : "";
-  const requestOrigin = req.headers.get("origin") || "";
-  const allowedOrigin = appOrigin || vercelOrigin || requestOrigin || "*";
-
-  const headers = new Headers({
-    "Access-Control-Allow-Origin": allowedOrigin,
-    "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Requested-With",
-  });
-
-  if (allowedOrigin !== "*") {
-    headers.set("Access-Control-Allow-Credentials", "true");
-  }
-
-  return headers;
-}
 
 // ============================================================================
 // OPTIONS Handler (CORS Preflight)
@@ -66,7 +66,7 @@ export async function OPTIONS(req: NextRequest) {
 
 /**
  * GET /api/vehicles
- * 
+ *
  * Query Parameters:
  * - limit: number (default: 50)
  * - offset: number (default: 0)
@@ -84,17 +84,20 @@ export async function OPTIONS(req: NextRequest) {
  * - searchTerm: string (searches brand, model, plate)
  * - orderBy: string (default: "id")
  * - orderDirection: "ASC" | "DESC" (default: "DESC")
- * 
+ *
  * Returns:
  * - success: boolean
  * - data: Vehicle[]
  * - meta: { total, limit, offset, durationMs, queryCount }
  */
 const getHandler = withErrorHandling(async (req, { logger, requestId, startTime }) => {
+  const auth = requirePermission(req, "vehicles:view");
+  if (auth.response) return auth.response;
+
   // Add overall timeout for the entire handler
   // OPTIMIZED: Reduced from 45s to 30s for faster failure and better UX
   const HANDLER_TIMEOUT_MS = 30000;
-  
+
   // Log request details
   logger.debug("Parsing query parameters", {
     url: req.url,
@@ -103,7 +106,7 @@ const getHandler = withErrorHandling(async (req, { logger, requestId, startTime 
   // Parse query parameters with validation
   const { searchParams } = new URL(req.url);
   const hasExplicitLimit = searchParams.has("limit");
-  
+
   // OPTIMIZED: Reduced default limit from 100 to 50 for better performance
   const filters: VehicleFilters = {
     limit: Math.min(parseInt(searchParams.get("limit") || "50", 10), 200), // Max 200, default 50
@@ -113,7 +116,7 @@ const getHandler = withErrorHandling(async (req, { logger, requestId, startTime 
   };
 
   // Validate orderDirection
-  if (!["ASC", "DESC"].includes(filters.orderDirection)) {
+  if (!filters.orderDirection || !["ASC", "DESC"].includes(filters.orderDirection)) {
     return createErrorResponse(
       "Invalid orderDirection. Must be 'ASC' or 'DESC'.",
       requestId,
@@ -145,7 +148,7 @@ const getHandler = withErrorHandling(async (req, { logger, requestId, startTime 
         requestId,
         Date.now() - startTime,
         400,
-        buildCorsHeaders(req)
+      buildCorsHeaders(req)
       );
     }
     filters.yearMin = year;
@@ -160,7 +163,7 @@ const getHandler = withErrorHandling(async (req, { logger, requestId, startTime 
         requestId,
         Date.now() - startTime,
         400,
-        buildCorsHeaders(req)
+      buildCorsHeaders(req)
       );
     }
     filters.yearMax = year;
@@ -175,7 +178,7 @@ const getHandler = withErrorHandling(async (req, { logger, requestId, startTime 
         requestId,
         Date.now() - startTime,
         400,
-        buildCorsHeaders(req)
+      buildCorsHeaders(req)
       );
     }
     filters.priceMin = price;
@@ -190,7 +193,7 @@ const getHandler = withErrorHandling(async (req, { logger, requestId, startTime 
         requestId,
         Date.now() - startTime,
         400,
-        buildCorsHeaders(req)
+      buildCorsHeaders(req)
       );
     }
     filters.priceMax = price;
@@ -215,10 +218,10 @@ const getHandler = withErrorHandling(async (req, { logger, requestId, startTime 
   }
 
   // When any filter is active, increase the limit to ensure all matching records are returned
-  const hasActiveFilters = category || brand || model || condition || 
-                         yearMin || yearMax || priceMin || priceMax || 
+  const hasActiveFilters = category || brand || model || condition ||
+                         yearMin || yearMax || priceMin || priceMax ||
                          color || bodyType || taxType || searchTerm || filters.withoutImage;
-  
+
   if (hasActiveFilters && !hasExplicitLimit) {
     filters.limit = 10000; // Get all matching records
   }
@@ -227,66 +230,67 @@ const getHandler = withErrorHandling(async (req, { logger, requestId, startTime 
 
   // 🚀 PHASE 1 STEP 3: Try LRU cache first
   let cacheHit = false;
-  let vehiclesResult: { success: boolean; data?: any[]; meta?: any; error?: string } = {
+  let vehiclesResult: VehiclesResult = {
     success: false,
     data: [],
     meta: {},
   };
-  
+
   // Skip cache for noCache=1 or mutations (offset=0 typically uncached)
   const noCache = searchParams.get("noCache") === "1";
   if (!noCache) {
-    vehiclesResult.data = getCachedVehicles(filters) || [];
-    if (vehiclesResult.data.length > 0) {
+    const cached = getCachedVehicles(filters);
+    if (cached && cached.data.length > 0) {
       cacheHit = true;
-      logger.info("LRU Cache HIT", { filterKey: JSON.stringify({category: filters.category, brand: filters.brand}), size: vehiclesResult.data.length });
+      logger.info("LRU Cache HIT", { filterKey: JSON.stringify({category: filters.category, brand: filters.brand}), size: cached.data.length });
+      vehiclesResult.data = cached.data;
+      vehiclesResult.meta = cached.meta as VehiclesMeta; // Assign cached meta
       vehiclesResult.success = true;
-      vehiclesResult.meta = { cacheHit: true, queryCount: 0 };
+      vehiclesResult.meta = { ...vehiclesResult.meta, cacheHit: true, queryCount: 0 };
     }
   }
 
-  let statsResult: { success: boolean; data?: any; error?: string } = { success: true, data: null };
-  
+  let statsResult: StatsResult = { success: true, data: null };
+
   if (!vehiclesResult.success) {
     logger.debug("Cache MISS - querying DB", { filters });
-    
+
     // Create a timeout promise
     const timeoutPromise = new Promise<never>((_, reject) => {
       setTimeout(() => reject(new Error('Query timeout')), HANDLER_TIMEOUT_MS);
     });
 
     // Execute queries in parallel for better performance with timeout
-    const [freshVehiclesResult, freshStatsResult] = await Promise.race([
+    const [freshVehiclesResult, freshStatsResult, freshCountResult] = await Promise.race([
       Promise.all([
         vehicleService.getVehicles(filters),
-        // Skip expensive stats if in lite mode (no filters except pagination)
-        (filters.category || filters.brand || filters.model || filters.condition || 
-         filters.searchTerm || filters.yearMin || filters.yearMax || 
-         filters.priceMin || filters.priceMax || filters.color || 
-         filters.bodyType || filters.taxType || filters.withoutImage)
-          ? Promise.resolve({ success: true, data: null as any }) // Skip stats for filtered queries
-          : vehicleService.getVehicleStats(),
+        // ALWAYS fetch stats so Quick Filters (Cars, Motorcycles, etc.) don't vanish
+        vehicleService.getVehicleStats(),
+        // Fetch actual matching count for correct pagination
+        vehicleService.countWithFilters(filters)
       ]),
       timeoutPromise
     ]);
 
     vehiclesResult = freshVehiclesResult;
     statsResult = freshStatsResult;
-    
-    // 🚀 Cache successful fresh result
-    if (vehiclesResult.success && vehiclesResult.data?.length) {
-      setCachedVehicles(vehiclesResult.data, filters);
+    const countResult = freshCountResult;
+
+    // Cache successful fresh result, including meta
+    if (vehiclesResult.success && vehiclesResult.data) {
+      // Include stats in the meta to be cached
+      const meta = { ...vehiclesResult.meta, stats: statsResult.data, total: countResult.data };
+      setCachedVehicles(vehiclesResult.data, meta, filters);
       logger.info("LRU Cache SET", { filterKey: JSON.stringify({category: filters.category, brand: filters.brand}), size: vehiclesResult.data.length });
     }
   }
 
   if (!vehiclesResult.success) {
-    // Log the service error but return sanitized message to user
     logger.error("Vehicle service returned error", new Error(vehiclesResult.error || "Unknown error"), {
       filters,
       queryCount: vehiclesResult.meta?.queryCount,
     });
-    
+
     return createErrorResponse(
       "Failed to fetch vehicles. Please try again later.",
       requestId,
@@ -296,10 +300,11 @@ const getHandler = withErrorHandling(async (req, { logger, requestId, startTime 
     );
   }
 
-  // Use filtered count for accurate pagination
-  const total = vehiclesResult.data?.length || 0;
-
-  const stats = statsResult.success ? statsResult.data : null;
+  // Fix: use the actual total count from DB matching filters
+  const total = vehiclesResult.meta?.total ?? vehiclesResult.data?.length ?? 0;
+  const stats = (statsResult.success && statsResult.data)
+    ? statsResult.data
+    : vehiclesResult.meta?.stats;
 
   logger.info("Successfully fetched vehicles", {
     count: vehiclesResult.data?.length,
@@ -346,40 +351,47 @@ export { getHandler as GET };
 
 /**
  * POST /api/vehicles
- * 
+ *
  * Body: Partial<VehicleDB> (without id, created_at, updated_at)
  * Supports both JSON and FormData (with image file upload)
- * 
+ *
  * Returns:
  * - success: boolean
  * - data: Vehicle (created)
  * - meta: { durationMs, queryCount }
  */
 const postHandler = withErrorHandling(async (req, { logger, requestId, startTime }) => {
+  const auth = requirePermission(req, "vehicles:create");
+  if (auth.response) return auth.response;
+
   // Check if request is FormData or JSON
   const contentType = req.headers.get("content-type") || "";
   const isFormData = contentType.includes("multipart/form-data");
-  
+
   let vehicleData: Record<string, unknown>;
   let imageFile: File | null = null;
-  
+  let imageSize: number | undefined;
+  let imageName: string | undefined;
+
   if (isFormData) {
     // Handle FormData with potential image upload
     const formData = await req.formData();
-    
+
     // Extract vehicle data from form fields
     vehicleData = {};
     formData.forEach((value, key) => {
       if (key === "image" && value instanceof File) {
         imageFile = value;
+        imageSize = value.size;
+        imageName = value.name;
       } else {
         vehicleData[key] = value;
       }
     });
-    
+
     logger.debug("Processing FormData request", {
       hasImage: !!imageFile,
-      imageSize: imageFile?.size,
+      imageSize,
       fields: Object.keys(vehicleData),
     });
   } else {
@@ -399,11 +411,11 @@ const postHandler = withErrorHandling(async (req, { logger, requestId, startTime
       );
     }
   }
-  
+
   // Validate required fields
   const requiredFields = ["category", "brand", "model", "year", "plate"];
   const missingFields = requiredFields.filter(field => !vehicleData[field]);
-  
+
   if (missingFields.length > 0) {
     return createErrorResponse(
       `Missing required fields: ${missingFields.join(", ")}`,
@@ -413,7 +425,7 @@ const postHandler = withErrorHandling(async (req, { logger, requestId, startTime
       buildCorsHeaders(req)
     );
   }
-  
+
   // Validate year is reasonable
   const year = parseInt(vehicleData.year as string, 10);
   if (isNaN(year) || year < 1900 || year > 2100) {
@@ -425,12 +437,12 @@ const postHandler = withErrorHandling(async (req, { logger, requestId, startTime
       buildCorsHeaders(req)
     );
   }
-  
+
   // Validate market price if provided
   const marketPriceRaw = vehicleData.market_price || vehicleData.marketPrice;
   let marketPrice: number = 0;
   if (marketPriceRaw !== undefined && marketPriceRaw !== null && marketPriceRaw !== "") {
-    const price = parseInt(String(marketPriceRaw), 10);
+    const price = parseFloat(String(marketPriceRaw));
     if (isNaN(price) || price < 0) {
       return createErrorResponse(
         "Invalid market price. Must be a positive number.",
@@ -442,14 +454,20 @@ const postHandler = withErrorHandling(async (req, { logger, requestId, startTime
     }
     marketPrice = price;
   }
-  
+
   // Create vehicle through service layer
   logger.info("Creating new vehicle", {
     plate: vehicleData.plate,
     category: vehicleData.category,
     brand: vehicleData.brand,
   });
-  
+
+  // TODO: Implement actual image upload to Cloudinary or similar service
+  // If imageFile is present, upload it and get image_id and thumbnail_url
+  if (imageFile) {
+    logger.warn("Image file detected but upload logic is not implemented.", { filename: imageName, size: imageSize });
+  }
+
   // Build vehicle data with proper null handling
   const createData: Parameters<typeof vehicleService.createVehicle>[0] = {
     category: vehicleData.category as string,
@@ -465,14 +483,14 @@ const postHandler = withErrorHandling(async (req, { logger, requestId, startTime
     image_id: (vehicleData.image_id as string) || (vehicleData.imageId as string) || null,
     thumbnail_url: (vehicleData.thumbnail_url as string) || (vehicleData.thumbnailUrl as string) || null,
   };
-  
+
   const result = await vehicleService.createVehicle(createData);
-  
+
   if (!result.success) {
     logger.error("Failed to create vehicle", new Error(result.error || "Unknown error"), {
       plate: vehicleData.plate,
     });
-    
+
     return createErrorResponse(
       result.error || "Failed to create vehicle. Please try again.",
       requestId,
@@ -481,7 +499,7 @@ const postHandler = withErrorHandling(async (req, { logger, requestId, startTime
       buildCorsHeaders(req)
     );
   }
-  
+
   logger.info("Vehicle created successfully", {
     vehicleId: result.data?.VehicleId,
     plate: result.data?.Plate,
@@ -491,7 +509,7 @@ const postHandler = withErrorHandling(async (req, { logger, requestId, startTime
   import('./_cache').then(({ clearCachedVehicles }) => {
     clearCachedVehicles();
   });
-  
+
   return createSuccessResponse(
     result.data,
     requestId,
@@ -511,18 +529,21 @@ export { postHandler as POST };
 
 /**
  * DELETE /api/vehicles?id={number}
- * 
+ *
  * Query Parameters:
  * - id: number (required)
- * 
+ *
  * Returns:
  * - success: boolean
  * - data: boolean (true if deleted)
  * - meta: { durationMs, queryCount }
- * 
+ *
  * NOTE: PUT /api/vehicles is deprecated. Use PUT /api/vehicles/[id] instead.
  */
 const deleteHandler = withErrorHandling(async (req, { logger, requestId, startTime }) => {
+  const auth = requirePermission(req, "vehicles:delete");
+  if (auth.response) return auth.response;
+
   const { searchParams } = new URL(req.url);
   const id = parseInt(searchParams.get("id") || "", 10);
 
@@ -545,7 +566,7 @@ const deleteHandler = withErrorHandling(async (req, { logger, requestId, startTi
     logger.error("Failed to delete vehicle", new Error(result.error || "Unknown error"), {
       vehicleId: id,
     });
-    
+
     return createErrorResponse(
       result.error || "Failed to delete vehicle",
       requestId,

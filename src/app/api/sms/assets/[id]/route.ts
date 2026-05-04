@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requirePermission } from '@/lib/auth-helpers';
 import { smsService } from '@/services/SmsService';
 
 function parseAssetId(id: string): string | null {
@@ -37,8 +38,11 @@ function mapToDbPayload(data: Record<string, unknown>): Record<string, unknown> 
   return payload;
 }
 
-export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const auth = requirePermission(req, 'sms:view');
+    if (auth.response) return auth.response;
+
     const { id } = await params;
     const assetId = parseAssetId(id);
     if (assetId === null) {
@@ -58,6 +62,9 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
 
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const auth = requirePermission(req, 'sms:edit');
+    if (auth.response) return auth.response;
+
     const { id } = await params;
     const assetId = parseAssetId(id);
     if (assetId === null) {
@@ -77,8 +84,11 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
   }
 }
 
-export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const auth = requirePermission(req, 'sms:delete');
+    if (auth.response) return auth.response;
+
     const { id } = await params;
     const assetId = parseAssetId(id);
     if (assetId === null) {
@@ -95,4 +105,3 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
     return NextResponse.json({ success: false, error: (error as Error).message }, { status: 500 });
   }
 }
-

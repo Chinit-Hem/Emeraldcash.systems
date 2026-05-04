@@ -1,13 +1,13 @@
 /**
  * useVehiclesNeon - Simplified SWR-based data fetching
- * 
+ *
  * Neon-style serverless data flow:
  * - No complex localStorage caching
  * - SWR for automatic revalidation
  * - Optimistic updates
  * - Simple, clean API
  * - Mutation detection for cache invalidation
- * 
+ *
  * @module useVehiclesNeon
  */
 
@@ -35,6 +35,8 @@ interface VehiclesResponse {
     hasMore: boolean;
     durationMs: number;
     requestId: string;
+    countsByCategory?: VehicleMeta["countsByCategory"];
+    countsByCondition?: VehicleMeta["countsByCondition"];
   };
 }
 
@@ -76,18 +78,18 @@ async function fetcher(url: string): Promise<VehiclesResponse> {
   const response = await fetch(url, {
     credentials: "include",
   });
-  
+
   if (!response.ok) {
     const error = await response.json().catch(() => ({ error: "Unknown error" }));
     throw new Error(error.error || `HTTP ${response.status}`);
   }
-  
+
   const data = await response.json();
-  
+
   if (!data.success) {
     throw new Error(data.error || "API returned unsuccessful response");
   }
-  
+
   return data;
 }
 
@@ -97,7 +99,7 @@ async function fetcher(url: string): Promise<VehiclesResponse> {
 
 /**
  * Simplified vehicles hook using SWR
- * 
+ *
  * Features:
  * - Automatic caching and revalidation
  * - Optimistic updates
@@ -119,7 +121,9 @@ limit = 500, // Increased for dashboard pagination fix (total 1218 vehicles)
   const queryString = useMemo(() => {
     const params = new URLSearchParams();
     if (cursor) params.set("cursor", cursor);
+    // Always set the limit if provided, let the API handle defaults/max
     if (limit) params.set("limit", String(limit));
+
     if (category && category !== "All") params.set("category", category);
     if (brand && brand !== "All") params.set("brand", brand);
     if (search) params.set("search", search);
@@ -130,7 +134,7 @@ limit = 500, // Increased for dashboard pagination fix (total 1218 vehicles)
   const key = `/api/vehicles/edge?${queryString}`;
 
   // Track if we should force refresh due to mutation
-  const [forceRefreshKey, setForceRefreshKey] = useState(0);
+  const [, setForceRefreshKey] = useState(0);
   const lastMutationTimeRef = useRef<number | null>(null);
 
   // Check for mutations on mount and periodically
@@ -168,8 +172,8 @@ limit = 500, // Increased for dashboard pagination fix (total 1218 vehicles)
     key,
     fetcher,
     {
-      refreshInterval: 30000, // Perf: Stats 30s poll
-      revalidateOnFocus: true, // Revalidate when user returns to tab
+      refreshInterval,
+      revalidateOnFocus: false,
       revalidateOnReconnect: true,
       dedupingInterval: 5000, // Standard deduping
       errorRetryCount: 3,
@@ -186,18 +190,12 @@ limit = 500, // Increased for dashboard pagination fix (total 1218 vehicles)
   // Build meta object
   const meta = useMemo((): VehicleMeta | null => {
     if (!data?.meta) return null;
-    
+
     return {
-      total: data.meta.total,
-      countsByCategory: {
-        Cars: 0, // Will be populated by separate stats call
-        Motorcycles: 0,
-        TukTuks: 0,
-      },
-      countsByCondition: {
-        New: 0,
-        Used: 0,
-      },
+      ...data.meta,
+      // Ensure countsByCategory and countsByCondition are always present, even if empty
+      countsByCategory: data.meta.countsByCategory || {},
+      countsByCondition: data.meta.countsByCondition || {},
     };
   }, [data]);
 
@@ -279,7 +277,7 @@ export async function createVehicleOptimistic(
 
   try {
     // Make the actual API call
-    const response = await fetch("/api/vehicles/edge", {
+    const response = await fetch("/api/vehicles", { // Corrected endpoint
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(vehicleData),
@@ -290,7 +288,7 @@ export async function createVehicleOptimistic(
     }
 
     const result = await response.json();
-    
+
     if (!result.success) {
       throw new Error(result.error || "Failed to create vehicle");
     }
@@ -372,25 +370,25 @@ async function statsFetcher(url: string): Promise<StatsResponse> {
   const response = await fetch(url, {
     credentials: "include",
   });
-  
+
   if (!response.ok) {
     const error = await response.json().catch(() => ({ error: "Unknown error" }));
     throw new Error(error.error || `HTTP ${response.status}`);
   }
-  
+
   const data = await response.json();
-  
+
   if (!data.success) {
     throw new Error(data.error || "API returned unsuccessful response");
   }
-  
+
   return data;
 }
 
 /**
  * Hook to fetch vehicle statistics
  */
-export function useVehicleStats(refreshInterval = 30000): {
+export function useVehicleStats(refreshInterval = 120000): {
   stats: VehicleStats | undefined;
   loading: boolean;
   error: string | null;
@@ -400,9 +398,9 @@ export function useVehicleStats(refreshInterval = 30000): {
     statsFetcher,
     {
       refreshInterval,
-      revalidateOnFocus: true,
+      revalidateOnFocus: false,
       revalidateOnReconnect: true,
-      dedupingInterval: 2000,
+      dedupingInterval: 10000,
     }
   );
 

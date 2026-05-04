@@ -1,9 +1,9 @@
 /**
  * Image Upload API Route
- * 
+ *
  * Handles image uploads to Cloudinary for vehicle images.
  * Supports multipart/form-data uploads.
- * 
+ *
  * @module api/upload
  */
 
@@ -11,6 +11,7 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 import { uploadImage } from "@/lib/cloudinary";
+import { requirePermission } from "@/lib/auth-helpers";
 import { generateUUID } from "@/lib/uuid";
 import { NextRequest, NextResponse } from "next/server";
 import { Buffer } from "node:buffer";
@@ -63,7 +64,7 @@ async function parseFormData(request: NextRequest): Promise<{
     if (contentType.includes('multipart/form-data')) {
       console.log("[Upload API] Processing multipart/form-data");
       const formData = await request.formData();
-      
+
       // Log all form fields for debugging
       console.log("[Upload API] Form fields:");
       for (const [key, value] of formData.entries()) {
@@ -72,19 +73,19 @@ async function parseFormData(request: NextRequest): Promise<{
       const file = formData.get("file") as File | null || formData.get("image") as File | null;
       const vehicleId = formData.get("vehicleId") as string | null;
       const category = formData.get("category") as string | null;
-      
+
       return { file, base64Image: null, vehicleId, category };
-    } 
-    
+    }
+
     // Fallback: JSON with base64 data URL (edit page)
     console.log("[Upload API] Processing JSON with base64");
     const jsonBody = await request.json();
     console.log("[Upload API] JSON body keys:", Object.keys(jsonBody ?? {}));
-    
+
     const base64Image = (jsonBody.file || jsonBody.image || '').toString().trim();
     const vehicleId = (jsonBody.vehicleId || jsonBody.vehicle_id || '').toString() || null;
     const category = (jsonBody.category || '').toString() || null;
-    
+
     return { file: null, base64Image, vehicleId, category };
   } catch (error) {
     return {
@@ -179,7 +180,10 @@ function validateFile(file: File): { valid: boolean; error?: string } {
  * POST /api/upload
  * Upload an image to Cloudinary
  */
-export async function POST(request: NextRequest): Promise<NextResponse<UploadResponse>> {
+export async function POST(request: NextRequest): Promise<NextResponse> {
+  const auth = requirePermission(request, "vehicles:create");
+  if (auth.response) return auth.response;
+
   const requestId = generateUUID();
   const startTime = Date.now();
 
@@ -240,7 +244,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<UploadRes
     } else {
       // File upload
       console.log(`[Upload API ${requestId}] Uploading file: ${file?.name} (${file?.size} bytes)`);
-      
+
       // Validate file
       const validation = validateFile(file!);
       if (!validation.valid) {
@@ -249,7 +253,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<UploadRes
           { status: 400 }
         );
       }
-      
+
       uploadResult = await uploadImage(file!, {
         category: category || "vehicles",
         publicId: vehicleId ? `vehicle_${vehicleId}` : undefined,
@@ -303,7 +307,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<UploadRes
 
     // Provide more helpful error messages based on error type
     let userErrorMessage = errorMessage;
-    
+
     if (errorMessage.includes("signature") || errorMessage.includes("401")) {
       userErrorMessage = "Cloudinary authentication failed. Please check your API credentials configuration.";
     } else if (errorMessage.includes("timeout")) {
@@ -313,8 +317,8 @@ export async function POST(request: NextRequest): Promise<NextResponse<UploadRes
     }
 
     return NextResponse.json(
-      { 
-        ok: false, 
+      {
+        ok: false,
         error: userErrorMessage,
         details: process.env.NODE_ENV === 'development' ? errorMessage : undefined,
         requestId,
@@ -334,14 +338,17 @@ export async function POST(request: NextRequest): Promise<NextResponse<UploadRes
  * GET /api/upload
  * Health check endpoint with Cloudinary configuration status
  */
-export async function GET(): Promise<NextResponse> {
+export async function GET(request: NextRequest): Promise<NextResponse> {
+  const auth = requirePermission(request, "vehicles:view");
+  if (auth.response) return auth.response;
+
   const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
   const apiKey = process.env.CLOUDINARY_API_KEY;
   const apiSecret = process.env.CLOUDINARY_API_SECRET;
   const uploadPreset = process.env.CLOUDINARY_UPLOAD_PRESET || "vms_unsigned";
-  
+
   const isConfigured = !!(cloudName && apiKey && apiSecret);
-  
+
   // Test Cloudinary connection if configured
   let connectionTest = null;
   if (isConfigured) {
@@ -355,10 +362,10 @@ export async function GET(): Promise<NextResponse> {
       };
     }
   }
-  
+
   return NextResponse.json(
-    { 
-      ok: true, 
+    {
+      ok: true,
       message: "Upload API is running",
       cloudinary: {
         configured: isConfigured,

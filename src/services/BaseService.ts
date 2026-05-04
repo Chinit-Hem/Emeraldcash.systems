@@ -1,10 +1,10 @@
 /**
  * BaseService Abstract Class - OOAD Implementation
- * 
+ *
  * Provides foundation for all service layer classes using:
  * - Template Method Pattern for extensible CRUD operations
  * - Generic types for type safety
- * 
+ *
  * @template TEntity - API response entity type (extends BaseEntity)
  * @template TDBRecord - Database record type (extends BaseDBRecord)
  * @template TFilters - Filter type (extends BaseFilters)
@@ -12,7 +12,7 @@
 
 import type { ServiceResult, BaseEntity, BaseDBRecord, BaseFilters } from '@/types/core';
 import { dbManager } from '@/lib/db-singleton';
-import { getCache, setCache } from '@/lib/redis';
+import { getCache, setCache, delCache, delCachePattern } from '@/lib/redis';
 
 // ============================================================================
 // Types
@@ -24,7 +24,7 @@ export type { ServiceResult, BaseFilters, BaseEntity, BaseDBRecord };
 // BaseService Abstract Class
 // ============================================================================
 
-export abstract class BaseService<
+abstract class BaseService<
   TEntity extends BaseEntity,
   TDBRecord extends BaseDBRecord,
   TFilters extends BaseFilters = BaseFilters
@@ -79,18 +79,6 @@ export abstract class BaseService<
     const conditions: string[] = [];
     let _paramIndex = params.length + 1;
 
-    // Default limit/offset
-    if (filters.limit) {
-      conditions.push(`LIMIT $${_paramIndex}`);
-      params.push(filters.limit);
-      _paramIndex++;
-    }
-    if (filters.offset) {
-      conditions.push(`OFFSET $${_paramIndex}`);
-      params.push(filters.offset);
-      _paramIndex++;
-    }
-
     // Default searchTerm
     if (filters.searchTerm) {
       conditions.push(`(brand ILIKE $${_paramIndex} OR model ILIKE $${_paramIndex})`);
@@ -102,6 +90,19 @@ export abstract class BaseService<
     if (conditions.length > 0) {
       query += ` WHERE ${conditions.join(' AND ')}`;
     }
+
+    // ⚡️ PERF: Append LIMIT and OFFSET outside the WHERE clause
+    if (filters.limit) {
+      query += ` LIMIT $${_paramIndex}`;
+      params.push(filters.limit);
+      _paramIndex++;
+    }
+    if (filters.offset) {
+      query += ` OFFSET $${_paramIndex}`;
+      params.push(filters.offset);
+      _paramIndex++;
+    }
+
     return { query, params, _paramIndex };
   }
 
@@ -139,12 +140,15 @@ export abstract class BaseService<
 
       await this.setCache(cacheKey, entities, 30000); // 30s TTL
 
+      const duration = Date.now() - startTime;
       this.stats.totalQueries++;
+      this.stats.averageResponseTimeMs =
+        (this.stats.averageResponseTimeMs * (this.stats.totalQueries - 1) + duration) / this.stats.totalQueries;
 
       return {
         success: true,
         data: entities,
-        meta: { durationMs: Date.now() - startTime, queryCount: 1 },
+        meta: { durationMs: duration, queryCount: 1 },
       };
     } catch (error) {
       return this.handleError(error, 'getAll');
@@ -207,8 +211,8 @@ export abstract class BaseService<
         VALUES (${placeholders})
         RETURNING *
       `;
-      
-      const result = await dbManager.executeUnsafe<TDBRecord>(query, Object.values(data) as any[]);
+
+      const result = await dbManager.executeUnsafe<TDBRecord>(query, Object.values(data) as unknown[]);
 
       if (result.length === 0) {
         return {
@@ -219,7 +223,7 @@ export abstract class BaseService<
       }
 
       const entity = this.toEntity(result[0]);
-      this.invalidateCache(); // Clear list caches
+      await this.invalidateCache(); // Clear list caches
 
       this.stats.totalQueries++;
 
@@ -239,18 +243,25 @@ export abstract class BaseService<
   public async update(id: number, data: Partial<TDBRecord>): Promise<ServiceResult<TEntity>> {
     const startTime = Date.now();
     try {
-      const updates = Object.keys(data)
-        .map((key, i) => `${key} = $${i + 2}`)
-        .join(', ');
-      
+      const updates: string[] = [];
+      const params: (string | number | null)[] = [];
+      let paramIndex = 1;
+
+      for (const [key, value] of Object.entries(data)) {
+        if (key === 'id' || key === 'created_at' || key === 'updated_at') continue;
+        updates.push(`${key} = $${paramIndex}`);
+        params.push(value as string | number | null);
+        paramIndex++;
+      }
+
       const query = `
         UPDATE ${this.tableName}
-        SET ${updates}, updated_at = NOW()
-        WHERE id = $1
+        SET ${updates.join(', ')}, updated_at = NOW()
+        WHERE id = $${paramIndex}
         RETURNING *
       `;
-      
-      const result = await dbManager.executeUnsafe<TDBRecord>(query, [id, ...Object.values(data) as any[]]);
+      params.push(id);
+      const result = await dbManager.executeUnsafe<TDBRecord>(query, params);
 
       if (result.length === 0) {
         return {
@@ -261,7 +272,7 @@ export abstract class BaseService<
       }
 
       const entity = this.toEntity(result[0]);
-      this.invalidateCache();
+      await this.invalidateCache();
 
       this.stats.totalQueries++;
 
@@ -284,7 +295,7 @@ export abstract class BaseService<
       const query = `DELETE FROM ${this.tableName} WHERE id = $1 RETURNING *`;
       const result = await dbManager.executeUnsafe(query, [id]);
 
-      this.invalidateCache();
+      await this.invalidateCache();
 
       this.stats.totalQueries++;
 
@@ -319,14 +330,17 @@ export abstract class BaseService<
     }
   }
 
-  public invalidateCache(key?: string): void {
-    // Implement pattern-based invalidation if needed
-    if (key) {
-      try {
-        // Redis delete pattern or specific key
-      } catch {}
-    } else {
-      // Clear all service caches in production implementation
+  public async invalidateCache(key?: string): Promise<void> {
+    try {
+      if (key) {
+        // Invalidate a specific key
+        await delCache(key);
+      } else {
+        // Invalidate all keys for this service (e.g., using a pattern)
+        await delCachePattern(`${this.serviceName}:*`);
+      }
+    } catch (error) {
+      console.warn(`[${this.serviceName}] Cache invalidation failed:`, error);
     }
   }
 
@@ -364,3 +378,4 @@ export abstract class BaseService<
   }
 }
 
+export { BaseService };

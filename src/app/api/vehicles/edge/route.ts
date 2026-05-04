@@ -3,6 +3,7 @@
  * Identical to /api/vehicles but with edge runtime optimizations
  */
 import { vehicleService } from "@/services/VehicleService";
+import { requirePermission } from "@/lib/auth-helpers";
 import { NextRequest, NextResponse } from "next/server";
 import { createErrorResponse, createSuccessResponse, withErrorHandling } from "@/lib/api-error-wrapper";
 import type { VehicleFilters } from "@/types/vehicle";
@@ -29,8 +30,11 @@ export async function OPTIONS(req: NextRequest) {
 }
 
 const getHandler = withErrorHandling(async (req: NextRequest) => {
+  const auth = requirePermission(req, "vehicles:view");
+  if (auth.response) return auth.response;
+
   const { searchParams } = new URL(req.url);
-  
+
   const filters: VehicleFilters = {
     limit: parseInt(searchParams.get("limit") || "500"),
     offset: parseInt(searchParams.get("offset") || "0"),
@@ -43,19 +47,21 @@ const getHandler = withErrorHandling(async (req: NextRequest) => {
   if (searchParams.get("cursor")) filters.offset = parseInt(searchParams.get("cursor")!) * filters.limit!;
 
   const result = await vehicleService.getVehicles(filters);
-  
-  if (!result.success) {
+
+  if (!result.success || !result.data) {
     return createErrorResponse(result.error!, "edge-vehicles", 0, 500, buildCorsHeaders(req));
   }
+
+  const vehicles = result.data;
 
   // 🚀 Fuzzy search suggestions: if search term is present but few/no results,
   // generate suggestions using Levenshtein distance for typo tolerance.
   let suggestions: unknown[] | undefined;
   const searchTerm = filters.searchTerm;
-  if (searchTerm && result.data.length < 3) {
+  if (searchTerm && vehicles.length < 3) {
     try {
       const suggestResult = await vehicleService.getSearchSuggestions(searchTerm, 5);
-      if (suggestResult.success && suggestResult.data.length > 0) {
+      if (suggestResult.success && suggestResult.data && suggestResult.data.length > 0) {
         suggestions = suggestResult.data.map((s) => ({
           vehicleId: s.vehicle.VehicleId,
           brand: s.vehicle.Brand,
@@ -73,10 +79,10 @@ const getHandler = withErrorHandling(async (req: NextRequest) => {
   }
 
   return createSuccessResponse(
-    result.data,
+    vehicles,
     "edge-vehicles",
     0,
-    { total: result.data.length, ...filters, suggestions },
+    { total: vehicles.length, ...filters, suggestions },
     buildCorsHeaders(req)
   );
 }, { context: "vehicles-edge" });

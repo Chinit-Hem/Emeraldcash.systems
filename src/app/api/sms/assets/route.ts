@@ -1,10 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requirePermission } from '@/lib/auth-helpers';
 import { smsService } from '@/services/SmsService';
 import { validateAssetForm } from '@/lib/sms-validation';
 import type { SmsAssetDB, SmsFilters } from '@/services/SmsService';
 
 export async function GET(req: NextRequest) {
   try {
+    const auth = requirePermission(req, 'sms:view');
+    if (auth.response) return auth.response;
+
     const { searchParams } = new URL(req.url);
     const page = parseInt(searchParams.get('page') || '1');
     const pageSize = parseInt(searchParams.get('pageSize') || '20');
@@ -12,12 +16,12 @@ export async function GET(req: NextRequest) {
     const status = searchParams.get('status') || undefined;
     const assigned_to = searchParams.get('assigned_to') || undefined;
 
-    const filters = { 
-      search, 
-      status, 
-      assigned_to, 
-      limit: pageSize, 
-      offset: (page - 1) * pageSize 
+    const filters = {
+      search,
+      status,
+      assigned_to,
+      limit: pageSize,
+      offset: (page - 1) * pageSize
     };
     const result = await smsService.getAssets(filters as SmsFilters);
     if (!result.success) {
@@ -28,10 +32,10 @@ export async function GET(req: NextRequest) {
     }
 
     const total = result.data?.length || 0;
-    
-    return NextResponse.json({ 
-      success: true, 
-      data: result.data || [], 
+
+    return NextResponse.json({
+      success: true,
+      data: result.data || [],
       total,
       page,
       pageSize,
@@ -66,6 +70,9 @@ function mapToDbPayload(data: Record<string, unknown>): Omit<SmsAssetDB, 'id' | 
 
 export async function POST(req: NextRequest) {
   try {
+    const auth = requirePermission(req, 'sms:create');
+    if (auth.response) return auth.response;
+
     const body = await req.json();
 
     // Validate incoming data
@@ -91,4 +98,3 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: false, error: (error as Error).message }, { status: 500 });
   }
 }
-

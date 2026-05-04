@@ -3,7 +3,7 @@ import { someService } from '@/services/SomeService';
 import type { SomeDB } from '@/services/SomeService';
 
 export async function GET(
-  req: NextRequest, 
+  req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
@@ -21,14 +21,14 @@ export async function GET(
     return NextResponse.json({ success: true, data: result.data });
   } catch (error) {
     return NextResponse.json(
-      { success: false, error: (error as Error).message }, 
+      { success: false, error: (error as Error).message },
       { status: 500 }
     );
   }
 }
 
 export async function POST(
-  req: NextRequest, 
+  req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
@@ -47,21 +47,21 @@ export async function POST(
     return NextResponse.json({ success: true, data: result.data });
   } catch (error) {
     return NextResponse.json(
-      { success: false, error: (error as Error).message }, 
+      { success: false, error: (error as Error).message },
       { status: 500 }
     );
   }
 }
 
 export async function PUT(
-  req: NextRequest, 
+  req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  return POST(req, { params: params as any });
+  return POST(req, { params });
 }
 
 export async function DELETE(
-  req: NextRequest, 
+  req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
@@ -79,7 +79,7 @@ export async function DELETE(
     return NextResponse.json({ success: true, data: true });
   } catch (error) {
     return NextResponse.json(
-      { success: false, error: (error as Error).message }, 
+      { success: false, error: (error as Error).message },
       { status: 500 }
     );
   }

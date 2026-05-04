@@ -1,12 +1,13 @@
 // LAZY IMPORT: Only load Cloudinary SDK when needed
 // This saves ~2-3MB of memory per function instance
 let cloudinaryInstance: typeof import("cloudinary").v2 | null = null;
+import type { UploadApiResponse } from "cloudinary";
 
 // Import folder utilities
 import { getCloudinaryFolder } from "./cloudinary-folders";
 
 // Import crypto at top level for signature generation
-import crypto from "crypto";
+import crypto from "node:crypto";
 
 // Environment variables
 const CLOUDINARY_CLOUD_NAME = process.env.CLOUDINARY_CLOUD_NAME;
@@ -15,8 +16,8 @@ const CLOUDINARY_API_SECRET = process.env.CLOUDINARY_API_SECRET;
 
 // Check if Cloudinary is configured
 const isCloudinaryConfigured = !!(
-  CLOUDINARY_CLOUD_NAME && 
-  CLOUDINARY_API_KEY && 
+  CLOUDINARY_CLOUD_NAME &&
+  CLOUDINARY_API_KEY &&
   CLOUDINARY_API_SECRET
 );
 
@@ -38,7 +39,7 @@ if (typeof window === 'undefined') {
 async function getCloudinary(): Promise<typeof import("cloudinary").v2> {
   if (!cloudinaryInstance) {
     const { v2: cloudinary } = await import("cloudinary");
-    
+
     if (isCloudinaryConfigured) {
       cloudinary.config({
         cloud_name: CLOUDINARY_CLOUD_NAME,
@@ -47,13 +48,13 @@ async function getCloudinary(): Promise<typeof import("cloudinary").v2> {
         secure: true,
         timeout: 120, // 120 seconds (Cloudinary expects seconds, not milliseconds)
       });
-      
+
       // SDK loaded successfully
     }
-    
+
     cloudinaryInstance = cloudinary;
   }
-  
+
   return cloudinaryInstance;
 }
 
@@ -74,16 +75,16 @@ const _DEFAULT_UPLOAD_PRESET = process.env.CLOUDINARY_UPLOAD_PRESET || "vms_unsi
 function isTransientError(error: Error): boolean {
   const message = error.message.toLowerCase();
   const httpCode = (error as Error & { http_code?: number }).http_code;
-  
+
   // Check for transient error indicators
   const isTimeout = message.includes("timeout") || message.includes("etimedout");
-  const isNetworkError = message.includes("econnreset") || 
-                         message.includes("econnrefused") || 
+  const isNetworkError = message.includes("econnreset") ||
+                         message.includes("econnrefused") ||
                          message.includes("socket hang up") ||
                          message.includes("network");
   const isServerError = httpCode === 502 || httpCode === 503 || httpCode === 504;
   const isRateLimit = httpCode === 429;
-  
+
   return isTimeout || isNetworkError || isServerError || isRateLimit;
 }
 
@@ -92,43 +93,39 @@ function delay(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+/**
+ * Generate a unique ID for Cloudinary public_id
+ */
+function generateUUID(): string {
+  return crypto.randomUUID();
+}
+
 // Compress image before upload to reduce size and upload time
 async function compressImageForUpload(
   imageData: File | Blob,
   maxWidth = 1280,
-  quality = 0.8
+  quality = 0.8,
+  compress = true
 ): Promise<Buffer> {
-  // For server-side, we'll use sharp if available, otherwise just resize
   try {
-    // Check if sharp is available
-    const sharp = await import('sharp').catch(() => null);
-    
-    if (!sharp) {
-      // Fallback: just convert to buffer without compression
-      const arrayBuffer = await imageData.arrayBuffer();
-      return Buffer.from(arrayBuffer);
-    }
-    
     const arrayBuffer = await imageData.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
-    
+    if (!compress) return buffer;
+
+    const sharp = await import('sharp').catch(() => null);
+    if (!sharp) return buffer;
+
     // Process with sharp
-    const processed = await sharp.default(buffer)
-      .resize(maxWidth, null, { 
+    return await sharp.default(buffer)
+      .resize(maxWidth, null, {
         withoutEnlargement: true,
         fit: 'inside'
       })
-      .jpeg({ 
+      .webp({ // Prioritize WebP for better compression
         quality: Math.round(quality * 100),
-        progressive: true,
-        mozjpeg: true
       })
       .toBuffer();
-    
-    // Image compressed successfully
-    return processed;
   } catch (_error) {
-    // Compression failed, use original
     const arrayBuffer = await imageData.arrayBuffer();
     return Buffer.from(arrayBuffer);
   }
@@ -183,7 +180,7 @@ export async function uploadImage(
   const maxRetries = options.retryAttempts ?? 3;
   const initialRetryDelay = options.retryDelay ?? 1000;
   const timeoutMs = options.timeout || 30000;
-  
+
   let lastError: Error | null = null;
   let attempts = 0;
 
@@ -191,33 +188,36 @@ export async function uploadImage(
   while (attempts < maxRetries) {
     attempts++;
     const attemptStartTime = Date.now();
-    
+
     // Upload attempt started
 
     try {
       // Determine folder based on category or use provided folder
       let targetFolder = options.folder;
       if (options.category && !options.folder) {
-        targetFolder = getCloudinaryFolder(options.category);
+        targetFolder = getCloudinaryFolder(options.category); // Use category to determine folder
       }
-      
+
       // Build upload options with timeout
       const uploadOptions = {
         folder: targetFolder || "vehicles",
         resource_type: "image" as const,
         timeout: Math.floor(timeoutMs / 1000), // Cloudinary expects seconds
-      } as {
+      } as { // Explicitly define type for uploadOptions
         folder: string;
-        resource_type: "image";
-        public_id?: string;
+        resource_type: "image"; // Removed public_id from here
+        public_id?: string; // Added public_id here
         tags?: string[];
         transformation?: object;
         timeout?: number;
         upload_preset?: string;
       };
 
+      // Generate a unique public_id if not provided
       if (options.publicId) {
         uploadOptions.public_id = options.publicId;
+      } else {
+        uploadOptions.public_id = `${uploadOptions.folder}/${generateUUID()}`;
       }
 
       if (options.tags) {
@@ -239,7 +239,7 @@ export async function uploadImage(
         console.log('[Cloudinary] Using signed upload with API credentials');
       }
 
-      let result;
+      let result: UploadApiResponse;
       let originalSize = 0;
       let compressedSize = 0;
       let wasCompressed = false;
@@ -252,7 +252,7 @@ export async function uploadImage(
         // Check file size before uploading
         const fileSize = imageData.size;
         const maxSize = 10 * 1024 * 1024; // 10MB limit
-        
+
         if (fileSize > maxSize) {
           return {
             success: false,
@@ -261,126 +261,40 @@ export async function uploadImage(
           };
         }
 
+        // Use Cloudinary SDK upload_stream to avoid base64 conversion memory spike
+        const buffer = await compressImageForUpload(
+          imageData,
+          options.maxWidth || 1280,
+          options.quality || 0.8,
+          options.compress !== false
+        );
+
         originalSize = fileSize;
-        console.log(`[Cloudinary] Processing file of size ${fileSize} bytes`);
-        
-        // Compress image before upload if enabled (default: true)
-        const shouldCompress = options.compress !== false;
-        let buffer: Buffer;
-        
-        try {
-          if (shouldCompress) {
-            console.log('[Cloudinary] Compressing image...');
-            buffer = await compressImageForUpload(
-              imageData, 
-              options.maxWidth || 1280, 
-              options.quality || 0.8
+        compressedSize = buffer.length;
+        wasCompressed = compressedSize < originalSize;
+
+        result = await Promise.race<UploadApiResponse>([
+          new Promise((resolve, reject) => {
+            const stream = cloudinary.uploader.upload_stream(
+              uploadOptions,
+              (error, uploadResult) => {
+                if (error) return reject(error);
+                if (!uploadResult) return reject(new Error("Cloudinary upload returned no result"));
+                resolve(uploadResult);
+              }
             );
-            compressedSize = buffer.length;
-            wasCompressed = compressedSize < originalSize;
-            console.log(`[Cloudinary] Compressed from ${originalSize} to ${compressedSize} bytes`);
-          } else {
-            // No compression - convert directly to buffer
-            console.log('[Cloudinary] Converting to buffer without compression...');
-            const arrayBuffer = await imageData.arrayBuffer();
-            buffer = Buffer.from(arrayBuffer);
-            compressedSize = buffer.length;
-            console.log(`[Cloudinary] Converted to buffer: ${buffer.length} bytes`);
-          }
-        } catch (conversionError) {
-          console.error('[Cloudinary] Error converting image:', conversionError);
-          return {
-            success: false,
-            error: `Failed to process image: ${conversionError instanceof Error ? conversionError.message : 'Unknown error'}`,
-            attempts,
-          };
-        }
-        
-        // Use Cloudinary REST API directly via fetch
-        console.log('[Cloudinary] Starting REST API upload...');
-        const uploadStartTime = Date.now();
-        
-        try {
-          // Build form data for REST API
-          const formData = new FormData();
-          formData.append('file', `data:image/jpeg;base64,${buffer.toString('base64')}`);
-          formData.append('api_key', CLOUDINARY_API_KEY!);
-          
-          // Generate signature for signed upload
-          // Parameters must be in alphabetical order for signature
-          const timestamp = Math.floor(Date.now() / 1000).toString();
-          
-          // Build parameters object for signature (alphabetical order is critical)
-          const paramsToSign: Record<string, string> = {
-            folder: uploadOptions.folder,
-            timestamp: timestamp,
-          };
-          
-          if (uploadOptions.public_id) {
-            paramsToSign.public_id = uploadOptions.public_id;
-          }
-          
-          // Sort keys alphabetically and build string to sign
-          const sortedKeys = Object.keys(paramsToSign).sort();
-          const stringToSign = sortedKeys
-            .map(key => `${key}=${paramsToSign[key]}`)
-            .join('&') + CLOUDINARY_API_SECRET;
-          
-          const signature = crypto.createHash('sha256').update(stringToSign).digest('hex');
-          
-          console.log('[Cloudinary] Signature params:', { 
-            folder: uploadOptions.folder, 
-            timestamp, 
-            public_id: uploadOptions.public_id,
-            signatureLength: signature.length 
-          });
-          
-          formData.append('timestamp', timestamp);
-          formData.append('signature', signature);
-          formData.append('folder', uploadOptions.folder);
-          
-          if (uploadOptions.public_id) {
-            formData.append('public_id', uploadOptions.public_id);
-          }
-          
-          console.log(`[Cloudinary] Uploading to cloud: ${CLOUDINARY_CLOUD_NAME}`);
-          
-          const uploadUrl = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`;
-          
-          const response = await Promise.race([
-            fetch(uploadUrl, {
-              method: 'POST',
-              body: formData,
-            }),
-            new Promise((_, reject) => 
-              setTimeout(() => {
-                const timeoutDuration = Date.now() - uploadStartTime;
-                reject(new Error(`Upload timeout after ${timeoutMs}ms (actual: ${timeoutDuration}ms)`));
-              }, timeoutMs)
-            )
-          ]) as Response;
-          
-          const uploadDuration = Date.now() - uploadStartTime;
-          
-          if (!response.ok) {
-            const errorText = await response.text();
-            console.error(`[Cloudinary] HTTP error ${response.status}: ${errorText}`);
-            throw new Error(`HTTP ${response.status}: ${errorText}`);
-          }
-          
-          result = await response.json();
-          console.log(`[Cloudinary] Upload succeeded after ${uploadDuration}ms`);
-        } catch (uploadError) {
-          const uploadDuration = Date.now() - uploadStartTime;
-          console.error(`[Cloudinary] REST API upload failed after ${uploadDuration}ms:`, uploadError);
-          throw uploadError;
-        }
+            stream.end(buffer);
+          }),
+          new Promise((_, reject) =>
+            setTimeout(() => reject(new Error(`Upload timeout after ${timeoutMs}ms`)), timeoutMs)
+          )
+        ]);
       } else {
         // Handle base64 string (legacy method) with timeout
         // Check base64 data size
         const base64Size = imageData.length * 0.75; // Approximate size in bytes
         const maxBase64Size = 10 * 1024 * 1024; // 10MB limit
-        
+
         if (base64Size > maxBase64Size) {
           return {
             success: false,
@@ -389,9 +303,9 @@ export async function uploadImage(
           };
         }
 
-        result = await Promise.race([
+        result = await Promise.race<UploadApiResponse>([
           cloudinary.uploader.upload(imageData, uploadOptions),
-          new Promise((_, reject) => 
+          new Promise((_, reject) =>
             setTimeout(() => reject(new Error(`Upload timeout after ${timeoutMs}ms`)), timeoutMs)
           )
         ]);
@@ -420,35 +334,35 @@ export async function uploadImage(
       };
     } catch (_error) {
       const _attemptDuration = Date.now() - attemptStartTime;
-      
+
       // Properly extract error message from various error types
       let errorMessage: string;
       if (_error instanceof Error) {
         errorMessage = _error.message;
       } else if (typeof _error === 'object' && _error !== null) {
         // Handle Cloudinary error objects that may have nested error properties
-        const cloudinaryError = _error as { 
-          message?: string; 
+        const cloudinaryError = _error as {
+          message?: string;
           error?: { message?: string };
           json?: { error?: { message?: string } };
         };
-        errorMessage = cloudinaryError.message 
-          || cloudinaryError.error?.message 
-          || cloudinaryError.json?.error?.message 
+        errorMessage = cloudinaryError.message
+          || cloudinaryError.error?.message
+          || cloudinaryError.json?.error?.message
           || JSON.stringify(_error);
       } else {
         errorMessage = String(_error);
       }
-      
+
       lastError = new Error(errorMessage);
-      
+
       // Copy over any Cloudinary-specific properties
       if (typeof _error === 'object' && _error !== null) {
         const cloudinaryError = _error as { http_code?: number; error_code?: string };
         (lastError as Error & { http_code?: number }).http_code = cloudinaryError.http_code;
         (lastError as Error & { error_code?: string }).error_code = cloudinaryError.error_code;
       }
-      
+
       // Log error for debugging
       console.error(`[Cloudinary] Upload attempt ${attempts} failed:`, lastError.message);
 
@@ -466,32 +380,32 @@ export async function uploadImage(
 
   // All retries exhausted or non-transient error - return detailed error
   console.error(`[Cloudinary] All ${attempts} attempts failed. Last error:`, lastError);
-  
+
   // Extract detailed error information
   let errorMessage = "Upload failed";
   let errorCode = "";
   let errorDetails = "";
-  
+
   if (lastError) {
     errorMessage = lastError.message;
-    
+
     // Try to extract Cloudinary-specific error details
-    const cloudinaryError = lastError as Error & { 
-      http_code?: number; 
+    const cloudinaryError = lastError as Error & {
+      http_code?: number;
       error?: { message?: string; code?: string };
       json?: { error?: { message?: string; code?: string } };
     };
-    
+
     if (cloudinaryError.http_code) {
       errorCode = `HTTP ${cloudinaryError.http_code}`;
     }
-    
+
     if (cloudinaryError.error?.message) {
       errorDetails = cloudinaryError.error.message;
     } else if (cloudinaryError.json?.error?.message) {
       errorDetails = cloudinaryError.json.error.message;
     }
-    
+
     // Log full error structure for debugging
     console.error("[Cloudinary] Full error structure:", {
       message: lastError.message,
@@ -501,7 +415,7 @@ export async function uploadImage(
       error_details: errorDetails,
     });
   }
-  
+
   // Build detailed error message
   let detailedError = errorMessage;
   if (errorCode) {
@@ -510,13 +424,13 @@ export async function uploadImage(
   if (errorDetails && errorDetails !== errorMessage) {
     detailedError = `${detailedError} - ${errorDetails}`;
   }
-  
+
   // Provide helpful guidance for specific error types
   if (errorMessage.includes("401") || errorMessage.includes("Invalid api_key") || errorCode === "HTTP 401") {
     return {
       success: false,
       error: `Cloudinary 401 Error: Invalid API credentials.
-        
+
 Please verify your Cloudinary credentials:
 1. Log in to https://cloudinary.com/console
 2. Go to Dashboard → Account Details
@@ -534,7 +448,7 @@ Original error: ${detailedError}`,
       attempts,
     };
   }
-  
+
   if (errorMessage.includes("413") || errorCode === "HTTP 413" || errorMessage.includes("File size too large")) {
     return {
       success: false,
@@ -547,7 +461,7 @@ Original error: ${detailedError}`,
       attempts,
     };
   }
-  
+
   if (errorMessage.includes("400") || errorCode === "HTTP 400") {
     return {
       success: false,
@@ -560,7 +474,7 @@ Original error: ${detailedError}`,
       attempts,
     };
   }
-  
+
   return {
     success: false,
     error: detailedError,
@@ -584,7 +498,7 @@ export async function deleteImage(publicId: string): Promise<{
   try {
     const cloudinary = await getCloudinary();
     const result = await cloudinary.uploader.destroy(publicId);
-    
+
     if (result.result === "ok") {
       return { success: true };
     } else {
@@ -625,7 +539,7 @@ export async function getOptimizedImageUrl(
     quality?: number;
     fetch_format?: string;
   }
-  
+
   const transformation: TransformationOptions = {};
 
   if (options.width) transformation.width = options.width;
@@ -664,13 +578,13 @@ export async function testCloudinaryConnection(): Promise<{
     };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : "Connection failed";
-    
+
     // Provide helpful guidance for 401 errors
     if (errorMessage.includes("401") || errorMessage.includes("Invalid api_key")) {
       return {
         success: false,
-        message: `Cloudinary 401 Error: Invalid API credentials. 
-        
+        message: `Cloudinary 401 Error: Invalid API credentials.
+
 Please verify your Cloudinary credentials:
 1. Log in to https://cloudinary.com/console
 2. Go to Dashboard → Account Details
@@ -687,7 +601,7 @@ Please verify your Cloudinary credentials:
 Original error: ${errorMessage}`,
       };
     }
-    
+
     return {
       success: false,
       message: errorMessage,
@@ -709,36 +623,36 @@ const DEFAULT_PLACEHOLDER_URL = "https://res.cloudinary.com/demo/image/upload/w_
  */
 export function isCloudinaryPublicId(value: string): boolean {
   if (!value || typeof value !== "string") return false;
-  
+
   // If it starts with http:// or https://, it's already a URL
   if (value.startsWith("http://") || value.startsWith("https://")) {
     return false;
   }
-  
+
   // If it starts with data:, it's a data URL
   if (value.startsWith("data:")) {
     return false;
   }
-  
+
   // If it contains drive.google.com or googleusercontent.com, it's a Google Drive URL
   if (value.includes("drive.google.com") || value.includes("googleusercontent.com")) {
     return false;
   }
-  
+
   // Google Drive file IDs are typically 33 characters, alphanumeric only
   // They look like: 1v5AFTWvBIzJa5ijhGPzJKedNj_5Sqcky
   // Exclude these by checking length and pattern
   if (value.length === 33 && /^[a-zA-Z0-9_-]{33}$/.test(value)) {
     return false;
   }
-  
+
   // Also exclude shorter alphanumeric strings that look like Drive IDs
   // Drive IDs are usually 25-44 characters of alphanumeric + underscore + hyphen
   if (value.length >= 25 && value.length <= 44 && /^[a-zA-Z0-9_-]+$/.test(value)) {
     // This looks like a Google Drive ID, not a Cloudinary public_id
     return false;
   }
-  
+
   // Cloudinary public_ids typically:
   // - May contain folder paths with slashes (e.g., "vehicles/cars/car_123")
   // - Often have descriptive names with underscores
@@ -752,7 +666,7 @@ export function isCloudinaryPublicId(value: string): boolean {
  * Uses the configured cloud name from environment variables
  */
 export async function getCloudinaryUrlFromPublicId(
-  publicId: string | null | undefined, 
+  publicId: string | null | undefined,
   options: {
     width?: number;
     height?: number;
@@ -787,7 +701,7 @@ export async function getCloudinaryUrlFromPublicId(
     quality?: number;
     fetch_format?: string;
   }
-  
+
   const transformation: TransformationOptions = {};
 
   if (options.width) transformation.width = options.width;
@@ -810,13 +724,13 @@ export async function getCloudinaryUrlFromPublicId(
  */
 function isGoogleDriveId(value: string): boolean {
   if (!value || typeof value !== "string") return false;
-  
+
   // Google Drive file IDs are typically 25-44 characters
   // They look like: 1v5AFTWvBIzJa5ijhGPzJKedNj_5Sqcky
   if (value.length >= 25 && value.length <= 44 && /^[a-zA-Z0-9_-]+$/.test(value)) {
     return true;
   }
-  
+
   return false;
 }
 
@@ -845,8 +759,8 @@ export async function normalizeImageUrl(imageId: string | null | undefined): Pro
   }
 
   // If it's already a valid URL, return as-is
-  if (trimmed.startsWith("http://") || 
-      trimmed.startsWith("https://") || 
+  if (trimmed.startsWith("http://") ||
+      trimmed.startsWith("https://") ||
       trimmed.startsWith("data:")) {
     return trimmed;
   }

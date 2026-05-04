@@ -1,11 +1,11 @@
 /**
  * LMS Service - Learning Management System Operations
- * 
+ *
  * Refactored to extend BaseService using OOAD patterns:
  * - Inheritance: Extends BaseService for common CRUD
  * - Composition: Uses repositories for data access
  * - Template Method: Overrides base methods with LMS-specific logic
- * 
+ *
  * @module LmsService
  */
 
@@ -165,8 +165,19 @@ export class LmsService extends BaseService<LmsCategoryEntity, LmsCategoryDB> {
       _query += ` WHERE ${conditions.join(" AND ")}`;
     }
 
-    return { query: _query, params, _paramIndex };
+    // Append LIMIT and OFFSET outside the WHERE clause for correct pagination
+    if (filters.limit) {
+      _query += ` LIMIT $${_paramIndex}`;
+      params.push(filters.limit);
+      _paramIndex++;
+    }
+    if (filters.offset) {
+      _query += ` OFFSET $${_paramIndex}`;
+      params.push(filters.offset);
+      _paramIndex++;
+    }
 
+    return { query: _query, params, _paramIndex };
   }
 
   // ============================================================================
@@ -175,15 +186,15 @@ export class LmsService extends BaseService<LmsCategoryEntity, LmsCategoryDB> {
 
   public async getCategories(): Promise<ServiceResult<(LmsCategoryEntity & { lessonCount: number })[]>> {
     const startTime = Date.now();
-    
+
     try {
       const categories = await this.categoryRepo.getCategoriesWithLessonCounts();
-      
+
       const data = categories.map(cat => ({
         ...this.toEntity(cat),
         lessonCount: cat.lesson_count,
       }));
-      
+
       return {
         success: true,
         data,
@@ -200,9 +211,19 @@ export class LmsService extends BaseService<LmsCategoryEntity, LmsCategoryDB> {
 
   public async createCategory(input: CreateLmsCategoryInput): Promise<ServiceResult<LmsCategoryEntity>> {
     const startTime = Date.now();
-    
+
     try {
-      const exists = await this.categoryRepo.existsByName(input.name);
+      // Check if category with the same name already exists
+      // Use a parameterized query to prevent SQL injection
+      const exists = await this.categoryRepo.count([
+        {
+          column: "name",
+          operator: "eq",
+          value: input.name,
+        },
+        { column: "is_active", operator: "eq", value: true },
+      ]) > 0;
+
       if (exists) {
         return {
           success: false,
@@ -238,14 +259,14 @@ export class LmsService extends BaseService<LmsCategoryEntity, LmsCategoryDB> {
   ): Promise<ServiceResult<LmsCategoryEntity>> {
     // Convert camelCase input to snake_case for DB
     const updates: Partial<LmsCategoryDB> = {};
-    
+
     if (input.name !== undefined) updates.name = input.name;
     if (input.description !== undefined) updates.description = input.description;
     if (input.icon !== undefined) updates.icon = input.icon;
     if (input.color !== undefined) updates.color = input.color;
     if (input.orderIndex !== undefined) updates.order_index = input.orderIndex;
     if (input.isActive !== undefined) updates.is_active = input.isActive;
-    
+
     return this.update(id, updates);
   }
 
@@ -259,10 +280,10 @@ export class LmsService extends BaseService<LmsCategoryEntity, LmsCategoryDB> {
 
   public async getLessonsByCategory(categoryId: number): Promise<ServiceResult<LmsLessonEntity[]>> {
     const startTime = Date.now();
-    
+
     try {
       const lessons = await this.lessonRepo.getByCategory(categoryId);
-      
+
       return {
         success: true,
         data: lessons.map(this.toLessonEntity),
@@ -279,10 +300,10 @@ export class LmsService extends BaseService<LmsCategoryEntity, LmsCategoryDB> {
 
   public async getAllLessons(): Promise<ServiceResult<LmsLessonEntity[]>> {
     const startTime = Date.now();
-    
+
     try {
       const lessons = await this.lessonRepo.getAllActive();
-      
+
       return {
         success: true,
         data: lessons.map(this.toLessonEntity),
@@ -299,10 +320,10 @@ export class LmsService extends BaseService<LmsCategoryEntity, LmsCategoryDB> {
 
   public async getLessonById(id: number): Promise<ServiceResult<LmsLessonEntity>> {
     const startTime = Date.now();
-    
+
     try {
       const lesson = await this.lessonRepo.findById(id);
-      
+
       if (!lesson) {
         return {
           success: false,
@@ -314,7 +335,7 @@ export class LmsService extends BaseService<LmsCategoryEntity, LmsCategoryDB> {
           },
         };
       }
-      
+
       return {
         success: true,
         data: this.toLessonEntity(lesson),
@@ -331,11 +352,11 @@ export class LmsService extends BaseService<LmsCategoryEntity, LmsCategoryDB> {
 
   public async createLesson(input: CreateLmsLessonInput): Promise<ServiceResult<LmsLessonEntity>> {
     const startTime = Date.now();
-    
+
     try {
-      // Validate category exists using inherited getById method
-      const categoryResult = await this.getById(input.categoryId);
-      if (!categoryResult.success || !categoryResult.data) {
+      // Validate category exists using repository's exists method (returns boolean)
+      const categoryExists = await this.categoryRepo.exists(input.categoryId); // This returns a boolean
+      if (!categoryExists) { // Check the boolean directly
         return {
           success: false,
           error: `Category not found: ${input.categoryId}`,
@@ -403,14 +424,14 @@ export class LmsService extends BaseService<LmsCategoryEntity, LmsCategoryDB> {
     input: UpdateLmsLessonInput
   ): Promise<ServiceResult<LmsLessonEntity>> {
     const startTime = Date.now();
-    
+
     try {
       const updates: Partial<LmsLessonDB> = {};
-      
+
       if (input.categoryId !== undefined) updates.category_id = input.categoryId;
       if (input.title !== undefined) updates.title = input.title;
       if (input.description !== undefined) updates.description = input.description;
-      
+
       if (input.youtubeUrl !== undefined) {
         const videoId = extractYoutubeVideoId(input.youtubeUrl);
         if (!videoId) {
@@ -427,16 +448,27 @@ export class LmsService extends BaseService<LmsCategoryEntity, LmsCategoryDB> {
         updates.youtube_url = input.youtubeUrl;
         updates.youtube_video_id = videoId;
       }
-      
+
       if (input.stepByStepInstructions !== undefined) {
         updates.step_by_step_instructions = input.stepByStepInstructions;
       }
       if (input.durationMinutes !== undefined) updates.duration_minutes = input.durationMinutes;
       if (input.orderIndex !== undefined) updates.order_index = input.orderIndex;
       if (input.isActive !== undefined) updates.is_active = input.isActive;
-      
+
       const lesson = await this.lessonRepo.update(id, updates);
-      
+      if (!lesson) {
+        return {
+          success: false,
+          error: "Lesson not found",
+          meta: {
+            durationMs: Date.now() - startTime,
+            queryCount: 1,
+            cacheHit: false,
+          },
+        };
+      }
+
       return {
         success: true,
         data: this.toLessonEntity(lesson),
@@ -453,10 +485,10 @@ export class LmsService extends BaseService<LmsCategoryEntity, LmsCategoryDB> {
 
   public async deleteLesson(id: number): Promise<ServiceResult<boolean>> {
     const startTime = Date.now();
-    
+
     try {
       await this.lessonRepo.softDelete(id);
-      
+
       return {
         success: true,
         data: true,
@@ -477,10 +509,10 @@ export class LmsService extends BaseService<LmsCategoryEntity, LmsCategoryDB> {
 
   public async getStaff(): Promise<ServiceResult<LmsStaffEntity[]>> {
     const startTime = Date.now();
-    
+
     try {
       const staff = await this.staffRepo.getAllActive();
-      
+
       return {
         success: true,
         data: staff.map(this.toStaffEntity),
@@ -497,10 +529,10 @@ export class LmsService extends BaseService<LmsCategoryEntity, LmsCategoryDB> {
 
   public async getStaffById(id: number): Promise<ServiceResult<LmsStaffWithStats>> {
     const startTime = Date.now();
-    
+
     try {
       const result = await this.staffRepo.getStaffWithStats(id);
-      
+
       if (!result) {
         return {
           success: false,
@@ -512,7 +544,7 @@ export class LmsService extends BaseService<LmsCategoryEntity, LmsCategoryDB> {
           },
         };
       }
-      
+
       const staffWithStats: LmsStaffWithStats = {
         ...this.toStaffEntity(result.staff),
         totalLessons: result.totalLessons,
@@ -529,7 +561,7 @@ export class LmsService extends BaseService<LmsCategoryEntity, LmsCategoryDB> {
           isComplete: cat.total_lessons > 0 && cat.completed_lessons === cat.total_lessons,
         })),
       };
-      
+
       return {
         success: true,
         data: staffWithStats,
@@ -546,11 +578,11 @@ export class LmsService extends BaseService<LmsCategoryEntity, LmsCategoryDB> {
 
   public async createStaff(input: CreateLmsStaffInput): Promise<ServiceResult<LmsStaffEntity>> {
     const startTime = Date.now();
-    
+
     try {
       const validRoles = ["Appraiser", "Manager", "Admin", "Trainee"];
       const role = input.role && validRoles.includes(input.role) ? input.role : "Trainee";
-      
+
       const staff = await this.staffRepo.create({
         full_name: input.fullName,
         email: input.email || null,
@@ -559,7 +591,7 @@ export class LmsService extends BaseService<LmsCategoryEntity, LmsCategoryDB> {
         phone: input.phone || null,
         is_active: true,
       });
-      
+
       return {
         success: true,
         data: this.toStaffEntity(staff),
@@ -579,19 +611,30 @@ export class LmsService extends BaseService<LmsCategoryEntity, LmsCategoryDB> {
     input: UpdateLmsStaffInput
   ): Promise<ServiceResult<LmsStaffEntity>> {
     const startTime = Date.now();
-    
+
     try {
       const updates: Partial<LmsStaffDB> = {};
-      
+
       if (input.fullName !== undefined) updates.full_name = input.fullName;
       if (input.email !== undefined) updates.email = input.email;
       if (input.branchLocation !== undefined) updates.branch_location = input.branchLocation;
       if (input.role !== undefined) updates.role = input.role;
       if (input.phone !== undefined) updates.phone = input.phone;
       if (input.isActive !== undefined) updates.is_active = input.isActive;
-      
+
       const staff = await this.staffRepo.update(id, updates);
-      
+      if (!staff) {
+        return {
+          success: false,
+          error: "Staff not found",
+          meta: {
+            durationMs: Date.now() - startTime,
+            queryCount: 1,
+            cacheHit: false,
+          },
+        };
+      }
+
       return {
         success: true,
         data: this.toStaffEntity(staff),
@@ -608,10 +651,10 @@ export class LmsService extends BaseService<LmsCategoryEntity, LmsCategoryDB> {
 
   public async deleteStaff(id: number): Promise<ServiceResult<boolean>> {
     const startTime = Date.now();
-    
+
     try {
       await this.staffRepo.softDelete(id);
-      
+
       return {
         success: true,
         data: true,
@@ -634,7 +677,7 @@ export class LmsService extends BaseService<LmsCategoryEntity, LmsCategoryDB> {
     input: MarkLessonCompleteInput
   ): Promise<ServiceResult<{ completedAt: string; timeSpentSeconds: number | null }>> {
     const startTime = Date.now();
-    
+
     try {
       const completion = await this.completionRepo.markComplete(
         input.staffId,
@@ -642,7 +685,7 @@ export class LmsService extends BaseService<LmsCategoryEntity, LmsCategoryDB> {
         input.timeSpentSeconds,
         input.notes
       );
-      
+
       return {
         success: true,
         data: {
@@ -662,10 +705,10 @@ export class LmsService extends BaseService<LmsCategoryEntity, LmsCategoryDB> {
 
   public async getStaffCompletions(staffId: number): Promise<ServiceResult<number[]>> {
     const startTime = Date.now();
-    
+
     try {
       const lessonIds = await this.completionRepo.getCompletedLessonIds(staffId);
-      
+
       return {
         success: true,
         data: lessonIds,
@@ -682,10 +725,10 @@ export class LmsService extends BaseService<LmsCategoryEntity, LmsCategoryDB> {
 
   public async isLessonCompleted(staffId: number, lessonId: number): Promise<ServiceResult<boolean>> {
     const startTime = Date.now();
-    
+
     try {
       const isCompleted = await this.completionRepo.isCompleted(staffId, lessonId);
-      
+
       return {
         success: true,
         data: isCompleted,
@@ -709,7 +752,7 @@ export class LmsService extends BaseService<LmsCategoryEntity, LmsCategoryDB> {
    */
   public async getLmsDashboardInitial(): Promise<ServiceResult<InitialLmsData>> {
     const startTime = Date.now();
-    
+
     try {
       const [statsResult, categoriesResult, allLessonsResult] = await Promise.all([
         this.getDashboardStats(),
@@ -717,7 +760,14 @@ export class LmsService extends BaseService<LmsCategoryEntity, LmsCategoryDB> {
         this.getAllLessons()
       ]);
 
-      if (!statsResult.success || !categoriesResult.success || !allLessonsResult.success) {
+      if (
+        !statsResult.success ||
+        !statsResult.data ||
+        !categoriesResult.success ||
+        !categoriesResult.data ||
+        !allLessonsResult.success ||
+        !allLessonsResult.data
+      ) {
         return {
           success: false,
           error: 'Failed to load initial LMS data',
@@ -762,10 +812,10 @@ export class LmsService extends BaseService<LmsCategoryEntity, LmsCategoryDB> {
       return {
         success: true,
         data: initialData,
-        meta: { 
-          durationMs: Date.now() - startTime, 
-          queryCount: 3, 
-          cacheHit: false 
+        meta: {
+          durationMs: Date.now() - startTime,
+          queryCount: 3,
+          cacheHit: false
         }
       };
     } catch (error) {
@@ -775,16 +825,18 @@ export class LmsService extends BaseService<LmsCategoryEntity, LmsCategoryDB> {
 
   public async getDashboardStats(): Promise<ServiceResult<LmsDashboardStats>> {
     const startTime = Date.now();
-    
+
     try {
-      const stats = await this.dashboardRepo.getStats();
-      const staffProgress = await this.dashboardRepo.getStaffProgress();
-      const categoryCompletion = await this.dashboardRepo.getCategoryCompletion();
-      
+      const [stats, staffProgress, categoryCompletion] = await Promise.all([
+        this.dashboardRepo.getStats(),
+        this.dashboardRepo.getStaffProgress(),
+        this.dashboardRepo.getCategoryCompletion()
+      ]);
+
       const totalStaff = stats.totalStaff;
       const totalLessons = stats.totalLessons;
       const totalPossibleCompletions = totalStaff * totalLessons;
-      
+
       const dashboardStats: LmsDashboardStats = {
         total_staff: stats.totalStaff,
         total_categories: stats.totalCategories,
@@ -812,7 +864,7 @@ export class LmsService extends BaseService<LmsCategoryEntity, LmsCategoryDB> {
           ),
         })),
       };
-      
+
       return {
         success: true,
         data: dashboardStats,
@@ -832,7 +884,7 @@ export class LmsService extends BaseService<LmsCategoryEntity, LmsCategoryDB> {
     staffId: number
   ): Promise<ServiceResult<LmsCategoryWithLessons>> {
     const startTime = Date.now();
-    
+
     try {
       const categoryResult = await this.getById(categoryId);
       if (!categoryResult.success || !categoryResult.data) {
@@ -846,12 +898,12 @@ export class LmsService extends BaseService<LmsCategoryEntity, LmsCategoryDB> {
           },
         };
       }
-      
+
       const lessons = await this.lessonRepo.getLessonsWithCompletionStatus(categoryId, staffId);
-      
+
       const totalLessons = lessons.length;
       const completedLessons = lessons.filter(l => l.is_completed).length;
-      
+
       const categoryWithLessons: LmsCategoryWithLessons = {
         ...categoryResult.data,
         lessons: lessons.map(l => ({
@@ -863,7 +915,7 @@ export class LmsService extends BaseService<LmsCategoryEntity, LmsCategoryDB> {
         completedLessons,
         isComplete: totalLessons > 0 && completedLessons === totalLessons,
       };
-      
+
       return {
         success: true,
         data: categoryWithLessons,
@@ -883,16 +935,16 @@ export class LmsService extends BaseService<LmsCategoryEntity, LmsCategoryDB> {
     staffId: number
   ): Promise<ServiceResult<LmsLessonWithUnlockStatus[]>> {
     const startTime = Date.now();
-    
+
     try {
       const lessons = await this.lessonRepo.getLessonsWithCompletionStatus(categoryId, staffId);
-      
+
       let previousCompleted = true;
-      
+
       const lessonsWithUnlockStatus: LmsLessonWithUnlockStatus[] = lessons.map(lesson => {
         const isUnlocked = previousCompleted;
         previousCompleted = previousCompleted && lesson.is_completed;
-        
+
         return {
           ...this.toLessonEntity(lesson),
           isCompleted: lesson.is_completed,
@@ -900,7 +952,7 @@ export class LmsService extends BaseService<LmsCategoryEntity, LmsCategoryDB> {
           completedAt: lesson.completed_at,
         };
       });
-      
+
       return {
         success: true,
         data: lessonsWithUnlockStatus,
@@ -920,7 +972,7 @@ export class LmsService extends BaseService<LmsCategoryEntity, LmsCategoryDB> {
     lessonId: number
   ): Promise<ServiceResult<{ isUnlocked: boolean; message?: string }>> {
     const startTime = Date.now();
-    
+
     try {
       const lesson = await this.lessonRepo.findById(lessonId);
       if (!lesson) {
@@ -934,9 +986,9 @@ export class LmsService extends BaseService<LmsCategoryEntity, LmsCategoryDB> {
           },
         };
       }
-      
+
       const categoryLessons = await this.lessonRepo.getByCategory(lesson.category_id);
-      
+
       const targetIndex = categoryLessons.findIndex(l => l.id === lessonId);
       if (targetIndex === -1) {
         return {
@@ -949,7 +1001,7 @@ export class LmsService extends BaseService<LmsCategoryEntity, LmsCategoryDB> {
           },
         };
       }
-      
+
       if (targetIndex === 0) {
         return {
           success: true,
@@ -961,10 +1013,10 @@ export class LmsService extends BaseService<LmsCategoryEntity, LmsCategoryDB> {
           },
         };
       }
-      
+
       const previousLesson = categoryLessons[targetIndex - 1];
       const isPreviousCompleted = await this.completionRepo.isCompleted(staffId, Number(previousLesson.id));
-      
+
       if (!isPreviousCompleted) {
         return {
           success: true,
@@ -979,7 +1031,7 @@ export class LmsService extends BaseService<LmsCategoryEntity, LmsCategoryDB> {
           },
         };
       }
-      
+
       return {
         success: true,
         data: { isUnlocked: true },
@@ -999,10 +1051,10 @@ export class LmsService extends BaseService<LmsCategoryEntity, LmsCategoryDB> {
     categoryId: number
   ): Promise<ServiceResult<{ nextLessonId: number | null; allCompleted: boolean }>> {
     const startTime = Date.now();
-    
+
     try {
       const seqResult = await this.getSequentialLessonsForStaff(categoryId, staffId);
-      
+
       if (!seqResult.success || !seqResult.data) {
         return {
           success: false,
@@ -1014,10 +1066,10 @@ export class LmsService extends BaseService<LmsCategoryEntity, LmsCategoryDB> {
           },
         };
       }
-      
+
       const lessons = seqResult.data;
       const nextLesson = lessons.find(l => l.isUnlocked && !l.isCompleted);
-      
+
       if (nextLesson) {
         return {
           success: true,
@@ -1029,9 +1081,9 @@ export class LmsService extends BaseService<LmsCategoryEntity, LmsCategoryDB> {
           },
         };
       }
-      
+
       const allCompleted = lessons.every(l => l.isCompleted);
-      
+
       return {
         success: true,
         data: {
@@ -1087,7 +1139,7 @@ export class LmsService extends BaseService<LmsCategoryEntity, LmsCategoryDB> {
   protected handleError(error: unknown, operation: string): ServiceResult<never> {
     const errorMessage = error instanceof Error ? error.message : `Failed to ${operation}`;
     console.error(`[LmsService.${operation}] Error:`, errorMessage);
-    
+
     return {
       success: false,
       error: errorMessage,

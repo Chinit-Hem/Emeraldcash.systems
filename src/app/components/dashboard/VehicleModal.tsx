@@ -21,10 +21,10 @@ interface VehicleModalProps {
 
 /**
  * Unified Vehicle Modal
- * 
+ *
  * This component wraps the shared VehicleForm component to ensure
  * consistent styling and behavior across the entire application.
- * 
+ *
  * The VehicleForm component handles both modal and inline modes,
  * providing a unified user experience for adding and editing vehicles.
  */
@@ -65,10 +65,10 @@ export default function VehicleModal({ isOpen, vehicle, onClose, onSave, uploadP
     Time: "",
   };
 
-  const handleSubmit = async (data: Partial<Vehicle>, imageFile?: File) => {
+  const handleSubmit = async (data: Partial<Vehicle>, imageFile?: File | null) => {
     setIsLoading(true);
     setError(null);
-    
+
     try {
       await onSave(data, imageFile);
       onClose();

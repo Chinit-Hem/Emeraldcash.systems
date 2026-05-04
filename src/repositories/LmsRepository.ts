@@ -1,14 +1,14 @@
 /**
  * LMS Repository - Repository Pattern Implementation
- * 
+ *
  * Handles all database operations for LMS module:
  * - Categories
  * - Lessons
  * - Staff
  * - Completions
- * 
+ *
  * Extends BaseRepository for common CRUD operations.
- * 
+ *
  * @module repositories/LmsRepository
  */
 
@@ -41,7 +41,7 @@ export class LmsCategoryRepository extends BaseRepository<LmsCategoryDB> {
    */
   public async getCategoriesWithLessonCounts(): Promise<(LmsCategoryDB & { lesson_count: number })[]> {
     const query = `
-      SELECT 
+      SELECT
         c.*,
         COUNT(l.id) as lesson_count
       FROM ${this.tableName} c
@@ -59,14 +59,13 @@ export class LmsCategoryRepository extends BaseRepository<LmsCategoryDB> {
    * Check if category with name exists
    */
   public async existsByName(name: string): Promise<boolean> {
-    const escapedName = name.replace(/'/g, "''");
     const query = `
-      SELECT id FROM ${this.tableName} 
-      WHERE LOWER(name) = LOWER('${escapedName}') AND is_active = true
+      SELECT id FROM ${this.tableName}
+      WHERE LOWER(name) = LOWER($1) AND is_active = true
       LIMIT 1
     `;
-    
-    const result = await this.executeQuery<{ id: number }>(query);
+
+    const result = await this.executeQuery<{ id: number }>(query, [name]);
     return result.data.length > 0;
   }
 }
@@ -92,12 +91,12 @@ export class LmsLessonRepository extends BaseRepository<LmsLessonDB> {
    */
   public async getByCategory(categoryId: number): Promise<LmsLessonDB[]> {
     const query = `
-      SELECT * FROM ${this.tableName} 
-      WHERE category_id = ${categoryId} AND is_active = true
+      SELECT * FROM ${this.tableName}
+      WHERE category_id = $1 AND is_active = true
       ORDER BY order_index, id
     `;
 
-    const result = await this.executeQuery<LmsLessonDB>(query);
+    const result = await this.executeQuery<LmsLessonDB>(query, [categoryId]);
     return result.data;
   }
 
@@ -108,19 +107,18 @@ export class LmsLessonRepository extends BaseRepository<LmsLessonDB> {
     categoryId: number,
     staffId: number
   ): Promise<(LmsLessonDB & { is_completed: boolean; completed_at: string | null })[]> {
-    const query = `
-      SELECT 
+    const { dbManager } = await import("@/lib/db-singleton");
+    const result = await dbManager.executeUnsafe<LmsLessonDB & { is_completed: boolean; completed_at: string | null }>(`
+      SELECT
         l.*,
-        lc.completed_at IS NOT NULL as is_completed,
+        CASE WHEN lc.completed_at IS NOT NULL THEN true ELSE false END as is_completed,
         lc.completed_at
       FROM ${this.tableName} l
-      LEFT JOIN lms_lesson_completions lc ON lc.lesson_id = l.id AND lc.staff_id = ${staffId}
-      WHERE l.category_id = ${categoryId} AND l.is_active = true
+      LEFT JOIN lms_lesson_completions lc ON lc.lesson_id = l.id AND lc.staff_id = $1
+      WHERE l.category_id = $2 AND l.is_active = true
       ORDER BY l.order_index, l.id
-    `;
-
-    const result = await this.executeQuery<LmsLessonDB & { is_completed: boolean; completed_at: string | null }>(query);
-    return result.data;
+    `, [staffId, categoryId]);
+    return result;
   }
 
   /**
@@ -128,7 +126,7 @@ export class LmsLessonRepository extends BaseRepository<LmsLessonDB> {
    */
   public async getAllActive(): Promise<LmsLessonDB[]> {
     const query = `
-      SELECT * FROM ${this.tableName} 
+      SELECT * FROM ${this.tableName}
       WHERE is_active = true
       ORDER BY category_id, order_index, id
     `;
@@ -142,11 +140,11 @@ export class LmsLessonRepository extends BaseRepository<LmsLessonDB> {
    */
   public async countByCategory(categoryId: number): Promise<number> {
     const query = `
-      SELECT COUNT(*) as count FROM ${this.tableName} 
-      WHERE category_id = ${categoryId} AND is_active = true
+      SELECT COUNT(*) as count FROM ${this.tableName}
+      WHERE category_id = $1 AND is_active = true
     `;
 
-    const result = await this.executeQuery<{ count: string }>(query);
+    const result = await this.executeQuery<{ count: string }>(query, [categoryId]);
     return parseInt(result.data[0]?.count || "0");
   }
 }
@@ -186,48 +184,46 @@ export class LmsStaffRepository extends BaseRepository<LmsStaffDB> {
     if (!staff) return null;
 
     // Get completion stats
-    const statsQuery = `
-      SELECT 
+    const { dbManager } = await import("@/lib/db-singleton");
+    const statsResult = await dbManager.executeUnsafe<{
+      total_lessons: number;
+      completed_lessons: number;
+    }>(`
+      SELECT
         COUNT(DISTINCT l.id) as total_lessons,
         COUNT(DISTINCT lc.lesson_id) as completed_lessons
       FROM lms_lessons l
-      LEFT JOIN lms_lesson_completions lc ON lc.lesson_id = l.id AND lc.staff_id = ${staffId}
+      LEFT JOIN lms_lesson_completions lc ON lc.lesson_id = l.id AND lc.staff_id = $1
       WHERE l.is_active = true
-    `;
-
-    const statsResult = await this.executeQuery<{
-      total_lessons: number;
-      completed_lessons: number;
-    }>(statsQuery);
-    const stats = statsResult[0];
+    `, [staffId]);
+    const stats = statsResult[0] || { total_lessons: 0, completed_lessons: 0 };
 
     // Get category progress
-    const categoryQuery = `
-      SELECT 
+    const categoryResult = await dbManager.executeUnsafe<{
+      category_id: number;
+      category_name: string;
+      total_lessons: number;
+      completed_lessons: number;
+    }>(`
+
+      SELECT
         c.id as category_id,
         c.name as category_name,
         COUNT(l.id) as total_lessons,
         COUNT(lc.lesson_id) as completed_lessons
       FROM lms_categories c
       LEFT JOIN lms_lessons l ON l.category_id = c.id AND l.is_active = true
-      LEFT JOIN lms_lesson_completions lc ON lc.lesson_id = l.id AND lc.staff_id = ${staffId}
+      LEFT JOIN lms_lesson_completions lc ON lc.lesson_id = l.id AND lc.staff_id = $1
       WHERE c.is_active = true
       GROUP BY c.id, c.name
       ORDER BY c.order_index
-    `;
-
-    const categoryResult = await this.executeQuery<{
-      category_id: number;
-      category_name: string;
-      total_lessons: number;
-      completed_lessons: number;
-    }>(categoryQuery);
+    `, [staffId]);
 
     return {
       staff,
       totalLessons: parseInt(String(stats?.total_lessons || 0)),
       completedLessons: parseInt(String(stats?.completed_lessons || 0)),
-      categoriesProgress: categoryResult.data,
+    categoriesProgress: categoryResult,
     };
   }
 
@@ -236,7 +232,7 @@ export class LmsStaffRepository extends BaseRepository<LmsStaffDB> {
    */
   public async getAllActive(): Promise<LmsStaffDB[]> {
     const query = `
-      SELECT * FROM ${this.tableName} 
+      SELECT * FROM ${this.tableName}
       WHERE is_active = true
       ORDER BY full_name
     `;
@@ -271,22 +267,19 @@ export class LmsCompletionRepository extends BaseRepository<LmsLessonCompletionD
     timeSpentSeconds?: number | null,
     notes?: string | null
   ): Promise<LmsLessonCompletionDB> {
-    const timeValue = timeSpentSeconds ?? "NULL";
-    const notesValue = notes ? `'${notes.replace(/'/g, "''")}'` : "NULL";
-
     const query = `
       INSERT INTO ${this.tableName} (staff_id, lesson_id, time_spent_seconds, notes)
-      VALUES (${staffId}, ${lessonId}, ${timeValue}, ${notesValue})
-      ON CONFLICT (staff_id, lesson_id) 
-      DO UPDATE SET 
+      VALUES ($1, $2, $3, $4)
+      ON CONFLICT (staff_id, lesson_id)
+      DO UPDATE SET
         completed_at = CURRENT_TIMESTAMP,
         time_spent_seconds = EXCLUDED.time_spent_seconds,
         notes = EXCLUDED.notes
       RETURNING *
     `;
 
-    const result = await this.executeQuery<LmsLessonCompletionDB>(query);
-    return result[0];
+    const result = await this.executeQuery<LmsLessonCompletionDB>(query, [staffId, lessonId, timeSpentSeconds ?? null, notes ?? null]);
+    return result.data[0];
   }
 
   /**
@@ -295,10 +288,10 @@ export class LmsCompletionRepository extends BaseRepository<LmsLessonCompletionD
   public async getCompletedLessonIds(staffId: number): Promise<number[]> {
     const query = `
       SELECT lesson_id FROM ${this.tableName}
-      WHERE staff_id = ${staffId}
+      WHERE staff_id = $1
     `;
 
-    const result = await this.executeQuery<{ lesson_id: number }>(query);
+    const result = await this.executeQuery<{ lesson_id: number }>(query, [staffId]);
     return result.data.map(r => r.lesson_id);
   }
 
@@ -308,11 +301,11 @@ export class LmsCompletionRepository extends BaseRepository<LmsLessonCompletionD
   public async isCompleted(staffId: number, lessonId: number): Promise<boolean> {
     const query = `
       SELECT 1 FROM ${this.tableName}
-      WHERE staff_id = ${staffId} AND lesson_id = ${lessonId}
+      WHERE staff_id = $1 AND lesson_id = $2
       LIMIT 1
     `;
 
-    const result = await this.executeQuery<unknown>(query);
+    const result = await this.executeQuery<unknown>(query, [staffId, lessonId]);
     return result.data.length > 0;
   }
 
@@ -322,10 +315,10 @@ export class LmsCompletionRepository extends BaseRepository<LmsLessonCompletionD
   public async getCompletionCount(staffId: number): Promise<number> {
     const query = `
       SELECT COUNT(*) as count FROM ${this.tableName}
-      WHERE staff_id = ${staffId}
+      WHERE staff_id = $1
     `;
 
-    const result = await this.executeQuery<{ count: string }>(query);
+    const result = await this.executeQuery<{ count: string }>(query, [staffId]);
     return parseInt(result.data[0]?.count || "0");
   }
 }
@@ -355,7 +348,7 @@ export class LmsDashboardRepository {
     completedLessonsTotal: number;
   }> {
     const query = `
-      SELECT 
+      SELECT
         (SELECT COUNT(*) FROM lms_staff WHERE is_active = true) as total_staff,
         (SELECT COUNT(*) FROM lms_categories WHERE is_active = true) as total_categories,
         (SELECT COUNT(*) FROM lms_lessons WHERE is_active = true) as total_lessons,
@@ -393,7 +386,7 @@ export class LmsDashboardRepository {
     last_activity: string | null;
   }[]> {
     const query = `
-      SELECT 
+      SELECT
         s.id as staff_id,
         s.full_name as staff_name,
         s.branch_location as branch,
@@ -420,7 +413,7 @@ export class LmsDashboardRepository {
     completed_lessons: number;
   }[]> {
     const query = `
-      SELECT 
+      SELECT
         c.id as category_id,
         c.name as category_name,
         COUNT(DISTINCT l.id) as total_lessons,
@@ -439,9 +432,9 @@ export class LmsDashboardRepository {
   /**
    * Execute raw query (helper)
    */
-  private async executeQuery<T>(query: string): Promise<T[]> {
-    const { dbManager } = await import("@/lib/db-singleton");
-    return await dbManager.executeUnsafe<T>(query);
+  private async executeQuery<T>(query: string, params: (string | number | null)[] = []): Promise<T[]> {
+    const { dbManager } = await import("@/lib/db-singleton"); // Dynamic import for dbManager
+    return await dbManager.executeUnsafe<T>(query, params, 30000); // Default timeout for dashboard queries
   }
 }
 

@@ -52,16 +52,16 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const { success, error: syncError } = body;
-    
+
     if (typeof success !== 'boolean') {
       return NextResponse.json(
         { error: 'Invalid request: success must be a boolean' },
         { status: 400 }
       );
     }
-    
+
     updateSyncStatus(success, syncError);
-    
+
     return NextResponse.json({
       success: true,
       lastSyncTime: LAST_SYNC_TIME,
@@ -77,7 +77,7 @@ export async function POST(req: NextRequest) {
 
 /**
  * GET /api/health
- * 
+ *
  * Comprehensive health check endpoint that tests:
  * - Neon PostgreSQL connection
  * - Connection pool status
@@ -86,20 +86,20 @@ export async function POST(req: NextRequest) {
  */
 const healthHandler = withErrorHandling(async (req, { logger, requestId, startTime }) => {
   logger.info("Health check started");
-  
+
   // Check Neon PostgreSQL connection
   let dbStatus: "connected" | "disconnected" | "error" = "disconnected";
   let dbMessage = "";
   let dbHost = "";
-  
+
   try {
     // Test connection with a simple query
     const connectionTest = await testConnection();
-    
+
     if (connectionTest.success) {
       dbStatus = "connected";
       dbMessage = connectionTest.message;
-      
+
       // Extract host from DATABASE_URL (safely)
       const dbUrl = process.env.DATABASE_URL || "";
       try {
@@ -108,7 +108,7 @@ const healthHandler = withErrorHandling(async (req, { logger, requestId, startTi
       } catch {
         dbHost = "unknown";
       }
-      
+
       logger.info("Database connection healthy", { host: dbHost });
     } else {
       dbStatus = "error";
@@ -124,16 +124,16 @@ const healthHandler = withErrorHandling(async (req, { logger, requestId, startTi
 
   // Get connection pool stats
   const dbStats = getConnectionStats();
-  
+
   // Check cache status
   const cachedVehicles = getCachedVehicles();
   const cacheStatus = cachedVehicles ? "hit" : "miss";
-  
+
   // Check Cloudinary connectivity
   let cloudinaryStatus: "connected" | "disconnected" | "error" = "disconnected";
   let cloudinaryMessage = "";
   let cloudinaryCloudName = "";
-  
+
   try {
     const cloudinaryTest = await testCloudinaryConnection();
     if (cloudinaryTest.success) {
@@ -152,7 +152,7 @@ const healthHandler = withErrorHandling(async (req, { logger, requestId, startTi
     cloudinaryMessage = cloudinaryErrorMessage;
     logger.error("Cloudinary health check error", error instanceof Error ? error : new Error(cloudinaryErrorMessage));
   }
-  
+
   // Determine overall health
   let status: "healthy" | "degraded" | "unhealthy" = "healthy";
   if (dbStatus === "error" && cloudinaryStatus === "error") {
@@ -160,10 +160,10 @@ const healthHandler = withErrorHandling(async (req, { logger, requestId, startTi
   } else if (dbStatus === "error" || cloudinaryStatus === "error") {
     status = "degraded";
   }
-  
+
   // Calculate uptime
   const uptime = Math.floor((Date.now() - START_TIME) / 1000);
-  
+
   const metrics: HealthMetrics = {
     timestamp: new Date().toISOString(),
     status,
@@ -182,7 +182,7 @@ const healthHandler = withErrorHandling(async (req, { logger, requestId, startTi
     },
     cache: {
       status: cacheStatus,
-      vehicleCount: cachedVehicles?.length || 0,
+      vehicleCount: cachedVehicles?.data.length || 0,
       lastUpdated: LAST_SYNC_TIME,
     },
     cloudinary: {
@@ -192,20 +192,20 @@ const healthHandler = withErrorHandling(async (req, { logger, requestId, startTi
     },
     uptime,
   };
-  
-  logger.info("Health check completed", { 
-    status, 
-    dbStatus, 
+
+  logger.info("Health check completed", {
+    status,
+    dbStatus,
     dbHost,
     cloudinaryStatus,
-    uptime 
+    uptime
   });
-  
+
   const duration = Date.now() - startTime;
   const corsHeaders = new Headers();
   corsHeaders.set("X-Response-Time", `${duration}ms`);
   corsHeaders.set("Cache-Control", "no-cache, no-store, must-revalidate");
-  
+
   return createSuccessResponse(
     metrics,
     requestId,

@@ -1,11 +1,11 @@
 /**
  * useVehicleFormUnified - UNIFIED FORM HOOK (Merged Legacy + Neon)
- * 
+ *
  * Combines:
  * ✅ useVehicleForm (client state/validation)
  * ✅ useVehicleFormNeon (upload/compression/retry)
  * ✅ React 18 concurrent features
- * 
+ *
  * @module useVehicleFormUnified
  */
 
@@ -42,17 +42,17 @@ export interface UseVehicleFormOptions {
 }
 
 export function useVehicleFormUnified(options: UseVehicleFormOptions) {
-  const { 
-    initialVehicle, 
+  const {
+    initialVehicle,
     onSubmit,
-    onSubmitSuccess, 
-    onSubmitError, 
+    onSubmitSuccess,
+    onSubmitError,
     validateOnBlur = true,
-    validateOnChange = false 
+    validateOnChange = false
   } = options;
 
   const [isPending, startTransition] = useTransition();
-  
+
   // Unified state
   const [state, setState] = useState<UnifiedFormState>({
     formData: initialVehicle,
@@ -88,7 +88,7 @@ export function useVehicleFormUnified(options: UseVehicleFormOptions) {
   }, [initialVehicle.VehicleId]);
 
   // Computed values
-  const derivedPrices = useMemo(() => derivePrices(state.formData.PriceNew), [state.formData.PriceNew]);
+  const derivedPrices = useMemo(() => derivePrices(state.formData.PriceNew ?? null), [state.formData.PriceNew]);
   const categoryOptions = useMemo(() => {
     const cat = state.formData.Category || "";
     const isStandard = ["Cars", "Motorcycles", "Tuk Tuk"].includes(cat);
@@ -99,7 +99,7 @@ export function useVehicleFormUnified(options: UseVehicleFormOptions) {
     const initialData = initialVehicleRef.current;
     const currentData = state.formData;
     return (
-      JSON.stringify(currentData) !== JSON.stringify(initialData) || 
+      JSON.stringify(currentData) !== JSON.stringify(initialData) ||
       state.uploadedImage !== null
     );
   }, [state.formData, state.uploadedImage]);
@@ -109,7 +109,7 @@ export function useVehicleFormUnified(options: UseVehicleFormOptions) {
   // Validation
   const validateField = useCallback((field: keyof Vehicle | 'SenderId' | 'ReceiverId' | 'HandoverDate' | 'Status' | 'Remarks', value: unknown): string => {
     let error = "";
-    
+
     switch (field) {
       case "Brand":
       case "Model":
@@ -142,19 +142,19 @@ export function useVehicleFormUnified(options: UseVehicleFormOptions) {
         }
         break;
     }
-    
+
     return error;
   }, []);
 
 
   const validateForm = useCallback((): boolean => {
     const newErrors: Record<string, string> = {};
-    
+
     ["Brand", "Model", "Category"].forEach(field => {
       const error = validateField(field as keyof Vehicle, state.formData[field as keyof Vehicle]);
       if (error) newErrors[field] = error;
     });
-    
+
     // Stock tracking validation
     const stockError = validateField('Status', state.formData.Status);
     if (stockError) newErrors.Status = stockError;
@@ -173,7 +173,7 @@ export function useVehicleFormUnified(options: UseVehicleFormOptions) {
   const handleChange = useCallback((field: keyof Vehicle | 'SenderId' | 'ReceiverId' | 'HandoverDate' | 'Status' | 'Remarks', value: string | number | null) => {
     startTransition(() => {
       const newFormData = { ...state.formData, [field]: value };
-      
+
       if (field === "PriceNew") {
         const price = Number(value);
         if (!isNaN(price) && price > 0) {
@@ -182,7 +182,7 @@ export function useVehicleFormUnified(options: UseVehicleFormOptions) {
           newFormData.Price70 = derived.Price70;
         }
       }
-      
+
       setState(prev => ({
         ...prev,
         formData: newFormData,
@@ -238,7 +238,7 @@ export function useVehicleFormUnified(options: UseVehicleFormOptions) {
       setState(prev => ({
         ...prev,
         uploadedImage: null,
-        formData: { ...prev.formData, Image: null },
+        formData: { ...prev.formData, Image: undefined },
         errors: { ...prev.errors, Image: "" },
       }));
     });
@@ -263,9 +263,9 @@ export function useVehicleFormUnified(options: UseVehicleFormOptions) {
 
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!validateForm()) return;
 
+    if (!validateForm()) return;
+    // This is a loop.
     setState(prev => ({ ...prev, isSubmitting: true, stage: 'saving', progress: 0 }));
 
     try {
@@ -277,11 +277,11 @@ export function useVehicleFormUnified(options: UseVehicleFormOptions) {
       onSubmitSuccess?.({ ...initialVehicle, ...(state.formData as Partial<Vehicle>) });
     } catch (error) {
       const msg = error instanceof Error ? error.message : "Submit failed";
-      setState(prev => ({ 
-        ...prev, 
-        isSubmitting: false, 
-        stage: null, 
-        uploadError: msg 
+      setState(prev => ({
+        ...prev,
+        isSubmitting: false,
+        stage: null,
+        uploadError: msg
       }));
       onSubmitError?.(msg);
     }
@@ -299,7 +299,7 @@ export function useVehicleFormUnified(options: UseVehicleFormOptions) {
     derivedPrices,
     progress: state.progress,
     stage: state.stage,
-    
+
     // Actions
     handleChange,
     handleBlur,

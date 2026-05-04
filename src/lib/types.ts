@@ -14,11 +14,16 @@ export interface RoleDefinition {
 }
 
 // Permission types
-export type Permission = 
+export type Permission =
   | "vehicles:view"
   | "vehicles:create"
   | "vehicles:edit"
   | "vehicles:delete"
+  | "sms:view"
+  | "sms:create"
+  | "sms:edit"
+  | "sms:delete"
+  | "sms:transfer"
   | "users:view"
   | "users:create"
   | "users:edit"
@@ -35,6 +40,7 @@ export type Permission =
 export const DEFAULT_ROLE_PERMISSIONS: Record<string, Permission[]> = {
   Admin: [
     "vehicles:view", "vehicles:create", "vehicles:edit", "vehicles:delete",
+    "sms:view", "sms:create", "sms:edit", "sms:delete", "sms:transfer",
     "users:view", "users:create", "users:edit", "users:delete",
     "lms:view", "lms:manage",
     "settings:view", "settings:manage",
@@ -43,6 +49,8 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<string, Permission[]> = {
   ],
   Staff: [
     "vehicles:view",           // Can view vehicles (read-only)
+    "sms:view",                // Can view stock/assets
+    "sms:transfer",            // Can participate in stock transfers
     "users:view",              // Can view users
     "lms:view",                // Can access LMS
     "reports:view"             // Can view reports
@@ -56,6 +64,11 @@ export const PERMISSION_LABELS: Record<Permission, string> = {
   "vehicles:create": "Create Vehicles",
   "vehicles:edit": "Edit Vehicles",
   "vehicles:delete": "Delete Vehicles",
+  "sms:view": "View Stock",
+  "sms:create": "Create Stock",
+  "sms:edit": "Edit Stock",
+  "sms:delete": "Delete Stock",
+  "sms:transfer": "Transfer Stock",
   "users:view": "View Users",
   "users:create": "Create Users",
   "users:edit": "Edit Users",
@@ -72,6 +85,7 @@ export const PERMISSION_LABELS: Record<Permission, string> = {
 // Permission categories for grouping
 export const PERMISSION_CATEGORIES = {
   "Vehicles": ["vehicles:view", "vehicles:create", "vehicles:edit", "vehicles:delete"] as Permission[],
+  "SMS": ["sms:view", "sms:create", "sms:edit", "sms:delete", "sms:transfer"] as Permission[],
   "Users": ["users:view", "users:create", "users:edit", "users:delete"] as Permission[],
   "LMS": ["lms:view", "lms:manage"] as Permission[],
   "Settings": ["settings:view", "settings:manage"] as Permission[],

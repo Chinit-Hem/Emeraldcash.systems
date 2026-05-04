@@ -52,12 +52,12 @@ interface FormErrors {
 }
 
 // Modern Card Component - Clean Design
-function ModernCard({ 
-  children, 
+function ModernCard({
+  children,
   className = "",
-  hover = true 
-}: { 
-  children: React.ReactNode; 
+  hover = true
+}: {
+  children: React.ReactNode;
   className?: string;
   hover?: boolean;
 }) {
@@ -82,16 +82,16 @@ interface ModernInputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   icon?: React.ReactNode;
 }
 
-const ModernInput = memo(function ModernInput({ 
-  label, 
-  error, 
-  required, 
+const ModernInput = memo(function ModernInput({
+  label,
+  error,
+  required,
   icon,
   className = "",
-  ...props 
+  ...props
 }: ModernInputProps) {
   const [isFocused, setIsFocused] = useState(false);
-  
+
   return (
     <div className="w-full">
       <label className="block text-sm font-medium text-slate-600 mb-2">
@@ -102,7 +102,7 @@ const ModernInput = memo(function ModernInput({
         "relative flex items-center",
         "bg-white rounded-xl",
         "shadow-sm",
-        isFocused 
+        isFocused
           ? "shadow-sm ring-2 ring-emerald-100"
           : "hover:bg-slate-50",
         "transition-all duration-200",
@@ -164,7 +164,7 @@ const ModernSelect = memo(function ModernSelect({
   options,
 }: ModernSelectProps) {
   const [isFocused, setIsFocused] = useState(false);
-  
+
   return (
     <div className="w-full">
       <label className="block text-sm font-medium text-slate-600 mb-2">
@@ -175,7 +175,7 @@ const ModernSelect = memo(function ModernSelect({
         "relative",
         "bg-white rounded-xl",
         "shadow-sm",
-        isFocused 
+        isFocused
           ? "shadow-sm ring-2 ring-emerald-100"
           : "hover:bg-slate-50",
         "transition-all duration-200"
@@ -265,7 +265,7 @@ const ModernButton = memo(function ModernButton({
   };
 
   return (
-    <button 
+    <button
       className={cn(baseStyles, variantStyles[variant])}
       disabled={disabled || isLoading}
       {...props}
@@ -295,7 +295,7 @@ function SectionCard({
   delay?: number;
 }) {
   return (
-    <div 
+    <div
       className="animate-fade-in-up"
       style={{ animationDelay: `${delay}ms`, animationFillMode: 'both' }}
     >
@@ -319,14 +319,14 @@ function sanitizeNumericInput(value: unknown): number | null {
   if (value === null || value === undefined || value === "") {
     return null;
   }
-  
+
   if (typeof value === "number") {
     if (Number.isNaN(value)) {
       return null;
     }
     return value;
   }
-  
+
   if (typeof value === "string") {
     const trimmed = value.trim();
     if (trimmed === "" || trimmed === "undefined" || trimmed === "NaN") {
@@ -338,7 +338,7 @@ function sanitizeNumericInput(value: unknown): number | null {
     }
     return parsed;
   }
-  
+
   return null;
 }
 
@@ -348,14 +348,14 @@ function sanitizeVehicleDataForSubmit(data: Partial<Vehicle>): Partial<Vehicle> 
   sanitized.PriceNew = sanitizeNumericInput(data.PriceNew);
   sanitized.Price40 = sanitizeNumericInput(data.Price40);
   sanitized.Price70 = sanitizeNumericInput(data.Price70);
-  
+
   Object.keys(sanitized).forEach((key) => {
     const k = key as keyof Vehicle;
     if (sanitized[k] === undefined) {
       delete sanitized[k];
     }
   });
-  
+
   return sanitized;
 }
 
@@ -373,15 +373,15 @@ export const VehicleForm = memo(function VehicleForm({
 }: VehicleFormProps) {
   const { language } = useLanguage();
   const { t } = useTranslation(language);
-  
+
   const [formData, setFormData] = useState<Partial<Vehicle>>(vehicle);
   const [uploadedImage, setUploadedImage] = useState<File | string | null>(null);
   const [errors, setErrors] = useState<FormErrors>({});
   const [touched, setTouched] = useState<Record<string, boolean>>({});
-  
+
   const hasChanges = JSON.stringify(formData) !== JSON.stringify(vehicle) || uploadedImage !== null;
   const prevVehicleRef = useRef(vehicle);
-  
+
   useEffect(() => {
     if (prevVehicleRef.current !== vehicle) {
       prevVehicleRef.current = vehicle;
@@ -403,17 +403,17 @@ export const VehicleForm = memo(function VehicleForm({
     if (field === "Year" || field === "PriceNew") {
       sanitizedValue = sanitizeNumericInput(value);
     }
-    
+
     setFormData((prev) => {
       const next = { ...prev, [field]: sanitizedValue };
-      
+
       if (field === "PriceNew") {
         const priceNew = sanitizedValue as number | null;
         const derived = derivePrices(priceNew);
         next.Price40 = derived.Price40;
         next.Price70 = derived.Price70;
       }
-      
+
       return next;
     });
 
@@ -446,7 +446,7 @@ export const VehicleForm = memo(function VehicleForm({
           const year = Number(value);
           const currentYear = new Date().getFullYear() + 2;
           if (isNaN(year) || year < 1900 || year > currentYear) {
-            error = language === 'km' 
+            error = language === 'km'
               ? `ឆ្នាំត្រូវតែចន្លោះពី ១៩០០ ដល់ ${currentYear}`
               : `Year must be between 1900 and ${currentYear}`;
           }
@@ -498,7 +498,7 @@ export const VehicleForm = memo(function VehicleForm({
 
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     const allTouched: Record<string, boolean> = {};
     Object.keys(formData).forEach((key) => {
       allTouched[key] = true;
@@ -511,20 +511,20 @@ export const VehicleForm = memo(function VehicleForm({
 
     let imageFile: File | null = null;
     let imageUrl: string | null = null;
-    
+
     if (uploadedImage instanceof File) {
       imageFile = uploadedImage;
     } else if (typeof uploadedImage === "string" && uploadedImage.startsWith("data:image/")) {
       const { file: fileFromDataUrl, error: conversionError } = safeBase64ToFile(
-        uploadedImage, 
+        uploadedImage,
         `vehicle_image_${Date.now()}.jpg`
       );
-      
+
       if (conversionError) {
         setErrors((prev) => ({ ...prev, Image: conversionError }));
         return;
       }
-      
+
       if (fileFromDataUrl) {
         imageFile = fileFromDataUrl;
       } else {
@@ -533,7 +533,7 @@ export const VehicleForm = memo(function VehicleForm({
     } else if (typeof uploadedImage === "string" && uploadedImage.trim() && (uploadedImage.startsWith("http://") || uploadedImage.startsWith("https://"))) {
       imageUrl = uploadedImage.trim();
     }
-    
+
     let submitData: Partial<Vehicle>;
     if (imageFile) {
       const { Image: _Image, ...formDataWithoutImage } = formData;
@@ -543,7 +543,7 @@ export const VehicleForm = memo(function VehicleForm({
     } else {
       submitData = formData;
     }
-    
+
     const sanitizedSubmitData = sanitizeVehicleDataForSubmit(submitData);
     await onSubmit(sanitizedSubmitData, imageFile);
   }, [formData, uploadedImage, onSubmit, validateForm]);
@@ -553,7 +553,7 @@ export const VehicleForm = memo(function VehicleForm({
     setUploadedImage(null);
   }, []);
 
-  const derivedPrices = derivePrices(formData.PriceNew);
+  const derivedPrices = derivePrices(formData.PriceNew ?? null);
 
   const categoryValue = formData.Category || "";
   const categoryOptions =
@@ -567,14 +567,14 @@ export const VehicleForm = memo(function VehicleForm({
   const formContent = (
     <form onSubmit={handleSubmit} className="space-y-6">
       {/* Image Section */}
-      <SectionCard 
-        title={isKm ? "រូបភាពយានយន្ត" : "Vehicle Image"} 
+      <SectionCard
+        title={isKm ? "រូបភាពយានយន្ត" : "Vehicle Image"}
         icon={ImageIcon}
         delay={100}
       >
         <div className="space-y-4">
           <ImageInput
-            value={typeof formData.Image === 'string' ? formData.Image.trim() || null : null}
+            value={typeof formData.Image === 'string' ? formData.Image.trim() || undefined : undefined}
             onChange={async (value) => {
               if (!value) {
                 handleRemoveImage();
@@ -591,7 +591,7 @@ export const VehicleForm = memo(function VehicleForm({
             disabled={isSubmitting}
             maxSizeMB={5}
           />
-          
+
           {uploadProgress?.stage === 'compressing' && (
             <div className="flex items-center gap-2 text-[#718096]">
               <Loader2 className="w-4 h-4 animate-spin" />
@@ -600,7 +600,7 @@ export const VehicleForm = memo(function VehicleForm({
               </span>
             </div>
           )}
-          
+
           {uploadedImage instanceof File && (
             <div className="flex items-center gap-2 text-[#2ecc71]">
               <CheckCircle2 className="w-4 h-4" />
@@ -609,7 +609,7 @@ export const VehicleForm = memo(function VehicleForm({
               </span>
             </div>
           )}
-          
+
           {errors.Image && (
             <p className="text-sm text-red-500 flex items-center gap-1">
               <AlertCircle className="w-4 h-4" />
@@ -620,8 +620,8 @@ export const VehicleForm = memo(function VehicleForm({
       </SectionCard>
 
       {/* Basic Information */}
-      <SectionCard 
-        title={isKm ? "ព័ត៌មានមូលដ្ឋាន" : "Basic Information"} 
+      <SectionCard
+        title={isKm ? "ព័ត៌មានមូលដ្ឋាន" : "Basic Information"}
         icon={Car}
         delay={200}
       >
@@ -656,8 +656,8 @@ export const VehicleForm = memo(function VehicleForm({
             disabled={isSubmitting}
             options={[
               { value: "", label: isKm ? "ជ្រើសរើសប្រភេទ" : "Select category" },
-              ...categoryOptions.map((cat) => ({ 
-                value: cat, 
+              ...categoryOptions.map((cat) => ({
+                value: cat,
 label: isKm ? (cat === "Cars" ? "រថយន្ត" : cat === "Motorcycles" ? "ម៉ូតូ" : "កង់បី") : cat
               }))
             ]}
@@ -685,8 +685,8 @@ label: isKm ? (cat === "Cars" ? "រថយន្ត" : cat === "Motorcycles" ? "
       </SectionCard>
 
       {/* Specifications */}
-      <SectionCard 
-        title={isKm ? "លក្ខណៈសម្បត្តិ" : "Specifications"} 
+      <SectionCard
+        title={isKm ? "លក្ខណៈសម្បត្តិ" : "Specifications"}
         icon={Wrench}
         delay={300}
       >
@@ -739,8 +739,8 @@ label: isKm ? (cat === "Cars" ? "រថយន្ត" : cat === "Motorcycles" ? "
       </SectionCard>
 
       {/* Pricing */}
-      <SectionCard 
-        title={isKm ? "តម្លៃ" : "Pricing"} 
+      <SectionCard
+        title={isKm ? "តម្លៃ" : "Pricing"}
         icon={DollarSign}
         delay={400}
       >
@@ -796,7 +796,7 @@ label: isKm ? (cat === "Cars" ? "រថយន្ត" : cat === "Motorcycles" ? "
                 {uploadProgress.stage}...
               </p>
               <div className="mt-2 h-2 bg-slate-100 rounded-full overflow-hidden">
-                <div 
+                <div
                   className="h-full bg-emerald-500 transition-all duration-300 ease-out rounded-full"
                   style={{ width: `${uploadProgress.progress}%` }}
                 />
@@ -820,10 +820,10 @@ label: isKm ? (cat === "Cars" ? "រថយន្ត" : cat === "Motorcycles" ? "
           className="order-1 sm:order-2"
         >
           <Save className="w-4 h-4" />
-          {uploadProgress?.stage 
+          {uploadProgress?.stage
             ? `${uploadProgress.stage.charAt(0).toUpperCase() + uploadProgress.stage.slice(1)}... ${uploadProgress.progress}%`
-            : isSubmitting 
-              ? (isKm ? "កំពុងរក្សាទុក..." : "Saving...") 
+            : isSubmitting
+              ? (isKm ? "កំពុងរក្សាទុក..." : "Saving...")
               : (isKm ? "រក្សាទុក" : "Save Vehicle")}
         </ModernButton>
         <ModernButton
@@ -875,7 +875,7 @@ label: isKm ? (cat === "Cars" ? "រថយន្ត" : cat === "Motorcycles" ? "
                   </button>
                 </div>
               </div>
-              
+
               {/* Form Content */}
               <div className="p-4 md:p-6">
                 {formContent}

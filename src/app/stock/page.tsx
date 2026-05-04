@@ -7,9 +7,30 @@ import { GlassInput } from '@/components/ui/glass/GlassInput';
 import { AlertCircle } from 'lucide-react';
 import Link from 'next/link';
 
+type StockStats = {
+  total_items: number;
+  total_quantity: number;
+  low_stock_items: number;
+};
+
+type StockItem = {
+  model_key: string;
+  brand?: string;
+  model?: string;
+  year?: number | string;
+  location?: string;
+  available?: number;
+  quantity?: number;
+  reserved?: number;
+};
+
+function getErrorMessage(error: unknown, fallback: string) {
+  return error instanceof Error ? error.message : fallback;
+}
+
 export default function StockPage() {
-  const [stockStats, setStockStats] = useState({ total_items: 0, total_quantity: 0, low_stock_items: 0 });
-  const [stockItems, setStockItems] = useState([]);
+  const [stockStats, setStockStats] = useState<StockStats>({ total_items: 0, total_quantity: 0, low_stock_items: 0 });
+  const [stockItems, setStockItems] = useState<StockItem[]>([]);
   const [form, setForm] = useState({ modelKey: '', location: 'Warehouse A', quantity: 0, minStock: 5 });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -28,9 +49,9 @@ export default function StockPage() {
       } else {
         setError(data.error || 'Unknown API error');
       }
-    } catch (e: any) {
+    } catch (e: unknown) {
       console.error('Fetch stock error:', e);
-      setError(e.message || 'Failed to load stock data');
+      setError(getErrorMessage(e, 'Failed to load stock data'));
     }
   };
 
@@ -49,9 +70,9 @@ export default function StockPage() {
       });
       if (!res.ok) throw new Error('Adjustment API failed');
       fetchStock();
-    } catch (e: any) {
+    } catch (e: unknown) {
       console.error('Adjust error:', e);
-      setError(e.message || 'Quick adjust failed');
+      setError(getErrorMessage(e, 'Quick adjust failed'));
     } finally {
       setLoading(false);
     }
@@ -74,9 +95,9 @@ export default function StockPage() {
       if (!res.ok) throw new Error('Adjustment failed');
       fetchStock();
       setForm({ modelKey: '', location: 'Warehouse A', quantity: 0, minStock: 5 });
-    } catch (e: any) {
+    } catch (e: unknown) {
       console.error('Submit error:', e);
-      setError(e.message || 'Manual adjustment failed');
+      setError(getErrorMessage(e, 'Manual adjustment failed'));
     } finally {
       setLoading(false);
     }
@@ -90,14 +111,14 @@ export default function StockPage() {
           + New Adjustment
         </Link>
       </div>
-      
+
       {error && (
         <Alert variant="error" className="mb-6">
           <AlertCircle className="h-4 w-4" />
           <div>{error}</div>
         </Alert>
       )}
-      
+
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
 <GlassCard className="p-6 text-center">
@@ -120,14 +141,14 @@ export default function StockPage() {
             <div className="p-6">
               <h3 className="text-lg font-semibold mb-4 text-slate-900">Adjust Stock</h3>
               <form onSubmit={handleSubmit} className="space-y-4">
-                <GlassInput 
+                <GlassInput
                   placeholder="Model Key (e.g., toyota_camry_2023_new_white)"
                   value={form.modelKey}
                   onChange={(e) => setForm({...form, modelKey: e.target.value})}
                 />
                 <div className="space-y-1">
                   <label className="text-sm font-medium text-slate-700">Location</label>
-                  <select 
+                  <select
                     value={form.location}
                     onChange={(e) => setForm({...form, location: e.target.value})}
                     className="w-full p-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
@@ -137,13 +158,13 @@ export default function StockPage() {
                     ))}
                   </select>
                 </div>
-                <GlassInput 
+                <GlassInput
                   type="number"
                   placeholder="Quantity (+ to add, - to remove)"
                   value={form.quantity}
                   onChange={(e) => setForm({...form, quantity: parseInt(e.target.value) || 0})}
                 />
-                <GlassInput 
+                <GlassInput
                   type="number"
                   placeholder="Min Stock Level (optional)"
                   value={form.minStock}
@@ -164,7 +185,7 @@ export default function StockPage() {
                 {stockItems.length === 0 ? (
                   <p className="text-slate-500 text-center py-12">No stock items found. Use the form to create/adjust.</p>
                 ) : (
-                  stockItems.map((item: any) => (
+                  stockItems.map((item) => (
                     <div key={item.model_key} className="flex justify-between items-center p-4 bg-slate-50/50 rounded-lg border border-slate-100 hover:bg-slate-50 transition-colors">
                       <div className="flex-1 min-w-0">
                         <div className="font-semibold text-slate-900 truncate" title={item.model_key}>{item.brand} {item.model} ({item.year})</div>

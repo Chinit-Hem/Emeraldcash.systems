@@ -1,24 +1,21 @@
 /**
  * Video Player Component with YouTube Integration
- * 
+ *
  * Features:
  * - YouTube video embed with react-player (no custom overlay controls)
  * - Step-by-step instructions panel
  * - Mark as complete button
  * - Progress tracking
  * - Responsive design
- * 
+ *
  * WORKAROUND 1: Using react-player library for better origin handling
  * WORKAROUND 2: Removed sandbox attribute to prevent blocking
  * WORKAROUND 3: Dummy origin for local IPs implemented in buildYoutubeEmbedUrl
- * 
+ *
  * @module VideoPlayer
  */
 
 "use client";
-
-// Module-level debug log
-console.log("[VideoPlayer] Module loaded");
 
 import React, { useState, useRef } from "react";
 import {
@@ -125,14 +122,6 @@ export function VideoPlayer({
   onComplete,
   onBack,
 }: VideoPlayerProps) {
-  // Convert to YouTube EMBED URL format (required for ReactPlayer)
-  const playerUrl = youtubeVideoId 
-    ? `https://www.youtube.com/embed/${youtubeVideoId}`
-    : youtubeUrl;
-  
-  // Debug: Log when component mounts
-  console.log("[VideoPlayer] Component mounting with URL:", playerUrl, "ID:", youtubeVideoId);
-  
   const [currentStep, setCurrentStep] = useState(0);
   const [isCompleted, setIsCompleted] = useState(initialCompleted);
   const [showInstructions, setShowInstructions] = useState(true);
@@ -268,7 +257,7 @@ export function VideoPlayer({
                             Video Player Unavailable
                           </h3>
                           <p className="text-sm text-gray-400 mt-2 max-w-md">
-                            The embedded video player cannot load due to network restrictions. 
+                            The embedded video player cannot load due to network restrictions.
                             Please open the video directly on YouTube.
                           </p>
                         </div>

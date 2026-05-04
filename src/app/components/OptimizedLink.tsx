@@ -2,7 +2,7 @@
 
 import React, { useCallback, useRef, useEffect } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 
 interface OptimizedLinkProps {
   href: string;
@@ -15,7 +15,7 @@ interface OptimizedLinkProps {
 
 /**
  * OptimizedLink - Smart link component with instant navigation
- * 
+ *
  * Features:
  * - Prefetches on hover (instant navigation feel)
  * - Priority-based prefetching
@@ -31,6 +31,7 @@ export function OptimizedLink({
   onClick,
 }: OptimizedLinkProps) {
   const router = useRouter();
+  const pathname = usePathname();
   const linkRef = useRef<HTMLAnchorElement>(null);
   const prefetchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const hasPrefetched = useRef(false);
@@ -38,6 +39,7 @@ export function OptimizedLink({
   // Immediate prefetch on hover for instant navigation
   const handleMouseEnter = useCallback(() => {
     if (!prefetch || hasPrefetched.current) return;
+    if (href === pathname || href === "#") return;
 
     // High priority: prefetch immediately
     // Normal priority: prefetch after 50ms (to avoid unnecessary prefetches on quick hovers)
@@ -50,7 +52,7 @@ export function OptimizedLink({
         hasPrefetched.current = true;
       }
     }, delay);
-  }, [href, prefetch, priority, router]);
+  }, [href, pathname, prefetch, priority, router]);
 
   const handleMouseLeave = useCallback(() => {
     if (prefetchTimeoutRef.current) {
@@ -62,10 +64,11 @@ export function OptimizedLink({
   // Preload high priority routes on mount
   useEffect(() => {
     if (priority === "high" && prefetch && !hasPrefetched.current) {
+      if (href === pathname || href === "#") return;
       router.prefetch(href);
       hasPrefetched.current = true;
     }
-  }, [href, prefetch, priority, router]);
+  }, [href, pathname, prefetch, priority, router]);
 
   // Cleanup
   useEffect(() => {
@@ -77,7 +80,7 @@ export function OptimizedLink({
   }, []);
 
   const handleClick = useCallback(
-    (e: React.MouseEvent) => {
+    () => {
       onClick?.();
     },
     [onClick]

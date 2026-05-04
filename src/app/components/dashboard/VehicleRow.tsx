@@ -5,8 +5,8 @@ import { useTranslation } from "@/lib/i18n";
 import { derivePrices } from "@/lib/pricing";
 import type { Vehicle } from "@/lib/types";
 import { cn } from "@/lib/ui";
-import { useRouter } from "next/navigation";
-import { useState, useCallback } from "react";
+import type { AppRouterInstance } from "next/dist/shared/lib/app-router-context.shared-runtime";
+import { useState, useCallback, type CSSProperties, type Dispatch, type SetStateAction } from "react";
 import { formatPrice, getVehicleThumbnailUrl } from "@/lib/vehicle-helpers";
 import { OptimizedImage } from "@/app/components/OptimizedImage";
 import { useOptimisticVehicles } from "@/lib/useOptimisticVehicles";
@@ -49,10 +49,10 @@ const getColorHex = (colorName: string): string => {
     "indigo": "#6366f1",
     "emerald": "#10b981",
   };
-  
+
   const normalizedColor = colorName.toLowerCase().trim();
   if (colorMap[normalizedColor]) return colorMap[normalizedColor];
-  
+
   // Fallback hash color
   let hash = 0;
   for (let i = 0; i < colorName.length; i++) {
@@ -65,7 +65,7 @@ const getColorHex = (colorName: string): string => {
 interface VehicleRowProps {
   vehicle: Vehicle;
   index: number;
-  style: React.CSSProperties;
+  style: CSSProperties;
   isAdmin: boolean;
   visibleColumns: string[];
   sortField: keyof Vehicle | null;
@@ -74,10 +74,10 @@ interface VehicleRowProps {
   onEdit: (vehicle: Vehicle) => void;
   onDelete: (vehicle: Vehicle) => void;
   imageErrors: Set<string>;
-  setImageErrors: (errors: Set<string>) => void;
+  setImageErrors: Dispatch<SetStateAction<Set<string>>>;
   deletingId: string | null;
   handleOptimisticDelete: (vehicle: Vehicle) => Promise<void>;
-  router: any;
+  router: AppRouterInstance;
 }
 
 export default function VehicleRow({
@@ -101,12 +101,12 @@ export default function VehicleRow({
   const { t } = useTranslation(language);
   const [imageError, setImageError] = useState(false);
   const vehicleId = vehicle.VehicleId;
-  
+
   const derived = derivePrices(vehicle.PriceNew);
   const price40 = vehicle.Price40 ?? derived.Price40;
   const price70 = vehicle.Price70 ?? derived.Price70;
-  
-  const thumbUrl = !imageError 
+
+  const thumbUrl = !imageError
     ? getVehicleThumbnailUrl(vehicle.Image)
     : null;
 
@@ -116,7 +116,7 @@ export default function VehicleRow({
   }, [vehicleId, setImageErrors]);
 
   return (
-    <div 
+    <div
       className={cn(
         "flex border-b border-slate-200 last:border-b-0 hover:bg-slate-50 active:bg-slate-100 transition-colors",
         index % 2 === 0 ? "bg-white" : "bg-slate-50"
@@ -242,9 +242,9 @@ export default function VehicleRow({
           <div className="flex items-center gap-2">
             {vehicle.Color ? (
               <>
-                <div 
+                <div
                   className="w-4 h-4 rounded-full shadow-sm border-2 border-slate-200"
-                  style={{ 
+                  style={{
                     backgroundColor: getColorHex(vehicle.Color),
                   }}
                   title={vehicle.Color}
@@ -325,4 +325,3 @@ export default function VehicleRow({
     </div>
   );
 }
-

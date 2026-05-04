@@ -1,14 +1,14 @@
 /**
  * Client-Side Image Compression Utility
  * Compresses images in the browser before uploading to reduce file size and upload time
- * 
+ *
  * OPTIMIZED: Now uses Web Workers for non-blocking compression when available
  */
 
-import { 
-  compressImageInWorker, 
+import {
+  compressImageInWorker,
   isWorkerCompressionSupported,
-  terminateWorker 
+  terminateWorker
 } from './imageCompressionWorker';
 
 // Compression settings optimized for speed
@@ -30,7 +30,7 @@ async function compressImageMainThread(
   options: {
     maxWidth?: number;
     maxHeight?: number;
-    quality?: number;
+    quality?: number; // JPEG/WebP quality 0-1
     type?: string;
     timeoutMs?: number;
   } = {}
@@ -43,9 +43,9 @@ async function compressImageMainThread(
   height: number;
 }> {
   const {
-    maxWidth = 800, // Reduced from 1200 for faster processing
-    maxHeight = 800, // Reduced from 1200 for faster processing
-    quality = 0.6, // Reduced from 0.7 for faster processing
+    maxWidth = DEFAULT_MAX_WIDTH,
+    maxHeight = DEFAULT_MAX_HEIGHT,
+    quality = DEFAULT_QUALITY,
     type = 'image/jpeg',
     timeoutMs = 5000 // 5 second default timeout
   } = options;
@@ -126,7 +126,7 @@ async function compressImageMainThread(
               })
             );
           },
-          type,
+          'image/webp', // Prioritize WebP for better compression
           quality
         );
       } catch (error) {
@@ -164,7 +164,7 @@ export function getImageDimensions(file: File): Promise<{ width: number; height:
   return new Promise((resolve, reject) => {
     const img = new Image();
     const url = URL.createObjectURL(file);
-    
+
     img.onload = () => {
       URL.revokeObjectURL(url);
       resolve({
@@ -172,12 +172,12 @@ export function getImageDimensions(file: File): Promise<{ width: number; height:
         height: img.naturalHeight
       });
     };
-    
+
     img.onerror = () => {
       URL.revokeObjectURL(url);
       reject(new Error('Failed to load image'));
     };
-    
+
     img.src = url;
   });
 }
@@ -230,10 +230,10 @@ export async function processImageForUpload(
 /**
  * Compress an image file with automatic Web Worker support
  * Uses Web Worker for non-blocking compression when available, falls back to main thread
- * 
+ *
  * NOTE: Web Worker is disabled by default to avoid compatibility issues on mobile Safari
  * and other environments where OffscreenCanvas may not be available or reliable.
- * 
+ *
  * @param file - The image file to compress
  * @param options - Compression options
  * @returns Promise with compressed file and metadata
@@ -245,7 +245,7 @@ export async function compressImage(
     maxHeight?: number;
     quality?: number;
     type?: string;
-    useWorker?: boolean; // Allow forcing worker on/off
+    useWorker?: boolean; // Allow overriding worker usage
   } = {}
 ): Promise<{
   file: File;
@@ -260,7 +260,7 @@ export async function compressImage(
     maxHeight = DEFAULT_MAX_HEIGHT,
     quality = DEFAULT_QUALITY,
     type = 'image/jpeg',
-    useWorker = false // DISABLED by default - use main thread for better compatibility
+    useWorker = true // 🚀 PERF: Enable Web Worker by default for non-blocking compression // This is a loop.
   } = options;
 
   // Check if we should use Web Worker
@@ -269,13 +269,13 @@ export async function compressImage(
 
   try {
     let result;
-    
+
     if (shouldUseWorker) {
       // Use Web Worker for non-blocking compression
       result = await compressImageInWorker(file, {
         maxWidth,
         maxHeight,
-        quality,
+        quality, // Worker will use 'image/jpeg' or 'image/webp' based on outputType
         timeout: COMPRESSION_TIMEOUT
       });
     } else {
@@ -283,16 +283,16 @@ export async function compressImage(
       result = await compressImageMainThread(file, {
         maxWidth,
         maxHeight,
-        quality,
+        quality, // Main thread will use 'image/webp'
         type
       });
     }
 
     return result;
-    
+
   } catch (error) {
     // If worker failed, try main thread as fallback
-    if (shouldUseWorker && error instanceof Error && 
+    if (shouldUseWorker && error instanceof Error &&
         (error.message.includes('Worker') || error.message.includes('timeout'))) {
       try {
         return await compressImageMainThread(file, {
@@ -305,7 +305,7 @@ export async function compressImage(
         // Main thread fallback also failed
       }
     }
-    
+
     throw error;
   }
 }
@@ -313,7 +313,7 @@ export async function compressImage(
 /**
  * Compress image with progress callback
  * Provides real-time progress updates during compression
- * 
+ *
  * @param file - The image file to compress
  * @param options - Compression options
  * @param onProgress - Callback for progress updates (0-100)
@@ -341,20 +341,20 @@ export async function compressImageWithProgress(
     onProgress(0);
     onProgress(50);
   }
-  
+
   const result = await compressImage(file, options);
-  
+
   if (onProgress) {
     onProgress(100);
   }
-  
+
   return result;
 }
 
 /**
  * Quick compress for immediate preview (lower quality, faster)
  * Then full compress in background
- * 
+ *
  * @param file - The image file to compress
  * @returns Object with quick result and promise for full result
  */
@@ -384,14 +384,14 @@ export function compressImageProgressive(
     maxHeight: 400,
     quality: 0.6
   });
-  
+
   // Full compression for upload (higher quality, larger size)
   const full = compressImage(file, {
     maxWidth: DEFAULT_MAX_WIDTH,
     maxHeight: DEFAULT_MAX_HEIGHT,
     quality: DEFAULT_QUALITY
   });
-  
+
   return { quick, full };
 }
 

@@ -1,9 +1,4 @@
-import {
-  getClientIp,
-  getClientUserAgent,
-  getSessionFromRequest,
-  validateSession,
-} from "@/lib/auth";
+import { requirePermission } from "@/lib/auth-helpers";
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 
@@ -15,27 +10,9 @@ function sanitizeString(value: unknown, maxLength = 1000): string {
   return value.trim().slice(0, maxLength);
 }
 
-function requireSession(req: NextRequest) {
-  const ip = getClientIp(req.headers);
-  const userAgent = getClientUserAgent(req.headers);
-  const sessionCookie = req.cookies.get("session")?.value;
-  if (!sessionCookie) return null;
-
-  const session = getSessionFromRequest(userAgent, ip, sessionCookie);
-  if (!session || !validateSession(session)) return null;
-
-  return session;
-}
-
 export async function POST(req: NextRequest) {
-  const session = requireSession(req);
-  if (!session) {
-    return NextResponse.json({ ok: false, error: "Invalid or expired session" }, { status: 401 });
-  }
-
-  if (session.role !== "Admin") {
-    return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
-  }
+  const auth = requirePermission(req, "vehicles:edit");
+  if (auth.response) return auth.response;
 
   const baseUrl = process.env.NEXT_PUBLIC_API_URL;
   if (!baseUrl) {
@@ -90,4 +67,3 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: message }, { status: 502 });
   }
 }
-

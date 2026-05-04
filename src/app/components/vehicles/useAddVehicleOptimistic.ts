@@ -12,35 +12,35 @@ import type { Vehicle } from "@/lib/types";
  */
 function cleanBase64DataUrl(dataUrl: string): string {
   if (!dataUrl || typeof dataUrl !== 'string') return dataUrl;
-  
+
   // Only process data URLs
   if (!dataUrl.startsWith('data:')) return dataUrl;
-  
+
   // Find the comma separator
   const commaIndex = dataUrl.indexOf(',');
   if (commaIndex === -1) return dataUrl;
-  
+
   const header = dataUrl.substring(0, commaIndex);
   let base64Data = dataUrl.substring(commaIndex + 1);
-  
+
   // Remove all whitespace and control characters (including zero-width chars)
   base64Data = base64Data.replace(/[\s\u0000-\u001F\u007F-\u009F\u200B-\u200D\uFEFF]/g, '');
-  
+
   // Convert URL-safe base64 to standard
   base64Data = base64Data.replace(/-/g, "+").replace(/_/g, "/");
-  
+
   // Remove ellipsis characters
   base64Data = base64Data.replace(/…/g, '').replace(/\u2026/g, '');
-  
+
   // Remove all non-base64 characters
   base64Data = base64Data.replace(/[^A-Za-z0-9+/]/g, '');
-  
+
   // Add padding if needed
   const remainder = base64Data.length % 4;
   if (remainder !== 0) {
     base64Data += "=".repeat(4 - remainder);
   }
-  
+
   return `${header},${base64Data}`;
 }
 
@@ -83,14 +83,14 @@ const isRetryableError = (error: Error): boolean => {
   const has502 = message.includes('502') || message.includes('[http 502]');
   const has504 = message.includes('504') || message.includes('[http 504]');
   const hasTimeout = message.includes('timeout');
-  const hasNetworkError = message.includes('network') || 
+  const hasNetworkError = message.includes('network') ||
                           message.includes('econnreset') ||
                           message.includes('econnrefused') ||
                           message.includes('socket hang up');
-  
+
   const statusCode = (error as Error & { statusCode?: number }).statusCode;
   const isRetryableStatus = statusCode === 502 || statusCode === 504 || statusCode === 503;
-  
+
   return has502 || has504 || hasTimeout || hasNetworkError || isRetryableStatus;
 };
 
@@ -131,18 +131,18 @@ async function uploadImageToCloudinary(
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
     const errorMessage = errorData.error || errorData.details || `Upload failed: ${response.status}`;
-    
+
     console.error('[uploadImageToCloudinary] Server upload error:', {
       status: response.status,
       error: errorMessage,
       errorData,
     });
-    
+
     throw new Error(errorMessage);
   }
 
   const result = await response.json();
-  
+
   if (!result.ok || !result.data?.url) {
     throw new Error("Server response missing image URL");
   }
@@ -170,7 +170,7 @@ export function useAddVehicleOptimistic(
     ): Promise<Vehicle> => {
       setIsAdding(true);
       const tempId = generateTempId();
-      
+
       // Create optimistic vehicle for instant UI feedback
       const optimisticVehicle: Vehicle = {
         VehicleId: tempId,
@@ -202,26 +202,26 @@ export function useAddVehicleOptimistic(
         // Case A: We have a File object from file input
         if (imageFile) {
           const fileSizeKB = imageFile.size / 1024;
-          
+
           // Skip compression if file is already small enough (prevents double compression)
           let fileToUpload: File;
-          
+
           if (fileSizeKB < SKIP_COMPRESSION_THRESHOLD_KB) {
             console.log(`[addVehicle] File already small (${fileSizeKB.toFixed(2)}KB < ${SKIP_COMPRESSION_THRESHOLD_KB}KB), skipping compression`);
             fileToUpload = imageFile;
           } else {
             console.log(`[addVehicle] Compressing image file (${fileSizeKB.toFixed(2)}KB)...`);
-            
+
             const compressedResult = await compressImage(imageFile, {
               maxWidth: COMPRESSION_MAX_WIDTH,
               quality: COMPRESSION_QUALITY,
             });
-            
+
             console.log(`[addVehicle] Image compressed:`, {
               originalSize: `${(imageFile.size / 1024).toFixed(2)}KB`,
               compressedSize: `${(compressedResult.compressedSize / 1024).toFixed(2)}KB`,
             });
-            
+
             fileToUpload = compressedResult.file;
           }
 
@@ -231,7 +231,7 @@ export function useAddVehicleOptimistic(
             data.Category || "Cars",
             tempId
           );
-          
+
           console.log(`[addVehicle] Cloudinary upload complete:`, {
             url: cloudinaryImageUrl.substring(0, 100) + "...",
           });
@@ -239,25 +239,25 @@ export function useAddVehicleOptimistic(
         // Case B: We have a Base64 string in data.Image
         else if (data.Image && data.Image.startsWith("data:image/")) {
           console.log(`[addVehicle] Converting Base64 to File and uploading to Cloudinary...`);
-          
+
           // Clean the base64 data to remove any problematic characters
           const cleanedImage = cleanBase64DataUrl(data.Image);
-          
+
           console.log(`[addVehicle] Base64 cleaned:`, {
             originalLength: data.Image.length,
             cleanedLength: cleanedImage.length,
           });
-          
+
           const { file: fileFromBase64, error: conversionError } = safeBase64ToFile(
-            cleanedImage, 
+            cleanedImage,
             `vehicle_${tempId}_${Date.now()}.jpg`
           );
-          
+
           if (conversionError || !fileFromBase64) {
             console.error(`[addVehicle] Base64 conversion failed:`, conversionError);
             throw new Error(conversionError || "Failed to convert image data");
           }
-          
+
           console.log(`[addVehicle] Base64 converted to File:`, {
             size: `${(fileFromBase64.size / 1024).toFixed(2)}KB`,
           });
@@ -267,7 +267,7 @@ export function useAddVehicleOptimistic(
             data.Category || "Cars",
             tempId
           );
-          
+
           console.log(`[addVehicle] Cloudinary upload complete:`, {
             url: cloudinaryImageUrl.substring(0, 100) + "...",
           });
@@ -292,8 +292,8 @@ export function useAddVehicleOptimistic(
       // CRITICAL: If an image was provided but upload failed, block submission
       const imageWasProvided = !!imageFile || (data.Image && data.Image.startsWith("data:image/"));
       const imageUploadFailed = imageWasProvided && !cloudinaryImageUrl;
-      const imageUrlIsInvalid = cloudinaryImageUrl === "undefined" || 
-                                cloudinaryImageUrl === "null" || 
+      const imageUrlIsInvalid = cloudinaryImageUrl === "undefined" ||
+                                cloudinaryImageUrl === "null" ||
                                 (cloudinaryImageUrl && cloudinaryImageUrl.includes("/undefined"));
 
       if (imageUploadFailed || imageUrlIsInvalid) {
@@ -306,7 +306,7 @@ export function useAddVehicleOptimistic(
         setIsAdding(false);
         setIsProcessing(false);
         const error = new Error(
-          imageUrlIsInvalid 
+          imageUrlIsInvalid
             ? "Image upload returned an invalid URL. Please try uploading the image again."
             : "Image upload failed. Please check your internet connection and try again."
         );
@@ -329,8 +329,8 @@ export function useAddVehicleOptimistic(
       };
 
       // Only add image_id if we have a valid Cloudinary URL
-      if (cloudinaryImageUrl && 
-          (cloudinaryImageUrl.startsWith("http://") || 
+      if (cloudinaryImageUrl &&
+          (cloudinaryImageUrl.startsWith("http://") ||
            cloudinaryImageUrl.startsWith("https://"))) {
         // Double-check that we're not accidentally sending a Base64 string
         if (cloudinaryImageUrl.startsWith('data:image/')) {
@@ -362,7 +362,7 @@ export function useAddVehicleOptimistic(
 
       while (attempts < MAX_RETRY_ATTEMPTS) {
         attempts++;
-        
+
         console.log(`[addVehicle] API call attempt ${attempts}/${MAX_RETRY_ATTEMPTS}`);
 
         try {
@@ -389,9 +389,10 @@ export function useAddVehicleOptimistic(
             throw new Error(result.error || "API returned error");
           }
 
-          createdVehicle = result.data || optimisticVehicle;
-          
-          console.log(`[addVehicle] Add successful for vehicle ${createdVehicle.VehicleId || tempId}`);
+          createdVehicle = (result.data || optimisticVehicle) as Vehicle;
+          const finalVehicle = createdVehicle;
+
+          console.log(`[addVehicle] Add successful for vehicle ${finalVehicle.VehicleId || tempId}`);
 
           // Record mutation to trigger auto-refresh - ASYNC to not block success response
           setTimeout(() => {
@@ -400,15 +401,15 @@ export function useAddVehicleOptimistic(
           }, 0);
 
           // Call success callback immediately (don't wait for cache)
-          onSuccess?.(createdVehicle);
-          
+          onSuccess?.(finalVehicle);
+
           setIsAdding(false);
           setIsProcessing(false);
-          return createdVehicle;
-          
+          return finalVehicle;
+
         } catch (err) {
           lastError = err instanceof Error ? err : new Error("Failed to add vehicle");
-          
+
           console.error(`[addVehicle] API error on attempt ${attempts}:`, lastError.message);
 
           // Check if we should retry
@@ -417,7 +418,7 @@ export function useAddVehicleOptimistic(
             await delay(RETRY_DELAY_MS); // Fixed minimal delay - no exponential backoff
             continue;
           }
-          
+
           break;
         }
       }
@@ -425,7 +426,7 @@ export function useAddVehicleOptimistic(
       // All retries exhausted
       setIsAdding(false);
       setIsProcessing(false);
-      
+
       if (lastError) {
         const enhancedError = new Error(
           `${lastError.message}\n\n(Attempted ${attempts} time${attempts > 1 ? 's' : ''})`

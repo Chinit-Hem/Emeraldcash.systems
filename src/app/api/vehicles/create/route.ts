@@ -1,14 +1,16 @@
 /**
  * Vehicle CREATE API - POST /api/vehicles/create
- * 
+ *
  * Creates new vehicle using VehicleService.createVehicle()
  * Full CRUD support for AddVehicleModal
  */
 
 import { createErrorResponse, createSuccessResponse, withErrorHandling } from "@/lib/api-error-wrapper";
+import { requirePermission } from "@/lib/auth-helpers";
 import { vehicleService } from "@/services/VehicleService";
 import { NextRequest, NextResponse } from "next/server";
 import type { Vehicle } from "@/lib/types";
+import type { VehicleDB } from "@/services/VehicleService";
 
 // ============================================================================
 // CORS Headers (match existing pattern)
@@ -34,8 +36,11 @@ export async function OPTIONS(req: NextRequest) {
 // ============================================================================
 // POST Handler - Create New Vehicle
 const postHandler = withErrorHandling(async (req: NextRequest, { logger, requestId, startTime }) => {
+  const auth = requirePermission(req, "vehicles:create");
+  if (auth.response) return auth.response;
+
   logger.debug("[CREATE] POST /api/vehicles/create", { requestId });
-  
+
   // Parse request body
   let payload: Partial<Vehicle>;
   try {
@@ -64,11 +69,11 @@ const postHandler = withErrorHandling(async (req: NextRequest, { logger, request
     }
   }
 
-  logger.debug("[CREATE] Validated payload", { 
-    brand: payload.Brand, 
-    model: payload.Model, 
+  logger.debug("[CREATE] Validated payload", {
+    brand: payload.Brand,
+    model: payload.Model,
     plate: payload.Plate,
-    requestId 
+    requestId
   });
 
   // Convert to DB format for service
@@ -87,9 +92,9 @@ const postHandler = withErrorHandling(async (req: NextRequest, { logger, request
   };
 
   // Create vehicle
-  const result = await vehicleService.createVehicle(dbPayload as any);
+  const result = await vehicleService.createVehicle(dbPayload as Omit<VehicleDB, "id" | "created_at" | "updated_at">);
 
-  if (!result.success) {
+  if (!result.success || !result.data) {
     logger.error("[CREATE] Service error", { error: result.error, requestId });
     return createErrorResponse(
       result.error || "Failed to create vehicle",
@@ -100,10 +105,10 @@ const postHandler = withErrorHandling(async (req: NextRequest, { logger, request
     );
   }
 
-  logger.info("[CREATE] Success", { 
+  logger.info("[CREATE] Success", {
     vehicleId: result.data.VehicleId,
     plate: result.data.Plate,
-    requestId 
+    requestId
   });
 
   return createSuccessResponse(

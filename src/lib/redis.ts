@@ -19,3 +19,20 @@ export async function setCache<T>(key: string, value: T, ttlSeconds: number): Pr
   }
 }
 
+export async function delCache(key: string): Promise<void> {
+  try {
+    await redis.del(key);
+  } catch {
+    // Ignore Redis errors - fallback to stale-safe application behavior
+  }
+}
+
+export async function delCachePattern(pattern: string): Promise<void> {
+  try {
+    const keys = await redis.keys(pattern);
+    if (keys.length === 0) return;
+    await redis.del(...keys);
+  } catch {
+    // Ignore Redis errors - cache invalidation is best-effort
+  }
+}

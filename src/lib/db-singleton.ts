@@ -1,10 +1,10 @@
 /**
  * Database Singleton Module
- * 
+ *
  * Implements the Singleton Pattern for Neon PostgreSQL connection management.
  * Provides optimized connection pooling, health monitoring, and SSR-ready
  * query execution with built-in retry logic.
- * 
+ *
  * @module db-singleton
  */
 
@@ -92,7 +92,7 @@ class DatabaseManager {
    */
   private initializeConfig(): ConnectionConfig {
     const url = process.env.DATABASE_URL;
-    
+
     if (!url) {
       // During build time, return a placeholder config
       // The actual error will be thrown when trying to connect at runtime
@@ -144,10 +144,10 @@ class DatabaseManager {
     // Parse the URL properly to handle existing query parameters
     const baseUrl = config.url;
     const urlObj = new URL(baseUrl);
-    
+
     // Add sdk_semver parameter
     urlObj.searchParams.set('sdk_semver', '1.0.2');
-    
+
     const urlWithSdkVersion = urlObj.toString();
 
     // Connection logging removed for production
@@ -216,7 +216,7 @@ class DatabaseManager {
    */
   private updateMetrics(success: boolean, durationMs: number): void {
     this.health.totalQueries++;
-    
+
     if (!success) {
       this.health.failedQueries++;
       this.health.consecutiveFailures++;
@@ -231,7 +231,7 @@ class DatabaseManager {
     }
 
     // Calculate rolling average
-    this.health.averageResponseTimeMs = 
+    this.health.averageResponseTimeMs =
       this.queryTimes.reduce((a, b) => a + b, 0) / this.queryTimes.length;
 
     // Update health status
@@ -258,22 +258,22 @@ class DatabaseManager {
     for (let attempt = 0; attempt < maxRetries; attempt++) {
       try {
         let result: T;
-        
+
         // Apply timeout if specified
         if (timeoutMs && timeoutMs > 0) {
           result = await Promise.race([
             queryFn(),
-            new Promise<never>((_, reject) => 
+            new Promise<never>((_, reject) =>
               setTimeout(() => reject(new Error(`Query timeout after ${timeoutMs}ms`)), timeoutMs)
             )
           ]);
         } else {
           result = await queryFn();
         }
-        
+
         const duration = Date.now() - startTime;
         this.updateMetrics(true, duration);
-        
+
         return result;
       } catch (error) {
         lastError = error instanceof Error ? error : new Error(String(error));
@@ -288,7 +288,7 @@ class DatabaseManager {
 
         // Don't delay on last attempt
         if (attempt < maxRetries - 1) {
-          await new Promise(resolve => 
+          await new Promise(resolve =>
             setTimeout(resolve, this.calculateDelay(attempt))
           );
         }
@@ -307,7 +307,7 @@ class DatabaseManager {
    */
   public async execute<T>(strings: TemplateStringsArray, ...values: unknown[]): Promise<T[]> {
     const sql = this.getClient();
-    
+
     return this.query(
       () => sql(strings, ...values) as Promise<T[]>,
       { operationName: "raw SQL query" }
@@ -323,38 +323,20 @@ class DatabaseManager {
       async () => {
         const sql = this.getClient();
 
-        try {
-          let finalQuery = query;
-          if (params && params.length > 0) {
-            // Replace placeholders from highest index to lowest to avoid partial matches
-            for (let i = params.length - 1; i >= 0; i--) {
-              const param = params[i];
-              const placeholder = `$${i + 1}`;
-              let replacement: string;
+        // Dynamically construct the template literal parts and values
+        // This is the correct way to use neon's sql function when you have
+        // a query string with $N placeholders and a separate params array.
+        const parts = query.split(/\$\d+/); // Split by $1, $2, etc. This is a loop.
+        const strings = Object.assign(parts, { raw: parts }) as TemplateStringsArray;
 
-              if (param === null) {
-                replacement = 'NULL';
-              } else if (typeof param === 'number') {
-                replacement = String(param);
-              } else {
-                replacement = `'${String(param).replace(/'/g, "''")}'`;
-              }
-
-              const placeholderRegex = new RegExp(placeholder.replace(/\$/g, '\\$'), 'g');
-              finalQuery = finalQuery.replace(placeholderRegex, replacement);
-            }
-          }
-
-          // Neon SDK requires actual template literal syntax
-          const strings = Object.assign([finalQuery], { raw: [finalQuery] }) as TemplateStringsArray;
-
-          // Call sql function with the template strings array
-          const result = await sql(strings);
-          return result as T[];
-        } catch (execError) {
-          // Error logging removed for production - just re-throw
-          throw execError;
+        // Ensure the number of parts matches the number of parameters + 1
+        if (params && parts.length !== params.length + 1) {
+          throw new Error(`Mismatched parameters for query: "${query}". Expected ${parts.length - 1} parameters, got ${params.length}.`);
         }
+
+        // Call the sql function with the dynamically created template literal parts and values
+        const result = await sql(strings, ...(params || []));
+        return result as T[];
       },
       { operationName: "unsafe SQL query", timeoutMs }
     );
@@ -372,7 +354,7 @@ class DatabaseManager {
         },
         { operationName: "test connection", maxRetries: 1 }
       );
-      
+
       return {
         success: true,
         message: `Connected to PostgreSQL: ${result[0].version}`,

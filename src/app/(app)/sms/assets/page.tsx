@@ -57,7 +57,7 @@ export default function AssetsPage() {
     try {
       setLoading(true);
       setError(null);
-      
+
       const params = new URLSearchParams({
         page: pageFilters.page.toString(),
         pageSize: pageFilters.pageSize.toString(),
@@ -122,7 +122,7 @@ const data: ApiResponse<SmsStats> = await response.json();
     try {
       const method = editingAsset ? 'PUT' : 'POST';
       const url = editingAsset ? `/api/sms/assets/${editingAsset.id}` : '/api/sms/assets';
-      
+
       const response = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
@@ -130,7 +130,7 @@ const data: ApiResponse<SmsStats> = await response.json();
       });
 
       const result = await response.json();
-      
+
       if (result.success) {
         fetchAssets();
         fetchStats();
@@ -242,9 +242,10 @@ const data: ApiResponse<SmsStats> = await response.json();
               />
             </div>
             <div className="flex gap-3">
-              <div className="relative">
+<div className="relative">
                 <Filter className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
                 <select
+                  title="Filter by asset status"
                   value={filters.status}
                   onChange={(e) => handleFilterChange('status', e.target.value)}
                   className="pl-12 pr-6 py-4 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-emerald-500/20 focus:border-emerald-500 bg-white/50 backdrop-blur-sm shadow-inner transition-all"
@@ -292,8 +293,8 @@ const data: ApiResponse<SmsStats> = await response.json();
               </div>
               <h3 className="text-2xl font-bold text-slate-800 mb-2">No assets found</h3>
               <p className="text-slate-600 mb-8 max-w-md mx-auto">
-                {filters.search || filters.status || filters.assignedTo 
-                  ? 'Try adjusting your search or filters' 
+                {filters.search || filters.status || filters.assignedTo
+                  ? 'Try adjusting your search or filters'
                   : 'Get started by adding your first asset.'
                 }
               </p>
@@ -326,12 +327,12 @@ const data: ApiResponse<SmsStats> = await response.json();
                           <div className="flex items-center gap-4">
                             {asset.imageUrl ? (
                               <div className="relative w-14 h-14 rounded-2xl overflow-hidden shadow-md bg-slate-100">
-                                <Image 
-                                  src={asset.imageUrl!} 
-                                  alt={asset.name} 
-                                  fill 
-                                  sizes="56px" 
-                                  className="object-cover" 
+                                <Image
+                                  src={asset.imageUrl!}
+                                  alt={asset.name}
+                                  fill
+                                  sizes="56px"
+                                  className="object-cover"
                                 />
                               </div>
                             ) : (

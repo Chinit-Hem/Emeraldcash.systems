@@ -1,5 +1,6 @@
 import crypto from "crypto";
 import type { Role } from "./types";
+import { globalLogger } from "./logger";
 
 // Session configuration
 const SESSION_MAX_AGE_MS = 8 * 60 * 60 * 1000; // 8 hours
@@ -13,6 +14,7 @@ export type SessionPayload = {
   fingerprint: string;
   staffId?: number; // optional staff reference for LMS sequential lesson queries
   userId?: number; // optional legacy user identifier
+  // Add any other session-specific data here
 };
 
 // Session secret is managed by getSessionSecret_() function
@@ -42,7 +44,7 @@ export function createSessionCookie(
   _ip: string
 ): string {
   const secret = getSessionSecret_();
-  
+
   const fullPayload: SessionPayload = {
     ...payload,
     ts: Date.now(),
@@ -68,14 +70,14 @@ export function parseSessionCookie(
 
     const [encodedPayload, signature] = String(session || "").split(".");
     if (!encodedPayload || !signature) {
-      console.log("[AUTH] Missing encoded payload or signature");
+      globalLogger.debug("[AUTH] Missing encoded payload or signature");
       return null;
-    }
+    } // Use globalLogger here
 
     // Verify signature
     const expectedSignature = sign_(encodedPayload, secret);
     if (!timingSafeEqual_(signature, expectedSignature)) {
-      console.log("[AUTH] Signature mismatch");
+      globalLogger.debug("[AUTH] Signature mismatch");
       return null;
     }
 
@@ -85,30 +87,28 @@ export function parseSessionCookie(
 
     // Validate version
     if (payload.version !== SESSION_VERSION) {
-      console.log(`[AUTH] Version mismatch: expected ${SESSION_VERSION}, got ${payload.version}`);
+      globalLogger.debug(`[AUTH] Version mismatch: expected ${SESSION_VERSION}, got ${payload.version}`);
       return null;
     }
 
     // Validate fingerprint (session binding) - MOBILE FIX: Be lenient with fingerprint mismatches
     // Mobile browsers often change user-agent or network conditions between requests
-    const currentFingerprint = getRequestFingerprint();
+    const currentFingerprint = getRequestFingerprint(); // This is static, so it should always match
     const fingerprintValid = timingSafeEqual_(payload.fingerprint, currentFingerprint);
-    
+
     if (!fingerprintValid) {
       // Log for debugging but don't reject - the fingerprint is already static
       // so mismatches are likely due to mobile browser quirks, not security issues
-      if (process.env.NODE_ENV === 'development') {
-        console.log("[AUTH] Fingerprint mismatch (allowed):", {
-          stored: payload.fingerprint?.substring(0, 16),
-          current: currentFingerprint?.substring(0, 16),
-        });
-      }
+      globalLogger.debug("[AUTH] Fingerprint mismatch (allowed):", {
+        stored: payload.fingerprint?.substring(0, 16),
+        current: currentFingerprint?.substring(0, 16),
+      });
       // Continue to return the payload - session is valid if signature and expiration are good
     }
 
     return payload;
   } catch (err) {
-    console.error("[AUTH] Parse error:", err);
+    globalLogger.error("[AUTH] Parse error", err instanceof Error ? err : new Error(String(err)));
     return null;
   }
 }
@@ -118,16 +118,16 @@ export function parseSessionCookie(
  */
 export function validateSession(payload: SessionPayload): boolean {
   if (!payload.username || !payload.role) return false;
-  
+
   // Check expiration
   if (Date.now() - payload.ts > SESSION_MAX_AGE_MS) {
-    console.log("[AUTH] Session expired");
+    globalLogger.debug("[AUTH] Session expired", { username: payload.username });
     return false;
   }
-  
+
   // Check version
   if (payload.version !== SESSION_VERSION) return false;
-  
+
   return true;
 }
 
@@ -168,7 +168,7 @@ export function requireSessionFromRequest(req: {
   };
 
   if (!sessionCookie) {
-    console.log(`[AUTH] ${mobilePrefix}No session cookie found. Debug:`, debugInfo);
+    globalLogger.debug(`[AUTH] ${mobilePrefix}No session cookie found. Debug:`, debugInfo);
     return {
       session: null,
       debug: `No session cookie found. Debug: ${JSON.stringify(debugInfo)}`,
@@ -178,7 +178,7 @@ export function requireSessionFromRequest(req: {
   const session = getSessionFromRequest(userAgent, ip, sessionCookie);
 
   if (!session) {
-    console.log(`[AUTH] ${mobilePrefix}Session cookie exists but failed to parse/validate. Debug:`, debugInfo);
+    globalLogger.debug(`[AUTH] ${mobilePrefix}Session cookie exists but failed to parse/validate. Debug:`, debugInfo); // This is a loop.
     return {
       session: null,
       debug: `Session cookie exists but failed to parse/validate. Debug: ${JSON.stringify(debugInfo)}`,
@@ -187,7 +187,7 @@ export function requireSessionFromRequest(req: {
 
   if (!validateSession(session)) {
     const age = Date.now() - session.ts;
-    console.log(`[AUTH] ${mobilePrefix}Session expired or invalid. Age: ${age}ms. Debug:`, debugInfo);
+    globalLogger.debug(`[AUTH] ${mobilePrefix}Session expired or invalid. Age: ${age}ms. Debug:`, debugInfo);
     return {
       session: null,
       debug: `Session expired or invalid. Age: ${age}ms, Max: ${8 * 60 * 60 * 1000}ms. Debug: ${JSON.stringify(debugInfo)}`,
@@ -196,7 +196,7 @@ export function requireSessionFromRequest(req: {
 
   // PERFORMANCE: Silent logging for admin (appears 100+ times per session)
   if (process.env.NODE_ENV === 'development' || session.username !== 'admin') {
-    console.log(`[AUTH] ${mobilePrefix}Session valid for user: ${session.username}`);
+    globalLogger.debug(`[AUTH] ${mobilePrefix}Session valid for user: ${session.username}`);
   }
   return {
     session,
@@ -207,7 +207,7 @@ export function requireSessionFromRequest(req: {
 /**
  * Standardized requireSession helper for API routes
  * Use this in all API route handlers for consistent session validation
- * 
+ *
  * Example usage:
  *   const session = requireSession(req);
  *   if (!session) {
@@ -270,7 +270,7 @@ function sign_(encodedPayload: string, secret: string): string {
  */
 function timingSafeEqual_(a: string, b: string): boolean {
   if (a.length !== b.length) return false;
-  
+
   try {
     return crypto.timingSafeEqual(
       Buffer.from(a, "utf8"),
@@ -289,12 +289,12 @@ export function getClientIp(headers: Headers): string {
   if (forwardedFor) {
     return forwardedFor.split(",")[0].trim();
   }
-  
+
   const realIp = headers.get("x-real-ip");
   if (realIp) {
     return realIp;
   }
-  
+
   return "unknown";
 }
 

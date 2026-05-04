@@ -9,7 +9,6 @@ import { NeuKpiCard } from "@/components/ui/neu/NeuKpiCard";
 import Pagination from "@/app/components/dashboard/Pagination";
 import VehicleCardMobile from "@/app/components/dashboard/VehicleCardMobile";
 import VehicleModal from "@/app/components/dashboard/VehicleModal";
-import VehicleTable from "@/app/components/dashboard/VehicleTable";
 import { GlassButton } from "@/components/ui/glass/GlassButton";
 import { useDeleteVehicleOptimistic } from "@/app/components/vehicles/useDeleteVehicleOptimistic";
 import { useUpdateVehicleOptimistic } from "@/app/components/vehicles/useUpdateVehicleOptimistic";
@@ -29,6 +28,7 @@ import { driveThumbnailUrl } from "@/lib/drive";
 import { derivePrices } from "@/lib/pricing";
 import { useRouter } from "next/navigation";
 import { safeParseDate } from "@/lib/safeDate";
+import { VirtualTable } from "@/lib/virtualized-table";
 
 // iOS Vehicle Card Component with Image, Expand, and Admin Actions
 interface IOSVehicleCardProps {
@@ -50,25 +50,25 @@ function IOSVehicleCard({ vehicle, isAdmin, onEdit, onDelete }: IOSVehicleCardPr
 
   // Ensure Image is a string before using string methods
   const imageValue = typeof vehicle.Image === 'string' ? vehicle.Image : '';
-  
+
   // Check if it's a full Cloudinary URL
   const isCloudinaryUrl = imageValue.includes('res.cloudinary.com');
-  
+
   // Check if it's a Cloudinary public_id (not a full URL, contains folder path like "vehicles/cars/...")
-  const isCloudinaryPublicId = imageValue && 
-    !imageValue.startsWith('http') && 
+  const isCloudinaryPublicId = imageValue &&
+    !imageValue.startsWith('http') &&
     !imageValue.startsWith('data:') &&
     /^[a-zA-Z0-9_\-]+(\/[a-zA-Z0-9_\-]+)*$/.test(imageValue);
-  
+
   // Extract Google Drive file ID if not Cloudinary
   const imageFileId = !isCloudinaryUrl && !isCloudinaryPublicId ? extractDriveFileId(imageValue) : null;
-  
+
   const thumbUrl = useMemo(() => {
     if (isCloudinaryUrl) {
       // Use full Cloudinary URL directly - ensure it's a string
       return typeof vehicle.Image === 'string' ? vehicle.Image : '';
     }
-    
+
     if (isCloudinaryPublicId && vehicle.Image) {
       // Convert public_id to full Cloudinary URL
       // URL format: https://res.cloudinary.com/{cloud}/image/upload/{public_id}
@@ -76,7 +76,7 @@ function IOSVehicleCard({ vehicle, isAdmin, onEdit, onDelete }: IOSVehicleCardPr
       const publicId = typeof vehicle.Image === 'string' ? vehicle.Image : '';
       return `https://res.cloudinary.com/${cloudName}/image/upload/${publicId}`;
     }
-    
+
     // Try Google Drive
     if (!imageFileId || imageError) return null;
     return `${driveThumbnailUrl(imageFileId, "w300-h300")}`;
@@ -312,7 +312,7 @@ interface FilterState {
 function computeVehicleMeta(vehicles: Vehicle[] | undefined | null): VehicleMeta {
   // Safe default return for undefined/null input
   const safeVehicles = vehicles ?? [];
-  
+
   return {
     total: safeVehicles.length,
     countsByCategory: {
@@ -327,8 +327,8 @@ function computeVehicleMeta(vehicles: Vehicle[] | undefined | null): VehicleMeta
 // Robust no-image check matching server logic
       const imageValue = typeof v?.Image === 'string' ? v.Image.trim() : '';
       const hasValidImage = imageValue && (
-        imageValue.startsWith('http://') || 
-        imageValue.startsWith('https://') || 
+        imageValue.startsWith('http://') ||
+        imageValue.startsWith('https://') ||
         imageValue.startsWith('data:') ||
         /^[a-zA-Z0-9_\-]+(\/[a-zA-Z0-9_\-]+)*$/.test(imageValue)  // Cloudinary public ID
       );
@@ -358,7 +358,7 @@ export default function VehiclesClient() {
 
   // Local state for optimistic updates
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
-  
+
   // Track when optimistic updates are in progress to prevent useEffect from overwriting them
   const optimisticUpdateInProgress = useRef(false);
 
@@ -384,55 +384,55 @@ export default function VehiclesClient() {
   // Build API filters from UI filter state
   const apiFilters = useMemo((): import("@/lib/api").VehicleFilters => {
     const apiFilterParams: import("@/lib/api").VehicleFilters = {};
-    
+
     if (filters.search?.trim()) {
       apiFilterParams.search = filters.search.trim();
     }
-    
+
     if (filters.category && filters.category !== "All") {
       apiFilterParams.category = filters.category;
     }
-    
+
     if (filters.brand && filters.brand !== "All") {
       apiFilterParams.brand = filters.brand;
     }
-    
+
     if (filters.condition && filters.condition !== "All") {
       apiFilterParams.condition = filters.condition;
     }
-    
+
     if (filters.color && filters.color !== "All") {
       apiFilterParams.color = filters.color;
     }
-    
+
     if (filters.yearMin) {
       apiFilterParams.yearMin = parseInt(filters.yearMin);
     }
-    
+
     if (filters.yearMax) {
       apiFilterParams.yearMax = parseInt(filters.yearMax);
     }
-    
+
     if (filters.priceMin) {
       apiFilterParams.priceMin = parseFloat(filters.priceMin);
     }
-    
+
     if (filters.priceMax) {
       apiFilterParams.priceMax = parseFloat(filters.priceMax);
     }
-    
+
     if (filters.dateFrom) {
       apiFilterParams.dateFrom = filters.dateFrom;
     }
-    
+
     if (filters.dateTo) {
       apiFilterParams.dateTo = filters.dateTo;
     }
-    
+
     if (filters.withoutImage) {
       apiFilterParams.withoutImage = true;
     }
-    
+
     return apiFilterParams;
   }, [
     filters.search,
@@ -611,34 +611,34 @@ export default function VehiclesClient() {
     if (filters.search) {
       const searchLower = filters.search.toLowerCase().trim();
       const searchNumber = parseFloat(filters.search);
-      
+
       // Normalize search term for category matching (handles "tuk tuk" -> "TukTuks")
       const normalizedSearchCategory = normalizeCategoryLabel(searchLower);
-      
+
       // Also create a version without spaces for flexible matching
       const searchNoSpaces = searchLower.replace(/\s+/g, '');
-      
+
       result = result.filter((v) => {
         // Normalize vehicle category
         const normalizedVehicleCategory = normalizeCategoryLabel(v.Category);
-        
+
         // Check if search matches category (using normalized values)
         // This handles: "tuk tuk" -> "TukTuks", "car" -> "Cars", etc.
-        const categoryMatch = 
+        const categoryMatch =
           normalizedSearchCategory !== "Other" && normalizedSearchCategory === normalizedVehicleCategory;
-        
+
         // Also check raw category string for partial matches (with and without spaces)
         const categoryRaw = v.Category?.toLowerCase() || "";
-        const categoryPartialMatch = categoryRaw.includes(searchLower) || 
+        const categoryPartialMatch = categoryRaw.includes(searchLower) ||
                                      categoryRaw.includes(searchNoSpaces);
-        
+
         // Check if search term without spaces matches category without spaces
         // This handles: "tuk" matching "tuktuks", "tuk tuk" matching "tuktuks"
         const categoryNoSpaces = categoryRaw.replace(/\s+/g, '');
         const categoryFlexibleMatch = searchNoSpaces.length >= 2 && categoryNoSpaces.includes(searchNoSpaces);
-        
+
         // Text fields to search
-        const textMatch = 
+        const textMatch =
           v.Brand?.toLowerCase().includes(searchLower) ||
           v.Model?.toLowerCase().includes(searchLower) ||
           v.Plate?.toLowerCase().includes(searchLower) ||
@@ -651,17 +651,17 @@ export default function VehiclesClient() {
           v.BodyType?.toLowerCase().includes(searchLower) ||
           v.VehicleId?.toString().toLowerCase().includes(searchLower) ||
           v.Year?.toString().includes(searchLower);
-        
+
         // Numeric fields - match if search is a valid number
         let numberMatch = false;
         if (!isNaN(searchNumber)) {
-          numberMatch = 
+          numberMatch =
             v.PriceNew === searchNumber ||
             v.Price40 === searchNumber ||
             v.Price70 === searchNumber ||
             v.Year === searchNumber;
         }
-        
+
         return textMatch || numberMatch;
       });
     }
@@ -729,16 +729,16 @@ export default function VehiclesClient() {
         const imageValue = vehicle.Image;
         // Check if Image field is empty or null
         if (!imageValue || typeof imageValue !== 'string' || !imageValue.trim()) return true;
-        
+
         // Check if it's a valid image URL (Drive, Cloudinary, or data URL)
-        const isUrl = 
-          imageValue.startsWith('http://') || 
-          imageValue.startsWith('https://') || 
+        const isUrl =
+          imageValue.startsWith('http://') ||
+          imageValue.startsWith('https://') ||
           imageValue.startsWith('data:');
-        
+
         // Check if it's a Cloudinary public_id (folder/path format like "vehicles/cars/abc123")
         const isCloudinaryPublicId = /^[a-zA-Z0-9_\-]+(\/[a-zA-Z0-9_\-]+)*$/.test(imageValue);
-        
+
         return !(isUrl || isCloudinaryPublicId);
       });
     }
@@ -786,7 +786,8 @@ export default function VehiclesClient() {
   // `/vehicles?category=car&condition=new&noImage=1` work).
   const categoryParam = searchParams.get("category");
   const conditionParam = searchParams.get("condition");
-    const withoutImageParam = searchParams.get("withoutImage");\n    const noImageParam = searchParams.get("noImage") || withoutImageParam;
+  const withoutImageParam = searchParams.get("withoutImage");
+  const noImageParam = searchParams.get("noImage") || withoutImageParam;
 
   useEffect(() => {
     const nextCategory = categoryParam ? normalizeCategoryLabel(categoryParam) : "All";
@@ -843,7 +844,7 @@ export default function VehiclesClient() {
   // Using double optional chaining (??) to prevent undefined errors on iPhone Safari
   const kpis = useMemo(() => {
     const isFilteredView = viewMode === "filtered" && isFiltered;
-    
+
     if (isFilteredView) {
       return {
         total: filteredMeta?.total ?? 0,
@@ -853,7 +854,7 @@ export default function VehiclesClient() {
         avgPrice: filteredMeta?.avgPrice ?? 0,
       };
     }
-    
+
     // All-time view: use API meta (source of truth)
     // Defensive: ensure meta and countsByCategory exist before accessing properties
     return {
@@ -950,10 +951,10 @@ export default function VehiclesClient() {
       }
 
       // Validation: Don't append undefined, null, or string "undefined"
-      const isInvalid = 
-        value === undefined || 
-        value === null || 
-        value === "undefined" || 
+      const isInvalid =
+        value === undefined ||
+        value === null ||
+        value === "undefined" ||
         value === "NaN" ||
         (typeof value === 'number' && isNaN(value));
 
@@ -989,7 +990,7 @@ export default function VehiclesClient() {
   };
 
   // Unified handler that routes to add or update based on editingVehicle state
-  const handleSubmitVehicle = async (data: Partial<Vehicle>, imageFile?: File): Promise<void> => {
+  const handleSubmitVehicle = async (data: Partial<Vehicle>, imageFile?: File | null): Promise<void> => {
     if (editingVehicle) {
       // UPDATE mode: Use updateVehicle with Cloudinary upload
       console.log("[handleSubmitVehicle] UPDATE mode - using updateVehicle", {
@@ -997,13 +998,13 @@ export default function VehiclesClient() {
         hasImageFile: !!imageFile,
         hasImageInData: !!data.Image,
       });
-      
+
       // Set optimistic update flag to prevent useEffect from overwriting
       optimisticUpdateInProgress.current = true;
-      
+
       // Use the updateVehicle hook which handles Cloudinary upload and PUT request
       await updateVehicle(editingVehicle.VehicleId, data, editingVehicle, imageFile || null);
-      
+
       // Close modal and clear editing state on success
       // (onSuccess callback handles this, but we also do it here as backup)
       setIsAddEditModalOpen(false);
@@ -1014,9 +1015,9 @@ export default function VehiclesClient() {
       console.log("[handleSubmitVehicle] ADD mode - using handleSaveVehicle", {
         hasImageFile: !!imageFile,
       });
-      
-      await handleSaveVehicle(data, imageFile);
-      
+
+      await handleSaveVehicle(data, imageFile ?? undefined);
+
       // Close modal and refresh vehicle list
       setIsAddEditModalOpen(false);
       // Trigger a refetch to get the new vehicle
@@ -1030,7 +1031,7 @@ export default function VehiclesClient() {
     // Close modal immediately for instant feedback
     setIsDeleteModalOpen(false);
     setSelectedVehicle(null);
-    
+
     const loadingToastId = addToast("Deleting vehicle...", "info");
 
     // Optimistic delete: remove from UI immediately
@@ -1129,7 +1130,7 @@ export default function VehiclesClient() {
                     </svg>
                     Prev
                   </button>
-                  
+
                   <div className="flex items-center gap-1">
                     <span className="rounded-lg bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white">
                       {safeCurrentPage}
@@ -1139,7 +1140,7 @@ export default function VehiclesClient() {
                       {safeTotalPages}
                     </span>
                   </div>
-                  
+
                   <button
                     type="button"
                     onClick={() => setCurrentPage((prev) => Math.min(safeTotalPages, prev + 1))}
@@ -1464,7 +1465,7 @@ export default function VehiclesClient() {
                 </h3>
                 <div className="text-sm text-gray-600 dark:text-gray-400 mb-4 max-w-2xl mx-auto">
                   <p className="whitespace-pre-line">{error}</p>
-                  
+
                   {/* Dev mode: Show detailed error information */}
                   {process.env.NODE_ENV === 'development' && (
                     <div className="mt-4 p-3 bg-red-50 dark:bg-red-900/20 rounded-lg text-left">
@@ -1476,7 +1477,7 @@ export default function VehiclesClient() {
                       </p>
                     </div>
                   )}
-                  
+
                   {/* Config error: Show setup instructions */}
                   {isConfigError(error) && (
                     <div className="mt-4 p-4 bg-amber-50 dark:bg-amber-900/20 rounded-lg text-left border border-amber-200 dark:border-amber-800">
@@ -1495,8 +1496,8 @@ export default function VehiclesClient() {
                 <div className="flex flex-col sm:flex-row gap-3 justify-center">
                   <GlassButton onClick={() => refetch()}>Try Again</GlassButton>
                   {process.env.NODE_ENV === 'development' && (
-                    <GlassButton 
-                      onClick={() => window.location.reload()} 
+                    <GlassButton
+                      onClick={() => window.location.reload()}
                       variant="outline"
                     >
                       Reload Page

@@ -1,12 +1,12 @@
 /**
  * LMS Cache Layer - Vercel KV Integration
  * High-performance caching for /api/lms/lessons endpoint
- * 
+ *
  * Cache Strategy:
  * - lessons-{categoryId}: All lessons for category (5min TTL)
  * - lessons-seq-{categoryId}-{staffId}: Sequential lessons (5min TTL)
  * - Invalidated on lesson/category updates
- * 
+ *
  * @module lms-cache
  */
 
@@ -53,14 +53,14 @@ export async function getCachedLessonsByCategory(
 ): Promise<LmsCacheResult<LmsLesson[]>> {
   const cacheKey = `${CACHE_PREFIX}lessons:${categoryId}`;
   await ensureKv();
-  
+
   if (process.env.NODE_ENV === 'development' || !kv) {
     return { success: false };
   }
-  
+
   try {
     const cached = await kv.get(cacheKey);
-    
+
     if (cached) {
       const ttl = await kv.ttl(cacheKey);
       return {
@@ -71,7 +71,7 @@ export async function getCachedLessonsByCategory(
         ttlRemaining: ttl,
       };
     }
-    
+
     return { success: false };
   } catch (error) {
     console.error('[LmsCache] Get lessons error:', error);
@@ -88,9 +88,9 @@ export async function setCachedLessonsByCategory(
 ): Promise<boolean> {
   const cacheKey = `${CACHE_PREFIX}lessons:${categoryId}`;
   await ensureKv();
-  
+
   if (!kv) return false;
-  
+
   try {
     await kv.set(cacheKey, lessons, { ex: LESSONS_CACHE_TTL });
     return true;
@@ -109,12 +109,12 @@ export async function getCachedSequentialLessons(
 ): Promise<LmsCacheResult<LmsLesson[]>> {
   const cacheKey = `${CACHE_PREFIX}lessons-seq:${categoryId}:${staffId}`;
   await ensureKv();
-  
+
   if (!kv) return { success: false };
-  
+
   try {
     const cached = await kv.get(cacheKey);
-    
+
     if (cached) {
       const ttl = await kv.ttl(cacheKey);
       return {
@@ -125,7 +125,7 @@ export async function getCachedSequentialLessons(
         ttlRemaining: ttl,
       };
     }
-    
+
     return { success: false };
   } catch (error) {
     console.error('[LmsCache] Get sequential lessons error:', error);
@@ -142,9 +142,9 @@ export async function setCachedSequentialLessons(
   lessons: LmsLesson[]
 ): Promise<boolean> {
   const cacheKey = `${CACHE_PREFIX}lessons-seq:${categoryId}:${staffId}`;
-  
+
   if (!kv) return false;
-  
+
   try {
     await kv.set(cacheKey, lessons, { ex: LESSONS_CACHE_TTL });
     return true;
@@ -162,15 +162,17 @@ export async function setCachedSequentialLessons(
  * Invalidate all caches for a category (called on lesson/category update)
  */
 export async function invalidateCategoryCache(categoryId: number): Promise<void> {
+  await ensureKv();
   if (!kv) return;
-  
+  const client = kv;
+
   const keys = [
     `${CACHE_PREFIX}lessons:${categoryId}`,
   ];
-  
+
   try {
     await Promise.all(
-      keys.map(key => kv.del(key))
+      keys.map(key => client.del(key))
     );
   } catch (error) {
     console.error('[LmsCache] Invalidate error:', error);
@@ -181,10 +183,12 @@ export async function invalidateCategoryCache(categoryId: number): Promise<void>
  * Invalidate all LMS caches (nuclear option - on major schema changes)
  */
 export async function clearAllLmsCache(): Promise<void> {
+  await ensureKv();
   if (!kv) return;
-  
+  const client = kv;
+
   try {
-    await kv.flushdb();
+    await client.flushdb();
     console.log('[LmsCache] All LMS cache cleared');
   } catch (error) {
     console.error('[LmsCache] Clear all error:', error);
@@ -206,7 +210,7 @@ export async function getCacheStats(): Promise<{
   if (!kv) {
     return { totalKeys: 0, lmsKeys: 0, memoryUsage: 0 };
   }
-  
+
 interface RedisInfo {
   keys?: string;
   used_memory?: string;
@@ -240,4 +244,3 @@ const lmsCache = {
 };
 
 export default lmsCache;
-

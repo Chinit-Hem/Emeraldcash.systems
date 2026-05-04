@@ -10,10 +10,10 @@ import { formatFileSize as formatImageSize } from "@/lib/compressImage";
 import ImageInput from "@/components/ui/ImageInput";
 
 // Icons (import common ones used in project)
-import { 
-  Car, Bike, Tag, Calendar, DollarSign, CheckCircle2, 
-  FileText, ImageIcon as ImageIconComp, Loader2, Save, 
-  Sparkles, X, AlertCircle 
+import {
+  Car, Bike, Tag, Calendar, DollarSign, CheckCircle2,
+  FileText, ImageIcon as ImageIconComp, Loader2, Save,
+  Sparkles, X, AlertCircle
 } from "lucide-react";
 
 // Types
@@ -91,7 +91,7 @@ const INITIAL_FORM_DATA: Partial<Vehicle> = {
 // UI Components (kept as-is, minimal fixes)
 function ModalBackdrop({ children, onClose }: { children: React.ReactNode; onClose: () => void }) {
   return (
-    <div 
+    <div
       className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-sm"
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
@@ -127,13 +127,13 @@ function ModalHeader({ title, onClose }: { title: string; onClose: () => void })
   );
 }
 
-function FormSection({ 
-  title, 
-  icon: Icon, 
-  children 
-}: { 
-  title: string; 
-  icon: React.ComponentType<{ className?: string }>; 
+function FormSection({
+  title,
+  icon: Icon,
+  children
+}: {
+  title: string;
+  icon: React.ComponentType<{ className?: string }>;
   children: React.ReactNode;
 }) {
   return (
@@ -152,7 +152,7 @@ function FormSection({
 const FormInput = React.forwardRef<HTMLInputElement, React.InputHTMLAttributes<HTMLInputElement> & { label: string; error?: string; icon?: React.ComponentType<{ className?: string }>; }>(
   ({ label, error, icon: Icon, className, ...props }, ref) => {
     const [isFocused, setIsFocused] = useState(false);
-    
+
     return (
       <div className="space-y-1.5">
         <label className="text-sm font-medium text-slate-700 flex items-center gap-1.5">
@@ -199,7 +199,7 @@ function CategorySelector({ value, onChange }: { value: string; onChange: (value
               value === cat.value ? "border-emerald-500 bg-emerald-50 shadow-md" : "border-slate-200 bg-white hover:border-slate-300 hover:shadow-sm"
             )}
           >
-            <div 
+            <div
               className="w-12 h-12 rounded-xl flex items-center justify-center transition-colors"
               style={{ backgroundColor: value === cat.value ? `${cat.color}20` : '#f1f5f9', color: cat.color }}
             >
@@ -218,7 +218,7 @@ function CategorySelector({ value, onChange }: { value: string; onChange: (value
 // Main Component
 export default function AddVehicleModal({ isOpen, onClose, onSuccess }: AddVehicleModalProps) {
   const { success: toastSuccess, error: toastError } = useToast();
-  
+
   // Form state
   const [formData, setFormData] = useState(INITIAL_FORM_DATA);
   const [errors, setErrors] = useState<FormErrors>({});
@@ -244,7 +244,7 @@ export default function AddVehicleModal({ isOpen, onClose, onSuccess }: AddVehic
 
     return uploadData.data.url as string;
   }, []);
-  
+
   // Reset on open
   useEffect(() => {
     if (isOpen) {
@@ -262,14 +262,20 @@ export default function AddVehicleModal({ isOpen, onClose, onSuccess }: AddVehic
     if (!formData.Year || formData.Year < 1900 || formData.Year > new Date().getFullYear() + 1) newErrors.Year = "Valid year required";
     if (!formData.Plate?.trim()) newErrors.Plate = "Plate is required";
     if (!formData.PriceNew || formData.PriceNew <= 0) newErrors.PriceNew = "Valid price required";
-    
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   }, [formData]);
 
   const handleInputChange = useCallback((field: keyof Vehicle, value: string | number | null) => {
     setFormData(prev => ({ ...prev, [field]: value }));
-    if (errors[field as string]) setErrors(prev => ({ ...prev, [field as string]: undefined }));
+    if (errors[field as string]) {
+      setErrors(prev => {
+        const next = { ...prev };
+        delete next[field as string];
+        return next;
+      });
+    }
   }, [errors]);
 
   const handlePriceChange = useCallback((value: string) => {
@@ -311,7 +317,7 @@ export default function AddVehicleModal({ isOpen, onClose, onSuccess }: AddVehic
       toastError("Please fix form errors");
       return;
     }
-    
+
     setIsSubmitting(true);
     try {
       // Prepare payload
@@ -319,19 +325,19 @@ export default function AddVehicleModal({ isOpen, onClose, onSuccess }: AddVehic
       if (imageFile) {
         payload.Image = await uploadVehicleImage(imageFile, formData.Category);
       }
-      
+
       // Create vehicle
       const res = await fetch('/api/vehicles/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
-      
+
       if (!res.ok) {
         const errData = await res.json();
         throw new Error(errData.error || 'Failed to create vehicle');
       }
-      
+
       await res.json();
       toastSuccess("Vehicle created successfully!");
       onSuccess();
@@ -350,13 +356,13 @@ export default function AddVehicleModal({ isOpen, onClose, onSuccess }: AddVehic
       <ModalContainer>
         <form onSubmit={handleSubmit} className="max-h-[90vh] overflow-y-auto">
           <ModalHeader title="Add New Vehicle" onClose={onClose} />
-          
+
           <div className="p-6 space-y-6">
             {/* Category */}
             <FormSection title="Category" icon={Tag}>
-              <CategorySelector 
-                value={formData.Category || "Cars"} 
-                onChange={(cat) => handleInputChange("Category", cat)} 
+              <CategorySelector
+                value={formData.Category || "Cars"}
+                onChange={(cat) => handleInputChange("Category", cat)}
               />
             </FormSection>
 

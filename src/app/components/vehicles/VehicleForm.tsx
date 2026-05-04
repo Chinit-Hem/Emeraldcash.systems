@@ -41,14 +41,14 @@ function sanitizeNumericInput(value: unknown): number | null {
   if (value === null || value === undefined || value === "") {
     return null;
   }
-  
+
   if (typeof value === "number") {
     if (Number.isNaN(value)) {
       return null;
     }
     return value;
   }
-  
+
   if (typeof value === "string") {
     const trimmed = value.trim();
     if (trimmed === "" || trimmed === "undefined" || trimmed === "NaN") {
@@ -60,16 +60,16 @@ function sanitizeNumericInput(value: unknown): number | null {
     }
     return parsed;
   }
-  
+
   return null;
 }
 
 // Glassmorphism Card Component
-function GlassCard({ 
-  children, 
-  className = "" 
-}: { 
-  children: React.ReactNode; 
+function GlassCard({
+  children,
+  className = ""
+}: {
+  children: React.ReactNode;
   className?: string;
 }) {
   return (
@@ -184,7 +184,7 @@ function GlassButton({
     primary: "bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-sm hover:bg-slate-50",
     secondary: "bg-white/5 border border-white/10 text-slate-200 hover:bg-white/10 hover:border-white/20 hover:text-white",
   };
-  
+
   return (
     <button
       type={type}
@@ -219,14 +219,14 @@ function sanitizeVehicleDataForSubmit(data: Partial<Vehicle>): Partial<Vehicle> 
   sanitized.PriceNew = sanitizeNumericInput(data.PriceNew);
   sanitized.Price40 = sanitizeNumericInput(data.Price40);
   sanitized.Price70 = sanitizeNumericInput(data.Price70);
-  
+
   Object.keys(sanitized).forEach((key) => {
     const k = key as keyof Vehicle;
     if (sanitized[k] === undefined) {
       delete sanitized[k];
     }
   });
-  
+
   return sanitized;
 }
 
@@ -333,7 +333,7 @@ export function VehicleForm({
 }: VehicleFormProps) {
   const { language } = useLanguage();
   const { t } = useTranslation(language);
-  
+
   const [formData, setFormData] = useState<Partial<Vehicle>>(vehicle);
   const [uploadedImage, setUploadedImage] = useState<File | string | null>(null);
   const [imageLoading, _setImageLoading] = useState(false);
@@ -346,7 +346,7 @@ export function VehicleForm({
     compressedSize: number;
     compressionRatio: string;
   } | null>(null);
-  
+
   // isCompressing setter is used for image handling logic
   const setCompressing = setIsCompressing;
   void setCompressing;
@@ -354,7 +354,7 @@ export function VehicleForm({
   const hasChanges = JSON.stringify(formData) !== JSON.stringify(vehicle) || uploadedImage !== null;
   const prevVehicleRef = useRef(vehicle);
   const pendingUpdateRef = useRef<Partial<Vehicle> | null>(null);
-  
+
   useEffect(() => {
     if (prevVehicleRef.current !== vehicle) {
       prevVehicleRef.current = vehicle;
@@ -399,17 +399,17 @@ export function VehicleForm({
     if (field === "Year" || field === "PriceNew") {
       sanitizedValue = sanitizeNumericInput(value);
     }
-    
+
     setFormData((prev) => {
       const next = { ...prev, [field]: sanitizedValue };
-      
+
       if (field === "PriceNew") {
         const priceNew = sanitizedValue as number | null;
         const derived = derivePrices(priceNew);
         next.Price40 = derived.Price40;
         next.Price70 = derived.Price70;
       }
-      
+
       return next;
     });
 
@@ -501,7 +501,7 @@ export function VehicleForm({
 
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     const allTouched: Record<string, boolean> = {};
     Object.keys(formData).forEach((key) => {
       allTouched[key] = true;
@@ -514,20 +514,20 @@ export function VehicleForm({
 
     let imageFile: File | null = null;
     let imageUrl: string | null = null;
-    
+
     if (uploadedImage instanceof File) {
       imageFile = uploadedImage;
     } else if (typeof uploadedImage === "string" && uploadedImage.startsWith("data:image/")) {
       const { file: fileFromDataUrl, error: conversionError } = safeBase64ToFile(
-        uploadedImage, 
+        uploadedImage,
         `vehicle_image_${Date.now()}.jpg`
       );
-      
+
       if (conversionError) {
         setErrors((prev) => ({ ...prev, Image: conversionError }));
         return;
       }
-      
+
       if (fileFromDataUrl) {
         imageFile = fileFromDataUrl;
       } else {
@@ -536,7 +536,7 @@ export function VehicleForm({
     } else if (typeof uploadedImage === "string" && uploadedImage.trim() && (uploadedImage.startsWith("http://") || uploadedImage.startsWith("https://"))) {
       imageUrl = uploadedImage.trim();
     }
-    
+
     let submitData: Partial<Vehicle>;
     if (imageFile) {
       const { Image: _Image, ...formDataWithoutImage } = formData;
@@ -546,7 +546,7 @@ export function VehicleForm({
     } else {
       submitData = formData;
     }
-    
+
     const sanitizedSubmitData = sanitizeVehicleDataForSubmit(submitData);
     await onSubmit(sanitizedSubmitData, imageFile);
   }, [formData, uploadedImage, onSubmit, validateForm]);
@@ -556,7 +556,7 @@ export function VehicleForm({
     setUploadedImage(null);
   }, []);
 
-  const derivedPrices = derivePrices(formData.PriceNew);
+  const derivedPrices = derivePrices(formData.PriceNew ?? null);
 
   const categoryValue = formData.Category || "";
   const categoryOptions =
@@ -594,13 +594,13 @@ export function VehicleForm({
   };
 
   const isKm = language === 'km';
-  
+
   const formContent = (
     <form onSubmit={handleSubmit} className="space-y-5">
       {/* Image Section */}
       <GlassSectionCard title={isKm ? "រូបភាពយានយន្ត" : "Vehicle Image"} icon={icons.image}>
         <ImageInput
-          value={typeof formData.Image === 'string' ? formData.Image.trim() || null : null}
+          value={typeof formData.Image === 'string' ? formData.Image.trim() || undefined : undefined}
           onChange={async (value) => {
             if (!value) {
               handleRemoveImage();
@@ -631,14 +631,14 @@ export function VehicleForm({
             {isKm ? "រួចរាល់" : "Ready"}: {formatImageSize(uploadedImage.size)}
           </p>
         )}
-        
+
         {compressedPreview && isCompressing && (
           <div className="mt-4 p-4 rounded-xl bg-white/5 border border-white/10">
             <div className="flex items-center gap-3">
               <div className="relative w-16 h-16 rounded-lg overflow-hidden flex-shrink-0 bg-white/5">
-                <img 
-                  src={compressedPreview.url} 
-                  alt="Compressed preview" 
+                <img
+                  src={compressedPreview.url}
+                  alt="Compressed preview"
                   className="w-full h-full object-cover"
                 />
                 <div className="absolute inset-0 bg-emerald-500/20 animate-pulse" />
@@ -652,14 +652,14 @@ export function VehicleForm({
                   {isKm ? "កំពុងបង្ហាប់រូបភាព..." : "Optimizing image..."}
                 </p>
                 <p className="text-xs text-slate-400 mt-1">
-                  {formatImageSize(compressedPreview.originalSize)} → {formatImageSize(compressedPreview.compressedSize)} 
+                  {formatImageSize(compressedPreview.originalSize)} → {formatImageSize(compressedPreview.compressedSize)}
                   <span className="font-medium ml-1 text-emerald-400">(-{compressedPreview.compressionRatio})</span>
                 </p>
               </div>
             </div>
           </div>
         )}
-        
+
         {errors.Image && (
           <p className="mt-3 text-sm text-red-400">{errors.Image}</p>
         )}
@@ -698,8 +698,8 @@ export function VehicleForm({
             disabled={isSubmitting}
             options={[
               { value: "", label: isKm ? "ជ្រើសរើសប្រភេទ" : "Select category" },
-              ...categoryOptions.map((cat) => ({ 
-                value: cat, 
+              ...categoryOptions.map((cat) => ({
+                value: cat,
 label: isKm ? (cat === "Cars" ? "រថយន្ត" : cat === "Motorcycles" ? "ម៉ូតូ" : "កង់បី") : cat
               }))
             ]}
@@ -835,7 +835,7 @@ label: isKm ? (cat === "Cars" ? "រថយន្ត" : cat === "Motorcycles" ? "
                   {uploadProgress.stage}...
                 </p>
                 <div className="mt-2 h-2 w-full bg-white/10 rounded-full overflow-hidden">
-                  <div 
+                  <div
                     className="h-full bg-blue-500 transition-all duration-300 ease-out"
                     style={{ width: `${uploadProgress.progress}%` }}
                   />
@@ -847,7 +847,7 @@ label: isKm ? (cat === "Cars" ? "រថយន្ត" : cat === "Motorcycles" ? "
             </div>
           </div>
         )}
-        
+
         <div className="flex flex-col sm:flex-row gap-3">
           <GlassButton
             type="submit"
@@ -857,12 +857,12 @@ label: isKm ? (cat === "Cars" ? "រថយន្ត" : cat === "Motorcycles" ? "
             disabled={!hasChanges || isSubmitting || isCompressing || !!uploadProgress?.stage}
             className="order-1 sm:order-2"
           >
-            {uploadProgress?.stage 
+            {uploadProgress?.stage
               ? `${uploadProgress.stage.charAt(0).toUpperCase() + uploadProgress.stage.slice(1)}... ${uploadProgress.progress}%`
-              : isCompressing 
-                ? (isKm ? "កំពុងដំណើរការរូបភាព..." : "Processing Image...") 
-                : isSubmitting 
-                  ? (isKm ? "កំពុងរក្សាទុក..." : "Saving Changes...") 
+              : isCompressing
+                ? (isKm ? "កំពុងដំណើរការរូបភាព..." : "Processing Image...")
+                : isSubmitting
+                  ? (isKm ? "កំពុងរក្សាទុក..." : "Saving Changes...")
                   : (isKm ? "រក្សាទុកការផ្លាស់ប្តូរ" : "Save Changes")}
           </GlassButton>
           <GlassButton

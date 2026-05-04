@@ -12,7 +12,7 @@ type KpiCardProps = {
   onClick?: () => void;
 };
 
-function accentClasses(accent: KpiCardProps["accent"], isIOSSafari: boolean) {
+function accentClasses(accent: NonNullable<KpiCardProps["accent"]>, isIOSSafari: boolean) {
   if (isIOSSafari) {
     // iOS: Simple border colors without glass effects
     if (accent === "blue") return "border-t-2 border-emerald-500";
@@ -21,7 +21,7 @@ function accentClasses(accent: KpiCardProps["accent"], isIOSSafari: boolean) {
     if (accent === "gray") return "border-t-2 border-gray-400";
     return "border-t-2 border-emerald-500";
   }
-  
+
   // Desktop: Liquid Glass effect with accent colors
   const accentMap = {
     green: "dark:border-t-emerald-400/50",
@@ -30,7 +30,7 @@ function accentClasses(accent: KpiCardProps["accent"], isIOSSafari: boolean) {
     red: "dark:border-t-red-400/50",
     gray: "dark:border-t-slate-400/50",
   };
-  
+
   return accentMap[accent] || accentMap.green;
 }
 
@@ -86,7 +86,7 @@ export default function KpiCard({ label, value, sublabel, subtitle, accent = "gr
     >
       {/* Gloss effect overlay (dark mode only) */}
       <div className="absolute inset-x-0 top-0 h-1/3 bg-gradient-to-b from-white/10 to-transparent pointer-events-none hidden dark:block" />
-      
+
       {/* Content */}
       <div className="relative z-10">
         <div className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">

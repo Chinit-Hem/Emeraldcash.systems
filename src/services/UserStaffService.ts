@@ -1,14 +1,15 @@
 /**
  * Unified User/Staff Service
- * 
+ *
  * Integrates the Settings user management with LMS staff management.
  * When a user is created, they automatically become LMS staff.
- * 
+ *
  * @module services/UserStaffService
  */
 
 import { lmsService } from "./LmsService";
 import type { CreateLmsStaffInput, UpdateLmsStaffInput } from "@/lib/lms-entities";
+import { createUser, listUsers, deleteUser } from "@/lib/userStore";
 import type { Role } from "@/lib/types";
 
 // ============================================================================
@@ -26,7 +27,7 @@ export interface UnifiedUser {
   created_at: string;
   updated_at: string;
   // LMS specific
-  staff_id?: number;
+  staff_id?: string; // Changed to string to match DB ID type
   lms_role?: string;
 }
 
@@ -42,7 +43,7 @@ export interface CreateUnifiedUserDTO {
 
 export interface UpdateUnifiedUserDTO {
   username: string;
-  staff_id?: number;
+  staff_id?: number; // Assuming lmsService.updateStaff expects a number
   full_name?: string;
   email?: string;
   role?: Role;
@@ -78,19 +79,15 @@ export class UserStaffService {
   async createUserAndStaff(data: CreateUnifiedUserDTO): Promise<ServiceResponse<UnifiedUser>> {
     try {
       // Step 1: Create auth user via settings API
-      const userResponse = await fetch("/api/auth/users", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          username: data.username,
-          password: data.password,
-          role: data.role === "Admin" ? "Admin" : "Staff",
-        }),
+      const authResult = await createUser({
+        username: data.username,
+        password: data.password,
+        role: data.role === "Admin" ? "Admin" : "Staff",
+        createdBy: "system"
       });
 
-      if (!userResponse.ok) {
-        const error = await userResponse.json();
-        throw new Error(error.error || "Failed to create user");
+      if (!authResult.ok) {
+        throw new Error(authResult.error || "Failed to create user");
       }
 
       // Step 2: Create LMS staff with unified role
@@ -103,7 +100,7 @@ export class UserStaffService {
       };
 
       const staffResult = await lmsService.createStaff(staffData);
-      
+
       if (!staffResult.success) {
         // Rollback: Try to delete the created user
         console.error("[UserStaffService] Staff creation failed, attempting rollback");
@@ -114,14 +111,14 @@ export class UserStaffService {
       const unifiedUser: UnifiedUser = {
         username: data.username,
         full_name: staffData.fullName,
-        email: staffData.email,
+        email: staffData.email ?? null,
         role: data.role,
-        branch_location: staffData.branchLocation,
-        phone: staffData.phone,
+        branch_location: staffData.branchLocation ?? null,
+        phone: staffData.phone ?? null,
         is_active: true,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
-        staff_id: staffResult.data?.id ? Number(staffResult.data.id) : undefined,
+        staff_id: staffResult.data?.id ? String(staffResult.data.id) : undefined,
         lms_role: staffData.role,
       };
 
@@ -139,22 +136,21 @@ export class UserStaffService {
   async getAllUsers(): Promise<ServiceResponse<UnifiedUser[]>> {
     try {
       // Get auth users
-      const usersRes = await fetch("/api/auth/users", { cache: "no-store" });
-      const usersData = await usersRes.json();
-      
-      if (!usersRes.ok || !usersData.users) {
-        throw new Error(usersData.error || "Failed to fetch users");
+      const users = await listUsers();
+
+      if (!users) {
+        throw new Error("Failed to fetch users");
       }
 
       // Get LMS staff
       const staffResult = await lmsService.getStaff();
-      
+
       if (!staffResult.success) {
         throw new Error(staffResult.error || "Failed to fetch staff");
       }
 
       // Merge data
-      const unifiedUsers: UnifiedUser[] = usersData.users.map((user: { username: string; role: string; createdAt: number; updatedAt: number }) => {
+      const unifiedUsers: UnifiedUser[] = users.map((user) => {
         const staffMember = staffResult.data?.find(
           (s) => s.fullName.toLowerCase() === user.username.toLowerCase() ||
                 s.email?.toLowerCase() === user.username.toLowerCase()
@@ -170,7 +166,7 @@ export class UserStaffService {
           is_active: staffMember?.isActive ?? true,
           created_at: new Date(user.createdAt).toISOString(),
           updated_at: new Date(user.updatedAt).toISOString(),
-          staff_id: staffMember?.id ? Number(staffMember.id) : undefined,
+          staff_id: staffMember?.id ? String(staffMember.id) : undefined,
           lms_role: staffMember?.role,
         };
       });
@@ -233,15 +229,10 @@ export class UserStaffService {
   async deleteUser(username: string): Promise<ServiceResponse<boolean>> {
     try {
       // Delete auth user
-      const userRes = await fetch("/api/auth/users", {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username }),
-      });
+      const result = await deleteUser({ username, requestedBy: "system" });
 
-      if (!userRes.ok) {
-        const error = await userRes.json();
-        throw new Error(error.error || "Failed to delete user");
+      if (!result.ok) {
+        throw new Error(result.error || "Failed to delete user");
       }
 
       return { success: true, data: true };

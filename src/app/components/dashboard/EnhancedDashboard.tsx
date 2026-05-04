@@ -1,13 +1,13 @@
 /**
  * Enhanced Dashboard Component - Beautiful, Clean, Professional, Advanced, Standard
- * 
+ *
  * Design Philosophy:
  * - Glassmorphism + Neumorphism fusion for modern tactile feel
  * - Professional color palette with emerald accents
  * - Advanced micro-interactions and smooth animations
  * - Clean typography hierarchy with Inter font
  * - Standard component patterns for maintainability
- * 
+ *
  * @module EnhancedDashboard
  */
 
@@ -36,20 +36,21 @@ import {
   Search,
   TrendingUp
 } from "lucide-react";
+import Link from "next/link";
 
 // TukTuk Icon Component - From Sidebar Menu (IconTukTuk)
 function TukTukIcon({ className }: { className?: string }) {
   return (
-    <svg 
-      className={className} 
-      xmlns="http://www.w3.org/2000/svg" 
-      width="24" 
-      height="24" 
-      viewBox="0 0 24 24" 
-      fill="none" 
-      stroke="currentColor" 
-      strokeWidth="2" 
-      strokeLinecap="round" 
+    <svg
+      className={className}
+      xmlns="http://www.w3.org/2000/svg"
+      width="24"
+      height="24"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
       strokeLinejoin="round"
     >
       <path d="M4 16v-3a2 2 0 0 1 2-2h8l3 3v3" />
@@ -68,32 +69,32 @@ import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 
 const VehiclesByCategoryChart = dynamic(
   () => import("./charts/VehiclesByCategoryChart"),
-  { 
-    ssr: false, 
+  {
+    ssr: false,
     loading: () => <ChartSkeleton height={320} title="Loading category data..." />
   }
 );
 
 const NewVsUsedChart = dynamic(
   () => import("./charts/NewVsUsedChart"),
-  { 
-    ssr: false, 
+  {
+    ssr: false,
     loading: () => <ChartSkeleton height={320} title="Loading condition data..." />
   }
 );
 
 const VehiclesByBrandChart = dynamic(
   () => import("./charts/VehiclesByBrandChart"),
-  { 
-    ssr: false, 
+  {
+    ssr: false,
     loading: () => <ChartSkeleton height={320} title="Loading brand data..." />
   }
 );
 
 const MonthlyAddedChart = dynamic(
   () => import("./charts/MonthlyAddedChart"),
-  { 
-    ssr: false, 
+  {
+    ssr: false,
     loading: () => <ChartSkeleton height={320} title="Loading timeline data..." />
   }
 );
@@ -206,7 +207,7 @@ const VEHICLE_CATEGORIES = {
  */
 function ChartSkeleton({ height = 320, title = "Loading..." }: { height?: number; title?: string }) {
   return (
-    <div 
+    <div
       className="w-full flex flex-col items-center justify-center rounded-3xl bg-gradient-to-br from-[#e8ecf1] to-[#dce2e8] shadow-sm"
       style={{ height: `${height}px` }}
     >
@@ -264,7 +265,7 @@ function StatCard({
   };
 
   const isClickable = !!onClick || !!href;
-  
+
   // Handle subtitle click without nesting anchors
   const handleSubtitleClick = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -273,7 +274,7 @@ function StatCard({
       window.location.href = subtitleHref;
     }
   };
-  
+
   const content = (
     <div
       className={`
@@ -288,32 +289,32 @@ function StatCard({
     >
       {/* Background gradient accent */}
       <div className={`absolute top-0 right-0 w-32 h-32 bg-gradient-to-br ${colorClasses[color]} opacity-10 rounded-full blur-3xl transform translate-x-16 -translate-y-16 transition-opacity group-hover:opacity-20`} />
-      
+
       {/* Refresh indicator - Tiny dot */}
       {isRefreshing && (
         <div className="absolute -top-2 -right-2 w-4 h-4 bg-emerald-500 rounded-full animate-ping ring-2 ring-emerald-500/50" />
       )}
-      
+
       <div className="relative flex items-start justify-between">
         <div className="flex-1 min-w-0">
           <p className="text-sm font-semibold text-slate-500 uppercase tracking-wider">
             {title}
           </p>
-          
+
           <p className="mt-2 text-3xl font-bold text-slate-800 tracking-tight">
             {value}
           </p>
-          
+
           {trend && (
             <div className={`mt-2 flex items-center gap-1 text-sm font-medium ${trendUp ? 'text-emerald-600' : 'text-red-600'}`}>
               <TrendingUp className={`w-4 h-4 ${trendUp ? '' : 'rotate-180'}`} />
               {trend}
             </div>
           )}
-          
+
           {subtitle && (
             subtitleHref ? (
-              <span 
+              <span
                 onClick={handleSubtitleClick}
                 className="mt-2 inline-flex items-center gap-1 text-sm font-medium text-red-500 hover:text-red-600 transition-colors cursor-pointer"
               >
@@ -325,7 +326,7 @@ function StatCard({
             )
           )}
         </div>
-        
+
         <div className={`
           flex-shrink-0 p-3 rounded-2xl
           bg-gradient-to-br ${colorClasses[color]}
@@ -339,7 +340,7 @@ function StatCard({
   );
 
   if (href && !onClick) {
-    return <a href={href} className="block no-underline">{content}</a>;
+    return <Link href={href} className="block no-underline">{content}</Link>;
   }
 
   if (onClick) {
@@ -544,7 +545,7 @@ export default function EnhancedDashboard({
               <p className="text-xs text-slate-500">{language === 'km' ? 'វិភាគស្តុកយានយន្តពេលវេលាពិត' : 'Real-time inventory analytics'}</p>
             </div>
           </div>
-          
+
           <div className="flex items-center gap-3">
             <button
               onClick={handleRefresh}
@@ -554,12 +555,12 @@ export default function EnhancedDashboard({
             >
               <RefreshCw className={`w-5 h-5 ${isRefreshing ? 'animate-spin' : ''}`} />
             </button>
-            
+
             <button className="hidden sm:flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 font-medium transition-all active:scale-95">
               <Download className="w-4 h-4" />
               {language === 'km' ? 'ទាញយក' : 'Export'}
             </button>
-            
+
             <button className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-600 text-white font-medium shadow-lg shadow-emerald-500/30 hover:shadow-xl hover:shadow-emerald-500/40 transition-all active:scale-95">
               <Filter className="w-4 h-4" />
               {t.filter}
@@ -587,13 +588,13 @@ export default function EnhancedDashboard({
             {/* Vehicle Category Cards Grid */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
               {/* All Vehicles Card */}
-              <a
+              <Link
                 href="/vehicles"
                 className="group relative overflow-hidden rounded-3xl p-6 bg-gradient-to-br from-white to-slate-50 shadow-sm hover:bg-slate-50 transition-all duration-500 hover:-translate-y-1"
               >
                 {/* Animated Background Gradient */}
                 <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/5 via-teal-500/5 to-cyan-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-                
+
                 {/* Content */}
                 <div className="relative">
                   {/* Icon & Count Row */}
@@ -612,7 +613,7 @@ export default function EnhancedDashboard({
                   <div>
                     <h3 className="text-lg font-bold text-slate-800 mb-1">All Vehicles</h3>
                     <p className="text-sm text-slate-500 mb-3">View complete inventory</p>
-                    
+
                     {/* Progress Bar */}
                     <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
                       <div className="h-full w-full bg-gradient-to-r from-emerald-500 to-teal-500 rounded-full" />
@@ -624,15 +625,15 @@ export default function EnhancedDashboard({
                     <ChevronRight className="w-6 h-6 text-emerald-500" />
                   </div>
                 </div>
-              </a>
+              </Link>
 
               {/* Cars Card */}
-              <a
+              <Link
                 href="/vehicles?category=Cars"
                 className="group relative overflow-hidden rounded-3xl p-6 bg-gradient-to-br from-white to-blue-50/30 shadow-sm hover:bg-slate-50 transition-all duration-500 hover:-translate-y-1"
               >
                 <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 via-indigo-500/5 to-violet-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-                
+
                 <div className="relative">
                   <div className="flex items-start justify-between mb-4">
                     <div className="p-3 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 shadow-lg shadow-blue-500/30 group-hover:shadow-blue-500/40 group-hover:scale-110 transition-all duration-300">
@@ -648,9 +649,9 @@ export default function EnhancedDashboard({
                   <div>
                     <h3 className="text-lg font-bold text-slate-800 mb-1">Cars</h3>
                     <p className="text-sm text-slate-500 mb-3">Sedans, SUVs, Trucks</p>
-                    
+
                     <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
-                      <div 
+                      <div
                         className="h-full bg-gradient-to-r from-blue-500 to-indigo-500 rounded-full transition-all duration-1000"
                         style={{ width: `${Math.min((carsCount / totalVehicles) * 100, 100)}%` }}
                       />
@@ -661,15 +662,15 @@ export default function EnhancedDashboard({
                     <ChevronRight className="w-6 h-6 text-blue-500" />
                   </div>
                 </div>
-              </a>
+              </Link>
 
               {/* Motorcycles Card */}
-              <a
+              <Link
                 href="/vehicles?category=Motorcycles"
                 className="group relative overflow-hidden rounded-3xl p-6 bg-gradient-to-br from-white to-violet-50/30 shadow-sm hover:bg-slate-50 transition-all duration-500 hover:-translate-y-1"
               >
                 <div className="absolute inset-0 bg-gradient-to-br from-violet-500/5 via-purple-500/5 to-fuchsia-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-                
+
                 <div className="relative">
                   <div className="flex items-start justify-between mb-4">
                     <div className="p-3 rounded-2xl bg-gradient-to-br from-violet-500 to-purple-600 shadow-lg shadow-violet-500/30 group-hover:shadow-violet-500/40 group-hover:scale-110 transition-all duration-300">
@@ -685,9 +686,9 @@ export default function EnhancedDashboard({
                   <div>
                     <h3 className="text-lg font-bold text-slate-800 mb-1">Motorcycles</h3>
                     <p className="text-sm text-slate-500 mb-3">Scooters, Bikes</p>
-                    
+
                     <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
-                      <div 
+                      <div
                         className="h-full bg-gradient-to-r from-violet-500 to-purple-500 rounded-full transition-all duration-1000"
                         style={{ width: `${Math.min((motorcyclesCount / totalVehicles) * 100, 100)}%` }}
                       />
@@ -698,15 +699,15 @@ export default function EnhancedDashboard({
                     <ChevronRight className="w-6 h-6 text-violet-500" />
                   </div>
                 </div>
-              </a>
+              </Link>
 
               {/* Tuk Tuks Card */}
-              <a
+              <Link
                 href="/vehicles?category=Tuk+Tuk"
                 className="group relative overflow-hidden rounded-3xl p-6 bg-gradient-to-br from-white to-amber-50/30 shadow-sm hover:bg-slate-50 transition-all duration-500 hover:-translate-y-1"
               >
                 <div className="absolute inset-0 bg-gradient-to-br from-amber-500/5 via-orange-500/5 to-red-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-                
+
                 <div className="relative">
                   <div className="flex items-start justify-between mb-4">
                     <div className="p-3 rounded-2xl bg-gradient-to-br from-amber-500 to-orange-600 shadow-lg shadow-amber-500/30 group-hover:shadow-amber-500/40 group-hover:scale-110 transition-all duration-300">
@@ -722,9 +723,9 @@ export default function EnhancedDashboard({
                   <div>
                     <h3 className="text-lg font-bold text-slate-800 mb-1">Tuk Tuks</h3>
                     <p className="text-sm text-slate-500 mb-3">Three-wheelers</p>
-                    
+
                     <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
-                      <div 
+                      <div
                         className="h-full bg-gradient-to-r from-amber-500 to-orange-500 rounded-full transition-all duration-1000"
                         style={{ width: `${Math.min((tukTuksCount / totalVehicles) * 100, 100)}%` }}
                       />
@@ -735,12 +736,12 @@ export default function EnhancedDashboard({
                     <ChevronRight className="w-6 h-6 text-amber-500" />
                   </div>
                 </div>
-              </a>
+              </Link>
             </div>
 
             {/* Missing Images Alert Card */}
             {noImageCount > 0 && (
-              <a
+              <Link
 href="/vehicles?withoutImage=true"
                 className="flex items-center gap-4 p-4 rounded-2xl bg-gradient-to-r from-red-50 to-rose-50 border border-red-100 shadow-sm hover:shadow-md transition-all duration-300 group"
               >
@@ -755,7 +756,7 @@ href="/vehicles?withoutImage=true"
                   <p className="text-sm text-red-500">Click to view and upload images</p>
                 </div>
                 <ChevronRight className="w-5 h-5 text-red-400 group-hover:text-red-600 group-hover:translate-x-1 transition-all" />
-              </a>
+              </Link>
             )}
           </div>
 
@@ -795,7 +796,7 @@ href="/vehicles?withoutImage=true"
                 </span>
               )}
             </div>
-            
+
             <div className="flex items-center gap-2">
               {['Cars', 'Motorcycles', 'TukTuks', 'New', 'Used'].map((filter) => (
                 <button
@@ -803,8 +804,8 @@ href="/vehicles?withoutImage=true"
                   onClick={() => handleFilterClick(filter)}
                   className={`
                     px-3 py-1.5 rounded-lg text-sm font-medium transition-all
-                    ${activeFilter === filter 
-                      ? 'bg-emerald-100 text-emerald-700 shadow-inner' 
+                    ${activeFilter === filter
+                      ? 'bg-emerald-100 text-emerald-700 shadow-inner'
                       : 'bg-white text-slate-600 hover:bg-slate-50 shadow-sm'}
                   `}
                 >
@@ -900,29 +901,29 @@ href="/vehicles?withoutImage=true"
           {/* Quick Stats Footer */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 sm:gap-6">
             {[
-              { 
-                label: "With Images", 
+              {
+                label: "With Images",
                 value: (meta.total - meta.noImageCount).toLocaleString(),
                 icon: ImageIcon,
                 color: "text-emerald-600",
                 bgColor: "bg-emerald-50"
               },
-              { 
-                label: "Without Images", 
+              {
+                label: "Without Images",
                 value: meta.noImageCount.toLocaleString(),
                 icon: ImageOff,
                 color: "text-red-600",
                 bgColor: "bg-red-50"
               },
-              { 
-                label: "Average Price", 
+              {
+                label: "Average Price",
                 value: `$${Math.round(meta.avgPrice).toLocaleString()}`,
                 icon: DollarSign,
                 color: "text-blue-600",
                 bgColor: "bg-blue-50"
               },
-              { 
-                label: "Unique Brands", 
+              {
+                label: "Unique Brands",
                 value: aggregatedStats ? Object.keys(aggregatedStats.byBrand).length.toLocaleString() : '-',
                 icon: Package,
                 color: "text-purple-600",

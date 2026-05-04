@@ -1,3 +1,4 @@
+import { requirePermission } from '@/lib/auth-helpers';
 import { vehicleService } from '@/services/VehicleService';
 import { NextRequest, NextResponse } from 'next/server';
 
@@ -6,29 +7,31 @@ import { NextRequest, NextResponse } from 'next/server';
  * Server-side aggregated vehicle statistics
  * Cached 30s for dashboard performance
  */
-export async function GET(_request: NextRequest) {
+export async function GET(request: NextRequest) {
   const startTime = Date.now();
-  
+  const auth = requirePermission(request, 'vehicles:view');
+  if (auth.response) return auth.response;
+
   // 🚀 Add 10s timeout for dashboard stats
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 10000);
-  
+
   try {
     console.time('[DashboardStats]');
-    
+
     // 🚀 FIX: Force refresh to bypass stale cache and get fresh data
     const result = await Promise.race([
       vehicleService.getVehicleStats(true), // Force refresh - bypass cache
       new Promise<never>((_, reject) => controller.signal.addEventListener('abort', () => reject(new Error('Stats timeout (10s)'))))
     ]);
-    
+
     clearTimeout(timeoutId);
     console.timeEnd('[DashboardStats]');
-    
+
     if (!result.success || !result.data) {
       console.error(`[DashboardStats] Service error (${Date.now() - startTime}ms):`, result.error);
       return NextResponse.json(
-        { 
+        {
           error: 'Failed to fetch stats',
           fallback: {
             total: 0,
@@ -78,13 +81,13 @@ export async function GET(_request: NextRequest) {
   } catch (error) {
     clearTimeout(timeoutId);
     console.timeEnd('[DashboardStats]');
-    
+
     const duration = Date.now() - startTime;
     const errorMsg = error instanceof Error ? error.message : String(error);
     console.error(`[DashboardStats] ❌ ERROR (${duration}ms):`, errorMsg);
-    
+
     return NextResponse.json(
-      { 
+      {
         error: 'Internal server error',
         details: errorMsg,
         fallback: {
@@ -100,4 +103,3 @@ export async function GET(_request: NextRequest) {
     );
   }
 }
-

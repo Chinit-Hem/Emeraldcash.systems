@@ -1,9 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requirePermission } from '@/lib/auth-helpers';
 import { uploadImage } from '@/lib/cloudinary';
 import { randomUUID } from 'crypto';
 
 export async function POST(req: NextRequest) {
   try {
+    const auth = requirePermission(req, 'sms:create');
+    if (auth.response) return auth.response;
+
     const formData = await req.formData();
     const file = formData.get('file') as File | null;
     const folder = formData.get('folder') as string || 'sms/assets/images';

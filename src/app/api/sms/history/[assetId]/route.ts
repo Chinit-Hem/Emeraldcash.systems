@@ -1,11 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requirePermission } from '@/lib/auth-helpers';
 import { smsService } from '@/services/SmsService';
 
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ assetId: string }> }
 ) {
   try {
+    const auth = requirePermission(req, 'sms:view');
+    if (auth.response) return auth.response;
+
     const { assetId } = await params;
     const result = await smsService.getAssetHistory(assetId);
 

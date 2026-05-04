@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useCallback, useEffect, useRef, useState } from "react";
+import React, { createContext, useContext, useCallback, useEffect, useRef } from "react";
 import { useRouter, usePathname } from "next/navigation";
 
 interface InstantNavigationContextType {
@@ -19,9 +19,15 @@ type PrefetchTask = {
   timestamp: number;
 };
 
+const priorityWeights = {
+  high: 1,
+  normal: 2,
+  low: 3,
+} as const;
+
 /**
  * InstantNavigationProvider - Advanced route prefetching for 0s navigation
- * 
+ *
  * Features:
  * - Priority-based prefetch queue (high/normal/low)
  * - Viewport-aware prefetching (prefetches visible links first)
@@ -35,22 +41,14 @@ export function InstantNavigationProvider({ children }: { children: React.ReactN
   const prefetchQueueRef = useRef<PrefetchTask[]>([]);
   const prefetchedRoutes = useRef<Set<string>>(new Set());
   const isProcessing = useRef(false);
-  const [prefetchQueue, setPrefetchQueue] = useState<string[]>([]);
   const observerRef = useRef<IntersectionObserver | null>(null);
-
-  // Priority weights
-  const priorityWeights = {
-    high: 1,
-    normal: 2,
-    low: 3,
-  };
 
   // Process prefetch queue
   const processQueue = useCallback(() => {
     if (isProcessing.current || prefetchQueueRef.current.length === 0) return;
-    
+
     isProcessing.current = true;
-    
+
     // Sort by priority and timestamp
     const sorted = [...prefetchQueueRef.current].sort((a, b) => {
       if (a.priority !== b.priority) return a.priority - b.priority;
@@ -59,7 +57,7 @@ export function InstantNavigationProvider({ children }: { children: React.ReactN
 
     // Process in batches to avoid blocking
     const batch = sorted.slice(0, 3);
-    
+
     batch.forEach(task => {
       if (!prefetchedRoutes.current.has(task.href)) {
         router.prefetch(task.href);
@@ -69,8 +67,7 @@ export function InstantNavigationProvider({ children }: { children: React.ReactN
 
     // Remove processed items
     prefetchQueueRef.current = sorted.slice(3);
-    setPrefetchQueue(prefetchQueueRef.current.map(t => t.href));
-    
+
     // Schedule next batch
     if (prefetchQueueRef.current.length > 0) {
       setTimeout(() => {
@@ -86,10 +83,10 @@ export function InstantNavigationProvider({ children }: { children: React.ReactN
   const prefetchRoute = useCallback((href: string, priority: "high" | "normal" | "low" = "normal") => {
     // Don't prefetch current page
     if (href === pathname) return;
-    
+
     // Don't prefetch if already done
     if (prefetchedRoutes.current.has(href)) return;
-    
+
     // Don't add duplicates
     if (prefetchQueueRef.current.some(t => t.href === href)) return;
 
@@ -100,7 +97,6 @@ export function InstantNavigationProvider({ children }: { children: React.ReactN
     };
 
     prefetchQueueRef.current.push(task);
-    setPrefetchQueue(prev => [...prev, href]);
 
     // Use requestIdleCallback for non-critical prefetching
     if (typeof window !== "undefined" && "requestIdleCallback" in window) {
@@ -117,18 +113,18 @@ export function InstantNavigationProvider({ children }: { children: React.ReactN
       router.prefetch(href);
       prefetchedRoutes.current.add(href);
     }
-    
+
     // Small delay to ensure prefetch completes
     requestAnimationFrame(() => {
       router.push(href);
     });
   }, [router]);
 
-  // Setup Intersection Observer for automatic prefetching
+  // Setup lightweight Intersection Observer for automatic prefetching.
   useEffect(() => {
     if (typeof window === "undefined") return;
+    const observedLinks = new Set<Element>();
 
-    // Observe all links and prefetch when they enter viewport
     observerRef.current = new IntersectionObserver(
       (entries) => {
         entries.forEach(entry => {
@@ -142,60 +138,30 @@ export function InstantNavigationProvider({ children }: { children: React.ReactN
         });
       },
       {
-        rootMargin: "200px", // Start prefetching 200px before entering viewport
+        rootMargin: "50px",
         threshold: 0,
       }
     );
 
-    // Observe all internal links
     const observeLinks = () => {
       const links = document.querySelectorAll('a[href^="/"]:not([href^="//"])');
       links.forEach(link => {
+        if (observedLinks.has(link)) return;
+        observedLinks.add(link);
         observerRef.current?.observe(link);
       });
     };
 
-    // Initial observation
-    observeLinks();
-
-    // Re-observe when DOM changes
-    const mutationObserver = new MutationObserver(() => {
-      observeLinks();
-    });
-
-    mutationObserver.observe(document.body, {
-      childList: true,
-      subtree: true,
-    });
+    if ("requestIdleCallback" in window) {
+      window.requestIdleCallback(observeLinks, { timeout: 1500 });
+    } else {
+      setTimeout(observeLinks, 500);
+    }
 
     return () => {
       observerRef.current?.disconnect();
-      mutationObserver.disconnect();
+      observedLinks.clear();
     };
-  }, [prefetchRoute]);
-
-  // Auto-prefetch critical routes on mount
-  useEffect(() => {
-    const criticalRoutes = ["/vehicles", "/dashboard", "/settings", "/lms"];
-    const importantRoutes = ["/settings/profile", "/lms/admin"];
-
-    // Prefetch critical routes immediately
-    criticalRoutes.forEach(route => {
-      if (route !== pathname) {
-        prefetchRoute(route, "high");
-      }
-    });
-
-    // Prefetch important routes after a delay
-    const timer = setTimeout(() => {
-      importantRoutes.forEach(route => {
-        if (route !== pathname) {
-          prefetchRoute(route, "normal");
-        }
-      });
-    }, 3000);
-
-    return () => clearTimeout(timer);
   }, [pathname, prefetchRoute]);
 
   return (
@@ -204,7 +170,7 @@ export function InstantNavigationProvider({ children }: { children: React.ReactN
         prefetchRoute,
         navigateInstant,
         isPrefetching: isProcessing.current,
-        prefetchQueue,
+        prefetchQueue: prefetchQueueRef.current.map((task) => task.href),
       }}
     >
       {children}
@@ -217,7 +183,7 @@ export function InstantNavigationProvider({ children }: { children: React.ReactN
  */
 export function useInstantNavigation() {
   const context = useContext(InstantNavigationContext);
-  
+
   if (!context) {
     // Return default implementation if not in provider
     return {
@@ -230,7 +196,7 @@ export function useInstantNavigation() {
       isPrefetching: false,
     };
   }
-  
+
   return context;
 }
 
@@ -243,13 +209,13 @@ interface InstantLinkProps extends React.AnchorHTMLAttributes<HTMLAnchorElement>
   prefetch?: boolean;
 }
 
-export function InstantLink({ 
-  href, 
-  children, 
+export function InstantLink({
+  href,
+  children,
   prefetch = true,
   onMouseEnter,
   onClick,
-  ...props 
+  ...props
 }: InstantLinkProps) {
   const { prefetchRoute, navigateInstant } = useInstantNavigation();
 

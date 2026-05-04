@@ -1,15 +1,15 @@
 /**
  * Base Repository Class - Repository Pattern Implementation
- * 
+ *
  * Separates data access logic from business logic in services.
  * Provides a clean abstraction for database operations.
- * 
+ *
  * Features:
  * - Generic type support for any entity type
  * - SQL injection protection via parameterized queries
  * - Query building utilities
  * - Transaction support hooks
- * 
+ *
  * @module repositories/BaseRepository
  */
 
@@ -41,7 +41,7 @@ export interface QueryOptions {
 /**
  * Filter operators for repository queries
  */
-export type FilterOperator = 
+export type FilterOperator =
   | "eq" | "neq" | "gt" | "gte" | "lt" | "lte"
   | "like" | "ilike" | "in" | "nin" | "isNull" | "isNotNull";
 
@@ -73,10 +73,10 @@ export interface QueryBuilderState {
 export abstract class BaseRepository<TDB extends BaseDBRecord> {
   /** Database table name */
   protected abstract readonly tableName: string;
-  
+
   /** Default query timeout */
   protected readonly DEFAULT_TIMEOUT_MS = 30000;
-  
+
   /** Maximum retries for failed queries */
   protected readonly MAX_RETRIES = 2;
 
@@ -85,22 +85,20 @@ export abstract class BaseRepository<TDB extends BaseDBRecord> {
    */
   protected async executeQuery<T>(
     query: string,
+    params: (string | number | null)[] = [],
     options: QueryOptions = {}
   ): Promise<QueryResult<T>> {
     const startTime = Date.now();
     const timeoutMs = options.timeoutMs || this.DEFAULT_TIMEOUT_MS;
     const maxRetries = options.maxRetries || this.MAX_RETRIES;
-    const operationName = options.operationName || `${this.tableName}.query`;
+    const operationName = options.operationName || `${this.tableName}.executeQuery`;
 
     try {
       // Use dbManager's built-in retry and timeout handling
-      const result = await dbManager.query(
-        () => dbManager.executeUnsafe<T>(query),
-        {
-          operationName,
-          maxRetries,
-          timeoutMs,
-        }
+      const result = await dbManager.executeUnsafe<T>(
+        query,
+        params,
+        timeoutMs
       );
 
       return {
@@ -113,7 +111,7 @@ export abstract class BaseRepository<TDB extends BaseDBRecord> {
       console.error(`[${operationName}] Query failed:`, {
         error: errorMessage,
         queryLength: query.length,
-        durationMs: Date.now() - startTime,
+        durationMs: Date.now() - startTime, // This is for dbManager.query, not executeUnsafe.
       });
       throw error;
     }
@@ -143,8 +141,13 @@ export abstract class BaseRepository<TDB extends BaseDBRecord> {
         if (condition) {
           state.where.push(condition.sql);
           if (condition.param !== undefined) {
-            state.params.push(condition.param);
-            state.paramIndex++;
+            if (Array.isArray(condition.param)) {
+              state.params.push(...condition.param);
+              state.paramIndex += condition.param.length;
+            } else {
+              state.params.push(condition.param);
+              state.paramIndex++;
+            }
           }
         }
       }
@@ -160,24 +163,26 @@ export abstract class BaseRepository<TDB extends BaseDBRecord> {
         const safeColumn = this.sanitizeColumnName(o.column);
         return safeColumn ? `${safeColumn} ${o.direction}` : "";
       }).filter(Boolean);
-      
+
       if (orderClauses.length > 0) {
         query += ` ORDER BY ${orderClauses.join(", ")}`;
       }
     }
 
-    // Apply pagination
-    if (limit !== undefined) {
-      query += ` LIMIT ${limit}`;
-      if (offset !== undefined) {
-        query += ` OFFSET ${offset}`;
-      }
+    // Corrected Pagination Algorithm: LIMIT and OFFSET should be independent
+    if (limit !== undefined && limit !== null) {
+      query += ` LIMIT $${state.paramIndex}`;
+      state.params.push(limit);
+      state.paramIndex++;
     }
 
-    // Build final query with inline parameters
-    const finalQuery = this.buildFinalQuery(query, state.params);
-    
-    const result = await this.executeQuery<TDB>(finalQuery, {
+    if (offset !== undefined && offset !== null) {
+      query += ` OFFSET $${state.paramIndex}`;
+      state.params.push(offset);
+      state.paramIndex++;
+    }
+
+    const result = await this.executeQuery<TDB>(query, state.params, {
       operationName: `${this.tableName}.findAll`,
     });
 
@@ -188,9 +193,9 @@ export abstract class BaseRepository<TDB extends BaseDBRecord> {
    * Find single record by ID
    */
   public async findById(id: number): Promise<TDB | null> {
-    const query = `SELECT * FROM ${this.tableName} WHERE id = ${id}`;
-    
-    const result = await this.executeQuery<TDB>(query, {
+    const query = `SELECT * FROM ${this.tableName} WHERE id = $1`;
+
+    const result = await this.executeQuery<TDB>(query, [id], {
       operationName: `${this.tableName}.findById`,
     });
 
@@ -205,27 +210,19 @@ export abstract class BaseRepository<TDB extends BaseDBRecord> {
   ): Promise<TDB> {
     const now = new Date().toISOString();
 
-    // Get next available ID
-    const maxIdQuery = `SELECT COALESCE(MAX(id), 0) + 1 as next_id FROM ${this.tableName}`;
-    const maxIdResult = await this.executeQuery<{ next_id: number }>(maxIdQuery);
-    const nextId = maxIdResult.data[0]?.next_id || 1;
-
     // Build INSERT query
     const columns = Object.keys(data);
     const values = Object.values(data);
-    
-    const escapedValues = values.map(v => this.escapeValue(v));
-    
+
+    const placeholders = columns.map((_, i) => `$${i + 1}`).join(', ');
+
     const insertQuery = `
-      INSERT INTO ${this.tableName} (
-        id, ${columns.join(", ")}, created_at, updated_at
-      ) VALUES (
-        ${nextId}, ${escapedValues.join(", ")}, '${now}', '${now}'
-      )
+      INSERT INTO ${this.tableName} (${columns.join(", ")}${columns.length > 0 ? ', ' : ''}created_at, updated_at)
+      VALUES (${placeholders}, NOW(), NOW())
       RETURNING *
     `;
 
-    const result = await this.executeQuery<TDB>(insertQuery, {
+    const result = await this.executeQuery<TDB>(insertQuery, values as (string | number | null)[], { // Pass parameters
       operationName: `${this.tableName}.create`,
     });
 
@@ -236,34 +233,36 @@ export abstract class BaseRepository<TDB extends BaseDBRecord> {
    * Update existing record
    */
   public async update(id: number, data: Partial<TDB>): Promise<TDB | null> {
-    const now = new Date().toISOString();
-    const updates: string[] = [];
+    const now = new Date().toISOString();    const updates: string[] = []; // Array to hold "column = $N" clauses
+    const params: (string | number | null)[] = []; // Array to hold parameter values
+    let paramIndex = 1; // Start parameter index from 1
 
-    for (const [key, value] of Object.entries(data)) {
-      // Skip system fields
-      if (key === "id" || key === "created_at" || key === "updated_at") continue;
-      
-      const sanitizedKey = this.sanitizeColumnName(key);
-      if (sanitizedKey) {
-        updates.push(`${sanitizedKey} = ${this.escapeValue(value)}`);
+    for (const [key, value] of Object.entries(data)) { // Iterate over data to build update clauses
+      if (key === "id" || key === "created_at" || key === "updated_at") continue; // Skip system fields
+
+      const sanitizedKey = this.sanitizeColumnName(key); // Sanitize column name
+      if (sanitizedKey) { // If column name is safe
+        updates.push(`${sanitizedKey} = $${paramIndex}`); // Add update clause
+        params.push(value as string | number | null); // Add value to parameters
+        paramIndex++; // Increment parameter index
       }
     }
 
-    if (updates.length === 0) {
-      throw new Error("No fields to update");
+    if (updates.length === 0) { // If no fields to update
+      throw new Error("No fields to update"); // Throw error
     }
 
-    // Always update updated_at
-    updates.push(`updated_at = '${now}'`);
+    updates.push(`updated_at = NOW()`); // Always update updated_at
 
     const updateQuery = `
-      UPDATE ${this.tableName} 
+      UPDATE ${this.tableName}
       SET ${updates.join(", ")}
-      WHERE id = ${id}
+      WHERE id = $${paramIndex}
       RETURNING *
     `;
 
-    const result = await this.executeQuery<TDB>(updateQuery, {
+    params.push(id); // Add ID to parameters for WHERE clause
+    const result = await this.executeQuery<TDB>(updateQuery, params, { // Pass parameters
       operationName: `${this.tableName}.update`,
     });
 
@@ -274,9 +273,9 @@ export abstract class BaseRepository<TDB extends BaseDBRecord> {
    * Delete record
    */
   public async delete(id: number): Promise<boolean> {
-    const deleteQuery = `DELETE FROM ${this.tableName} WHERE id = ${id} RETURNING id`;
-    
-    const result = await this.executeQuery<{ id: number }>(deleteQuery, {
+    const deleteQuery = `DELETE FROM ${this.tableName} WHERE id = $1 RETURNING id`;
+
+    const result = await this.executeQuery<{ id: number }>(deleteQuery, [id], { // Pass parameters
       operationName: `${this.tableName}.delete`,
     });
 
@@ -289,13 +288,13 @@ export abstract class BaseRepository<TDB extends BaseDBRecord> {
   public async softDelete(id: number): Promise<boolean> {
     const now = new Date().toISOString();
     const query = `
-      UPDATE ${this.tableName} 
-      SET is_active = false, updated_at = '${now}'
-      WHERE id = ${id}
+      UPDATE ${this.tableName}
+      SET is_active = false, updated_at = NOW()
+      WHERE id = $1
       RETURNING id
     `;
-    
-    const result = await this.executeQuery<{ id: number }>(query, {
+
+    const result = await this.executeQuery<{ id: number }>(query, [id], {
       operationName: `${this.tableName}.softDelete`,
     });
 
@@ -312,26 +311,29 @@ export abstract class BaseRepository<TDB extends BaseDBRecord> {
 
     if (filters && filters.length > 0) {
       const conditions: string[] = [];
-      
+
       for (const filter of filters) {
         const condition = this.buildFilterCondition(filter, paramIndex);
         if (condition) {
           conditions.push(condition.sql);
           if (condition.param !== undefined) {
-            params.push(condition.param);
-            paramIndex++;
+            if (Array.isArray(condition.param)) {
+              params.push(...condition.param);
+              paramIndex += condition.param.length;
+            } else {
+              params.push(condition.param);
+              paramIndex++;
+            }
           }
         }
       }
-      
+
       if (conditions.length > 0) {
         query += ` WHERE ${conditions.join(" AND ")}`;
       }
     }
 
-    const finalQuery = this.buildFinalQuery(query, params);
-    
-    const result = await this.executeQuery<{ count: string }>(finalQuery, {
+    const result = await this.executeQuery<{ count: string }>(query, params, {
       operationName: `${this.tableName}.count`,
     });
 
@@ -342,9 +344,9 @@ export abstract class BaseRepository<TDB extends BaseDBRecord> {
    * Check if record exists
    */
   public async exists(id: number): Promise<boolean> {
-    const query = `SELECT 1 FROM ${this.tableName} WHERE id = ${id} LIMIT 1`;
-    
-    const result = await this.executeQuery<Record<string, unknown>>(query, {
+    const query = `SELECT 1 FROM ${this.tableName} WHERE id = $1 LIMIT 1`;
+
+    const result = await this.executeQuery<Record<string, unknown>>(query, [id], {
       operationName: `${this.tableName}.exists`,
     });
 
@@ -355,8 +357,8 @@ export abstract class BaseRepository<TDB extends BaseDBRecord> {
    * Execute raw SQL within transaction context
    */
   public async executeRaw<T>(query: string): Promise<T[]> {
-    const result = await this.executeQuery<T>(query, {
-      operationName: `${this.tableName}.raw`,
+    const result = await this.executeQuery<T>(query, [], {
+      operationName: `${this.tableName}.executeRaw`,
     });
     return result.data;
   }
@@ -371,7 +373,7 @@ export abstract class BaseRepository<TDB extends BaseDBRecord> {
   protected buildFilterCondition(
     filter: FilterCondition,
     paramIndex: number
-  ): { sql: string; param?: string | number | null } | null {
+  ): { sql: string; param?: string | number | null | (string | number | null)[] } | null {
     const safeColumn = this.sanitizeColumnName(filter.column);
     if (!safeColumn) return null;
 
@@ -393,9 +395,11 @@ export abstract class BaseRepository<TDB extends BaseDBRecord> {
       case "ilike":
         return { sql: `${safeColumn} ILIKE $${paramIndex}`, param: `%${filter.value}%` };
       case "in":
+        if (Array.isArray(filter.value)) {
+          const expandedPlaceholders = filter.value.map((_, i) => `$${paramIndex + i}`).join(', ');
+          return { sql: `${safeColumn} IN (${expandedPlaceholders})`, param: filter.value as (string | number | null)[] };
+        }
         return { sql: `${safeColumn} IN ($${paramIndex})`, param: filter.value as string };
-      case "nin":
-        return { sql: `${safeColumn} NOT IN ($${paramIndex})`, param: filter.value as string };
       case "isNull":
         return { sql: `${safeColumn} IS NULL` };
       case "isNotNull":
@@ -403,42 +407,6 @@ export abstract class BaseRepository<TDB extends BaseDBRecord> {
       default:
         return null;
     }
-  }
-
-  /**
-   * Build final query with inline parameters
-   */
-  protected buildFinalQuery(query: string, params: (string | number | null)[]): string {
-    let finalQuery = query;
-    
-    for (let i = 0; i < params.length; i++) {
-      const param = params[i];
-      const placeholder = `$${i + 1}`;
-      let replacement: string;
-      
-      if (param === null) {
-        replacement = "NULL";
-      } else if (typeof param === "number") {
-        replacement = String(param);
-      } else {
-        replacement = `'${String(param).replace(/'/g, "''")}'`;
-      }
-      
-      const placeholderRegex = new RegExp(placeholder.replace(/\$/g, "\\$"), "g");
-      finalQuery = finalQuery.replace(placeholderRegex, replacement);
-    }
-    
-    return finalQuery;
-  }
-
-  /**
-   * Escape value for SQL
-   */
-  protected escapeValue(value: unknown): string {
-    if (value === null) return "NULL";
-    if (typeof value === "number") return String(value);
-    if (typeof value === "boolean") return String(value);
-    return `'${String(value).replace(/'/g, "''")}'`;
   }
 
   /**
@@ -450,17 +418,6 @@ export abstract class BaseRepository<TDB extends BaseDBRecord> {
     return sanitized || null;
   }
 
-  /**
-   * Build ILIKE pattern for case-insensitive search
-   */
-  protected buildIlikePattern(searchTerm: string): string {
-    if (!searchTerm) return "%";
-    // Escape special SQL characters
-    const escaped = searchTerm
-      .replace(/%/g, "\\%")
-      .replace(/_/g, "\\_");
-    return `%${escaped}%`;
-  }
 }
 
 // Default export

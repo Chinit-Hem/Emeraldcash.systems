@@ -1,9 +1,10 @@
 /**
  * Cambodia Market Price Library
- * 
+ *
+ * @module market-price
  * Fetches and calculates market prices from Cambodian marketplaces
  * for vehicles (cars, motorcycles, tuk-tuks).
- * 
+ *
  * Features:
  * - Web scraping from Khmer24 and other Cambodian marketplaces
  * - Price extraction with outlier removal
@@ -14,6 +15,7 @@
  */
 
 // In-memory cache (1 hour TTL)
+import { globalLogger } from "./logger";
 const memoryCache = new Map<string, CacheEntry>();
 const CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
 
@@ -91,7 +93,7 @@ function isCacheValid(entry: CacheEntry): boolean {
 export function getCachedPrice(input: MarketPriceInput): MarketPriceResult | null {
   const key = getCacheKey(input);
   const entry = memoryCache.get(key);
-  
+
   if (entry && isCacheValid(entry)) {
     return {
       ...entry.data,
@@ -100,7 +102,7 @@ export function getCachedPrice(input: MarketPriceInput): MarketPriceResult | nul
       cachedUntil: new Date(entry.timestamp + CACHE_TTL_MS).toISOString(),
     };
   }
-  
+
   return null;
 }
 
@@ -152,10 +154,10 @@ export async function fetchMarketPrices(input: MarketPriceInput): Promise<Market
 
   // Fetch from external sources
   const results = await fetchFromKhmer24(input);
-  
+
   // Calculate price ranges
   const result = calculatePriceRanges(results);
-  
+
   // Cache the result (without metadata fields)
   const key = getCacheKey(input);
   memoryCache.set(key, {
@@ -196,7 +198,7 @@ export function setManualPriceOverride(
     updatedAt: new Date().toISOString(),
     updatedBy: override.updatedBy,
   });
-  
+
   // Clear cache entry so new override is used
   memoryCache.delete(key);
 }
@@ -226,23 +228,23 @@ export function importPricesFromCSV(csvContent: string): { success: number; fail
   let success = 0;
   let failed = 0;
   const errors: string[] = [];
-  
+
   // Skip header if present
   const startIndex = lines[0].toLowerCase().includes('brand') ? 1 : 0;
-  
+
   for (let i = startIndex; i < lines.length; i++) {
     const line = lines[i].trim();
     if (!line) continue;
-    
+
     // Handle both comma and tab-separated values
     const parts = line.includes('\t') ? line.split('\t') : line.split(',');
-    
+
     if (parts.length < 4) {
       errors.push(`Line ${i + 1}: Insufficient columns`);
       failed++;
       continue;
     }
-    
+
     try {
       const category = (parts[0] || "").trim();
       const brand = (parts[1] || "").trim();
@@ -253,13 +255,13 @@ export function importPricesFromCSV(csvContent: string): { success: number; fail
       const priceHigh = parts[6] ? parseFloat(parts[6].replace(/[$,]/g, '')) : null;
       const source = parts[7]?.trim() || "CSV Import";
       const confidence = (parts[8]?.trim() as "High" | "Medium" | "Low") || "Medium";
-      
+
       if (!category || !brand || !model || priceMedian === null) {
         errors.push(`Line ${i + 1}: Missing required fields`);
         failed++;
         continue;
       }
-      
+
       setManualPriceOverride(
         { category, brand, model, year: year || undefined },
         {
@@ -277,7 +279,7 @@ export function importPricesFromCSV(csvContent: string): { success: number; fail
       failed++;
     }
   }
-  
+
   return { success, failed, errors };
 }
 
@@ -292,18 +294,18 @@ export function importPricesFromJSON(jsonContent: string): { success: number; fa
   } catch (err) {
     return { success: 0, failed: 1, errors: [`Invalid JSON: ${err instanceof Error ? err.message : "Unknown error"}`] };
   }
-  
+
   if (!Array.isArray(data)) {
     return { success: 0, failed: 1, errors: ["JSON must be an array of price entries"] };
   }
-  
+
   let success = 0;
   let failed = 0;
   const errors: string[] = [];
-  
+
   for (let i = 0; i < data.length; i++) {
     const item = data[i] as Record<string, unknown>;
-    
+
     try {
       const category = String(item.category || "").trim();
       const brand = String(item.brand || "").trim();
@@ -314,13 +316,13 @@ export function importPricesFromJSON(jsonContent: string): { success: number; fa
       const priceHigh = typeof item.priceHigh === "number" ? item.priceHigh : null;
       const source = String(item.source || "JSON Import").trim();
       const confidence = (item.confidence as "High" | "Medium" | "Low") || "Medium";
-      
+
       if (!category || !brand || !model || priceMedian === null) {
         errors.push(`Item ${i + 1}: Missing required fields`);
         failed++;
         continue;
       }
-      
+
       setManualPriceOverride(
         { category, brand, model, year: year || undefined },
         {
@@ -338,7 +340,7 @@ export function importPricesFromJSON(jsonContent: string): { success: number; fa
       failed++;
     }
   }
-  
+
   return { success, failed, errors };
 }
 
@@ -358,12 +360,12 @@ export function exportPricesToJSON(inputs: MarketPriceInput[]): string {
     confidence: string;
     updatedAt: string;
   }> = [];
-  
+
   for (const input of inputs) {
     const key = getCacheKey(input);
     const manual = manualOverrides.get(key);
     const cached = memoryCache.get(key);
-    
+
     if (manual) {
       entries.push({
         category: input.category,
@@ -393,7 +395,7 @@ export function exportPricesToJSON(inputs: MarketPriceInput[]): string {
       });
     }
   }
-  
+
   return JSON.stringify(entries, null, 2);
 }
 
@@ -402,12 +404,14 @@ export function exportPricesToJSON(inputs: MarketPriceInput[]): string {
  */
 async function fetchFromKhmer24(input: MarketPriceInput): Promise<{ price: number; source: string }[]> {
   const results: { price: number; source: string }[] = [];
-  
+  let requestUrl = "";
+
   try {
     // Build search URL for Khmer24
     const searchQuery = buildKhmer24Query(input);
     const url = `https://www.khmer24.com/en/search/?q=${encodeURIComponent(searchQuery)}`;
-    
+    requestUrl = url;
+
     const response = await fetch(url, {
       headers: {
         "User-Agent": "VMS-MarketPriceBot/1.0 (Educational)",
@@ -418,20 +422,22 @@ async function fetchFromKhmer24(input: MarketPriceInput): Promise<{ price: numbe
     });
 
     if (!response.ok) {
-      // Request failure logging removed for production
+      if (process.env.NODE_ENV === 'development') {
+        globalLogger.warn("[MarketPrice] Khmer24 fetch failed", { status: response.status, statusText: response.statusText, url });
+      }
       return results;
     }
 
     const html = await response.text();
-    
+
     // Parse prices from HTML (simplified - in production, use proper HTML parser)
     const pricePattern = /\$\s*([\d,]+)/g;
     const matches = [...html.matchAll(pricePattern)];
-    
+
     for (const match of matches) {
       const priceStr = match[1].replace(/,/g, "");
       const price = parseFloat(priceStr);
-      
+
       // Filter reasonable prices (USD)
       if (price >= 100 && price <= 500000) {
         results.push({
@@ -441,8 +447,13 @@ async function fetchFromKhmer24(input: MarketPriceInput): Promise<{ price: numbe
       }
     }
   } catch (error) {
-    // Fetch failure logging removed for production
-    void error; // Mark error as used to prevent unused variable warning
+    if (process.env.NODE_ENV === 'development') {
+      globalLogger.error(
+        "[MarketPrice] Khmer24 fetch error",
+        error instanceof Error ? error : { error: String(error) },
+        { url: requestUrl }
+      );
+    }
   }
 
   return results;
@@ -453,11 +464,11 @@ async function fetchFromKhmer24(input: MarketPriceInput): Promise<{ price: numbe
  */
 function buildKhmer24Query(input: MarketPriceInput): string {
   const parts: string[] = [input.brand, input.model];
-  
+
   if (input.year) {
     parts.push(input.year.toString());
   }
-  
+
   if (input.category === "Cars") {
     parts.push("car", "vehicle");
   } else if (input.category === "Motorcycles") {
@@ -465,7 +476,7 @@ function buildKhmer24Query(input: MarketPriceInput): string {
   } else if (input.category === "Tuk Tuk") {
     parts.push("tuk", "tuktuk", "remork");
   }
-  
+
   return parts.join(" ");
 }
 
@@ -493,20 +504,20 @@ function calculatePriceRanges(
 
   // Extract unique sources
   const sources = [...new Set(priceData.map((p) => p.source))];
-  
+
   // Sort prices for percentile calculation
   const prices = priceData.map((p) => p.price).sort((a, b) => a - b);
-  
+
   // Remove outliers using IQR method
   const cleanedPrices = removeOutliers(prices);
-  
+
   // Calculate percentiles
   const sampleCount = cleanedPrices.length;
-  
+
   let priceLow: number | null = null;
   let priceMedian: number | null = null;
   let priceHigh: number | null = null;
-  
+
   if (sampleCount > 0) {
     priceLow = Math.round(percentile(cleanedPrices, 25));
     priceMedian = Math.round(percentile(cleanedPrices, 50));
@@ -570,12 +581,16 @@ function calculatePriceRanges(
  */
 function calculateVariance(prices: number[]): number | null {
   if (prices.length < 2) return null;
-  
-  const mean = prices.reduce((sum, price) => sum + price, 0) / prices.length;
-  const squaredDiffs = prices.map((price) => Math.pow(price - mean, 2));
-  const sumSquaredDiffs = squaredDiffs.reduce((sum, diff) => sum + diff, 0);
-  
-  return sumSquaredDiffs / prices.length;
+
+  // Optimized single-pass variance calculation with Bessel's correction (n-1)
+  let sum = 0;
+  let sumSq = 0;
+  for (const x of prices) {
+    sum += x;
+    sumSq += x * x;
+  }
+  const n = prices.length;
+  return (sumSq - (sum * sum) / n) / (n - 1);
 }
 
 /**
@@ -589,10 +604,10 @@ function removeOutliers(prices: number[]): number[] {
   const q1 = percentile(prices, 25);
   const q3 = percentile(prices, 75);
   const iqr = q3 - q1;
-  
+
   const lowerBound = q1 - 1.5 * iqr;
   const upperBound = q3 + 1.5 * iqr;
-  
+
   return prices.filter((price) => price >= lowerBound && price <= upperBound);
 }
 
@@ -601,15 +616,15 @@ function removeOutliers(prices: number[]): number[] {
  */
 function percentile(sortedArr: number[], p: number): number {
   if (sortedArr.length === 0) return 0;
-  
+
   const index = (p / 100) * (sortedArr.length - 1);
   const lower = Math.floor(index);
   const upper = Math.ceil(index);
-  
+
   if (lower === upper) {
     return sortedArr[lower];
   }
-  
+
   const weight = index - lower;
   return sortedArr[lower] * (1 - weight) + sortedArr[upper] * weight;
 }
@@ -723,7 +738,7 @@ export function estimatePriceRuleBased(
   };
 
   const basePrice = basePrices[category] || 25000;
-  
+
   // Brand multipliers - cars
   const carBrandMultipliers: Record<string, number> = {
     // Luxury brands
@@ -757,7 +772,7 @@ export function estimatePriceRuleBased(
   const multipliers = isMotorcycle ? motoBrandMultipliers : carBrandMultipliers;
 
   const multiplier = multipliers[brand] || multipliers["Other"] || 1.0;
-  
+
   // Year depreciation
   let yearMultiplier = 1.0;
   if (year) {
@@ -781,4 +796,3 @@ export function estimatePriceRuleBased(
     cacheHit: false,
   };
 }
-

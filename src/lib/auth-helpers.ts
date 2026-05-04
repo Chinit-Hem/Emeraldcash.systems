@@ -1,13 +1,13 @@
 /**
  * Auth Helpers - Simplified authentication utilities for API routes
- * 
+ *
  * @module auth-helpers
  */
 
-import { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { requireSession, type SessionPayload } from "./auth";
 
-import type { Role } from "./types";
+import { DEFAULT_ROLE_PERMISSIONS, type Permission, type Role } from "./types";
 
 /**
  * Auth result type
@@ -19,6 +19,48 @@ export interface AuthResult {
     role: Role;
   };
   error?: string;
+}
+
+export type PermissionResult =
+  | { session: SessionPayload; response: null }
+  | { session: null; response: NextResponse };
+
+function createAuthResponse(error: string, status: 401 | 403): NextResponse {
+  return NextResponse.json(
+    { ok: false, success: false, error },
+    {
+      status,
+      headers: {
+        "Cache-Control": "no-store",
+        "X-Content-Type-Options": "nosniff",
+      },
+    }
+  );
+}
+
+export function hasAppPermission(role: Role | undefined, permission: Permission): boolean {
+  if (!role) return false;
+  return DEFAULT_ROLE_PERMISSIONS[role]?.includes(permission) ?? false;
+}
+
+export function requirePermission(req: NextRequest, permission: Permission): PermissionResult {
+  const session = getSession(req);
+
+  if (!session) {
+    return {
+      session: null,
+      response: createAuthResponse("Unauthorized - Please log in", 401),
+    };
+  }
+
+  if (!hasAppPermission(session.role, permission)) {
+    return {
+      session: null,
+      response: createAuthResponse("Forbidden - Insufficient permissions", 403),
+    };
+  }
+
+  return { session, response: null };
 }
 
 /**
@@ -72,18 +114,18 @@ export async function requireRole(
   req?: NextRequest
 ): Promise<AuthResult> {
   const auth = await requireAuth(req);
-  
+
   if (!auth.success) {
     return auth;
   }
-  
+
   if (!auth.user || !allowedRoles.includes(auth.user.role)) {
     return {
       success: false,
       error: "Insufficient permissions",
     };
   }
-  
+
   return auth;
 }
 
@@ -113,16 +155,14 @@ export function isAdmin(session: SessionPayload | null): boolean {
  * Check if user can manage LMS content (Admin only)
  */
 export function canManageLMS(session: SessionPayload | null): boolean {
-  // Only Admin can manage LMS content (create, edit, delete)
-  return session?.role === "Admin";
+  return hasAppPermission(session?.role, "lms:manage");
 }
 
 /**
  * Check if user can access LMS (Admin or Staff)
  */
 export function canAccessLMS(session: SessionPayload | null): boolean {
-  // Both Admin and Staff can access LMS for learning
-  return session?.role === "Admin" || session?.role === "Staff";
+  return hasAppPermission(session?.role, "lms:view");
 }
 
 /**

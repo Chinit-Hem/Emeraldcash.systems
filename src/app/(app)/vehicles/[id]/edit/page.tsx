@@ -34,14 +34,14 @@ function EditVehicleInner() {
   const router = useRouter();
   const params = useParams<{ id: string }>();
   const rawId = typeof params?.id === "string" ? params.id : "";
-  
+
   // Check if the ID is a reserved word (e.g., someone navigated to /vehicles/edit)
   const isReservedId = RESERVED_IDS.includes(rawId.toLowerCase());
   const id = isReservedId ? "" : rawId;
-  
+
   const user = useAuthUser();
   const { success, error: showError } = useToast();
-  
+
   const isAdmin = user?.role === "Admin";
   const userRole = user?.role || "Viewer";
 
@@ -54,66 +54,44 @@ function EditVehicleInner() {
 
   // Hooks
   const { vehicle, loading, error: fetchError, refetch } = useVehicle(id);
-  
-  // Local state - initialize with vehicle when it loads
+
+  // Local state (simplified - no localVehicle sync delay)
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
-  const [localVehicle, setLocalVehicle] = useState<Vehicle | null>(null);
-  
-// Sync local vehicle with fetched vehicle when it changes (on initial load or refetch)
-  // Using setTimeout to defer state update and avoid the setState-in-effect warning
-  const hasInitializedRef = React.useRef(false);
-  useEffect(() => {
-    if (vehicle && !hasInitializedRef.current) {
-      hasInitializedRef.current = true;
-      // Defer state update to next tick to avoid synchronous setState in effect
-      const timeoutId = setTimeout(() => {
-        setLocalVehicle(vehicle);
-      }, 0);
-      return () => clearTimeout(timeoutId);
-    }
-  }, [vehicle]);
 
-  // Derived value for safe access - handles both null cases
-  const currentVehicle = localVehicle ?? vehicle ?? null;
+  // Use vehicle directly - no local sync delay
+  const currentVehicle = vehicle;
+
   // Fetch all vehicles for navigation - use high limit to ensure current vehicle is included
   const { vehicles: allVehicles } = useVehicles({ noCache: true, limit: 10000 });
-  
+
   // Calculate next and previous vehicles
   const { nextVehicle, prevVehicle } = useMemo(() => {
     if (!allVehicles || allVehicles.length === 0 || !vehicle) {
       return { nextVehicle: null, prevVehicle: null };
     }
-    
+
     const currentIndex = allVehicles.findIndex(v => v.VehicleId === vehicle.VehicleId);
     if (currentIndex === -1) {
       return { nextVehicle: null, prevVehicle: null };
     }
-    
+
     const next = currentIndex < allVehicles.length - 1 ? allVehicles[currentIndex + 1] : null;
     const prev = currentIndex > 0 ? allVehicles[currentIndex - 1] : null;
-    
+
     return { nextVehicle: next, prevVehicle: prev };
   }, [allVehicles, vehicle]);
 
   const handleUpdateSuccess = useCallback((updatedVehicle?: Vehicle) => {
     success("Vehicle updated successfully");
-    
-    // If we have the updated vehicle with new image, update local state immediately
-    // so the form shows the new Cloudinary image before navigating
-    if (updatedVehicle) {
-      // Update local vehicle state so the form shows the new image immediately
-      setLocalVehicle(updatedVehicle);
-    }
-    
-    // Refresh vehicle data to ensure cache is updated
+
+    // Refresh vehicle data (hook handles optimistic update)
     refetch();
-    
-    // Navigate to view page after a short delay to show the success
-    setTimeout(() => {
-      router.push(`/vehicles/${id}/view`);
-    }, 1200); // Slightly longer delay so user can see the new image
+
+    // Navigate to view immediately (no delay needed)
+    router.push(`/vehicles/${id}/view`);
   }, [success, router, id, refetch]);
+
 
   const handleUpdateError = useCallback((err: string) => {
     showError(err);
@@ -140,44 +118,37 @@ function EditVehicleInner() {
     handleDeleteError
   );
 
-  // Handle form submission
+  // Handle form submission (simplified)
   const handleSubmit = useCallback(async (formData: Partial<Vehicle>, image?: File | null) => {
-    const vehicleToUpdate = currentVehicle;
-    if (!vehicleToUpdate) return;
-    
+    if (!currentVehicle) return;
+
     setSubmitError(null);
-    
-    // IMPORTANT: Exclude Image from formData to prevent data URLs from being saved
-    // The image will be handled separately via the imageFile parameter
-    const { Image: _Image, ...dataWithoutImage } = formData;
-    
-    const updateData = {
-      ...dataWithoutImage,
-      VehicleId: vehicleToUpdate.VehicleId,
-    };
-    
-    // Extract File from image if it's a File, otherwise pass null
+
+    // Exclude Image data URL
+    const { Image: _Image, ...data } = formData;
+
     const imageFile = image instanceof File ? image : undefined;
-    // Call updateVehicle with all required parameters: vehicleId, data, originalVehicle, imageFile
+
     await updateVehicle(
-      vehicleToUpdate.VehicleId,
-      updateData,
-      vehicleToUpdate,
+      currentVehicle.VehicleId,
+      data,
+      currentVehicle,
       imageFile
     );
-  }, [localVehicle, vehicle, updateVehicle]);
+  }, [currentVehicle, updateVehicle]);
+
 
   // Handle cancel with unsaved changes warning
   const handleCancel = useCallback(() => {
     router.push(`/vehicles/${id}/view`);
   }, [router, id]);
 
-  // Handle delete
+  // Handle delete (simplified)
   const handleDelete = useCallback(async () => {
-const vehicleToDelete = currentVehicle;
-    if (!vehicleToDelete) return;
-    await deleteVehicle(vehicleToDelete);
-}, [currentVehicle, deleteVehicle]);
+    if (!currentVehicle) return;
+    await deleteVehicle(currentVehicle);
+  }, [currentVehicle, deleteVehicle]);
+
 
   // Clear submit error
   const handleClearError = useCallback(() => {
@@ -236,7 +207,8 @@ const vehicleToDelete = currentVehicle;
   }
 
   // Not found state
-  if (!localVehicle && !vehicle) {
+  if (!vehicle) {
+
     return (
       <div className="p-4 sm:p-6 lg:p-8">
         <div className="max-w-3xl mx-auto">
@@ -305,12 +277,13 @@ const vehicleToDelete = currentVehicle;
               <GlassButton onClick={() => router.push("/vehicles")} variant="secondary">
                 Back to List
               </GlassButton>
-              <GlassButton 
-                onClick={() => vehicleForView && router.push(`/vehicles/${vehicleForView.VehicleId}/view`)} 
+              <GlassButton
+                onClick={() => vehicle && router.push(`/vehicles/${vehicle.VehicleId}/view`)}
                 variant="primary"
               >
                 View Vehicle
               </GlassButton>
+
             </div>
           </GlassCard>
         </div>
@@ -322,8 +295,8 @@ const vehicleToDelete = currentVehicle;
     <div className="p-4 sm:p-6 lg:p-8 pb-24 md:pb-8">
       <div className="max-w-6xl mx-auto">
         {/* Main Glass Card */}
-        <GlassCard 
-          variant="elevated" 
+        <GlassCard
+          variant="elevated"
           className="overflow-hidden bg-gradient-to-br from-white/70 via-emerald-50/10 via-red-50/5 via-emerald-50/10 to-white/70 dark:from-white/8 dark:via-emerald-500/10 dark:via-red-900/5 dark:via-emerald-900/8 dark:to-white/8 border-white/20 dark:border-white/10"
         >
           {/* Header */}
@@ -350,7 +323,7 @@ const vehicleToDelete = currentVehicle;
                   </svg>
                   Back
                 </GlassButton>
-                
+
                 {/* Navigation Buttons */}
                 <div className="flex items-center gap-1 border-l border-gray-300 dark:border-gray-600 pl-3">
                   <GlassButton
@@ -408,7 +381,7 @@ const vehicleToDelete = currentVehicle;
                   </p>
                 </div>
               </div>
-              
+
 {/* Status Chips */}
               <div className="flex items-center gap-2 flex-wrap">
                 {currentVehicle?.Category && (
@@ -433,13 +406,14 @@ const vehicleToDelete = currentVehicle;
 {/* Form Content */}
           <div className="p-4 md:p-6 space-y-6">
             <BasicVehicleForm
-              vehicle={currentVehicle as Vehicle}
+              vehicle={vehicle}
               onSubmit={handleSubmit}
               onCancel={handleCancel}
               isSubmitting={isUpdating}
               submitError={submitError}
               onClearError={handleClearError}
             />
+
           </div>
 
           {/* Delete Section - Only for Admin */}
@@ -484,13 +458,14 @@ const vehicleToDelete = currentVehicle;
 
 {/* Delete Confirmation Modal */}
       <ConfirmDeleteModal
-        vehicle={currentVehicle as Vehicle}
+        vehicle={vehicle}
         isOpen={isDeleteModalOpen}
         isDeleting={isDeleting}
         userRole={userRole}
         onConfirm={handleDelete}
         onCancel={() => setIsDeleteModalOpen(false)}
       />
+
     </div>
   );
 }

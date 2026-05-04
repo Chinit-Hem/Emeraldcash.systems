@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requirePermission } from '@/lib/auth-helpers';
 import { smsService } from '@/services/SmsService';
 
 function isTimeoutError(error: string | undefined): boolean {
@@ -10,8 +11,11 @@ function resolveStatus(error: string | undefined): number {
   return isTimeoutError(error) ? 504 : 500;
 }
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
+    const auth = requirePermission(req, 'sms:view');
+    if (auth.response) return auth.response;
+
     const result = await smsService.getTransfers();
     if (!result.success) {
       return NextResponse.json(
@@ -33,6 +37,9 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   try {
+    const auth = requirePermission(req, 'sms:transfer');
+    if (auth.response) return auth.response;
+
     const { assetId, senderId, receiverId, location, remark } = await req.json();
     const result = await smsService.createTransfer({
       assetId,
@@ -58,4 +65,3 @@ export async function POST(req: NextRequest) {
     );
   }
 }
-

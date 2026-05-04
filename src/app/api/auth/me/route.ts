@@ -12,13 +12,8 @@ export async function GET(req: NextRequest) {
     const ip = getClientIp(req.headers);
     const userAgent = getClientUserAgent(req.headers);
     const sessionCookie = req.cookies.get("session")?.value;
-    
-    // Debug logging for mobile
+
     const isMobile = /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(userAgent);
-    if (isMobile) {
-      console.log(`[API_ME] Request from mobile: ${userAgent.substring(0, 50)}...`);
-      console.log(`[API_ME] Session cookie exists: ${!!sessionCookie}`);
-    }
 
     if (!sessionCookie) {
       const res = NextResponse.json({ ok: false, error: "No session cookie" });
@@ -36,11 +31,11 @@ export async function GET(req: NextRequest) {
 
     // Get full user profile from database
     const userProfile = await getUserByUsername(session.username);
-    
+
     const res = NextResponse.json({
       ok: true,
-      user: { 
-        username: session.username, 
+      user: {
+        username: session.username,
         role: session.role,
         full_name: userProfile?.full_name || null,
         email: userProfile?.email || null,
@@ -51,16 +46,16 @@ export async function GET(req: NextRequest) {
         updated_at: userProfile?.updated_at || null,
       },
     });
-    
+
     // Add debug headers for mobile
     if (isMobile) {
       res.headers.set("X-Auth-Debug", "success");
       res.headers.set("X-User-Role", session.role);
     }
-    
+
     return res;
   } catch (err) {
-    console.error("[API_ME] Error:", err);
+    void err;
     const res = NextResponse.json({ ok: false, error: "Internal error" });
     res.headers.set("X-Auth-Debug", "error");
     return res;

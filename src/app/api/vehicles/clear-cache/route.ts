@@ -1,9 +1,10 @@
+import { requirePermission } from "@/lib/auth-helpers";
 import { clearCachedVehicles } from "../_cache";
 import { NextRequest, NextResponse } from "next/server";
 
-export async function POST(_req: NextRequest) {
-  // Optional: Add authentication if needed
-  // For now, allow anyone to clear cache (since it's just cache invalidation)
+export async function POST(req: NextRequest) {
+  const auth = requirePermission(req, "vehicles:edit");
+  if (auth.response) return auth.response;
 
   clearCachedVehicles();
   return NextResponse.json({ ok: true, message: "Cache cleared" });

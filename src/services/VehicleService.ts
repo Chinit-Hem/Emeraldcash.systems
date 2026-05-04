@@ -1,9 +1,9 @@
 /**
  * Vehicle Service Class - OOAD Implementation
- * 
+ *
  * Extends BaseService to provide vehicle-specific CRUD operations.
  * Implements the Service Layer pattern with Singleton for vehicle operations.
- * 
+ *
  * Features:
  * - Extends BaseService for common CRUD operations
  * - Case-insensitive ILIKE filtering with TRIM() for accuracy
@@ -11,7 +11,7 @@
  * - SSR-ready POJO returns (no serialization errors)
  * - Comprehensive error handling with structured error objects
  * - Price calculation utilities (40% and 70% depreciation)
- * 
+ *
  * @module VehicleService
  */
 
@@ -155,25 +155,25 @@ export class VehicleService extends BaseService<VehicleEntity, VehicleDB> {
     // Normalize category with plural/singular handling
     const normalizedCategory = VehicleService.normalizeCategory(dbVehicle.category);
 
-    // Use thumbnail_url if available and is a valid URL (pre-computed Google Drive thumbnail), 
+    // Use thumbnail_url if available and is a valid URL (pre-computed Google Drive thumbnail),
     // otherwise fall back to image_id (which may be a Cloudinary public_id or Drive ID)
     // Check if thumbnail_url is a valid URL (starts with http://, https://, or data:)
     const thumbnailUrl = dbVehicle.thumbnail_url?.trim();
     const hasValidThumbnail = thumbnailUrl && (
-      thumbnailUrl.startsWith("http://") || 
-      thumbnailUrl.startsWith("https://") || 
+      thumbnailUrl.startsWith("http://") ||
+      thumbnailUrl.startsWith("https://") ||
       thumbnailUrl.startsWith("data:")
     );
-    
+
     // Synchronous normalization - just check if image_id is already a URL
     const imageId = dbVehicle.image_id?.trim() || "";
     const isImageIdUrl = imageId && (
-      imageId.startsWith("http://") || 
-      imageId.startsWith("https://") || 
+      imageId.startsWith("http://") ||
+      imageId.startsWith("https://") ||
       imageId.startsWith("data:")
     );
-    const normalizedImage = hasValidThumbnail 
-      ? thumbnailUrl 
+    const normalizedImage = hasValidThumbnail
+      ? thumbnailUrl
       : (isImageIdUrl ? imageId : imageId); // Return as-is, Cloudinary URL generation happens elsewhere
 
     // Create entity with both BaseEntity and Vehicle properties
@@ -182,7 +182,7 @@ export class VehicleService extends BaseService<VehicleEntity, VehicleDB> {
       id: String(dbVehicle.id),
       createdAt: dbVehicle.created_at || new Date().toISOString(),
       updatedAt: dbVehicle.updated_at || new Date().toISOString(),
-      
+
       // Vehicle properties
       VehicleId: String(dbVehicle.id),
       Category: normalizedCategory,
@@ -243,21 +243,21 @@ conditions.push(`(NULLIF(TRIM(COALESCE(image_id, '')), '') IS NULL AND NULLIF(TR
       params.push(searchPattern);
       _paramIndex++;
     }
-    
+
     // Brand filter with ILIKE - removed TRIM for performance
     if (filters?.brand) {
       conditions.push(`brand ILIKE $${_paramIndex}`);
       params.push(VehicleService.buildIlikePattern(filters.brand));
       _paramIndex++;
     }
-    
+
     // Model filter with ILIKE - removed TRIM for performance
     if (filters?.model) {
       conditions.push(`model ILIKE $${_paramIndex}`);
       params.push(VehicleService.buildIlikePattern(filters.model));
       _paramIndex++;
     }
-    
+
     // Condition filter - exact match (fastest)
     if (filters?.condition) {
       const normalizedCondition = VehicleService.normalizeCondition(filters.condition);
@@ -265,54 +265,54 @@ conditions.push(`(NULLIF(TRIM(COALESCE(image_id, '')), '') IS NULL AND NULLIF(TR
       params.push(normalizedCondition);
       _paramIndex++;
     }
-    
+
     // Color filter with ILIKE - removed TRIM for performance
     if (filters?.color) {
       conditions.push(`color ILIKE $${_paramIndex}`);
       params.push(VehicleService.buildIlikePattern(filters.color));
       _paramIndex++;
     }
-    
+
     // Body type filter with ILIKE - removed TRIM for performance
     if (filters?.bodyType) {
       conditions.push(`body_type ILIKE $${_paramIndex}`);
       params.push(VehicleService.buildIlikePattern(filters.bodyType));
       _paramIndex++;
     }
-    
+
     // Tax type filter with ILIKE - removed TRIM for performance
     if (filters?.taxType) {
       conditions.push(`tax_type ILIKE $${_paramIndex}`);
       params.push(VehicleService.buildIlikePattern(filters.taxType));
       _paramIndex++;
     }
-    
+
     // Year range filters - use exact comparisons (index-friendly)
     if (filters?.yearMin !== undefined && filters.yearMin !== null) {
       conditions.push(`year >= $${_paramIndex}`);
       params.push(filters.yearMin);
       _paramIndex++;
     }
-    
+
     if (filters?.yearMax !== undefined && filters.yearMax !== null) {
       conditions.push(`year <= $${_paramIndex}`);
       params.push(filters.yearMax);
       _paramIndex++;
     }
-    
+
     // Price range filters - use exact comparisons (index-friendly)
     if (filters?.priceMin !== undefined && filters.priceMin !== null) {
       conditions.push(`market_price >= $${_paramIndex}`);
       params.push(filters.priceMin);
       _paramIndex++;
     }
-    
+
     if (filters?.priceMax !== undefined && filters.priceMax !== null) {
       conditions.push(`market_price <= $${_paramIndex}`);
       params.push(filters.priceMax);
       _paramIndex++;
     }
-    
+
     // Global search term - OPTIMIZED: search only brand and model (removed plate and category)
     // This reduces the number of OR conditions and improves performance
     if (filters?.searchTerm) {
@@ -327,6 +327,18 @@ conditions.push(`(NULLIF(TRIM(COALESCE(image_id, '')), '') IS NULL AND NULLIF(TR
     let query = baseQuery;
     if (conditions.length > 0) {
       query += ` WHERE ${conditions.join(" AND ")}`;
+    }
+
+    // Append LIMIT and OFFSET outside the WHERE clause
+    if (filters.limit) {
+      query += ` LIMIT $${_paramIndex}`;
+      params.push(filters.limit);
+      _paramIndex++;
+    }
+    if (filters.offset) {
+      query += ` OFFSET $${_paramIndex}`;
+      params.push(filters.offset);
+      _paramIndex++;
     }
 
     return { query, params, _paramIndex };
@@ -357,42 +369,42 @@ conditions.push(`(NULLIF(TRIM(COALESCE(image_id, '')), '') IS NULL AND NULLIF(TR
    */
   public static normalizeCategory(category: string): string {
     if (!category) return "Other";
-    
+
     const lower = category.toLowerCase().trim();
-    
+
     // Use includes() for partial matching - more flexible than exact match
     // Order matters: check more specific patterns first
-    
+
     // Car variations: "car", "cars", "mycar", "supercar", etc.
     if (lower.includes("car")) {
       return "Cars";
     }
-    
+
     // Motorcycle variations: "motorcycle", "motorcycles", "motor", etc.
     if (lower.includes("motor")) {
       return "Motorcycles";
     }
-    
+
     // Tuk Tuk variations: "tuk", "tuktuk", "tuk-tuk", etc.
     if (lower.includes("tuk")) {
       return "TukTuks";
     }
-    
+
     // Truck variations: "truck", "trucks", "pickuptruck", etc.
     if (lower.includes("truck")) {
       return "Trucks";
     }
-    
+
     // Van variations: "van", "vans", "minivan", etc.
     if (lower.includes("van")) {
       return "Vans";
     }
-    
+
     // Bus variations: "bus", "buses", "minibus", etc.
     if (lower.includes("bus")) {
       return "Buses";
     }
-    
+
     // Default: return trimmed original with first letter capitalized
     return category.trim().charAt(0).toUpperCase() + category.trim().slice(1).toLowerCase();
   }
@@ -458,7 +470,7 @@ conditions.push(`(NULLIF(TRIM(COALESCE(image_id, '')), '') IS NULL AND NULLIF(TR
    */
   private generateModelKey(vehicle: VehicleDB | VehicleEntity): string {
     let brand: string, model: string, year: number | null, condition: string, color: string;
-    
+
     if ('brand' in vehicle && 'model' in vehicle) {
       const vdb = vehicle as VehicleDB;
       brand = vdb.brand || '';
@@ -474,7 +486,7 @@ conditions.push(`(NULLIF(TRIM(COALESCE(image_id, '')), '') IS NULL AND NULLIF(TR
       condition = vent.Condition || '';
       color = vent.Color || '';
     }
-    
+
     const parts = [
       brand.replace(/[^a-zA-Z0-9]/g, '').toLowerCase(),
       model.replace(/[^a-zA-Z0-9]/g, '').toLowerCase(),
@@ -493,23 +505,25 @@ conditions.push(`(NULLIF(TRIM(COALESCE(image_id, '')), '') IS NULL AND NULLIF(TR
     const startTime = Date.now();
     try {
       let query = `
-        SELECT 
+        SELECT
           si.*,
-          CASE 
-            WHEN si.quantity <= si.min_stock THEN true 
-            ELSE false 
+          CASE
+            WHEN si.quantity <= si.min_stock THEN true
+            ELSE false
           END as is_low_stock
         FROM stock_items si
       `;
 
+      const params: (string | number | null)[] = [];
       if (modelKey) {
-        const safeModelKey = modelKey.replace(/'/g, "''");
-        query += ` WHERE si.model_key = '${safeModelKey}'`;
+        query += ` WHERE si.model_key = $1`;
+        // The 'params' array is already defined in the outer scope,
+        // so we should push to it, not re-declare.
+        params.push(modelKey);
       }
 
       query += ` ORDER BY si.brand, si.model, si.location`;
-
-      const result = await dbManager.executeUnsafe<StockItem>(query);
+      const result = await dbManager.executeUnsafe<StockItem>(query, params);
 
 
       return {
@@ -535,7 +549,7 @@ conditions.push(`(NULLIF(TRIM(COALESCE(image_id, '')), '') IS NULL AND NULLIF(TR
     const startTime = Date.now();
     try {
       const query = `
-        SELECT 
+        SELECT
           COUNT(*) as total_items,
           SUM(quantity) as total_quantity,
           SUM(CASE WHEN quantity <= min_stock THEN 1 ELSE 0 END)::integer as low_stock_items,
@@ -544,13 +558,18 @@ conditions.push(`(NULLIF(TRIM(COALESCE(image_id, '')), '') IS NULL AND NULLIF(TR
       `;
 
       const result = await dbManager.executeUnsafe<Record<string, unknown>>(query);
-      const row = (result[0] || {}) as any;
+      const row = (result[0] || {}) as {
+        total_items?: string | number;
+        total_quantity?: string | number;
+        low_stock_items?: string | number;
+        locations?: string[];
+      };
 
 
       const stats: StockStats = {
-        total_items: parseInt(row.total_items) || 0,
-        total_quantity: parseInt(row.total_quantity) || 0,
-        low_stock_items: parseInt(row.low_stock_items) || 0,
+        total_items: parseInt(String(row.total_items ?? 0)) || 0,
+        total_quantity: parseInt(String(row.total_quantity ?? 0)) || 0,
+        low_stock_items: parseInt(String(row.low_stock_items ?? 0)) || 0,
         locations: row.locations || [],
       };
 
@@ -589,11 +608,11 @@ conditions.push(`(NULLIF(TRIM(COALESCE(image_id, '')), '') IS NULL AND NULLIF(TR
 
         // Lock the stock item row
         const itemQuery = await sql`
-          SELECT * FROM stock_items 
-          WHERE model_key = ${modelKey} AND location = ${location} 
+          SELECT * FROM stock_items
+          WHERE model_key = ${modelKey} AND location = ${location}
           FOR UPDATE
         `;
-        
+
         let stockItem: StockItemTable | undefined;
         if (itemQuery.length > 0) {
           stockItem = itemQuery[0] as unknown as StockItemTable;
@@ -604,7 +623,7 @@ conditions.push(`(NULLIF(TRIM(COALESCE(image_id, '')), '') IS NULL AND NULLIF(TR
             VALUES (${modelKey}, ${location}, ${Math.max(0, delta)}, ${Math.max(0, delta)}, 0, 5, '', '', null, '', '')
             ON CONFLICT (model_key, location) DO NOTHING
           `;
-          
+
           // Get the newly created item
           const newItemQuery = await sql`
             SELECT * FROM stock_items WHERE model_key = ${modelKey} AND location = ${location}
@@ -619,10 +638,10 @@ conditions.push(`(NULLIF(TRIM(COALESCE(image_id, '')), '') IS NULL AND NULLIF(TR
         // Update quantity
         const newQuantity = Math.max(0, stockItem.quantity + delta);
         const newAvailable = Math.max(0, stockItem.available + delta);
-        
+
         await sql`
-          UPDATE stock_items 
-          SET 
+          UPDATE stock_items
+          SET
             quantity = ${newQuantity},
             available = ${newAvailable},
             last_updated = NOW(),
@@ -793,7 +812,7 @@ conditions.push(`(NULLIF(TRIM(COALESCE(image_id, '')), '') IS NULL AND NULLIF(TR
     const result = await this.getById(id);
     if (!result.success) {
       console.info(`[VehicleService] Vehicle ID ${id} NOT FOUND`);
-    } else {
+    } else if (result.data) {
       console.info(`[VehicleService] Vehicle ID ${id} FOUND: ${result.data.Plate || 'N/A'}`);
     }
     if (result.success && result.data) {
@@ -814,9 +833,8 @@ conditions.push(`(NULLIF(TRIM(COALESCE(image_id, '')), '') IS NULL AND NULLIF(TR
 
     try {
       // Escape plate to prevent SQL injection
-      const escapedPlate = plate.replace(/'/g, "''");
-      const query = `SELECT * FROM ${this.tableName} WHERE plate ILIKE '${escapedPlate}'`;
-      const result = await dbManager.executeUnsafe<VehicleDB>(query);
+      const query = `SELECT * FROM ${this.tableName} WHERE plate ILIKE $1`;
+      const result = await dbManager.executeUnsafe<VehicleDB>(query, [plate]);
 
       if (result.length === 0) {
         return {
@@ -834,7 +852,7 @@ conditions.push(`(NULLIF(TRIM(COALESCE(image_id, '')), '') IS NULL AND NULLIF(TR
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Failed to fetch vehicle by plate";
       console.error("[VehicleService.getVehicleByPlate] Error:", errorMessage);
-      
+
       return {
         success: false,
         error: errorMessage,
@@ -852,7 +870,7 @@ conditions.push(`(NULLIF(TRIM(COALESCE(image_id, '')), '') IS NULL AND NULLIF(TR
   ): Promise<ServiceResult<Vehicle>> {
     // Normalize category before saving
     const normalizedCategory = VehicleService.normalizeCategory(vehicle.category);
-    
+
     const data = {
       ...vehicle,
       category: normalizedCategory,
@@ -877,7 +895,7 @@ conditions.push(`(NULLIF(TRIM(COALESCE(image_id, '')), '') IS NULL AND NULLIF(TR
     vehicle: Partial<VehicleDB>
   ): Promise<ServiceResult<Vehicle>> {
     // Normalize category if provided
-    const data = vehicle.category 
+    const data = vehicle.category
       ? { ...vehicle, category: VehicleService.normalizeCategory(vehicle.category) }
       : vehicle;
 
@@ -911,7 +929,7 @@ conditions.push(`(NULLIF(TRIM(COALESCE(image_id, '')), '') IS NULL AND NULLIF(TR
       // 🚀 FIX: Updated cache key to v8 to bust stale cache
       const cacheKey = "vehicle:stats:v8";
 
-      
+
       // Check cache unless force refresh is requested
       if (!forceRefresh) {
         const cached = await this.getFromCache<VehicleStats>(cacheKey);
@@ -936,7 +954,7 @@ conditions.push(`(NULLIF(TRIM(COALESCE(image_id, '')), '') IS NULL AND NULLIF(TR
       // 🚀 OPTIMIZED: Replace slow LIKE '%car%' with CASE WHEN + ILIKE ANY (10x faster)
       // RECOMMEND: CREATE INDEX CONCURRENTLY idx_vehicles_category_lower ON vehicles (LOWER(category));
       const query = `
-        SELECT 
+        SELECT
           COUNT(*) as total,
         COUNT(*) FILTER (WHERE category ILIKE ANY(ARRAY['%car%','car','cars'])) as cars_count,
 COUNT(*) FILTER (WHERE category ILIKE ANY(ARRAY['%motor%','motorcycle%','bike%'])) as motorcycles_count,
@@ -956,7 +974,7 @@ AVG(CASE WHEN market_price > 0 THEN market_price ELSE NULL END)::numeric as avg_
 
       console.log("[VehicleService.getVehicleStats] Executing query...");
       console.log("[VehicleService.getVehicleStats] Query:", query.substring(0, 200) + "...");
-      
+
       // Use dbManager.executeUnsafe for raw SQL queries
       let statsResult: Array<{
         total: string | number;
@@ -973,7 +991,7 @@ AVG(CASE WHEN market_price > 0 THEN market_price ELSE NULL END)::numeric as avg_
         avg_price: string | number;
         no_image_count: string | number;
       }> | null = null;
-      
+
       try {
         statsResult = await dbManager.executeUnsafe(query);
       } catch (queryError) {
@@ -987,18 +1005,18 @@ AVG(CASE WHEN market_price > 0 THEN market_price ELSE NULL END)::numeric as avg_
           avgPrice: 0,
           noImageCount: 0,
         };
-        
+
         return {
           success: true, // Return success with fallback data
           data: fallbackStats,
           meta: { durationMs: Date.now() - startTime, queryCount: 1 },
         };
       }
-      
-      // 🚀 PERF: Remove verbose logging in production
+
       if (process.env.NODE_ENV === 'development') {
+        // 🚀 PERF: Remove verbose logging in production
         console.log("[VehicleService.getVehicleStats] Raw result type:", typeof statsResult);
-        console.log("[VehicleService.getVehicleStats] Raw result isArray:", Array.isArray(statsResult));
+        console.log("[VehicleService.getVehicleStats] Raw result isArray:", Array.isArray(statsResult)); // Guarded for dev
         console.log("[VehicleService.getVehicleStats] Raw result:", JSON.stringify(statsResult).substring(0, 500));
       }
 
@@ -1026,7 +1044,7 @@ AVG(CASE WHEN market_price > 0 THEN market_price ELSE NULL END)::numeric as avg_
           avgPrice: 0,
           noImageCount: 0,
         };
-        
+
         return {
           success: true,
           data: fallbackStats,
@@ -1085,7 +1103,7 @@ AVG(CASE WHEN market_price > 0 THEN market_price ELSE NULL END)::numeric as avg_
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Failed to fetch vehicle stats";
       console.error("[VehicleService.getVehicleStats] Error:", errorMessage);
-      
+
       return {
         success: false,
         error: errorMessage,
@@ -1120,9 +1138,10 @@ AVG(CASE WHEN market_price > 0 THEN market_price ELSE NULL END)::numeric as avg_
       const query = `SELECT COUNT(*) as count, COUNT(id) as id_count FROM ${this.tableName}`;
       console.log(`[VehicleService.getVehicleStatsLite] Executing: ${query}`);
       const result = await dbManager.executeUnsafe<{ count: string | number; id_count: string | number }>(query);
-      
-      console.log(`[VehicleService.getVehicleStatsLite] Raw result:`, JSON.stringify(result[0] || {}, null, 2));
 
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`[VehicleService.getVehicleStatsLite] Raw result:`, JSON.stringify(result[0] || {}, null, 2)); // Guarded for dev
+      }
       const row = result[0] || { count: 0, id_count: 0 };
       const totalCount = parseInt(String(row.count)) || 0;
       const idCount = parseInt(String(row.id_count)) || 0;
@@ -1143,7 +1162,7 @@ AVG(CASE WHEN market_price > 0 THEN market_price ELSE NULL END)::numeric as avg_
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Failed to fetch vehicle count";
       console.error("[VehicleService.getVehicleStatsLite] Error:", errorMessage);
-      
+
       return {
         success: false,
         error: errorMessage,
@@ -1157,7 +1176,7 @@ AVG(CASE WHEN market_price > 0 THEN market_price ELSE NULL END)::numeric as avg_
    */
   public async getTotalCount(noCache = false): Promise<ServiceResult<number>> {
     const statsResult = await this.getVehicleStatsLite(noCache);
-    if (!statsResult.success) {
+    if (!statsResult.success || !statsResult.data) {
       return {
         success: false,
         error: statsResult.error,
@@ -1193,36 +1212,18 @@ AVG(CASE WHEN market_price > 0 THEN market_price ELSE NULL END)::numeric as avg_
       }
 
 
-      // Build final query with inline parameters
-      let finalQuery = query;
-      for (let i = 0; i < params.length; i++) {
-        const param = params[i];
-        const placeholder = `$${i + 1}`;
-        let replacement: string;
-        
-        if (param === null) {
-          replacement = 'NULL';
-        } else if (typeof param === 'number') {
-          replacement = String(param);
-        } else {
-          replacement = `'${String(param).replace(/'/g, "''")}'`;
-        }
-        
-        const placeholderRegex = new RegExp(placeholder.replace(/\$/g, '\\$'), 'g');
-        finalQuery = finalQuery.replace(placeholderRegex, replacement);
-      }
-
       // Add timeout to prevent hanging
       // INCREASED: 25 seconds for count with complex filters on large datasets
       const COUNT_TIMEOUT_MS = 25000;
-      
+
+      // Use dbManager.executeUnsafe with parameters directly
       const result = await Promise.race([
-        dbManager.executeUnsafe<{ count: string | number }>(finalQuery),
-        new Promise<never>((_, reject) => 
+        dbManager.executeUnsafe<{ count: string | number }>(query, params),
+        new Promise<never>((_, reject) =>
           setTimeout(() => reject(new Error('Count query timeout')), COUNT_TIMEOUT_MS)
         )
       ]);
-      
+
       const count = parseInt(String(result[0]?.count)) || 0;
 
       return {
@@ -1233,7 +1234,7 @@ AVG(CASE WHEN market_price > 0 THEN market_price ELSE NULL END)::numeric as avg_
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Failed to count vehicles with filters";
       console.error("[VehicleService.countWithFilters] Error:", errorMessage);
-      
+
       return {
         success: false,
         error: errorMessage,
@@ -1254,29 +1255,29 @@ AVG(CASE WHEN market_price > 0 THEN market_price ELSE NULL END)::numeric as avg_
       const escapedTerm = searchTerm.replace(/'/g, "''");
       const pattern = VehicleService.buildIlikePattern(escapedTerm);
       // Also search by normalized category
-      const normalizedCategory = VehicleService.normalizeCategory(searchTerm);
-      const categoryPattern = VehicleService.buildIlikePattern(normalizedCategory);
-      
+      const normalizedCategoryPattern = VehicleService.buildIlikePattern(VehicleService.normalizeCategory(searchTerm)); // This is fine as it's part of the pattern
+
       // Build the query based on whether limit is provided
       // Use inline parameters instead of $1, $2 for Neon compatibility
       let query: string;
-      
+      const queryParams: (string | number)[] = [pattern, pattern, pattern, normalizedCategoryPattern];
+
       if (limit !== undefined && limit !== null) {
         query = `
-          SELECT * FROM ${this.tableName} 
-          WHERE brand ILIKE '${pattern}' OR model ILIKE '${pattern}' OR plate ILIKE '${pattern}' OR category ILIKE '${categoryPattern}'
+          SELECT * FROM ${this.tableName}
+          WHERE brand ILIKE $1 OR model ILIKE $2 OR plate ILIKE $3 OR category ILIKE $4 -- Use parameterized query
           ORDER BY brand, model
-          LIMIT ${limit}
+          LIMIT $5 -- Use parameterized query
         `;
+        queryParams.push(limit);
       } else {
         query = `
-          SELECT * FROM ${this.tableName} 
-          WHERE brand ILIKE '${pattern}' OR model ILIKE '${pattern}' OR plate ILIKE '${pattern}' OR category ILIKE '${categoryPattern}'
+          SELECT * FROM ${this.tableName}
+          WHERE brand ILIKE $1 OR model ILIKE $2 OR plate ILIKE $3 OR category ILIKE $4 -- Use parameterized query
           ORDER BY brand, model
         `;
       }
-
-      const result = await dbManager.executeUnsafe<VehicleDB>(query);
+      const result = await dbManager.executeUnsafe<VehicleDB>(query, queryParams);
 
       return {
         success: true,
@@ -1286,7 +1287,7 @@ AVG(CASE WHEN market_price > 0 THEN market_price ELSE NULL END)::numeric as avg_
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Failed to search vehicles";
       console.error("[VehicleService.searchVehicles] Error:", errorMessage);
-      
+
       return {
         success: false,
         error: errorMessage,
@@ -1323,13 +1324,14 @@ AVG(CASE WHEN market_price > 0 THEN market_price ELSE NULL END)::numeric as avg_
         };
       }
 
-      // Build broader candidate query: each token gets its own ILIKE OR condition
+      // Build broader candidate query: each token gets its own ILIKE OR condition (parameterized)
       const tokens = searchTerm
         .trim()
         .toLowerCase()
         .split(/\s+/)
         .filter((t) => t.length >= 2);
 
+      const queryParams: string[] = []; // Changed to string[]
       if (tokens.length === 0) {
         return {
           success: true,
@@ -1338,16 +1340,11 @@ AVG(CASE WHEN market_price > 0 THEN market_price ELSE NULL END)::numeric as avg_
         };
       }
 
-      // Escape each token for SQL safety
-      const safeTokens = tokens.map((t) => t.replace(/'/g, "''"));
-
-      // Build OR conditions for each token against brand, model, plate, category
-      const tokenConditions = safeTokens
-        .map(
-          (tok) =>
-            `brand ILIKE '%${tok}%' OR model ILIKE '%${tok}%' OR plate ILIKE '%${tok}%' OR category ILIKE '%${tok}%'`
-        )
-        .join(" OR ");
+      const tokenConditions = tokens.map((_, i) => { // Dynamically build parameterized conditions
+        queryParams.push(`%${tokens[i]}%`, `%${tokens[i]}%`, `%${tokens[i]}%`, `%${tokens[i]}%`);
+        const paramOffset = i * 4;
+        return `(brand ILIKE $${paramOffset + 1} OR model ILIKE $${paramOffset + 2} OR plate ILIKE $${paramOffset + 3} OR category ILIKE $${paramOffset + 4})`;
+      }).join(" OR ");
 
       const candidateQuery = `
         SELECT * FROM ${this.tableName}
@@ -1356,7 +1353,7 @@ AVG(CASE WHEN market_price > 0 THEN market_price ELSE NULL END)::numeric as avg_
         LIMIT 200
       `;
 
-      const candidates = await dbManager.executeUnsafe<VehicleDB>(candidateQuery);
+      const candidates = await dbManager.executeUnsafe<VehicleDB>(candidateQuery, queryParams);
       const candidateVehicles = candidates.map((v) => this.toVehicle(this.toEntity(v)));
 
       // Apply fuzzy ranking on candidates

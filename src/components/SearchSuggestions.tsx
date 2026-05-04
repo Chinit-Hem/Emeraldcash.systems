@@ -64,7 +64,7 @@ export default function SearchSuggestions({
           Did you mean?
         </h3>
         <span className="text-sm text-slate-500">
-          Showing suggestions for "{searchTerm}"
+          {`Showing suggestions for "${searchTerm}"`}
         </span>
       </div>
 
@@ -129,4 +129,3 @@ export default function SearchSuggestions({
     </div>
   );
 }
-

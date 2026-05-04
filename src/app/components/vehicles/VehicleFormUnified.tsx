@@ -1,16 +1,16 @@
 /**
  * VehicleFormUnified - Master Component for All Vehicle Forms
- * 
+ *
  * A single, high-performance component that handles all vehicle form layouts
  * using the useVehicleForm hook. Supports multiple layout variants while
  * maintaining consistent validation and API service integration.
- * 
+ *
  * Layout Variants:
  * - "default": Standard grid layout (used in add/edit pages)
  * - "compact": Compact list layout (for side panels)
  * - "modal": Full modal overlay (for dashboard quick add/edit)
  * - "wizard": Step-by-step wizard (for guided entry)
- * 
+ *
  * @module VehicleFormUnified
  */
 
@@ -165,43 +165,43 @@ const ImageSection: React.FC<{
   onImageChange: (image: File | string | null) => Promise<void>;
   onRemoveImage: () => void;
   layout: VehicleFormLayout;
-}> = React.memo(({ 
-  formData, 
-  uploadedImage, 
-  imageLoading, 
-  errors, 
-  isSubmitting, 
-  onImageChange, 
+}> = React.memo(({
+  formData,
+  uploadedImage,
+  imageLoading,
+  errors,
+  isSubmitting,
+  onImageChange,
   onRemoveImage,
-  layout 
+  layout
 }) => {
   const isCompact = layout === "compact";
-  
+
   // Ensure Image is a string - handle cases where it might be an array or other type
   const imageValue = typeof formData.Image === 'string' ? formData.Image : '';
-  
+
   // Convert uploadedImage to File for ImageInput compatibility
   const handleImageChange = async (value: string | null) => {
     if (!value) {
       onRemoveImage();
       return;
     }
-    
+
     // If it's a URL (starts with http), pass it as string
     if (value.startsWith("http")) {
       await onImageChange(value);
       return;
     }
-    
+
     // If it's a data URL, we need to convert it to a File
     // For now, we'll pass it as is and let the parent handle it
     await onImageChange(value);
   };
-  
+
   return (
     <SectionCard title="Vehicle Image" icon={ICONS.image} className={isCompact ? "p-3" : undefined}>
       <ImageInput
-        value={imageValue || null}
+        value={imageValue || undefined}
         onChange={handleImageChange}
         label={isCompact ? undefined : "Vehicle Image"}
         helperText={isCompact ? undefined : "Drag & drop, click to upload, paste URL, or Ctrl+V"}
@@ -247,7 +247,7 @@ const BasicInfoSection: React.FC<{
 }) => {
   const isCompact = layout === "compact";
   const gridCols = isCompact ? "grid-cols-1" : "grid-cols-1 md:grid-cols-2";
-  
+
   return (
     <SectionCard title="Basic Information" icon={ICONS.basic} className={isCompact ? "p-3" : undefined}>
       <div className={`grid ${gridCols} gap-4`}>
@@ -330,7 +330,7 @@ const SpecsSection: React.FC<{
 }) => {
   const isCompact = layout === "compact";
   const gridCols = isCompact ? "grid-cols-1" : "grid-cols-1 md:grid-cols-2";
-  
+
   return (
     <SectionCard title="Specifications" icon={ICONS.specs} className={isCompact ? "p-3" : undefined}>
       <div className={`grid ${gridCols} gap-4`}>
@@ -406,7 +406,7 @@ const PricingSection: React.FC<{
 }) => {
   const isCompact = layout === "compact";
   const gridCols = isCompact ? "grid-cols-1" : "grid-cols-1 md:grid-cols-3";
-  
+
   return (
     <SectionCard title="Pricing" icon={ICONS.pricing} className={isCompact ? "p-3" : undefined}>
       <div className={`grid ${gridCols} gap-4`}>
@@ -474,7 +474,7 @@ export function VehicleFormUnified({
     validateOnBlur: true,
     validateOnChange: false,
   }), [vehicle, onSubmit]);
-  
+
 
   const {
     formData,
@@ -503,7 +503,7 @@ export function VehicleFormUnified({
     { value: 'LOST', label: 'Lost / Missing' },
     { value: 'RETURNED', label: 'Returned' },
   ]);
-  
+
   // Load users for dropdowns
   useEffect(() => {
     const loadUsers = async () => {
@@ -515,24 +515,24 @@ export function VehicleFormUnified({
     loadUsers();
   }, []);
 
-  const userOptions = useMemo(() => 
+  const userOptions = useMemo(() =>
     users.map(user => ({ value: String(user.staff_id || 0), label: `${user.full_name} (${user.username})` }))
   , [users]);
 
-  
+
   // Clear external error when form changes
   React.useEffect(() => {
     if (externalError && onClearExternalError) {
       onClearExternalError();
     }
   }, [formData, uploadedImage, externalError, onClearExternalError]);
-  
+
   // Determine which sections to show
   const showImage = !disabledSections.includes("image");
   const showBasic = !disabledSections.includes("basic");
   const showSpecs = !disabledSections.includes("specs");
   const showPricing = !disabledSections.includes("pricing");
-  
+
   // Wizard step content
   const getWizardStepContent = () => {
     switch (wizardStep) {
@@ -591,7 +591,7 @@ export function VehicleFormUnified({
         return null;
     }
   };
-  
+
   // Render form content based on layout
   const renderFormContent = () => {
     if (layout === "wizard") {
@@ -618,13 +618,13 @@ export function VehicleFormUnified({
               </React.Fragment>
             ))}
           </div>
-          
+
           {/* Step Content */}
           {getWizardStepContent()}
-          
+
           {/* Custom children/special fields */}
           {children}
-          
+
           {/* Wizard Navigation */}
           <div className="flex justify-between pt-4 border-t border-gray-200 dark:border-gray-700">
             <GlassButton
@@ -661,7 +661,7 @@ export function VehicleFormUnified({
         </div>
       );
     }
-    
+
     // Default, compact, and modal layouts
     return (
       <div className="space-y-6">
@@ -709,10 +709,10 @@ export function VehicleFormUnified({
             layout={layout}
           />
         )}
-        
+
         {/* Custom children/special fields */}
         {children}
-        
+
         {/* Submit Error */}
         {(externalError || Object.keys(errors).some(k => errors[k])) && (
           <div className="p-4 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
@@ -724,7 +724,7 @@ export function VehicleFormUnified({
             </p>
           </div>
         )}
-        
+
         {/* Actions */}
         <div className={`flex ${layout === "compact" ? "flex-col" : "flex-col sm:flex-row"} gap-3 ${layout !== "modal" ? "sticky bottom-0 -mx-4 md:-mx-6 -mb-4 md:-mb-6 mt-8 bg-white/95 dark:bg-gray-900/95 backdrop-blur-xl border-t border-gray-200 dark:border-gray-800 p-4 md:p-6 rounded-b-2xl" : ""}`}>
           <GlassButton
@@ -758,7 +758,7 @@ export function VehicleFormUnified({
       </div>
     );
   };
-  
+
   // Modal wrapper
   if (layout === "modal") {
     return (
@@ -785,7 +785,7 @@ export function VehicleFormUnified({
                 </button>
               </div>
             </div>
-            
+
             {/* Form Content */}
             <form onSubmit={handleSubmit} className={`p-4 md:p-6 ${className}`}>
               {renderFormContent()}
@@ -795,7 +795,7 @@ export function VehicleFormUnified({
       </div>
     );
   }
-  
+
   // Standard form (default, compact, wizard)
   return (
     <form onSubmit={handleSubmit} className={className}>

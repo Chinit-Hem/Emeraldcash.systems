@@ -12,6 +12,12 @@ type ErrorBoundaryState = {
   error: Error | null;
 };
 
+type FormDebuggerWindow = Window & {
+  formDebugger?: {
+    captureError?: (error: Error, context?: Record<string, unknown>) => void;
+  };
+};
+
 export default class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
   constructor(props: ErrorBoundaryProps) {
     super(props);
@@ -29,10 +35,10 @@ componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
       componentStack: errorInfo.componentStack,
       url: typeof window !== 'undefined' ? window.location.href : 'server'
     });
-    
+
     // Enhanced formDebugger capture
     if (typeof window !== 'undefined') {
-      const formDebuggerContext = (window as any).formDebugger;
+      const formDebuggerContext = (window as FormDebuggerWindow).formDebugger;
       if (formDebuggerContext?.captureError) {
         formDebuggerContext.captureError(error, {
           componentStack: errorInfo.componentStack,

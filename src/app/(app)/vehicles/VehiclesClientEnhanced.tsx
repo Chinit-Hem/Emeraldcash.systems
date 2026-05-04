@@ -105,15 +105,15 @@ const DEFAULT_ITEMS_PER_PAGE = 10;
 
 function TukTukIcon({ className }: { className?: string }) {
   return (
-    <svg 
-      xmlns="http://www.w3.org/2000/svg" 
-      width="24" 
-      height="24" 
-      viewBox="0 0 24 24" 
-      fill="none" 
-      stroke="currentColor" 
-      strokeWidth="2" 
-      strokeLinecap="round" 
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="24"
+      height="24"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
       strokeLinejoin="round"
       className={className}
     >
@@ -129,26 +129,26 @@ function TukTukIcon({ className }: { className?: string }) {
 // UI Components
 // ============================================================================
 
-function NeuCard({ 
-  children, 
-  className, 
-  hover = true, 
-  active = false, 
-  onClick 
-}: { 
-  children: React.ReactNode; 
-  className?: string; 
-  hover?: boolean; 
-  active?: boolean; 
+function NeuCard({
+  children,
+  className,
+  hover = true,
+  active = false,
+  onClick
+}: {
+  children: React.ReactNode;
+  className?: string;
+  hover?: boolean;
+  active?: boolean;
   onClick?: () => void;
 }) {
   return (
-    <div 
-      onClick={onClick} 
+    <div
+      onClick={onClick}
       className={cn(
-        "bg-gradient-to-br from-[#f8fafc] to-[#f1f5f9] rounded-2xl transition-all duration-300",
-        active 
-          ? "shadow-[inset_4px_4px_8px_#cbd5e1,inset_-4px_-4px_8px_#ffffff]" 
+"bg-gradient-to-br from-[#f8fafc] to-[#f1f5f9] rounded-2xl transition-all duration-150",
+        active
+          ? "shadow-[inset_4px_4px_8px_#cbd5e1,inset_-4px_-4px_8px_#ffffff]"
           : "shadow-[6px_6px_12px_#cbd5e1,-6px_-6px_12px_#ffffff]",
         hover && !active && "hover:shadow-[8px_8px_16px_#cbd5e1,-8px_-8px_16px_#ffffff] hover:-translate-y-0.5",
         className
@@ -159,31 +159,31 @@ function NeuCard({
   );
 }
 
-function NeuButton({ 
-  children, 
-  onClick, 
-  variant = "default", 
-  size = "md", 
-  className, 
-  disabled = false, 
+function NeuButton({
+  children,
+  onClick,
+  variant = "default",
+  size = "md",
+  className,
+  disabled = false,
   icon: Icon,
   loading = false
-}: { 
-  children: React.ReactNode; 
-  onClick?: () => void; 
-  variant?: "default" | "primary" | "danger" | "ghost" | "secondary"; 
-  size?: "sm" | "md" | "lg"; 
-  className?: string; 
-  disabled?: boolean; 
+}: {
+  children: React.ReactNode;
+  onClick?: () => void;
+  variant?: "default" | "primary" | "danger" | "ghost" | "secondary";
+  size?: "sm" | "md" | "lg";
+  className?: string;
+  disabled?: boolean;
   icon?: React.ComponentType<{ className?: string }>;
   loading?: boolean;
 }) {
-  const sizeClasses = { 
-    sm: "px-3 py-2 text-xs", 
-    md: "px-4 py-2.5 text-sm", 
-    lg: "px-6 py-3 text-base" 
+  const sizeClasses = {
+    sm: "px-3 py-2 text-xs",
+    md: "px-4 py-2.5 text-sm",
+    lg: "px-6 py-3 text-base"
   };
-  
+
   const variantClasses = {
     default: cn(
       "bg-gradient-to-br from-[#f8fafc] to-[#f1f5f9] text-slate-600",
@@ -223,13 +223,13 @@ function NeuButton({
   };
 
   return (
-    <button 
-      onClick={onClick} 
-      disabled={disabled || loading} 
+    <button
+      onClick={onClick}
+      disabled={disabled || loading}
       className={cn(
         "flex items-center justify-center gap-2 rounded-xl font-medium",
-        sizeClasses[size], 
-        variantClasses[variant], 
+        sizeClasses[size],
+        variantClasses[variant],
         (disabled || loading) && "opacity-50 cursor-not-allowed",
         className
       )}
@@ -242,29 +242,29 @@ function NeuButton({
   );
 }
 
-function NeuInput({ 
-  value, 
-  onChange, 
-  placeholder, 
-  type = "text", 
-  icon: Icon, 
-  className 
-}: { 
-  value: string; 
-  onChange: (value: string) => void; 
-  placeholder?: string; 
-  type?: string; 
-  icon?: React.ComponentType<{ className?: string }>; 
+function NeuInput({
+  value,
+  onChange,
+  placeholder,
+  type = "text",
+  icon: Icon,
+  className
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+  type?: string;
+  icon?: React.ComponentType<{ className?: string }>;
   className?: string;
 }) {
   return (
     <div className={cn("relative", className)}>
       {Icon && <Icon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />}
-      <input 
-        type={type} 
-        value={value} 
-        onChange={(e) => onChange(e.target.value)} 
-        placeholder={placeholder} 
+      <input
+        type={type}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
         className={cn(
           "w-full bg-white rounded-2xl transition-all duration-200",
           "shadow-[4px_4px_8px_#e2e8f0,-4px_-4px_8px_#ffffff]",
@@ -272,7 +272,7 @@ function NeuInput({
           "focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500/40",
           "text-slate-700 placeholder-slate-400 outline-none",
           Icon ? "pl-12 pr-4 py-3" : "px-4 py-3"
-        )} 
+        )}
       />
     </div>
   );
@@ -280,11 +280,11 @@ function NeuInput({
 
 function AnimatedCounter({ value, duration = 1000 }: { value: number; duration?: number }) {
   const [displayValue, setDisplayValue] = useState(0);
-  
+
   useEffect(() => {
     let startTime: number;
     let animationFrame: number;
-    
+
     const animate = (currentTime: number) => {
       if (!startTime) startTime = currentTime;
       const progress = Math.min((currentTime - startTime) / duration, 1);
@@ -292,11 +292,11 @@ function AnimatedCounter({ value, duration = 1000 }: { value: number; duration?:
       setDisplayValue(Math.floor(easeOutQuart * value));
       if (progress < 1) animationFrame = requestAnimationFrame(animate);
     };
-    
+
     animationFrame = requestAnimationFrame(animate);
     return () => cancelAnimationFrame(animationFrame);
   }, [value, duration]);
-  
+
   return <span>{displayValue.toLocaleString()}</span>;
 }
 
@@ -304,90 +304,90 @@ function AnimatedCounter({ value, duration = 1000 }: { value: number; duration?:
 // Quick Filter Card Component
 // ============================================================================
 
-function QuickFilterCard({ 
-  active, 
-  onClick, 
-  icon: Icon, 
-  label, 
-  count, 
-  color, 
-  index = 0 
-}: { 
-  active: boolean; 
-  onClick: () => void; 
-  icon: React.ComponentType<{ className?: string }>; 
-  label: string; 
-  count: number; 
-  color: "emerald" | "blue" | "purple" | "orange" | "slate"; 
+function QuickFilterCard({
+  active,
+  onClick,
+  icon: Icon,
+  label,
+  count,
+  color,
+  index = 0
+}: {
+  active: boolean;
+  onClick: () => void;
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+  count: number;
+  color: "emerald" | "blue" | "purple" | "orange" | "slate";
   index?: number;
 }) {
   const [isHovered, setIsHovered] = useState(false);
   const [isPressed, setIsPressed] = useState(false);
-  
+
   const colorClasses = {
-    emerald: { 
-      gradient: "from-emerald-500 via-emerald-600 to-emerald-700", 
-      bg: "bg-emerald-500", 
-      light: "bg-emerald-100", 
-      text: "text-emerald-700", 
-      shadow: "shadow-emerald-500/30", 
+    emerald: {
+      gradient: "from-emerald-500 via-emerald-600 to-emerald-700",
+      bg: "bg-emerald-500",
+      light: "bg-emerald-100",
+      text: "text-emerald-700",
+      shadow: "shadow-emerald-500/30",
       glow: "shadow-emerald-500/50",
       ring: "ring-emerald-200"
     },
-    blue: { 
-      gradient: "from-blue-500 via-blue-600 to-blue-700", 
-      bg: "bg-blue-500", 
-      light: "bg-blue-100", 
-      text: "text-blue-700", 
-      shadow: "shadow-blue-500/30", 
+    blue: {
+      gradient: "from-blue-500 via-blue-600 to-blue-700",
+      bg: "bg-blue-500",
+      light: "bg-blue-100",
+      text: "text-blue-700",
+      shadow: "shadow-blue-500/30",
       glow: "shadow-blue-500/50",
       ring: "ring-blue-200"
     },
-    purple: { 
-      gradient: "from-purple-500 via-purple-600 to-purple-700", 
-      bg: "bg-purple-500", 
-      light: "bg-purple-100", 
-      text: "text-purple-700", 
-      shadow: "shadow-purple-500/30", 
+    purple: {
+      gradient: "from-purple-500 via-purple-600 to-purple-700",
+      bg: "bg-purple-500",
+      light: "bg-purple-100",
+      text: "text-purple-700",
+      shadow: "shadow-purple-500/30",
       glow: "shadow-purple-500/50",
       ring: "ring-purple-200"
     },
-    orange: { 
-      gradient: "from-orange-500 via-orange-600 to-orange-700", 
-      bg: "bg-orange-500", 
-      light: "bg-orange-100", 
-      text: "text-orange-700", 
-      shadow: "shadow-orange-500/30", 
+    orange: {
+      gradient: "from-orange-500 via-orange-600 to-orange-700",
+      bg: "bg-orange-500",
+      light: "bg-orange-100",
+      text: "text-orange-700",
+      shadow: "shadow-orange-500/30",
       glow: "shadow-orange-500/50",
       ring: "ring-orange-200"
     },
-    slate: { 
-      gradient: "from-slate-500 via-slate-600 to-slate-700", 
-      bg: "bg-slate-500", 
-      light: "bg-slate-100", 
-      text: "text-slate-700", 
-      shadow: "shadow-slate-500/30", 
+    slate: {
+      gradient: "from-slate-500 via-slate-600 to-slate-700",
+      bg: "bg-slate-500",
+      light: "bg-slate-100",
+      text: "text-slate-700",
+      shadow: "shadow-slate-500/30",
       glow: "shadow-slate-500/50",
       ring: "ring-slate-200"
     },
   };
-  
+
   const colors = colorClasses[color];
 
   return (
-    <button 
-      onClick={onClick} 
-      onMouseEnter={() => setIsHovered(true)} 
-      onMouseLeave={() => { setIsHovered(false); setIsPressed(false); }} 
-      onMouseDown={() => setIsPressed(true)} 
-      onMouseUp={() => setIsPressed(false)} 
+    <button
+      onClick={onClick}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => { setIsHovered(false); setIsPressed(false); }}
+      onMouseDown={() => setIsPressed(true)}
+      onMouseUp={() => setIsPressed(false)}
       className={cn(
         "group relative flex flex-col items-start gap-3 p-5 rounded-2xl transition-all duration-500 w-full overflow-hidden border backdrop-blur-xl",
-        active 
-          ? cn("bg-gradient-to-br text-white border-white/20", colors.gradient, colors.shadow, "shadow-lg scale-[1.02]") 
+        active
+          ? cn("bg-gradient-to-br text-white border-white/20", colors.gradient, colors.shadow, "shadow-lg scale-[1.02]")
           : cn("bg-white/80 border-white/60 hover:bg-white/95 hover:shadow-xl hover:shadow-slate-200/50 hover:scale-[1.02] hover:-translate-y-1 shadow-[0_4px_20px_rgba(0,0,0,0.05)]"),
         isPressed && "scale-[0.98] transition-transform duration-150"
-      )} 
+      )}
       style={{ animationDelay: `${index * 100}ms` }}
     >
       <div className={cn(
@@ -395,34 +395,34 @@ function QuickFilterCard({
         active ? "opacity-100" : "group-hover:opacity-100",
         "bg-gradient-to-br from-white/10 to-transparent"
       )} />
-      
+
       <div className="relative flex items-center justify-between w-full">
-        <div className={cn(
-          "flex items-center justify-center w-12 h-12 rounded-xl transition-all duration-300",
-          active 
-            ? "bg-white/20 shadow-inner" 
+<div className={cn(
+          "flex items-center justify-center w-12 h-12 rounded-xl transition-all duration-150",
+          active
+            ? "bg-white/20 shadow-inner"
             : cn("bg-gradient-to-br shadow-md", colors.light, "group-hover:shadow-lg group-hover:scale-110")
         )}>
-          <Icon className={cn("w-6 h-6 transition-all duration-300", active ? "text-white" : colors.text)} />
+          {Icon && <Icon className="w-6 h-6 transition-all duration-150" />}
         </div>
         {active && <CheckCircle2 className="w-5 h-5 text-white/80" />}
       </div>
-      
+
       <div className="relative w-full text-left">
         <div className={cn(
-          "text-3xl font-bold tracking-tight transition-all duration-300",
+"text-3xl font-bold tracking-tight transition-all duration-150",
           active ? "text-white" : "text-slate-800"
         )}>
           <AnimatedCounter value={count} duration={800 + index * 100} />
         </div>
         <div className={cn(
-          "text-sm font-medium transition-all duration-300",
+"text-sm font-medium transition-all duration-150",
           active ? "text-white/80" : "text-slate-500"
         )}>
           {label}
         </div>
       </div>
-      
+
       <div className={cn(
         "absolute -inset-px rounded-2xl opacity-0 transition-opacity duration-500 pointer-events-none",
         isHovered && !active && colors.glow,
@@ -436,12 +436,12 @@ function QuickFilterCard({
 // View Toggle Component
 // ============================================================================
 
-function ViewToggle({ 
-  view, 
+function ViewToggle({
+  view,
   onChange,
   t
-}: { 
-  view: ViewMode; 
+}: {
+  view: ViewMode;
   onChange: (view: ViewMode) => void;
   t: ReturnType<typeof useTranslation>["t"];
 }) {
@@ -479,11 +479,11 @@ function ViewToggle({
 // Totals Toggle Component
 // ============================================================================
 
-function TotalsToggle({ 
-  mode, 
-  onChange 
-}: { 
-  mode: TotalsMode; 
+function TotalsToggle({
+  mode,
+  onChange
+}: {
+  mode: TotalsMode;
   onChange: (mode: TotalsMode) => void;
 }) {
   return (
@@ -494,13 +494,13 @@ function TotalsToggle({
       <button
         onClick={() => onChange(mode === "all" ? "filtered" : "all")}
         className={cn(
-          "relative w-12 h-6 rounded-full transition-colors duration-300 shadow-[inset_2px_2px_4px_#cbd5e1,inset_-2px_-2px_4px_#ffffff]",
+"relative w-12 h-6 rounded-full transition-colors duration-150 shadow-[inset_2px_2px_4px_#cbd5e1,inset_-2px_-2px_4px_#ffffff]",
           mode === "filtered" ? "bg-emerald-500" : "bg-slate-200"
         )}
       >
         <span
           className={cn(
-            "absolute top-1 left-1 w-4 h-4 bg-white rounded-full shadow-md transition-transform duration-300",
+"absolute top-1 left-1 w-4 h-4 bg-white rounded-full shadow-md transition-transform duration-150",
             mode === "filtered" ? "translate-x-6" : "translate-x-0"
           )}
         />
@@ -516,21 +516,21 @@ function TotalsToggle({
 // Filter Tag Component
 // ============================================================================
 
-function FilterTag({ 
-  label, 
-  value, 
-  onRemove 
-}: { 
-  label: string; 
-  value: string; 
+function FilterTag({
+  label,
+  value,
+  onRemove
+}: {
+  label: string;
+  value: string;
   onRemove: () => void;
 }) {
   return (
     <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-50 text-emerald-700 text-xs font-medium border border-emerald-100 shadow-sm">
       <span className="text-emerald-500">{label}:</span>
       <span className="font-semibold">{value}</span>
-      <button 
-        onClick={onRemove} 
+      <button
+        onClick={onRemove}
         className="ml-1 p-0.5 rounded-full hover:bg-emerald-200 text-emerald-600 hover:text-emerald-800 transition-colors"
       >
         <X className="w-3 h-3" />
@@ -543,15 +543,15 @@ function FilterTag({
 // Action Button Component
 // ============================================================================
 
-function ActionButton({ 
-  onClick, 
-  icon: Icon, 
-  label, 
+function ActionButton({
+  onClick,
+  icon: Icon,
+  label,
   variant = "default"
-}: { 
-  onClick: (e: React.MouseEvent) => void; 
-  icon: React.ComponentType<{ className?: string }>; 
-  label: string; 
+}: {
+  onClick: (e: React.MouseEvent) => void;
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
   variant?: "default" | "edit" | "delete";
 }) {
   const variantClasses = {
@@ -560,8 +560,9 @@ function ActionButton({
     delete: "text-slate-500 hover:text-red-600 hover:ring-red-200"
   };
 
-  return (
+return (
     <button
+      title={label}
       onClick={(e) => {
         e.stopPropagation();
         onClick(e);
@@ -586,16 +587,16 @@ function ActionButton({
 // Vehicle Card Component (Grid View)
 // ============================================================================
 
-function VehicleCard({ 
-  vehicle, 
-  isAdmin, 
-  onView, 
-  onEdit, 
+function VehicleCard({
+  vehicle,
+  isAdmin,
+  onView,
+  onEdit,
   onDelete,
   getImageUrl,
   t
-}: { 
-  vehicle: Vehicle; 
+}: {
+  vehicle: Vehicle;
   isAdmin: boolean;
   onView: (id: string) => void;
   onEdit: (id: string) => void;
@@ -619,13 +620,13 @@ function VehicleCard({
 
   const imageUrl = getImageUrl(vehicle.Image);
 
-  return (
-    <div className="group bg-white rounded-2xl shadow-[0_4px_20px_rgba(0,0,0,0.08)] hover:shadow-[0_8px_30px_rgba(0,0,0,0.12)] transition-all duration-300 overflow-hidden border border-slate-100 hover:border-emerald-200">
+return (
+    <div className="group bg-white rounded-2xl shadow-[0_4px_20px_rgba(0,0,0,0.08)] hover:shadow-[0_8px_30px_rgba(0,0,0,0.12)] transition-all duration-150 overflow-hidden border border-slate-100 hover:border-emerald-200">
       {/* Image */}
       <div className="relative aspect-[4/3] overflow-hidden bg-slate-100">
 {imageUrl ? (
-            <img 
-              src={imageUrl} 
+            <img
+              src={imageUrl}
               alt={`${vehicle.Brand} ${vehicle.Model}`}
               className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
               onError={(e) => {
@@ -634,7 +635,7 @@ function VehicleCard({
               }}
             />
           ) : (
-            <img 
+            <img
               src="/placeholder-car.svg"
               alt="No image"
               className="w-full h-full object-cover opacity-20"
@@ -689,7 +690,7 @@ function VehicleCard({
           {vehicle.Color && (
             <div className="flex items-center gap-2 text-slate-600">
               <span className="text-slate-400">{t.color}:</span>
-              <span 
+              <span
                 className="w-4 h-4 rounded-full border border-slate-200"
                 style={{ backgroundColor: vehicle.Color.toLowerCase() }}
               />
@@ -706,23 +707,23 @@ function VehicleCard({
 
         {/* Actions */}
         <div className="flex items-center gap-2 pt-3 border-t border-slate-100">
-          <ActionButton 
-            onClick={() => onView(vehicle.VehicleId)} 
-            icon={Eye} 
-            label={t.view} 
+          <ActionButton
+            onClick={() => onView(vehicle.VehicleId)}
+            icon={Eye}
+            label={t.view}
           />
           {isAdmin && (
             <>
-              <ActionButton 
-                onClick={() => onEdit(vehicle.VehicleId)} 
-                icon={Pen} 
-                label={t.edit} 
+              <ActionButton
+                onClick={() => onEdit(vehicle.VehicleId)}
+                icon={Pen}
+                label={t.edit}
                 variant="edit"
               />
-              <ActionButton 
-                onClick={() => onDelete(vehicle)} 
-                icon={Trash2} 
-                label={t.delete} 
+              <ActionButton
+                onClick={() => onDelete(vehicle)}
+                icon={Trash2}
+                label={t.delete}
                 variant="delete"
               />
             </>
@@ -742,8 +743,8 @@ function LoadingSkeleton({ view }: { view: ViewMode }) {
     return (
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
         {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
-          <div 
-            key={i} 
+          <div
+            key={i}
             className="bg-white rounded-2xl shadow-[0_4px_20px_rgba(0,0,0,0.08)] overflow-hidden border border-slate-100"
           >
             <div className="aspect-[4/3] bg-slate-200 animate-pulse" />
@@ -792,7 +793,7 @@ export default function VehiclesClientEnhanced() {
   // ==========================================================================
   // State Management
   // ==========================================================================
-  
+
   const [viewMode, setViewMode] = useState<ViewMode>("list");
   const [totalsMode, setTotalsMode] = useState<TotalsMode>("all");
   const [currentPage, setCurrentPage] = useState(1);
@@ -800,7 +801,7 @@ export default function VehiclesClientEnhanced() {
   const [lastSync, setLastSync] = useState<Date>(new Date());
   const [showColumnMenu, setShowColumnMenu] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
-  
+
   // Filter state
   const [filters, setFilters] = useState<FilterState>({
     search: "",
@@ -894,25 +895,25 @@ export default function VehiclesClientEnhanced() {
   // Data Fetching
   // ==========================================================================
 
-  // Convert quick filter to category parameter for server-side filtering
-  const categoryFilter = useMemo(() => {
-    if (!quickFilter) return undefined;
+// OPTIMIZATION: Always load ALL data at once (2000 limit covers most deployments)
+  // Then filter locally for instant quick filter switching - no server round-trip!
+  const { vehicles, meta, loading, error, refresh, isValidating } = useVehiclesNeon({
+    limit: 2000,
+    refreshInterval: 0,
+  });
+
+  // Convert quick filter to category - LOCAL filtering only for instant response!
+  // This avoids server fetches when switching categories
+const categoryFilter = useMemo(() => {
+    if (!quickFilter) return null;
     // Map quick filter values to category names that match the database
     switch (quickFilter) {
-case "cars": return "Cars";
-case "motorcycles": return "Motorcycles";
-case "tuktuks": return "TukTuks";
+      case "cars": return "Cars";
+      case "motorcycles": return "Motorcycles";
+      case "tuktuks": return "TukTuks";
       default: return undefined;
     }
   }, [quickFilter]);
-
-  const { vehicles, meta, loading, error, refresh, isValidating } = useVehiclesNeon({
-    // Keep a high limit even when quick category filters are active so counts and pagination
-    // reflect the full matching dataset (e.g. Cars > 100).
-    limit: 2000,
-    category: categoryFilter,
-    refreshInterval: 0,
-  });
 
   const { stats, loading: statsLoading } = useVehicleStats(30000); // 30s refresh
 
@@ -996,11 +997,11 @@ case "tuktuks": return "TukTuks";
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [showColumnMenu]);
-  
+
   // ==========================================================================
   // Helper Functions
   // ==========================================================================
-  
+
   const normalizeCategory = useCallback((cat: string | undefined): string => {
     return cat?.toLowerCase().trim() || "";
   }, []);
@@ -1066,7 +1067,7 @@ const isTukTukCategory = useCallback((cat: string | undefined): boolean => {
     }
 
     const groups = new Map<string, Vehicle[]>();
-    
+
     vehicles.forEach(vehicle => {
       const key = getGroupKey(vehicle, groupBy);
       if (!groups.has(key)) {
@@ -1098,28 +1099,28 @@ const isTukTukCategory = useCallback((cat: string | undefined): boolean => {
 
   const filteredVehicles = useMemo(() => {
     if (!vehicles) return [];
-    
+
     let result = [...vehicles];
-    
+
     // Apply quick filter
     if (quickFilter) {
       switch (quickFilter) {
-        case "cars": 
-          result = result.filter(v => isCarCategory(v.Category)); 
+        case "cars":
+          result = result.filter(v => isCarCategory(v.Category));
           break;
-        case "motorcycles": 
-          result = result.filter(v => isMotorcycleCategory(v.Category)); 
+        case "motorcycles":
+          result = result.filter(v => isMotorcycleCategory(v.Category));
           break;
-        case "tuktuks": 
-          result = result.filter(v => isTukTukCategory(v.Category)); 
+        case "tuktuks":
+          result = result.filter(v => isTukTukCategory(v.Category));
           break;
       }
     }
-    
+
     // Apply advanced filters
     if (filters.search) {
       const searchTerms = filters.search.toLowerCase().trim().split(/\s+/).filter(term => term.length > 0);
-      
+
       if (searchTerms.length > 0) {
         result = result.filter(v => {
           // Create a searchable string from all vehicle fields
@@ -1134,73 +1135,73 @@ const isTukTukCategory = useCallback((cat: string | undefined): boolean => {
             v.BodyType,
             v.TaxType
           ].filter(Boolean).join(' ').toLowerCase();
-          
+
           // ALL search terms must match somewhere in the vehicle data
           return searchTerms.every(term => searchableText.includes(term));
         });
       }
     }
-    
+
     if (filters.category && filters.category !== "all") {
       result = result.filter(v => v.Category?.toLowerCase() === filters.category.toLowerCase());
     }
-    
+
     if (filters.condition && filters.condition !== "all") {
       result = result.filter(v => v.Condition?.toLowerCase() === filters.condition.toLowerCase());
     }
-    
+
     if (filters.brand) {
       result = result.filter(v => v.Brand?.toLowerCase().includes(filters.brand.toLowerCase()));
     }
-    
+
     if (filters.model) {
       result = result.filter(v => v.Model?.toLowerCase().includes(filters.model.toLowerCase()));
     }
-    
+
     if (filters.year) {
       result = result.filter(v => v.Year?.toString().includes(filters.year));
     }
-    
+
     if (filters.plate) {
       result = result.filter(v => v.Plate?.toLowerCase().includes(filters.plate.toLowerCase()));
     }
-    
+
     if (filters.minPrice) {
       const minPrice = parseFloat(filters.minPrice);
       if (!isNaN(minPrice)) {
         result = result.filter(v => (v.PriceNew || 0) >= minPrice);
       }
     }
-    
+
     if (filters.maxPrice) {
       const maxPrice = parseFloat(filters.maxPrice);
       if (!isNaN(maxPrice)) {
         result = result.filter(v => (v.PriceNew || 0) <= maxPrice);
       }
     }
-    
+
     if (filters.taxType) {
       result = result.filter(v => v.TaxType?.toLowerCase().includes(filters.taxType.toLowerCase()));
     }
-    
+
     // Apply image filter
     if (filters.hasImage === 'no') {
       result = result.filter(v => !v.Image || v.Image === '');
     }
-    
+
     // Apply sorting
     result.sort((a, b) => {
       const aVal = a[sortField];
       const bVal = b[sortField];
-      
+
       if (aVal === null || aVal === undefined) return sortDirection === "asc" ? -1 : 1;
       if (bVal === null || bVal === undefined) return sortDirection === "asc" ? 1 : -1;
-      
+
       if (aVal < bVal) return sortDirection === "asc" ? -1 : 1;
       if (aVal > bVal) return sortDirection === "asc" ? 1 : -1;
       return 0;
     });
-    
+
     return result;
   }, [vehicles, quickFilter, filters, sortField, sortDirection, isCarCategory, isMotorcycleCategory, isTukTukCategory]);
 
@@ -1270,7 +1271,7 @@ const isTukTukCategory = useCallback((cat: string | undefined): boolean => {
   }, [sortField]);
 
   const toggleColumn = (key: ColumnKey) => {
-    setVisibleColumns(prev => 
+    setVisibleColumns(prev =>
       prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]
     );
   };
@@ -1295,7 +1296,7 @@ const isTukTukCategory = useCallback((cat: string | undefined): boolean => {
   };
 
   const hasActiveFilters = () => {
-    return filters.search || filters.brand || filters.model || filters.year || 
+    return filters.search || filters.brand || filters.model || filters.year ||
            filters.plate || filters.minPrice || filters.maxPrice || filters.taxType ||
            filters.hasImage ||
            (filters.category && filters.category !== "all") ||
@@ -1325,22 +1326,22 @@ const isTukTukCategory = useCallback((cat: string | undefined): boolean => {
   // ==========================================================================
   // Image URL Helper
   // ==========================================================================
-  
+
 const getVehicleImageUrl = useCallback((imageValue: string | undefined): string | null => {
     if (!imageValue?.trim()) {
       return '/placeholder-car.svg';
     }
-    
+
     const trimmed = imageValue.trim();
     if (process.env.NODE_ENV === 'development') {
       console.debug('[Image]', trimmed.substring(0, 50) + '...');
     }
-    
+
     // Full URL (Cloudinary/Drive)
     if (trimmed.match(/^https?:\/\//) || trimmed.startsWith('data:')) {
       return trimmed;
     }
-    
+
     // Drive ID
     const driveFileId = extractDriveFileId(trimmed);
     if (driveFileId) {
@@ -1350,13 +1351,13 @@ const getVehicleImageUrl = useCallback((imageValue: string | undefined): string 
       }
       return thumbUrl;
     }
-    
+
     // Cloudinary public ID (path format)
     if (/^[a-z0-9\-_\/]+$/.test(trimmed)) {
       const cloud = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME || 'demo';
       return `https://res.cloudinary.com/${cloud}/image/upload/w400,h300,c_fill/${trimmed}`;
     }
-    
+
     if (process.env.NODE_ENV === 'development') {
       console.warn('[Image] Unknown format:', trimmed);
     }
@@ -1368,30 +1369,30 @@ const getVehicleImageUrl = useCallback((imageValue: string | undefined): string 
   // ==========================================================================
 
   const getSortIcon = (field: ColumnKey) => {
-    const fieldMapping: Record<ColumnKey, keyof Vehicle | null> = { 
-      id: "VehicleId", 
-      image: null, 
-      category: "Category", 
-      brand: "Brand", 
-      model: "Model", 
-      year: "Year", 
-      plate: "Plate", 
+    const fieldMapping: Record<ColumnKey, keyof Vehicle | null> = {
+      id: "VehicleId",
+      image: null,
+      category: "Category",
+      brand: "Brand",
+      model: "Model",
+      year: "Year",
+      plate: "Plate",
       priceNew: "PriceNew",
       price40: "Price40",
       price70: "Price70",
       taxType: "TaxType",
       bodyType: "BodyType",
       color: "Color",
-      condition: "Condition", 
-      actions: null 
+      condition: "Condition",
+      actions: null
     };
-    
+
     const vehicleField = fieldMapping[field];
     if (!vehicleField || sortField !== vehicleField) {
       return <ArrowUpDown className="w-3 h-3 text-slate-400" />;
     }
-    return sortDirection === "asc" ? 
-      <ArrowUp className="w-3 h-3 text-emerald-500" /> : 
+    return sortDirection === "asc" ?
+      <ArrowUp className="w-3 h-3 text-emerald-500" /> :
       <ArrowDown className="w-3 h-3 text-emerald-500" />;
   };
 
@@ -1437,7 +1438,7 @@ const getVehicleImageUrl = useCallback((imageValue: string | undefined): string 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-slate-100 to-slate-200 p-4 sm:p-6 lg:p-8">
       <div className="max-w-[1600px] mx-auto space-y-6">
-        
+
         {/* Header Section */}
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
           <div>
@@ -1449,7 +1450,7 @@ const getVehicleImageUrl = useCallback((imageValue: string | undefined): string 
             </h1>
             <p className="text-slate-500 mt-2 ml-13">{t.manageTrackVehicles}</p>
           </div>
-          
+
           <div className="flex flex-wrap items-center gap-3">
             {/* Last Sync */}
             <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-white/80 shadow-[0_2px_8px_rgba(0,0,0,0.05)] border border-slate-100">
@@ -1458,26 +1459,26 @@ const getVehicleImageUrl = useCallback((imageValue: string | undefined): string 
                 Last sync: {lastSync.toLocaleTimeString()}
               </span>
             </div>
-            
+
             {/* Totals Toggle */}
             <TotalsToggle mode={totalsMode} onChange={setTotalsMode} />
-            
+
             {/* Refresh Button */}
-            <NeuButton 
-              variant="default" 
-              size="sm" 
-              onClick={handleRefresh} 
+            <NeuButton
+              variant="default"
+              size="sm"
+              onClick={handleRefresh}
               loading={isRefreshing}
               icon={RefreshCw}
             >
               Refresh
             </NeuButton>
-            
+
             {/* Add Vehicle - Admin only */}
             {isAdmin && (
-              <NeuButton 
-                variant="primary" 
-                size="sm" 
+              <NeuButton
+                variant="primary"
+                size="sm"
                 icon={Plus}
                 onClick={() => setShowAddModal(true)}
               >
@@ -1559,18 +1560,19 @@ const getVehicleImageUrl = useCallback((imageValue: string | undefined): string 
             <div className="flex flex-col lg:flex-row gap-4">
               {/* Search Input */}
               <div className="flex-1">
-                <NeuInput 
-                  value={filters.search} 
-                  onChange={(val) => setFilters(prev => ({ ...prev, search: val }))} 
-                  placeholder="t.searchByBrandModel" 
-                  icon={Search} 
+                <NeuInput
+                  value={filters.search}
+                  onChange={(val) => setFilters(prev => ({ ...prev, search: val }))}
+                  placeholder="t.searchByBrandModel"
+                  icon={Search}
                 />
               </div>
-              
+
               {/* Category Dropdown - Quick Access */}
               <div className="w-full sm:w-48">
                 <div className="relative">
-                  <select
+<select
+                    title="Filter by category"
                     value={quickFilter || filters.category}
                     onChange={(e) => {
                       const value = e.target.value;
@@ -1594,32 +1596,33 @@ const getVehicleImageUrl = useCallback((imageValue: string | undefined): string 
                   <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
                 </div>
               </div>
-              
+
               {/* Filter Controls */}
               <div className="flex flex-wrap items-center gap-3">
-                <NeuButton 
-                  variant={showFilters ? "primary" : "default"} 
-                  size="md" 
+                <NeuButton
+                  variant={showFilters ? "primary" : "default"}
+                  size="md"
                   onClick={() => setShowFilters(!showFilters)}
                   icon={Filter}
                 >
                   More Filters
                 </NeuButton>
-              
+
               {hasActiveFilters() && (
-                <NeuButton 
-                  variant="ghost" 
-                  size="md" 
+                <NeuButton
+                  variant="ghost"
+                  size="md"
                   onClick={resetFilters}
                   icon={RotateCcw}
                 >
                   Reset
                 </NeuButton>
               )}
-              
+
               {/* Group By Dropdown */}
               <div className="relative">
-                <select
+<select
+                  title="Group vehicles by"
                   value={groupBy}
                   onChange={(e) => setGroupBy(e.target.value as GroupByOption)}
                   className="w-full px-4 py-2.5 rounded-xl bg-white shadow-[4px_4px_8px_#e2e8f0,-4px_-4px_8px_#ffffff] text-slate-700 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500/30 appearance-none cursor-pointer pr-10"
@@ -1633,9 +1636,9 @@ const getVehicleImageUrl = useCallback((imageValue: string | undefined): string 
                 </select>
                 <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
               </div>
-              
+
               <ViewToggle view={viewMode} onChange={setViewMode} t={t} />
-              
+
               {/* Columns Dropdown */}
               <div className="relative" ref={columnMenuRef}>
                 <button
@@ -1653,46 +1656,46 @@ const getVehicleImageUrl = useCallback((imageValue: string | undefined): string 
                   <Columns className="w-4 h-4" />
                   Columns
                 </button>
-                
+
                 {showColumnMenu && (
                   <NeuCard className="absolute right-0 top-full mt-2 p-4 w-64 z-50" hover={false}>
                     <div className="space-y-3">
                       <div className="flex items-center justify-between pb-2 border-b border-slate-200">
                         <span className="font-semibold text-slate-700">{t.visibleColumns}</span>
-                        <button 
-                          onClick={() => setShowColumnMenu(false)} 
+                        <button
+                          onClick={() => setShowColumnMenu(false)}
                           className="text-slate-500 hover:text-slate-700"
                         >
                           <X className="w-4 h-4" />
                         </button>
                       </div>
-                      
+
                       <div className="space-y-2 max-h-64 overflow-y-auto">
                         {COLUMNS.filter(col => col.key !== "actions").map((col) => (
-                          <label 
-                            key={col.key} 
+                          <label
+                            key={col.key}
                             className="flex items-center gap-3 cursor-pointer hover:bg-slate-50 p-2 rounded-lg transition-colors"
                           >
-                            <input 
-                              type="checkbox" 
-                              checked={visibleColumns.includes(col.key)} 
-                              onChange={() => toggleColumn(col.key)} 
+                            <input
+                              type="checkbox"
+                              checked={visibleColumns.includes(col.key)}
+                              onChange={() => toggleColumn(col.key)}
                               className="rounded border-slate-300 text-emerald-500 focus:ring-emerald-500 w-4 h-4"
                             />
                             <span className="text-sm text-slate-600">{col.label}</span>
                           </label>
                         ))}
                       </div>
-                      
+
                       <div className="flex gap-2 pt-2 border-t border-slate-200">
-                        <button 
-                          onClick={() => setVisibleColumns(COLUMNS.map(c => c.key))} 
+                        <button
+                          onClick={() => setVisibleColumns(COLUMNS.map(c => c.key))}
                           className="flex-1 px-3 py-1.5 text-xs font-medium text-emerald-600 bg-emerald-50 hover:bg-emerald-100 rounded-lg transition-colors"
                         >
                           Select All
                         </button>
-                        <button 
-                          onClick={() => setVisibleColumns(["image", "brand", "model", "actions"])} 
+                        <button
+                          onClick={() => setVisibleColumns(["image", "brand", "model", "actions"])}
                           className="flex-1 px-3 py-1.5 text-xs font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors"
                         >
                           Minimal
@@ -1706,25 +1709,26 @@ const getVehicleImageUrl = useCallback((imageValue: string | undefined): string 
           </div>
 
           {/* Advanced Filters Panel */}
-          {showFilters && (
+{showFilters && (
             <div className="bg-white/90 backdrop-blur-xl rounded-2xl border border-slate-200 shadow-lg p-5 animate-in slide-in-from-top-2 duration-300">
               <div className="flex items-center justify-between mb-4">
                 <h4 className="text-sm font-semibold text-slate-700 flex items-center gap-2">
                   <Filter className="w-4 h-4 text-emerald-500" />
                   Advanced Filters
                 </h4>
-                <button 
-                  onClick={() => setShowFilters(false)} 
+                <button
+                  onClick={() => setShowFilters(false)}
                   className="text-slate-400 hover:text-slate-600"
                 >
                   <X className="w-4 h-4" />
                 </button>
               </div>
-              
+
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6 gap-4">
                 <div>
                   <label className="block text-xs font-medium text-slate-600 mb-1.5">{t.category}</label>
-                  <select
+<select
+                    title="Filter by category"
                     value={filters.category}
                     onChange={(e) => setFilters(prev => ({ ...prev, category: e.target.value }))}
                     className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500/30 transition-all"
@@ -1735,10 +1739,11 @@ const getVehicleImageUrl = useCallback((imageValue: string | undefined): string 
                     <option value="tuktuks">TukTuks</option>
                   </select>
                 </div>
-                
+
                 <div>
                   <label className="block text-xs font-medium text-slate-600 mb-1.5">{t.condition}</label>
-                  <select
+<select
+                    title="Filter by condition"
                     value={filters.condition}
                     onChange={(e) => setFilters(prev => ({ ...prev, condition: e.target.value }))}
                     className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500/30 transition-all"
@@ -1750,76 +1755,77 @@ const getVehicleImageUrl = useCallback((imageValue: string | undefined): string 
                     <option value="other">Other</option>
                   </select>
                 </div>
-                
+
                 <div>
                   <label className="block text-xs font-medium text-slate-600 mb-1.5">{t.brand}</label>
-                  <input 
-                    type="text" 
-                    value={filters.brand} 
-                    onChange={(e) => setFilters(prev => ({ ...prev, brand: e.target.value }))} 
-                    placeholder="e.g. Toyota" 
+                  <input
+                    type="text"
+                    value={filters.brand}
+                    onChange={(e) => setFilters(prev => ({ ...prev, brand: e.target.value }))}
+                    placeholder="e.g. Toyota"
                     className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-sm text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500/30 transition-all"
                   />
                 </div>
-                
+
                 <div>
                   <label className="block text-xs font-medium text-slate-600 mb-1.5">{t.model}</label>
-                  <input 
-                    type="text" 
-                    value={filters.model} 
-                    onChange={(e) => setFilters(prev => ({ ...prev, model: e.target.value }))} 
-                    placeholder="e.g. Camry" 
+                  <input
+                    type="text"
+                    value={filters.model}
+                    onChange={(e) => setFilters(prev => ({ ...prev, model: e.target.value }))}
+                    placeholder="e.g. Camry"
                     className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-sm text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500/30 transition-all"
                   />
                 </div>
-                
+
                 <div>
                   <label className="block text-xs font-medium text-slate-600 mb-1.5">{t.year}</label>
-                  <input 
-                    type="text" 
-                    value={filters.year} 
-                    onChange={(e) => setFilters(prev => ({ ...prev, year: e.target.value }))} 
-                    placeholder="e.g. 2022" 
+                  <input
+                    type="text"
+                    value={filters.year}
+                    onChange={(e) => setFilters(prev => ({ ...prev, year: e.target.value }))}
+                    placeholder="e.g. 2022"
                     className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-sm text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500/30 transition-all"
                   />
                 </div>
-                
+
                 <div>
                   <label className="block text-xs font-medium text-slate-600 mb-1.5">{t.plate}</label>
-                  <input 
-                    type="text" 
-                    value={filters.plate} 
-                    onChange={(e) => setFilters(prev => ({ ...prev, plate: e.target.value }))} 
-                    placeholder="e.g. PP-1234" 
+                  <input
+                    type="text"
+                    value={filters.plate}
+                    onChange={(e) => setFilters(prev => ({ ...prev, plate: e.target.value }))}
+                    placeholder="e.g. PP-1234"
                     className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-sm text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500/30 transition-all"
                   />
                 </div>
-                
+
                 <div>
                   <label className="block text-xs font-medium text-slate-600 mb-1.5">{t.minPrice}</label>
-                  <input 
-                    type="number" 
-                    value={filters.minPrice} 
-                    onChange={(e) => setFilters(prev => ({ ...prev, minPrice: e.target.value }))} 
-                    placeholder="0" 
+                  <input
+                    type="number"
+                    value={filters.minPrice}
+                    onChange={(e) => setFilters(prev => ({ ...prev, minPrice: e.target.value }))}
+                    placeholder="0"
                     className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-sm text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500/30 transition-all"
                   />
                 </div>
-                
+
                 <div>
                   <label className="block text-xs font-medium text-slate-600 mb-1.5">{t.maxPrice}</label>
-                  <input 
-                    type="number" 
-                    value={filters.maxPrice} 
-                    onChange={(e) => setFilters(prev => ({ ...prev, maxPrice: e.target.value }))} 
-                    placeholder="999999" 
+                  <input
+                    type="number"
+                    value={filters.maxPrice}
+                    onChange={(e) => setFilters(prev => ({ ...prev, maxPrice: e.target.value }))}
+                    placeholder="999999"
                     className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-sm text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500/30 transition-all"
                   />
                 </div>
-                
+
                 <div>
                   <label className="block text-xs font-medium text-slate-600 mb-1.5">{t.taxType}</label>
-                  <select
+<select
+                    title="Filter by tax type"
                     value={filters.taxType}
                     onChange={(e) => setFilters(prev => ({ ...prev, taxType: e.target.value }))}
                     className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500/30 transition-all"
@@ -1835,9 +1841,9 @@ const getVehicleImageUrl = useCallback((imageValue: string | undefined): string 
                 <div>
                   <label className="block text-xs font-medium text-slate-600 mb-1.5">{t.imageStatus}</label>
                   <button
-                    onClick={() => setFilters(prev => ({ 
-                      ...prev, 
-                      hasImage: prev.hasImage === 'no' ? '' : 'no' 
+                    onClick={() => setFilters(prev => ({
+                      ...prev,
+                      hasImage: prev.hasImage === 'no' ? '' : 'no'
                     }))}
                     className={cn(
                       "w-full px-3 py-2 rounded-xl text-sm font-medium transition-all duration-200 flex items-center justify-center gap-2",
@@ -1861,84 +1867,84 @@ const getVehicleImageUrl = useCallback((imageValue: string | undefined): string 
           {hasActiveFilters() && (
             <div className="flex items-center gap-2 flex-wrap">
               <span className="text-xs text-slate-500 font-medium">{t.activeFilters}:</span>
-              
+
               {filters.search && (
-                <FilterTag 
-                  label="Search" 
-                  value={filters.search} 
-                  onRemove={() => setFilters(prev => ({ ...prev, search: "" }))} 
+                <FilterTag
+                  label="Search"
+                  value={filters.search}
+                  onRemove={() => setFilters(prev => ({ ...prev, search: "" }))}
                 />
               )}
-              
+
               {quickFilter && (
-                <FilterTag 
-                  label="Category" 
-                  value={quickFilter.charAt(0).toUpperCase() + quickFilter.slice(1)} 
-                  onRemove={() => setQuickFilter(null)} 
+                <FilterTag
+                  label="Category"
+                  value={quickFilter.charAt(0).toUpperCase() + quickFilter.slice(1)}
+                  onRemove={() => setQuickFilter(null)}
                 />
               )}
-              
+
               {filters.category !== "all" && (
-                <FilterTag 
-                  label="Category" 
-                  value={filters.category} 
-                  onRemove={() => setFilters(prev => ({ ...prev, category: "all" }))} 
+                <FilterTag
+                  label="Category"
+                  value={filters.category}
+                  onRemove={() => setFilters(prev => ({ ...prev, category: "all" }))}
                 />
               )}
-              
+
               {filters.condition !== "all" && (
-                <FilterTag 
-                  label="Condition" 
-                  value={filters.condition} 
-                  onRemove={() => setFilters(prev => ({ ...prev, condition: "all" }))} 
+                <FilterTag
+                  label="Condition"
+                  value={filters.condition}
+                  onRemove={() => setFilters(prev => ({ ...prev, condition: "all" }))}
                 />
               )}
-              
+
               {filters.brand && (
-                <FilterTag 
-                  label="Brand" 
-                  value={filters.brand} 
-                  onRemove={() => setFilters(prev => ({ ...prev, brand: "" }))} 
+                <FilterTag
+                  label="Brand"
+                  value={filters.brand}
+                  onRemove={() => setFilters(prev => ({ ...prev, brand: "" }))}
                 />
               )}
-              
+
               {filters.model && (
-                <FilterTag 
-                  label="Model" 
-                  value={filters.model} 
-                  onRemove={() => setFilters(prev => ({ ...prev, model: "" }))} 
+                <FilterTag
+                  label="Model"
+                  value={filters.model}
+                  onRemove={() => setFilters(prev => ({ ...prev, model: "" }))}
                 />
               )}
-              
+
               {filters.year && (
-                <FilterTag 
-                  label="Year" 
-                  value={filters.year} 
-                  onRemove={() => setFilters(prev => ({ ...prev, year: "" }))} 
+                <FilterTag
+                  label="Year"
+                  value={filters.year}
+                  onRemove={() => setFilters(prev => ({ ...prev, year: "" }))}
                 />
               )}
-              
+
               {filters.plate && (
-                <FilterTag 
-                  label="Plate" 
-                  value={filters.plate} 
-                  onRemove={() => setFilters(prev => ({ ...prev, plate: "" }))} 
+                <FilterTag
+                  label="Plate"
+                  value={filters.plate}
+                  onRemove={() => setFilters(prev => ({ ...prev, plate: "" }))}
                 />
               )}
-              
+
               {(filters.minPrice || filters.maxPrice) && (
-                <FilterTag 
-                  label="Price" 
-                  value={`$${filters.minPrice || "0"} - $${filters.maxPrice || "∞"}`} 
-                  onRemove={() => setFilters(prev => ({ ...prev, minPrice: "", maxPrice: "" }))} 
+                <FilterTag
+                  label="Price"
+                  value={`$${filters.minPrice || "0"} - $${filters.maxPrice || "∞"}`}
+                  onRemove={() => setFilters(prev => ({ ...prev, minPrice: "", maxPrice: "" }))}
                 />
               )}
-              
+
               {filters.taxType && (
-                <FilterTag 
-                  label="Tax" 
-                  value={filters.taxType} 
-                  onRemove={() => setFilters(prev => ({ ...prev, taxType: "" }))} 
+                <FilterTag
+                  label="Tax"
+                  value={filters.taxType}
+                  onRemove={() => setFilters(prev => ({ ...prev, taxType: "" }))}
                 />
               )}
             </div>
@@ -1969,7 +1975,7 @@ const getVehicleImageUrl = useCallback((imageValue: string | undefined): string 
               </span>
             )}
           </div>
-          
+
           {viewMode === "list" && groupBy === "none" && (
             <div className="text-sm text-slate-500">
               Sorted by {sortField} ({sortDirection})
@@ -2056,7 +2062,7 @@ const getVehicleImageUrl = useCallback((imageValue: string | undefined): string 
                       </thead>
                       <tbody className="divide-y divide-slate-100">
                         {group.vehicles.map((vehicle, index) => (
-                          <tr 
+                          <tr
                             key={vehicle.VehicleId}
                             onClick={() => handleView(vehicle.VehicleId)}
                             className="group hover:bg-slate-50/80 transition-all duration-200 cursor-pointer"
@@ -2065,14 +2071,14 @@ const getVehicleImageUrl = useCallback((imageValue: string | undefined): string 
                             {visibleColumns.includes("id") && (
                               <td className="px-4 py-3.5 text-sm font-medium text-slate-500">#{vehicle.VehicleId}</td>
                             )}
-                            
+
                             {visibleColumns.includes("image") && (
                               <td className="px-4 py-3.5">
                                 {(() => {
                                   const imageUrl = getVehicleImageUrl(vehicle.Image);
                                   return imageUrl ? (
-                                    <img 
-                                      src={imageUrl} 
+                                    <img
+                                      src={imageUrl}
                                       alt={vehicle.Model || "Vehicle"}
                                       className="w-12 h-12 rounded-xl object-cover shadow-sm ring-2 ring-white"
                                     />
@@ -2084,7 +2090,7 @@ const getVehicleImageUrl = useCallback((imageValue: string | undefined): string 
                                 })()}
                               </td>
                             )}
-                            
+
                             {visibleColumns.includes("category") && (
                               <td className="px-4 py-3.5">
                                 <span className={cn(
@@ -2095,19 +2101,19 @@ const getVehicleImageUrl = useCallback((imageValue: string | undefined): string 
                                 </span>
                               </td>
                             )}
-                            
+
                             {visibleColumns.includes("brand") && (
                               <td className="px-4 py-3.5 text-sm font-semibold text-slate-800">{vehicle.Brand}</td>
                             )}
-                            
+
                             {visibleColumns.includes("model") && (
                               <td className="px-4 py-3.5 text-sm text-slate-700">{vehicle.Model}</td>
                             )}
-                            
+
                             {visibleColumns.includes("year") && (
                               <td className="px-4 py-3.5 text-sm text-slate-600 font-medium">{vehicle.Year || "-"}</td>
                             )}
-                            
+
                             {visibleColumns.includes("plate") && (
                               <td className="px-4 py-3.5">
                                 <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-mono font-medium bg-slate-100 text-slate-700 ring-1 ring-slate-200">
@@ -2115,25 +2121,25 @@ const getVehicleImageUrl = useCallback((imageValue: string | undefined): string 
                                 </span>
                               </td>
                             )}
-                            
+
                             {visibleColumns.includes("priceNew") && (
                               <td className="px-4 py-3.5 text-sm font-bold text-emerald-600">
                                 ${vehicle.PriceNew?.toLocaleString() || "-"}
                               </td>
                             )}
-                            
+
                             {visibleColumns.includes("price40") && (
                               <td className="px-4 py-3.5 text-sm font-medium text-blue-600">
                                 ${vehicle.Price40?.toLocaleString() || "-"}
                               </td>
                             )}
-                            
+
                             {visibleColumns.includes("price70") && (
                               <td className="px-4 py-3.5 text-sm font-medium text-purple-600">
                                 ${vehicle.Price70?.toLocaleString() || "-"}
                               </td>
                             )}
-                            
+
                             {visibleColumns.includes("taxType") && (
                               <td className="px-4 py-3.5">
                                 <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium bg-slate-100 text-slate-700 ring-1 ring-slate-200">
@@ -2141,16 +2147,16 @@ const getVehicleImageUrl = useCallback((imageValue: string | undefined): string 
                                 </span>
                               </td>
                             )}
-                            
+
                             {visibleColumns.includes("bodyType") && (
                               <td className="px-4 py-3.5 text-sm text-slate-700">{vehicle.BodyType || "-"}</td>
                             )}
-                            
+
                             {visibleColumns.includes("color") && (
                               <td className="px-4 py-3.5">
                                 <div className="flex items-center gap-2">
                                   {vehicle.Color && (
-                                    <span 
+                                    <span
                                       className="w-4 h-4 rounded-full border border-slate-200 shadow-sm"
                                       style={{ backgroundColor: vehicle.Color.toLowerCase() }}
                                     />
@@ -2159,12 +2165,12 @@ const getVehicleImageUrl = useCallback((imageValue: string | undefined): string 
                                 </div>
                               </td>
                             )}
-                            
+
                             {visibleColumns.includes("condition") && (
                               <td className="px-4 py-3.5">
                                 <span className={cn(
                                   "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold",
-                                  vehicle.Condition?.toLowerCase() === "new" 
+                                  vehicle.Condition?.toLowerCase() === "new"
                                     ? "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200"
                                     : "bg-amber-50 text-amber-700 ring-1 ring-amber-200"
                                 )}>
@@ -2176,27 +2182,27 @@ const getVehicleImageUrl = useCallback((imageValue: string | undefined): string 
                                 </span>
                               </td>
                             )}
-                            
+
                             {visibleColumns.includes("actions") && (
                               <td className="px-4 py-3.5">
                                 <div className="flex items-center gap-1.5">
-                                  <ActionButton 
-                                    onClick={() => handleView(vehicle.VehicleId)} 
-                                    icon={Eye} 
-                                    label="View" 
+                                  <ActionButton
+                                    onClick={() => handleView(vehicle.VehicleId)}
+                                    icon={Eye}
+                                    label="View"
                                   />
                                   {isAdmin && (
                                     <>
-                                      <ActionButton 
-                                        onClick={() => handleEdit(vehicle.VehicleId)} 
-                                        icon={Pen} 
-                                        label="Edit" 
+                                      <ActionButton
+                                        onClick={() => handleEdit(vehicle.VehicleId)}
+                                        icon={Pen}
+                                        label="Edit"
                                         variant="edit"
                                       />
-                                      <ActionButton 
-                                        onClick={() => handleDelete(vehicle)} 
-                                        icon={Trash2} 
-                                        label="Delete" 
+                                      <ActionButton
+                                        onClick={() => handleDelete(vehicle)}
+                                        icon={Trash2}
+                                        label="Delete"
                                         variant="delete"
                                       />
                                     </>
@@ -2212,7 +2218,7 @@ const getVehicleImageUrl = useCallback((imageValue: string | undefined): string 
                 </div>
               </div>
             ))}
-            
+
             {filteredVehicles.length === 0 && (
               <div className="space-y-6">
                 {/* Fuzzy Suggestions */}
@@ -2247,12 +2253,13 @@ const getVehicleImageUrl = useCallback((imageValue: string | undefined): string 
               <div className="text-sm text-slate-500">
                 Page {currentPage} of {totalPages}
               </div>
-              
+
               {/* Items Per Page Dropdown */}
               <div className="flex items-center gap-2">
                 <span className="text-sm text-slate-500">Show:</span>
                 <div className="relative">
-                  <select
+<select
+                    title="Items per page"
                     value={itemsPerPage}
                     onChange={(e) => {
                       const newValue = parseInt(e.target.value, 10);
@@ -2272,17 +2279,17 @@ const getVehicleImageUrl = useCallback((imageValue: string | undefined): string 
                 <span className="text-sm text-slate-500">{t.perPage}</span>
               </div>
             </div>
-            
+
             <div className="flex items-center gap-2">
-              <NeuButton 
-                variant="default" 
-                size="sm" 
-                onClick={() => setCurrentPage(p => Math.max(1, p - 1))} 
+              <NeuButton
+                variant="default"
+                size="sm"
+                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
                 disabled={currentPage <= 1}
               >
                 Previous
               </NeuButton>
-              
+
               <div className="flex items-center gap-1">
                 {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
                   // Show pages around current page
@@ -2296,7 +2303,7 @@ const getVehicleImageUrl = useCallback((imageValue: string | undefined): string 
                   } else {
                     pageNum = currentPage - 2 + i;
                   }
-                  
+
                   return (
                     <button
                       key={pageNum}
@@ -2313,11 +2320,11 @@ const getVehicleImageUrl = useCallback((imageValue: string | undefined): string 
                   );
                 })}
               </div>
-              
-              <NeuButton 
-                variant="default" 
-                size="sm" 
-                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} 
+
+              <NeuButton
+                variant="default"
+                size="sm"
+                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
                 disabled={currentPage >= totalPages}
               >
                 Next

@@ -1,14 +1,15 @@
 import type { Vehicle, VehicleMeta } from "./types";
 import { recordMutation } from "./vehicleCache";
 
+import { globalLogger } from "./logger";
 
 // API Configuration
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL?.trim();
 const MAX_RETRIES = 3;
 const _RETRY_DELAY_MS = 1000;
-const REQUEST_TIMEOUT_MS = 60000; // 60 seconds for apiRequest
-// INCREASED: 60 seconds for fetchJSON to match server-side handler timeout (45s) + buffer
-const FETCH_TIMEOUT_MS = 60000;
+// Client-side request timeout should be slightly higher than server-side handler timeout
+const REQUEST_TIMEOUT_MS = 65000; // 65 seconds for apiRequest (for POST/PUT/DELETE)
+const FETCH_TIMEOUT_MS = 35000; // 35 seconds for fetchJSON (for GET requests)
 
 // Auth configuration - support both Bearer header and query token
 const USE_QUERY_TOKEN = process.env.NEXT_PUBLIC_USE_QUERY_TOKEN === "true";
@@ -62,17 +63,17 @@ export function validateApiUrl(url: string): { valid: boolean; error?: string } 
 
   // Check for local IP addresses (common mistake)
   if (url.includes("192.168.") || url.includes("10.0.") || url.includes("127.0.") || url.includes("localhost")) {
-    return { 
-      valid: false, 
-      error: "API URL points to a local address. Please use a public HTTPS endpoint for production." 
+    return {
+      valid: false,
+      error: "API URL points to a local address. Please use a public HTTPS endpoint for production."
     };
   }
 
   // Check for HTTPS in production
   if (process.env.NODE_ENV === "production" && url.startsWith("http://")) {
-    return { 
-      valid: false, 
-      error: "API URL must use HTTPS in production" 
+    return {
+      valid: false,
+      error: "API URL must use HTTPS in production"
     };
   }
 
@@ -132,13 +133,15 @@ export async function fetchJSON<T = unknown>(
     requestUrl = urlObj.toString();
   }
 
-  // Request logging removed for production
+  if (process.env.NODE_ENV === 'development') {
+    globalLogger.debug("fetchJSON request", { url: requestUrl, method: options.method });
+  }
 
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
 
   try {
-    // Prepare headers with auth
+    // Prepare headers with auth // This is a loop.
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
       ...options.headers as Record<string, string>,
@@ -162,7 +165,9 @@ export async function fetchJSON<T = unknown>(
     // Get response text first for logging and error handling
     const responseText = await response.text();
 
-    // Response logging removed for production
+    if (process.env.NODE_ENV === 'development') {
+      globalLogger.debug("fetchJSON response", { url: requestUrl, status: response.status, responseText: responseText.substring(0, 500) });
+    }
 
     // Handle authentication errors
     if (response.status === 401) {
@@ -171,34 +176,28 @@ export async function fetchJSON<T = unknown>(
         const currentPath = window.location.pathname;
         if (currentPath === '/login') {
           throw new ApiError(
-            "Authentication required. Please log in.", 
-            401, 
+            "Authentication required. Please log in.",
+            401,
             "AUTH_REQUIRED"
           );
         }
-        
+
         // Prevent multiple simultaneous redirects
         if (isRedirecting) {
           throw new ApiError(
-            "Authentication required. Redirecting to login...", 
-            401, 
+            "Authentication required. Redirecting to login...",
+            401,
             "AUTH_REQUIRED"
           );
         }
-        
+
         isRedirecting = true;
-        
+
         // Clear any stored auth state and redirect to login (once)
-        import('./auth').then(({ clearAuthToken }) => {
-          clearAuthToken();
-          // Use replace to prevent back button from returning to 401 page
-          const redirectUrl = '/login?redirect=' + encodeURIComponent(currentPath);
-          window.location.replace(redirectUrl);
-        }).catch(() => {
-          // Fallback if dynamic import fails
-          window.location.href = '/login';
-        });
-        
+        localStorage.removeItem("auth_token");
+        const redirectUrl = '/login?redirect=' + encodeURIComponent(currentPath);
+        window.location.replace(redirectUrl);
+
         // Reset flag after delay (in case redirect fails)
         if (redirectTimeout) clearTimeout(redirectTimeout);
         redirectTimeout = setTimeout(() => {
@@ -207,8 +206,8 @@ export async function fetchJSON<T = unknown>(
       }
 
       throw new ApiError(
-        "Your session has expired. Please log in again.", 
-        401, 
+        "Your session has expired. Please log in again.",
+        401,
         "AUTH_REQUIRED"
       );
     }
@@ -218,29 +217,29 @@ export async function fetchJSON<T = unknown>(
     // Handle other HTTP errors with user-friendly messages
     if (response.status === 403) {
       throw new ApiError(
-        "You don't have permission to access this resource.", 
-        403, 
+        "You don't have permission to access this resource.",
+        403,
         "FORBIDDEN"
       );
     }
     if (response.status === 404) {
       throw new ApiError(
-        "The requested resource was not found.", 
-        404, 
+        "The requested resource was not found.",
+        404,
         "NOT_FOUND"
       );
     }
     if (response.status === 504) {
       throw new ApiError(
-        "The server took too long to respond. This usually happens when the database is processing a large query. Please try again or refresh the page.", 
-        504, 
+        "The server took too long to respond. This usually happens when the database is processing a large query. Please try again or refresh the page.",
+        504,
         "GATEWAY_TIMEOUT"
       );
     }
     if (response.status >= 500) {
       throw new ApiError(
-        "The server encountered an error. Please try again later.", 
-        response.status, 
+        "The server encountered an error. Please try again later.",
+        response.status,
         "SERVER_ERROR"
       );
     }
@@ -277,7 +276,7 @@ export async function fetchJSON<T = unknown>(
       throw error;
     }
 
-    if (error.name === 'AbortError') {
+    if (error instanceof Error && error.name === 'AbortError') {
       throw new NetworkError(
         `Request timed out after ${FETCH_TIMEOUT_MS/1000} seconds.\n\n` +
         `URL: ${requestUrl}\n` +
@@ -291,25 +290,25 @@ export async function fetchJSON<T = unknown>(
 
     if (error instanceof TypeError) {
       // More specific network error diagnostics with troubleshooting steps
-      const isLocalhost = typeof window !== 'undefined' && 
+      const isLocalhost = typeof window !== 'undefined' &&
         (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
       const isNextJsApi = fullUrl.includes('/api/');
-      
+
       let troubleshooting = `Possible causes:\n`;
-      
+
       if (isNextJsApi && isLocalhost) {
-        troubleshooting += 
+        troubleshooting +=
           `• Next.js dev server is not running (run 'npm run dev')\n` +
           `• Port 3000 is already in use by another application\n` +
           `• Firewall is blocking localhost connections`;
       } else {
-        troubleshooting += 
+        troubleshooting +=
           `• API URL is incorrect or unreachable\n` +
           `• CORS policy blocking the request\n` +
           `• Network is offline\n` +
           `• Server is down`;
       }
-      
+
       throw new NetworkError(
         `Network connection failed.\n\n` +
         `URL: ${requestUrl}\n` +
@@ -345,6 +344,7 @@ async function apiRequest<T>(
   retries = MAX_RETRIES
 ): Promise<T> {
   const url = resolveRequestUrl(endpoint);
+  let lastError: Error | undefined;
 
   for (let attempt = 1; attempt <= retries; attempt++) {
     try {
@@ -412,37 +412,38 @@ async function apiRequest<T>(
       return data.data || data;
 
     } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error));
       const isLastAttempt = attempt === retries;
       const isRetryableError =
-        error instanceof NetworkError ||
-        (error instanceof ApiError && (error.status >= 500 || error.status === 504)) ||
-        error.name === "AbortError" ||
-        error.message?.includes("fetch") ||
-        error.message?.includes("timeout") ||
-        error.message?.includes("Gateway timeout");
+        lastError instanceof NetworkError ||
+        (lastError instanceof ApiError && (lastError.status >= 500 || lastError.status === 504)) ||
+        lastError.name === "AbortError" ||
+        lastError.message.includes("fetch") ||
+        lastError.message.includes("timeout") ||
+        lastError.message.includes("Gateway timeout");
 
       if (isLastAttempt || !isRetryableError) {
-        if (error instanceof ApiError) {
-          throw error;
+        if (lastError instanceof ApiError) {
+          throw lastError;
         }
-        throw new NetworkError(
-          error instanceof Error ? error.message : "Network request failed"
-        );
+        throw new NetworkError(lastError.message || "Network request failed");
       }
 
       // Exponential backoff with jitter for timeout errors
       // Use longer delays for timeout errors to give server time to recover
-      const isTimeoutError = 
-        error instanceof NetworkError ||
-        error.message?.includes("timeout") ||
-        error.message?.includes("Gateway timeout") ||
+      const isTimeoutError =
+        lastError instanceof NetworkError ||
+        lastError.message.includes("timeout") ||
+        lastError.message.includes("Gateway timeout") ||
         (error instanceof ApiError && error.status === 504);
-      
+
       const baseDelay = isTimeoutError ? 2000 : 1000;
       const delayMs = Math.min(baseDelay * Math.pow(2, attempt - 1), 8000) + Math.random() * 500;
       // Retry logging removed for production
       await new Promise(resolve => setTimeout(resolve, delayMs));
-    }
+    } // Use globalLogger here
+
+    globalLogger.warn(`API request failed, retrying (${attempt + 1}/${retries})`, { endpoint, error: lastError?.message });
   }
 
   throw new NetworkError("Request failed after all retries");
@@ -491,32 +492,32 @@ export const vehicleApi = {
     // Add filter parameters if provided
     if (options.filters) {
       const { filters } = options;
-      
+
       // Search term
       if (filters.search?.trim()) {
         params.set("searchTerm", filters.search.trim());
       }
-      
+
       // Category filter
       if (filters.category && filters.category !== "All") {
         params.set("category", filters.category);
       }
-      
+
       // Brand filter
       if (filters.brand && filters.brand !== "All") {
         params.set("brand", filters.brand);
       }
-      
+
       // Model filter
       if (filters.model?.trim()) {
         params.set("model", filters.model.trim());
       }
-      
+
       // Condition filter
       if (filters.condition && filters.condition !== "All") {
         params.set("condition", filters.condition);
       }
-      
+
       // Year range
       if (filters.yearMin !== undefined && filters.yearMin !== null) {
         params.set("yearMin", String(filters.yearMin));
@@ -524,7 +525,7 @@ export const vehicleApi = {
       if (filters.yearMax !== undefined && filters.yearMax !== null) {
         params.set("yearMax", String(filters.yearMax));
       }
-      
+
       // Price range
       if (filters.priceMin !== undefined && filters.priceMin !== null) {
         params.set("priceMin", String(filters.priceMin));
@@ -532,22 +533,22 @@ export const vehicleApi = {
       if (filters.priceMax !== undefined && filters.priceMax !== null) {
         params.set("priceMax", String(filters.priceMax));
       }
-      
+
       // Color filter
       if (filters.color && filters.color !== "All") {
         params.set("color", filters.color);
       }
-      
+
       // Body type filter
       if (filters.bodyType?.trim()) {
         params.set("bodyType", filters.bodyType.trim());
       }
-      
+
       // Tax type filter
       if (filters.taxType?.trim()) {
         params.set("taxType", filters.taxType.trim());
       }
-      
+
       // Date range
       if (filters.dateFrom?.trim()) {
         params.set("dateFrom", filters.dateFrom.trim());
@@ -555,12 +556,12 @@ export const vehicleApi = {
       if (filters.dateTo?.trim()) {
         params.set("dateTo", filters.dateTo.trim());
       }
-      
+
       // Without image filter
       if (filters.withoutImage) {
         params.set("withoutImage", "1");
       }
-      
+
       // When filters are active and no explicit maxRows, increase limit to get all matching results
       if (!options.maxRows && Object.keys(filters).length > 0) {
         params.set("limit", "10000");
@@ -568,13 +569,15 @@ export const vehicleApi = {
     }
 
     const endpoint = `/api/vehicles?${params.toString()}`;
-    
-    // Request logging removed for production
-    
+
+    if (process.env.NODE_ENV === 'development') {
+      globalLogger.debug("getVehicles API call", { endpoint });
+    }
+
     try {
       const response = await fetchJSON<{ ok: boolean; data: Vehicle[]; meta?: VehicleMeta; error?: string }>(endpoint);
 
-      
+
       // Handle API response format
       if (response.ok === false) {
         throw new ApiError(response.error || "Failed to fetch vehicles", 500, "API_ERROR");
@@ -589,13 +592,13 @@ export const vehicleApi = {
       } else if (response.data && Array.isArray(response.data)) {
         // { data, meta } format
         return { data: response.data, meta: response.meta };
-      } else if (response.data === undefined && Array.isArray((response as unknown as { vehicles?: Vehicle[] }).vehicles)) {
+      } else if (response.data === undefined && Array.isArray((response as unknown as { vehicles?: Vehicle[]; meta?: VehicleMeta }).vehicles)) {
         // Alternative: { vehicles: [...] } format
         return { data: (response as unknown as { vehicles: Vehicle[] }).vehicles, meta: (response as unknown as { meta?: VehicleMeta }).meta };
       } else {
         // Unexpected format - throw error
         throw new ApiError(
-          "Unexpected API response format. Expected { data: Vehicle[] } or Vehicle[].", 
+          "Unexpected API response format. Expected { data: Vehicle[] } or Vehicle[].",
           500,
           "FORMAT_ERROR"
         );
@@ -627,11 +630,11 @@ export const vehicleApi = {
     const response = await fetchJSON<{ ok: boolean; data: Vehicle; error?: string }>(
       `/api/vehicles/${encodeURIComponent(id)}`
     );
-    
+
     if (response.ok === false) {
       throw new ApiError(response.error || "Failed to fetch vehicle", 500, "API_ERROR");
     }
-    
+
     return response.data;
   },
 
@@ -660,7 +663,7 @@ export const vehicleApi = {
 
   // Delete vehicle
   async deleteVehicle(id: string): Promise<void> {
-    await apiRequest<void>(`/api/vehicles/${encodeURIComponent(id)}`, {
+    await apiRequest<void>(`/api/vehicles?id=${encodeURIComponent(id)}`, {
       method: "DELETE",
     });
     // Record mutation to invalidate client-side cache
@@ -728,9 +731,9 @@ export function getErrorMessage(error: unknown): string {
 }
 
 // Get detailed error info for debugging
-export function getErrorDetails(error: unknown): { 
-  message: string; 
-  code?: string; 
+export function getErrorDetails(error: unknown): {
+  message: string;
+  code?: string;
   status?: number;
   type: "config" | "api" | "network" | "unknown";
 } {
@@ -741,11 +744,11 @@ export function getErrorDetails(error: unknown): {
     return { message: error.message, type: "config" };
   }
   if (isApiError(error)) {
-    return { 
-      message: error.message, 
-      code: error.code, 
+    return {
+      message: error.message,
+      code: error.code,
       status: error.status,
-      type: "api" 
+      type: "api"
     };
   }
   if (isNetworkError(error)) {

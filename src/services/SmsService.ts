@@ -1,9 +1,9 @@
 /**
  * SMS Asset Service - OOAD Implementation
- * 
+ *
  * Extends BaseService for SMS asset operations.
  * Implements singleton pattern matching VehicleService.
- * 
+ *
  * Features:
  * - Full CRUD for sms_assets table
  * - SMS-specific filtering (search, status, assigned_to)
@@ -52,7 +52,7 @@ export interface SmsAssetEntity {
   id: string;
   createdAt: string;
   updatedAt: string;
-  
+
   // SMS Asset properties
   name: string;
   itemCode: string | null;
@@ -146,7 +146,7 @@ export class SmsAssetService extends BaseService<SmsAssetEntity, SmsAssetDB> {
       id: dbAsset.id.toString(),
       createdAt: dbAsset.created_at,
       updatedAt: dbAsset.updated_at || dbAsset.created_at,
-      
+
       name: dbAsset.name,
       itemCode: dbAsset.item_code,
       type: dbAsset.type,
@@ -223,6 +223,18 @@ export class SmsAssetService extends BaseService<SmsAssetEntity, SmsAssetDB> {
       _query += ` WHERE ${conditions.join(" AND ")}`;
     }
 
+    // Append LIMIT and OFFSET outside the WHERE clause for correct pagination
+    if (filters.limit) {
+      _query += ` LIMIT $${paramIndex}`;
+      params.push(filters.limit);
+      paramIndex++;
+    }
+    if (filters.offset) {
+      _query += ` OFFSET $${paramIndex}`;
+      params.push(filters.offset);
+      paramIndex++;
+    }
+
     return { query: _query, params, _paramIndex: paramIndex };
   }
 
@@ -254,7 +266,7 @@ export class SmsAssetService extends BaseService<SmsAssetEntity, SmsAssetDB> {
   /**
    * Update asset by string UUID
    */
-  public async updateAsset(id: string, data: Partial<SmsAssetDB>): Promise<ServiceResult<SmsAssetEntity>> {
+  public async updateAsset(id: string, data: Partial<Omit<SmsAssetDB, 'id' | 'created_at' | 'updated_at'>>): Promise<ServiceResult<SmsAssetEntity>> {
     const startTime = Date.now();
     try {
       const columns = Object.keys(data);
@@ -282,12 +294,12 @@ export class SmsAssetService extends BaseService<SmsAssetEntity, SmsAssetDB> {
   /**
    * Delete asset by string UUID
    */
-  public async deleteAsset(id: string): Promise<ServiceResult<boolean>> {
+  public async deleteAsset(id: string): Promise<ServiceResult<boolean>> { // Overriding BaseService.delete which expects number
     const startTime = Date.now();
     try {
       const query = `DELETE FROM ${this.tableName} WHERE id = $1 RETURNING *`;
       const result = await dbManager.executeUnsafe(query, [id]);
-      this.invalidateCache();
+      await this.invalidateCache();
       return { success: true, data: result.length > 0, meta: { durationMs: Date.now() - startTime, queryCount: 1 } };
     } catch (error) {
       return this.handleError(error, 'deleteAsset');
@@ -320,8 +332,8 @@ export class SmsAssetService extends BaseService<SmsAssetEntity, SmsAssetDB> {
     const startTime = Date.now();
     try {
       let query = `
-        SELECT 
-          st.id, st.asset_id as "assetId", st.sender_id as "senderId", 
+        SELECT
+          st.id, st.asset_id as "assetId", st.sender_id as "senderId",
           st.receiver_id as "receiverId", st.location, st.status, st.remark,
           st.created_at as "createdAt", st.accepted_at as "acceptedAt"
         FROM sms_transfers st
@@ -338,11 +350,10 @@ export class SmsAssetService extends BaseService<SmsAssetEntity, SmsAssetDB> {
 
       query += ` ORDER BY st.created_at DESC`;
 
-      // FIX: Don't append RETURNING * to a SELECT query
       const result = params.length
         ? await dbManager.executeUnsafe(query, params, 8000) as Array<Record<string, unknown>>
-        : await dbManager.executeUnsafe(query, undefined, 8000) as Array<Record<string, unknown>>;
-      
+        : await dbManager.executeUnsafe(query, [], 8000) as Array<Record<string, unknown>>;
+
       const transfers: SmsTransferEntity[] = result.map((row: Record<string, unknown>) => ({
         id: row.id as string,
         assetId: row.assetId as string,
@@ -426,7 +437,7 @@ export class SmsAssetService extends BaseService<SmsAssetEntity, SmsAssetDB> {
    * Update transfer status (accept/reject)
    */
   public async updateTransferStatus(
-    transferId: string, 
+    transferId: string,
     status: TransferStatus,
     userId: string
   ): Promise<ServiceResult<boolean>> {
@@ -441,7 +452,7 @@ export class SmsAssetService extends BaseService<SmsAssetEntity, SmsAssetDB> {
         [status, transferId],
         8000
       ) as Array<Record<string, unknown>>;
-      
+
       if (result.length === 0) {
         return {
           success: false,
@@ -451,7 +462,7 @@ export class SmsAssetService extends BaseService<SmsAssetEntity, SmsAssetDB> {
       }
 
       await this.logAudit(userId, 'update_transfer_status', { transferId, status });
-      
+
       return {
         success: true,
         data: true,
@@ -566,23 +577,23 @@ export class SmsAssetService extends BaseService<SmsAssetEntity, SmsAssetDB> {
 
       // Get transfers
       const transfersResult = await dbManager.execute`
-        SELECT 
+        SELECT
           'transfer' as type,
-          id, asset_id as assetId, sender_id as senderId, 
+          id, asset_id as assetId, sender_id as senderId,
           receiver_id as receiverId, location, status, remark as description,
           created_at as timestamp, accepted_at
-        FROM sms_transfers 
+        FROM sms_transfers
         WHERE asset_id = ${assetId}
         ORDER BY created_at DESC
       ` as Array<Record<string, unknown>>;
 
       // Get audits
       const auditsResult = await dbManager.execute`
-        SELECT 
+        SELECT
           'audit' as type,
           id, user_id, action as description, metadata,
           created_at as timestamp
-        FROM sms_audit_logs 
+        FROM sms_audit_logs
         WHERE (metadata->>'assetId') = ${assetId}
           OR metadata @> ${`{ "assetId": "${assetId}" }`}::jsonb
         ORDER BY created_at DESC

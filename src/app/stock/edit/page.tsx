@@ -1,17 +1,17 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, type FormEvent } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 
 export default function StockEditPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const modelKey = searchParams.get('modelKey') || '';
-  
-  const [form, setForm] = useState({ 
+
+  const [form, setForm] = useState({
     modelKey: modelKey,
-    location: 'Warehouse A', 
-    quantity: 0, 
+    location: 'Warehouse A',
+    quantity: 0,
     minStock: 5,
     reason: ''
   });
@@ -19,19 +19,19 @@ export default function StockEditPage() {
   const [success, setSuccess] = useState(false);
   const locations = ['Warehouse A', 'Showroom', 'Parking Lot'];
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setLoading(true);
     try {
       const res = await fetch('/api/stock/adjust', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          modelKey: form.modelKey, 
-          delta: form.quantity, 
+        body: JSON.stringify({
+          modelKey: form.modelKey,
+          delta: form.quantity,
           reason: form.reason || `Adjustment ${form.quantity > 0 ? '+' : ''}${form.quantity}`,
-          location: form.location, 
-          userId: 1 
+          location: form.location,
+          userId: 1
         })
       });
       if (res.ok) {
@@ -50,8 +50,8 @@ export default function StockEditPage() {
 
   return (
     <div className='p-6 lg:p-8 max-w-2xl mx-auto'>
-      <button 
-        onClick={() => router.back()} 
+      <button
+        onClick={() => router.back()}
         className='inline-flex items-center gap-2 text-slate-600 hover:text-slate-900 font-medium mb-6 lg:mb-8'
       >
         <svg className='w-5 h-5' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
@@ -59,11 +59,11 @@ export default function StockEditPage() {
         </svg>
         Back to Stock
       </button>
-      
+
       <div className='bg-white rounded-2xl shadow-xl p-8'>
         <h1 className='text-3xl font-bold text-slate-800 mb-2'>Adjust Stock</h1>
         <p className='text-slate-600 mb-8'>Edit inventory for <span className='font-mono font-semibold text-emerald-600'>{form.modelKey}</span></p>
-        
+
         <form onSubmit={handleSubmit} className='space-y-6'>
           <div className='space-y-2'>
             <label className='block text-sm font-semibold uppercase tracking-wider text-slate-500'>Model Key</label>
@@ -78,7 +78,7 @@ export default function StockEditPage() {
           <div className='grid md:grid-cols-2 gap-6'>
             <div className='space-y-2'>
               <label className='block text-sm font-semibold uppercase tracking-wider text-slate-500'>Location</label>
-              <select 
+              <select
                 value={form.location}
                 onChange={(e) => setForm({...form, location: e.target.value})}
                 className='w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all'

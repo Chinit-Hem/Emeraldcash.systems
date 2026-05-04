@@ -1,6 +1,6 @@
 /**
  * LazyLoadWrapper - Intersection Observer based lazy loading
- * 
+ *
  * Features:
  * - Lazy load components when they enter viewport
  * - Configurable root margin for early loading
@@ -56,7 +56,7 @@ export function LazyLoadWrapper({
         if (entry.isIntersecting) {
           setIsVisible(true);
           setHasTriggered(true);
-          
+
           if (triggerOnce) {
             observer.unobserve(element);
           }
@@ -117,6 +117,8 @@ function DefaultSkeleton() {
 /**
  * Lazy load a component with dynamic import
  */
+// Component libraries expose a wide range of prop contracts here; preserve inference for callers.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function lazyLoad<T extends React.ComponentType<any>>(
   importFn: () => Promise<{ default: T }>,
   options: {
@@ -143,6 +145,7 @@ export function lazyLoad<T extends React.ComponentType<any>>(
 /**
  * Preload component when user hovers over a trigger element
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function usePreload<T extends React.ComponentType<any>>(
   importFn: () => Promise<{ default: T }>
 ) {
@@ -190,7 +193,7 @@ export function useVisibilityTracking(
         if (entry.isIntersecting) {
           setIsVisible(true);
           onVisible();
-          
+
           if (options.triggerOnce !== false) {
             observer.unobserve(element);
           }

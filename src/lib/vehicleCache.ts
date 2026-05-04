@@ -1,6 +1,7 @@
 import type { Vehicle, VehicleMeta } from "@/lib/types";
 
 const CACHE_KEY = "vms-vehicles";
+// Renamed to avoid conflict with `_cache.ts`'s `meta` property in CacheEntry
 const META_KEY = "vms-vehicles-meta";
 const CACHE_VERSION_KEY = "vms-vehicles-version";
 const CACHE_TIMESTAMP_KEY = "vms-vehicles-timestamp";
@@ -23,7 +24,7 @@ export function readVehicleCache(): Vehicle[] | null {
       // Cache logging removed for production
       return null;
     }
-    
+
     const cached = localStorage.getItem(CACHE_KEY);
     if (!cached) return null;
     const parsed = JSON.parse(cached);
@@ -144,26 +145,26 @@ export function getCacheTimestamp(): number | null {
  */
 export function isCacheStale(): boolean {
   if (typeof window === "undefined") return true;
-  
+
   const cacheTime = getCacheTimestamp();
   const mutationTime = getLastMutationTime();
-  
+
   // If no cache timestamp, it's stale
   if (!cacheTime) return true;
-  
+
   // If mutation occurred after cache was written, it's stale
   if (mutationTime && mutationTime > cacheTime) {
     // Cache logging removed for production
     return true;
   }
-  
+
   // Check if cache is older than stale threshold
   const age = Date.now() - cacheTime;
   if (age > CACHE_STALE_MS) {
     // Cache logging removed for production
     return true;
   }
-  
+
   return false;
 }
 
@@ -175,10 +176,10 @@ export function isCacheStale(): boolean {
 export function shouldUseCache(noCache = false): boolean {
   // If explicitly requesting no cache, don't use it
   if (noCache) return false;
-  
+
   // If cache is stale, don't use it
   if (isCacheStale()) return false;
-  
+
   // Otherwise, cache is usable
   return true;
 }
@@ -223,23 +224,23 @@ export function isCacheExtremelyStale(): boolean {
 /**
  * Clear cache on mount - should be called when app initializes
  * This prevents showing stale data from previous sessions
- * 
+ *
  * NOTE: This function is now less aggressive to prevent cache-invalidation-storm.
  * Cache is only cleared if it's truly expired (10+ minutes old) or if a mutation occurred.
  */
 export function clearCacheOnMount(): void {
   if (typeof window === "undefined") return;
-  
+
   const cacheAge = getCacheAge();
-  
+
   // Cache logging removed for production
-  
+
   // Only clear if cache is truly expired (10+ minutes) - prevents cache-invalidation-storm
   if (cacheAge !== null && cacheAge > MAX_CACHE_AGE_MS) {
     clearAllVehicleCache();
     return;
   }
-  
+
   // Only clear if cache is stale due to mutation or version mismatch
   // Don't clear just because cache is "stale" by time - that causes the storm
   const mutationTime = getLastMutationTime();
@@ -255,18 +256,18 @@ export function clearCacheOnMount(): void {
  */
 export function invalidateAllCaches(): void {
   if (typeof window === "undefined") return;
-  
+
   try {
     // 1. Clear all vehicle cache data
     clearAllVehicleCache();
-    
+
     // 2. Record mutation timestamp (for other tabs/components)
     recordMutation();
-    
+
     // 3. Dispatch cache update event to notify all listeners.
     // Use an empty array payload so existing array-based listeners still fire.
     window.dispatchEvent(new CustomEvent(UPDATE_EVENT, { detail: [] }));
-    
+
     // 4. Clear any SWR cache keys (if using SWR)
     try {
       const swrCachePrefix = "swr-";
@@ -279,7 +280,7 @@ export function invalidateAllCaches(): void {
     } catch {
       // Ignore SWR cache clearing errors
     }
-    
+
     // Cache logging removed for production
   } catch (error) {
     // Error logging removed for production
@@ -306,16 +307,16 @@ export function getCacheStatus(): {
       version: null,
     };
   }
-  
+
   const cacheAge = getCacheAge();
   const lastMutation = getLastMutationTime();
   const cacheTime = getCacheTimestamp();
   const version = localStorage.getItem(CACHE_VERSION_KEY);
-  
+
   // Check if stale due to mutation
   const isStaleByMutation = lastMutation && cacheTime && lastMutation > cacheTime;
   const isStaleByAge = cacheAge === null || cacheAge > CACHE_STALE_MS;
-  
+
   return {
     hasCache: localStorage.getItem(CACHE_KEY) !== null,
     cacheAge,

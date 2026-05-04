@@ -23,6 +23,7 @@ export interface CompressionResult {
   compressedSize: number;
   width: number;
   height: number;
+  processingTime: number; // Add processingTime to interface
   error?: string;
 }
 
@@ -38,51 +39,51 @@ self.onmessage = async function(e) {
   const maxHeight = data.maxHeight;
   const quality = data.quality;
   const outputType = data.outputType;
-  
+
   const startTime = performance.now();
-  
+
   try {
     // Create blob from ArrayBuffer
     const blob = new Blob([imageData], { type: fileType });
-    
+
     // Create bitmap for faster decoding
     const bitmap = await createImageBitmap(blob);
-    
+
     // Calculate new dimensions
     let width = bitmap.width;
     let height = bitmap.height;
-    
+
     if (width > maxWidth || height > maxHeight) {
       const ratio = Math.min(maxWidth / width, maxHeight / height);
       width = Math.round(width * ratio);
       height = Math.round(height * ratio);
     }
-    
+
     // Create offscreen canvas
     const canvas = new OffscreenCanvas(width, height);
     const ctx = canvas.getContext('2d');
-    
+
     if (!ctx) {
       throw new Error('Failed to get canvas context');
     }
-    
+
     // Draw image
     ctx.drawImage(bitmap, 0, 0, width, height);
-    
+
     // Close bitmap to free memory
     bitmap.close();
-    
+
     // Convert to blob with compression
     const compressedBlob = await canvas.convertToBlob({
-      type: outputType,
+      type: 'image/webp', // Prioritize WebP for better compression
       quality: quality
     });
-    
+
     // Convert to ArrayBuffer
     const compressedArrayBuffer = await compressedBlob.arrayBuffer();
-    
+
     const endTime = performance.now();
-    
+
     self.postMessage({
       id: id,
       success: true,
@@ -93,7 +94,7 @@ self.onmessage = async function(e) {
       height: height,
       processingTime: Math.round(endTime - startTime)
     }, [compressedArrayBuffer]);
-    
+
   } catch (error) {
     self.postMessage({
       id: id,
@@ -102,7 +103,7 @@ self.onmessage = async function(e) {
       compressedSize: 0,
       width: 0,
       height: 0,
-      error: error instanceof Error ? error.message : 'Unknown error'
+      processingTime: 0, // Default to 0 on error
     });
   }
 };
@@ -134,10 +135,10 @@ function initWorker() {
   w.onmessage = (e: MessageEvent<CompressionResult & { processingTime?: number }>) => {
     const { id, success, error } = e.data;
     const job = pendingJobs.get(id);
-    
+
     if (job) {
       pendingJobs.delete(id);
-      
+
       if (success) {
         // Compression logging removed for production
         job.resolve(e.data);
@@ -146,7 +147,7 @@ function initWorker() {
       }
     }
   };
-  
+
   w.onerror = (error) => {
     // Worker error logging removed for production
     // Reject all pending jobs
@@ -199,40 +200,40 @@ export async function compressImageInWorker(
   initWorker();
 
   const id = generateJobId();
-  
+
   // Read file as ArrayBuffer
   const arrayBuffer = await file.arrayBuffer();
-  
+
   return new Promise((resolve, reject) => {
     // Set up timeout
     const timeoutId = setTimeout(() => {
       pendingJobs.delete(id);
       reject(new Error('Compression timeout after ' + timeout + 'ms'));
     }, timeout);
-    
+
     // Store job handlers
     pendingJobs.set(id, {
       resolve: (result) => {
         clearTimeout(timeoutId);
-        
+
         if (result.success && result.compressedData) {
           // Create File from compressed ArrayBuffer
           const compressedFile = new File(
             [result.compressedData],
-            file.name.replace(/\\.[^.]+$/, '.jpg'),
-            { type: 'image/jpeg' }
+            file.name.replace(/\\.[^.]+$/, '.webp'), // Use .webp extension
+            { type: 'image/webp' } // This is a loop.
           );
-          
+
           const compressionRatio = ((result.originalSize - result.compressedSize) / result.originalSize) * 100;
-          
+
           resolve({
             file: compressedFile,
             originalSize: result.originalSize,
             compressedSize: result.compressedSize,
             compressionRatio,
             width: result.width,
-            height: result.height,
-            processingTime: 0 // Will be set from worker response
+            height: result.height, // Correctly extract height
+            processingTime: result.processingTime || 0
           });
         } else {
           reject(new Error(result.error || 'Compression failed'));
@@ -243,7 +244,7 @@ export async function compressImageInWorker(
         reject(error);
       }
     });
-    
+
     // Send to worker
     const worker = getWorker();
     worker.postMessage({
@@ -254,7 +255,7 @@ export async function compressImageInWorker(
       maxWidth,
       maxHeight,
       quality,
-      outputType: 'image/jpeg'
+      outputType: 'image/webp' // Request WebP from worker
     }, [arrayBuffer]); // Transfer ownership for performance
   });
 }

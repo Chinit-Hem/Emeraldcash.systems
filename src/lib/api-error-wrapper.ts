@@ -1,6 +1,6 @@
 /**
  * API Error Wrapper - Higher-Order Function for Defensive API Route Handling
- * 
+ *
  * Provides:
  * - Automatic try-catch for all API handlers
  * - Consistent error response format
@@ -9,7 +9,7 @@
  * - Performance metrics (duration)
  * - User-friendly sanitized error messages
  * - Technical details in logs only
- * 
+ *
  * Usage:
  * ```typescript
  * export const GET = withErrorHandling(async (req: NextRequest, { logger }) => {
@@ -17,37 +17,13 @@
  *   // Errors are automatically caught and logged
  * });
  * ```
- * 
+ *
  * @module lib/api-error-wrapper
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import { Logger, createRequestLogger } from "./logger";
-
-// CORS headers builder (reused from vehicles route)
-function buildCorsHeaders(req: NextRequest): Headers {
-  const appOrigin = process.env.NEXT_PUBLIC_APP_ORIGIN?.trim();
-  const vercelUrl = process.env.NEXT_PUBLIC_VERCEL_URL?.trim();
-  const vercelOrigin = vercelUrl
-    ? vercelUrl.startsWith("http")
-      ? vercelUrl
-      : `https://${vercelUrl}`
-    : "";
-  const requestOrigin = req.headers.get("origin") || "";
-  const allowedOrigin = appOrigin || vercelOrigin || requestOrigin || "*";
-
-  const headers = new Headers({
-    "Access-Control-Allow-Origin": allowedOrigin,
-    "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Requested-With",
-  });
-
-  if (allowedOrigin !== "*") {
-    headers.set("Access-Control-Allow-Credentials", "true");
-  }
-
-  return headers;
-}
+import { buildCorsHeaders } from "./cors";
 
 // Interface for handler context
 export interface HandlerContext {
@@ -202,7 +178,7 @@ function getErrorStatusCode(error: Error | unknown): number {
 
 /**
  * Higher-order function to wrap API handlers with error handling
- * 
+ *
  * @param handler - The API route handler function
  * @param options - Optional configuration
  * @returns Wrapped handler with automatic error handling
@@ -276,7 +252,7 @@ export function withErrorHandling(
       // Log the full error with technical details
       contextualLogger.error(
         `API ${req.method} ${req.nextUrl.pathname} failed`,
-        error,
+        error instanceof Error ? error : { error: String(error) },
         {
           method: req.method,
           path: req.nextUrl.pathname,
@@ -304,8 +280,7 @@ export function withErrorHandling(
       corsHeaders.set("Content-Type", "application/json");
 
       return new NextResponse(JSON.stringify(errorResponse), {
-        status: statusCode,
-        headers: corsHeaders,
+        status: statusCode, headers: Object.fromEntries(corsHeaders.entries()),
       });
     }
   };

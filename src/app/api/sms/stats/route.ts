@@ -1,12 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requirePermission } from '@/lib/auth-helpers';
 import { smsService } from '@/services/SmsService';
 
-export async function GET(_request: NextRequest) {
+export async function GET(request: NextRequest) {
   const startTime = Date.now();
   try {
+    const auth = requirePermission(request, 'sms:view');
+    if (auth.response) return auth.response;
+
     const result = await smsService.getAssetStats();
     const duration = Date.now() - startTime;
-    
+
     if (result.success) {
       return NextResponse.json({
         success: true,

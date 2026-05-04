@@ -7,35 +7,42 @@ import { Suspense, type ReactNode, useEffect, useRef, useState } from "react";
 
 import Sidebar from "@/app/components/Sidebar";
 import { AuthUserProvider } from "@/app/components/AuthContext";
-import { UIProvider, useUI } from "@/app/components/UIContext";
+import { UIProvider } from "@/app/components/UIContext";
 import { clearCachedUser, getCachedUser, setCachedUser } from "@/app/components/authCache";
-import { isIOSSafariBrowser } from "@/lib/platform";
-import { useMounted } from "@/lib/useMounted";
-import { clearCacheOnMount } from "@/lib/vehicleCache";
 
 type AppShellProps = {
   children: ReactNode;
 };
 
+// Warm up database connection on mount - helps with 0ms loading feel
+function useConnectionWarmer() {
+  useEffect(() => {
+    // Ping serverless function to warm up connection in background
+    fetch('/api/ping', {
+      cache: 'no-store',
+      credentials: 'include',
+    }).catch(() => {
+      // Ignore errors - this is just for warming up, non-blocking
+    });
+  }, []);
+}
+
 function AppShellContent({ children }: AppShellProps) {
   const router = useRouter();
   const pathname = usePathname();
-  const { isModalOpen } = useUI();
 
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
+  // OPTIMIZATION: Show UI immediately with cached user, check auth in background
+  const [user, setUser] = useState<User | null>(() => getCachedUser());
+  const [loading, setLoading] = useState(false); // Changed: default false for 0ms load feel
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const hasRedirected = useRef(false);
-  
-  // Detect iOS Safari for performance optimization
-  const isIOSSafari = useMounted() && isIOSSafariBrowser();
+  const authChecked = useRef(false);
+
+  // Warm up DB connection on mount
+  useConnectionWarmer();
 
   useEffect(() => {
-    // Clear vehicle cache on app initialization to prevent stale data
-    console.log("[APPSHELL] Clearing cache on app initialization...");
-    clearCacheOnMount();
-
     let isActive = true;
     const controller = new AbortController();
     const defer =
@@ -43,22 +50,15 @@ function AppShellContent({ children }: AppShellProps) {
         ? queueMicrotask
         : (callback: () => void) => Promise.resolve().then(callback);
 
-    console.log("[APPSHELL] Starting auth check...");
-
-    // IMMEDIATE: Check cached user first to show something quickly
+    // Already have cached user - show UI immediately
     const cached = getCachedUser();
-    if (cached) {
-      console.log("[APPSHELL] Using cached user immediately:", cached.username);
-      defer(() => {
-        if (!isActive) return;
-        setUser(cached);
-        setLoading(false);
-      });
+    if (cached && !authChecked.current) {
+      setUser(cached);
+      // Don't set loading false because we're showing UI immediately
     }
 
     async function checkAuth() {
       try {
-        console.log("[APPSHELL] Fetching /api/auth/me...");
         const timeoutId = setTimeout(() => controller.abort(), 10000);
         const res = await fetch("/api/auth/me", {
           credentials: "include",
@@ -71,32 +71,30 @@ function AppShellContent({ children }: AppShellProps) {
           return;
         }
 
-        console.log("[APPSHELL] Auth response status:", res.status);
+        authChecked.current = true;
         const data = await res.json().catch(() => null);
-        console.log("[APPSHELL] Auth response:", data);
 
         if (!res.ok || !data?.ok || !data?.user) {
-          console.log("[APPSHELL] Auth failed:", data?.error || "no user");
           clearCachedUser();
-          setUser(null);
-          setLoading(false);
-
-          if (!hasRedirected.current) {
-            hasRedirected.current = true;
-            router.replace("/login");
+          // Only redirect if we don't have a cached user showing
+          if (!cached) {
+            setUser(null);
+            if (!hasRedirected.current) {
+              hasRedirected.current = true;
+              router.replace("/login");
+            }
           }
           return;
         }
 
-        console.log("[APPSHELL] Auth success:", data.user.username);
         setCachedUser(data.user as User);
         setUser(data.user as User);
         setError(null);
-        setLoading(false);
       } catch (err) {
         if (!isActive) return;
-        console.error("[APPSHELL] Auth error:", err);
 
+        // Auth check failed - if we have cached user, keep showing them
+        // If no cached user, show error
         const isAbortError = err instanceof Error && err.name === "AbortError";
         if (!cached) {
           setError(
@@ -105,13 +103,15 @@ function AppShellContent({ children }: AppShellProps) {
               : "Connection failed. Please check your network and try again."
           );
         }
-        setLoading(false);
       }
     }
 
-    // Always run server check, even if we have cached user
-    checkAuth();
-    
+    // Run server check in background (non-blocking UI)
+    // Use setTimeout to allow UI to render first
+    setTimeout(() => {
+      checkAuth();
+    }, 0);
+
     return () => {
       isActive = false;
       controller.abort();
@@ -185,7 +185,7 @@ function AppShellContent({ children }: AppShellProps) {
 
         {/* Mobile drawer - Neumorphism style */}
         {isSidebarOpen && (
-          <div 
+          <div
             className="fixed inset-0 z-[60] lg:hidden"
             onKeyDown={(e) => {
               if (e.key === 'Escape') setIsSidebarOpen(false);
@@ -196,7 +196,7 @@ function AppShellContent({ children }: AppShellProps) {
               onClick={() => setIsSidebarOpen(false)}
               aria-hidden="true"
             />
-            <div 
+            <div
               className="absolute inset-y-0 left-0 w-[280px] max-w-[85vw] h-full bg-neu-bg overflow-hidden shadow-neu-flat-lg"
               role="dialog"
               aria-modal="true"
@@ -225,12 +225,12 @@ function AppShellContent({ children }: AppShellProps) {
 
               <div className="flex items-center gap-3 min-w-0 flex-1 justify-center">
                 <div className="relative w-9 h-9 flex items-center justify-center overflow-hidden flex-shrink-0 neu-icon-btn !rounded-full">
-                  <Image 
-                    src="/logo.png" 
-                    alt="Emerald Cash" 
-                    width={28} 
-                    height={28} 
-                    className="w-7 h-7 object-contain" 
+                  <Image
+                    src="/logo.png"
+                    alt="Emerald Cash"
+                    width={28}
+                    height={28}
+                    className="w-7 h-7 object-contain"
                   />
                 </div>
                 <div className="flex flex-col min-w-0">

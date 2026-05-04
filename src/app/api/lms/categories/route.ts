@@ -1,9 +1,9 @@
 /**
  * LMS Categories API Route
- * 
+ *
  * GET /api/lms/categories - List all categories (Admin & Staff can view)
  * POST /api/lms/categories - Create new category (Admin only)
- * 
+ *
  * @module api/lms/categories
  */
 
@@ -45,7 +45,7 @@ function toLegacyCategory(category: CategoryEntityLike) {
 
 export async function GET(request: NextRequest) {
   const session = getSession(request);
-  
+
   if (!session) {
     return NextResponse.json(
       { success: false, error: "Unauthorized - Please log in" },
@@ -70,11 +70,6 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  // Log the first category to debug
-  if (result.data && result.data.length > 0) {
-    console.log("[API /lms/categories] First category from DB:", JSON.stringify(result.data[0], null, 2));
-  }
-
   const legacyCategories = (result.data ?? []).map((category) =>
     toLegacyCategory(category as CategoryEntityLike)
   );
@@ -92,7 +87,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   const session = getSession(request);
-  
+
   if (!session) {
     return NextResponse.json(
       { success: false, error: "Unauthorized - Please log in" },
@@ -154,7 +149,7 @@ export async function POST(request: NextRequest) {
 
 export async function PUT(request: NextRequest) {
   const session = getSession(request);
-  
+
   if (!session) {
     return NextResponse.json(
       { success: false, error: "Unauthorized - Please log in" },
@@ -220,7 +215,7 @@ export async function PUT(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   const session = getSession(request);
-  
+
   if (!session) {
     return NextResponse.json(
       { success: false, error: "Unauthorized - Please log in" },

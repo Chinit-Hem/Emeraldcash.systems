@@ -18,9 +18,9 @@ export type MarketPriceStats = {
 export function normalizeCategoryLabel(value: unknown): CategoryLabel {
   const raw = String(value ?? "").trim().replace(/\s+/g, ' ').replace(/\+/g, ' ').toLowerCase();
   if (!raw) return "Other";
-  if (raw === "cars" || raw === "car") return "Cars";
-  if (raw === "motorcycles" || raw === "motorcycle") return "Motorcycles";
-  if (raw === "tuk tuk" || raw === "tuktuk" || raw === "tuk-tuk" || raw === "tuktuks") return "TukTuks";
+  if (raw.includes("car")) return "Cars";
+  if (raw.includes("motor")) return "Motorcycles";
+  if (raw.includes("tuk")) return "TukTuks";
   return "Other";
 }
 
@@ -234,38 +234,59 @@ import { extractDriveFileId } from "@/lib/drive";
 /**
  * Compute vehicle metadata from an array of vehicles
  * Defensive programming: handles undefined/null inputs safely
- * 
+ *
  * This function consolidates the duplicate computeVehicleMeta logic from:
  * - VehiclesClient.tsx
  * - DashboardClient.tsx (via aggregatedStats)
- * 
+ *
  * @param vehicles - Array of vehicles (or undefined/null)
  * @returns VehicleMeta object with computed statistics
  */
 export function computeVehicleMeta(vehicles: Vehicle[] | undefined | null): VehicleMeta {
   // Safe default return for undefined/null input
   const safeVehicles = vehicles ?? [];
-  
-  return {
+
+  const stats = {
     total: safeVehicles.length,
+    cars: 0,
+    motorcycles: 0,
+    tuktuks: 0,
+    new: 0,
+    used: 0,
+    noImage: 0,
+    totalPrice: 0,
+    priceCount: 0,
+  };
+
+  for (const v of safeVehicles) {
+    const cat = normalizeCategoryLabel(v?.Category);
+    if (cat === "Cars") stats.cars++;
+    else if (cat === "Motorcycles") stats.motorcycles++;
+    else if (cat === "TukTuks") stats.tuktuks++;
+
+    const cond = normalizeConditionLabel(v?.Condition);
+    if (cond === "New") stats.new++;
+    else if (cond === "Used") stats.used++;
+
+    if (!v?.Image || v.Image.trim() === '') stats.noImage++;
+    if (v?.PriceNew != null && v.PriceNew > 0) {
+      stats.totalPrice += v.PriceNew;
+      stats.priceCount++;
+    }
+  }
+
+  return {
+    total: stats.total,
     countsByCategory: {
-      Cars: safeVehicles.filter(v => normalizeCategoryLabel(v?.Category) === "Cars").length,
-      Motorcycles: safeVehicles.filter(v => normalizeCategoryLabel(v?.Category) === "Motorcycles").length,
-      TukTuks: safeVehicles.filter(v => normalizeCategoryLabel(v?.Category) === "TukTuks").length,
+      Cars: stats.cars,
+      Motorcycles: stats.motorcycles,
+      TukTuks: stats.tuktuks,
     },
-    avgPrice: safeVehicles.length > 0
-      ? safeVehicles.reduce((sum, v) => sum + (v?.PriceNew || 0), 0) / safeVehicles.length
-      : 0,
-    noImageCount: safeVehicles.filter(v => {
-      // Check both Image field and thumbnail_url (if available in the vehicle object)
-      const hasImage = v?.Image && extractDriveFileId(v.Image);
-      // For vehicles with thumbnail_url stored separately, we need to check that too
-      // The vehicle object from API should have Image field populated with thumbnail_url if available
-      return !hasImage;
-    }).length,
+    avgPrice: stats.priceCount > 0 ? stats.totalPrice / stats.priceCount : 0,
+    noImageCount: stats.noImage,
     countsByCondition: {
-      New: safeVehicles.filter(v => normalizeConditionLabel(v?.Condition) === "New").length,
-      Used: safeVehicles.filter(v => normalizeConditionLabel(v?.Condition) === "Used").length,
+      New: stats.new,
+      Used: stats.used,
     },
   };
 }
@@ -289,7 +310,7 @@ export function computeBrandStats(
   const exclude = options?.exclude ?? INVALID_BRANDS;
 
   const counts = new Map<string, number>();
-  
+
   for (const v of safeVehicles) {
     const brand = String(v?.Brand ?? "").trim().toUpperCase();
     if (!brand || exclude.includes(brand)) continue;
