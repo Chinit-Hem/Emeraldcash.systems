@@ -31,7 +31,8 @@ function isPublicAsset(pathname: string): boolean {
     pathname === "/site.webmanifest" ||
     pathname === "/robots.txt" ||
     pathname === "/sitemap.xml" ||
-    pathname === "/manifest.json"
+    pathname === "/manifest.json" ||
+    pathname === "/manifest.webmanifest"
   ) {
     return true;
   }
@@ -76,7 +77,18 @@ function isIosDevice(userAgent: string): boolean {
   return /\b(iPhone|iPad|iPod)\b/i.test(userAgent);
 }
 
-function redirectToLogin(request: NextRequest): Response {
+function getRequestId(request: NextRequest): string {
+  const existingRequestId = request.headers.get("x-request-id");
+  if (existingRequestId) return existingRequestId;
+
+  if (typeof globalThis.crypto?.randomUUID === "function") {
+    return globalThis.crypto.randomUUID();
+  }
+
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
+}
+
+function redirectToLogin(request: NextRequest): NextResponse {
   const loginUrl = new URL("/login", request.url);
   const requestedPath = getSafeRedirectPath(
     `${request.nextUrl.pathname}${request.nextUrl.search}`
@@ -90,8 +102,7 @@ function redirectToLogin(request: NextRequest): Response {
     loginUrl.searchParams.set("redirect", requestedPath);
   }
 
-  // Use Web Response.redirect (Next.js 15 compatible) and avoid redirect caching.
-  const response = Response.redirect(loginUrl, 302);
+  const response = NextResponse.redirect(loginUrl, 302);
   response.headers.set("Cache-Control", "no-store, no-cache, must-revalidate, private");
   response.headers.set("Pragma", "no-cache");
   return response;
@@ -100,11 +111,11 @@ function redirectToLogin(request: NextRequest): Response {
 export async function middleware(request: NextRequest) {
   const startTime = Date.now();
   const { pathname } = request.nextUrl;
-  const userAgent = getClientUserAgent(request.headers);
-  // Fallback for crypto.randomUUID on HTTP environments
-  const requestId: string = request.headers.get("x-request-id") || crypto.randomUUID();
+  const requestId = getRequestId(request);
 
   try {
+    const userAgent = getClientUserAgent(request.headers);
+
     // Allow CORS preflight to reach route handlers.
     if (request.method === "OPTIONS") {
       return NextResponse.next();
@@ -186,7 +197,7 @@ export async function middleware(request: NextRequest) {
         request.nextUrl.searchParams.get("redirect")
       );
       const target = redirectParam || "/";
-      const response = Response.redirect(new URL(target, request.url), 302);
+      const response = NextResponse.redirect(new URL(target, request.url), 302);
       response.headers.set("Cache-Control", "no-store, no-cache, must-revalidate, private");
       response.headers.set("Pragma", "no-cache");
       response.headers.set("X-Request-ID", requestId);
@@ -202,7 +213,7 @@ export async function middleware(request: NextRequest) {
     const response = NextResponse.next();
     response.headers.set("X-Request-ID", requestId);
     return response;
-} catch (err) {
+  } catch (err) {
     // Global middleware error handler
     const duration = Date.now() - startTime;
     const error = err instanceof Error ? err : new Error(String(err));
@@ -238,6 +249,6 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|apple-touch-icon.png|apple-touch-icon-precomposed.png|robots.txt|sitemap.xml|site.webmanifest|manifest.json|.*\\.(?:svg|png|jpe?g|gif|ico|webp|avif|css|js|map|txt|xml|woff2?|ttf|eot|otf|mp4|webm)$).*)",
+    "/((?!_next/static|_next/image|favicon.ico|apple-touch-icon.png|apple-touch-icon-precomposed.png|robots.txt|sitemap.xml|site.webmanifest|manifest.json|manifest.webmanifest|.*\\.(?:svg|png|jpe?g|gif|ico|webp|avif|css|js|map|txt|xml|woff2?|ttf|eot|otf|mp4|webm)$).*)",
   ],
 };
