@@ -1,6 +1,7 @@
 import { requirePermission } from "@/lib/auth-helpers";
 import { NextRequest, NextResponse } from "next/server";
 import { createHash } from "crypto";
+import type { Permission } from "@/lib/types";
 
 /**
  * Cloudinary Signature API Route
@@ -58,9 +59,25 @@ function validateConfig(): { valid: boolean; error?: string } {
   return { valid: true };
 }
 
+function getRequiredPermission(folder: string): Permission {
+  return folder.startsWith("sms/") ? "sms:create" : "vehicles:create";
+}
+
 export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
-    const auth = requirePermission(request, "vehicles:create");
+    // Parse request body
+    let body: Record<string, unknown> = {};
+    try {
+      body = await request.json();
+    } catch {
+      // No body or invalid JSON, use defaults
+    }
+
+    const folder = (body.folder as string) || "vehicles";
+    const publicId = body.public_id as string | undefined;
+    const tags = body.tags as string[] | undefined;
+
+    const auth = requirePermission(request, getRequiredPermission(folder));
     if (auth.response) return auth.response;
 
     // Validate configuration
@@ -75,18 +92,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         { status: 500 }
       );
     }
-
-    // Parse request body
-    let body: Record<string, unknown> = {};
-    try {
-      body = await request.json();
-    } catch {
-      // No body or invalid JSON, use defaults
-    }
-
-    const folder = (body.folder as string) || "vehicles";
-    const publicId = body.public_id as string | undefined;
-    const tags = body.tags as string[] | undefined;
 
     // Generate timestamp (must be within 1 hour of upload)
     const timestamp = Math.floor(Date.now() / 1000);

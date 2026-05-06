@@ -26,76 +26,19 @@ interface LazyLoadWrapperProps {
 
 export function LazyLoadWrapper({
   children,
-  skeleton,
-  rootMargin = "100px",
-  threshold = 0.1,
-  triggerOnce = true,
-  fadeIn = true,
   className = "",
   minHeight = "200px",
-  disableSuspense = false,
 }: LazyLoadWrapperProps) {
-  const [isVisible, setIsVisible] = useState(false);
-  const [hasTriggered, setHasTriggered] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    // Check if IntersectionObserver is supported
-    if (!("IntersectionObserver" in window)) {
-      // Fallback: load immediately
-      setIsVisible(true);
-      setHasTriggered(true);
-      return;
-    }
-
-    const element = containerRef.current;
-    if (!element) return;
-
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) {
-          setIsVisible(true);
-          setHasTriggered(true);
-
-          if (triggerOnce) {
-            observer.unobserve(element);
-          }
-        } else if (!triggerOnce) {
-          setIsVisible(false);
-        }
-      },
-      {
-        rootMargin,
-        threshold,
-      }
-    );
-
-    observer.observe(element);
-
-    return () => {
-      observer.disconnect();
-    };
-  }, [rootMargin, threshold, triggerOnce]);
-
   const containerStyle: React.CSSProperties = {
     minHeight: typeof minHeight === "number" ? `${minHeight}px` : minHeight,
   };
 
   return (
-    <div
-      ref={containerRef}
-      className={`${className} ${fadeIn && isVisible ? "animate-fade-in" : ""}`}
+    <div 
+      className={className}
       style={containerStyle}
     >
-{isVisible ? (
-        disableSuspense ? children : (
-          <Suspense fallback={skeleton || <DefaultSkeleton />}>
-            {children}
-          </Suspense>
-        )
-      ) : (
-        skeleton || <DefaultSkeleton />
-      )}
+      {children}
     </div>
   );
 }

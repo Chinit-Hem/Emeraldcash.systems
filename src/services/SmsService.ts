@@ -274,9 +274,9 @@ export class SmsAssetService extends BaseService<SmsAssetEntity, SmsAssetDB> {
         return { success: false, error: 'No fields to update', meta: { durationMs: 0, queryCount: 0 } };
       }
 
-      const setClauses = columns.map((col, i) => `${col} = $${i + 2}`).join(', ');
-      const query = `UPDATE ${this.tableName} SET ${setClauses}, updated_at = NOW() WHERE id = $1 RETURNING *`;
-      const values = [id, ...Object.values(data)];
+      const setClauses = columns.map((col, i) => `${col} = $${i + 1}`).join(', ');
+      const query = `UPDATE ${this.tableName} SET ${setClauses}, updated_at = NOW() WHERE id = $${columns.length + 1} RETURNING *`;
+      const values = [...Object.values(data), id];
 
       const result = await dbManager.executeUnsafe<SmsAssetDB>(query, values);
       if (result.length === 0) {

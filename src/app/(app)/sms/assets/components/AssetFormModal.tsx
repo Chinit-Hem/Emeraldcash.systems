@@ -1,5 +1,6 @@
 "use client";
 
+import { compressImage } from '@/lib/compressImage';
 import { generateShortUUID } from '@/lib/uuid';
 import { Loader2, Save, Upload, X } from 'lucide-react';
 import Image from 'next/image';
@@ -28,6 +29,86 @@ interface AssetFormModalProps {
   initialData?: Partial<SmsAsset>;
   title: string;
   isEdit?: boolean;
+}
+
+interface CloudinarySignature {
+  signature: string;
+  timestamp: number;
+  api_key: string;
+  cloud_name: string;
+  upload_preset: string;
+  folder: string;
+  public_id?: string;
+  tags?: string;
+}
+
+async function getCloudinarySignature(publicId: string): Promise<CloudinarySignature> {
+  const response = await fetch('/api/cloudinary-signature', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      folder: 'sms/assets/images',
+      public_id: publicId,
+      tags: ['sms', 'asset'],
+    }),
+  });
+
+  const result = await response.json().catch(() => ({}));
+
+  if (!response.ok || !result.ok || !result.data) {
+    throw new Error(result.error || `Failed to prepare upload: ${response.status}`);
+  }
+
+  return result.data;
+}
+
+function uploadToCloudinary(
+  file: File,
+  signatureData: CloudinarySignature,
+  onProgress: (progress: number) => void
+): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('upload_preset', signatureData.upload_preset);
+    formData.append('folder', signatureData.folder);
+    formData.append('api_key', signatureData.api_key);
+    formData.append('timestamp', String(signatureData.timestamp));
+    formData.append('signature', signatureData.signature);
+
+    if (signatureData.public_id) formData.append('public_id', signatureData.public_id);
+    if (signatureData.tags) formData.append('tags', signatureData.tags);
+
+    const request = new XMLHttpRequest();
+    request.open('POST', `https://api.cloudinary.com/v1_1/${signatureData.cloud_name}/image/upload`);
+    request.timeout = 120000;
+
+    request.upload.onprogress = (event) => {
+      if (!event.lengthComputable) return;
+      onProgress(30 + Math.round((event.loaded / event.total) * 70));
+    };
+
+    request.onload = () => {
+      let result: { secure_url?: string; error?: { message?: string } } = {};
+      try {
+        result = JSON.parse(request.responseText || '{}');
+      } catch {
+        reject(new Error(`Cloudinary upload failed: ${request.status}`));
+        return;
+      }
+
+      if (request.status >= 200 && request.status < 300 && result.secure_url) {
+        resolve(result.secure_url);
+        return;
+      }
+
+      reject(new Error(result.error?.message || `Cloudinary upload failed: ${request.status}`));
+    };
+
+    request.onerror = () => reject(new Error('Network error while uploading image'));
+    request.ontimeout = () => reject(new Error('Image upload timed out. Try a smaller image or a stronger connection.'));
+    request.send(formData);
+  });
 }
 
 export default function AssetFormModal({
@@ -113,28 +194,37 @@ export default function AssetFormModal({
     setLoading(true);
     setUploadProgress(0);
 
-    const formDataToSend = new FormData();
-    formDataToSend.append('file', file);
-    formDataToSend.append('folder', 'sms/assets/images');
-    formDataToSend.append('publicId', `asset-${generateShortUUID()}`);
+    const publicId = `asset-${generateShortUUID()}`;
 
     try {
-      const response = await fetch('/api/sms/assets/upload', {
-        method: 'POST',
-        body: formDataToSend,
-      });
+      setUploadProgress(10);
+      const signatureData = await getCloudinarySignature(publicId);
 
-      const result = await response.json();
-
-      if (result.success) {
-        setFormData({ ...formData, imageUrl: result.url });
-        setImagePreview(result.url);
-        setErrors({ ...errors, image: '' });
-      } else {
-        setErrors({ ...errors, image: result.error || 'Upload failed' });
+      setUploadProgress(20);
+      let fileToUpload = file;
+      try {
+        const compressed = await compressImage(file, {
+          maxWidth: 1280,
+          maxHeight: 1280,
+          quality: 0.75,
+          type: 'image/webp',
+        });
+        fileToUpload = compressed.file;
+      } catch {
+        fileToUpload = file;
       }
-    } catch (_err) {
-      setErrors({ ...errors, image: 'Upload failed' });
+
+      setUploadProgress(30);
+      const imageUrl = await uploadToCloudinary(fileToUpload, signatureData, setUploadProgress);
+
+      setFormData({ ...formData, imageUrl });
+      setImagePreview(imageUrl);
+      setErrors({ ...errors, image: '' });
+    } catch (err) {
+      setErrors({
+        ...errors,
+        image: err instanceof Error ? err.message : 'Upload failed',
+      });
     } finally {
       setLoading(false);
       setUploadProgress(0);

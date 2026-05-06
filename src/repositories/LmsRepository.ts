@@ -434,7 +434,7 @@ export class LmsDashboardRepository {
    */
   private async executeQuery<T>(query: string, params: (string | number | null)[] = []): Promise<T[]> {
     const { dbManager } = await import("@/lib/db-singleton"); // Dynamic import for dbManager
-    return await dbManager.executeUnsafe<T>(query, params, 30000); // Default timeout for dashboard queries
+    return await dbManager.executeUnsafe<T>(query, params, 45000); // Increased timeout for LMS queries
   }
 }
 

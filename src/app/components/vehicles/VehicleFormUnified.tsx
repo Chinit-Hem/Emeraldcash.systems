@@ -527,206 +527,74 @@ export function VehicleFormUnified({
     }
   }, [formData, uploadedImage, externalError, onClearExternalError]);
 
-  // Determine which sections to show
-  const showImage = !disabledSections.includes("image");
-  const showBasic = !disabledSections.includes("basic");
-  const showSpecs = !disabledSections.includes("specs");
-  const showPricing = !disabledSections.includes("pricing");
-
-  // Wizard step content
-  const getWizardStepContent = () => {
-    switch (wizardStep) {
-      case 1:
-        return (
-          <>
-            {showImage && (
-              <ImageSection
-                formData={formData}
-                uploadedImage={uploadedImage}
-                imageLoading={imageLoading}
-                errors={errors}
-                isSubmitting={isSubmitting}
-                onImageChange={handleImageChange}
-                onRemoveImage={handleRemoveImage}
-                layout={layout}
-              />
-            )}
-            {showBasic && (
-              <BasicInfoSection
-                formData={formData}
-                errors={errors}
-                touched={touched}
-                isSubmitting={isSubmitting}
-                categoryOptions={categoryOptions}
-                onChange={handleChange}
-                onBlur={handleBlur}
-                layout={layout}
-              />
-            )}
-          </>
-        );
-      case 2:
-        return showSpecs ? (
-          <SpecsSection
-            formData={formData}
-            isSubmitting={isSubmitting}
-            onChange={handleChange}
-            layout={layout}
-          />
-        ) : null;
-      case 3:
-        return showPricing ? (
-          <PricingSection
-            formData={formData}
-            errors={errors}
-            touched={touched}
-            isSubmitting={isSubmitting}
-            derivedPrices={derivedPrices}
-            onChange={handleChange}
-            onBlur={handleBlur}
-            layout={layout}
-          />
-        ) : null;
-      default:
-        return null;
-    }
-  };
-
-  // Render form content based on layout
   const renderFormContent = () => {
-    if (layout === "wizard") {
-      return (
-        <div className="space-y-6">
-          {/* Wizard Progress */}
-          <div className="flex items-center gap-2 mb-6">
-            {Array.from({ length: totalWizardSteps }, (_, i) => i + 1).map((step) => (
-              <React.Fragment key={step}>
-                <div
-                  className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
-                    step === wizardStep
-                      ? "bg-emerald-600 text-white"
-                      : step < wizardStep
-                      ? "bg-emerald-100 text-emerald-700"
-                      : "bg-gray-100 text-gray-500"
-                  }`}
-                >
-                  {step < wizardStep ? "✓" : step}
-                </div>
-                {step < totalWizardSteps && (
-                  <div className={`flex-1 h-1 rounded ${step < wizardStep ? "bg-emerald-100" : "bg-gray-100"}`} />
-                )}
-              </React.Fragment>
-            ))}
-          </div>
-
-          {/* Step Content */}
-          {getWizardStepContent()}
-
-          {/* Custom children/special fields */}
-          {children}
-
-          {/* Wizard Navigation */}
-          <div className="flex justify-between pt-4 border-t border-gray-200 dark:border-gray-700">
-            <GlassButton
-              type="button"
-              variant="secondary"
-              onClick={() => onWizardStepChange?.(Math.max(1, wizardStep - 1))}
-              disabled={wizardStep === 1 || isSubmitting}
-            >
-              Previous
-            </GlassButton>
-            {wizardStep < totalWizardSteps ? (
-              <GlassButton
-                type="button"
-                variant="primary"
-                onClick={() => {
-                  if (validateForm()) {
-                    onWizardStepChange?.(wizardStep + 1);
-                  }
-                }}
-              >
-                Next
-              </GlassButton>
-            ) : (
-              <GlassButton
-                type="submit"
-                variant="primary"
-                isLoading={isSubmitting}
-                disabled={!hasChanges}
-              >
-                Save Vehicle
-              </GlassButton>
-            )}
-          </div>
-        </div>
-      );
-    }
-
-    // Default, compact, and modal layouts
+    // 0ms FIX: render all sections immediately (no wizard gating)
     return (
       <div className="space-y-6">
-        {showImage && (
-          <ImageSection
-            formData={formData}
-            uploadedImage={uploadedImage}
-            imageLoading={imageLoading}
-            errors={errors}
-            isSubmitting={isSubmitting}
-            onImageChange={handleImageChange}
-            onRemoveImage={handleRemoveImage}
-            layout={layout}
-          />
-        )}
-        {showBasic && (
-          <BasicInfoSection
-            formData={formData}
-            errors={errors}
-            touched={touched}
-            isSubmitting={isSubmitting}
-            categoryOptions={categoryOptions}
-            onChange={handleChange}
-            onBlur={handleBlur}
-            layout={layout}
-          />
-        )}
-        {showSpecs && (
-          <SpecsSection
-            formData={formData}
-            isSubmitting={isSubmitting}
-            onChange={handleChange}
-            layout={layout}
-          />
-        )}
-        {showPricing && (
-          <PricingSection
-            formData={formData}
-            errors={errors}
-            touched={touched}
-            isSubmitting={isSubmitting}
-            derivedPrices={derivedPrices}
-            onChange={handleChange}
-            onBlur={handleBlur}
-            layout={layout}
-          />
-        )}
+        <ImageSection
+          formData={formData}
+          uploadedImage={uploadedImage}
+          imageLoading={imageLoading}
+          errors={errors}
+          isSubmitting={isSubmitting}
+          onImageChange={handleImageChange}
+          onRemoveImage={handleRemoveImage}
+          layout={layout}
+        />
+        <BasicInfoSection
+          formData={formData}
+          errors={errors}
+          touched={touched}
+          isSubmitting={isSubmitting}
+          categoryOptions={categoryOptions}
+          onChange={handleChange}
+          onBlur={handleBlur}
+          layout={layout}
+        />
+        <SpecsSection
+          formData={formData}
+          isSubmitting={isSubmitting}
+          onChange={handleChange}
+          layout={layout}
+        />
+        <PricingSection
+          formData={formData}
+          errors={errors}
+          touched={touched}
+          isSubmitting={isSubmitting}
+          derivedPrices={derivedPrices}
+          onChange={handleChange}
+          onBlur={handleBlur}
+          layout={layout}
+        />
 
-        {/* Custom children/special fields */}
         {children}
 
-        {/* Submit Error */}
-        {(externalError || Object.keys(errors).some(k => errors[k])) && (
+        {(externalError || Object.keys(errors).some((k) => errors[k])) && (
           <div className="p-4 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
             <p className="text-sm text-red-800 dark:text-red-300 flex items-center gap-2">
               <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
               </svg>
               {externalError || "Please fix the errors above"}
             </p>
           </div>
         )}
 
-        {/* Actions */}
-        <div className={`flex ${layout === "compact" ? "flex-col" : "flex-col sm:flex-row"} gap-3 ${layout !== "modal" ? "sticky bottom-0 -mx-4 md:-mx-6 -mb-4 md:-mb-6 mt-8 bg-white/95 dark:bg-gray-900/95 backdrop-blur-xl border-t border-gray-200 dark:border-gray-800 p-4 md:p-6 rounded-b-2xl" : ""}`}>
+        <div
+          className={`flex ${
+            layout === "compact" ? "flex-col" : "flex-col sm:flex-row"
+          } gap-3 ${
+            layout !== "modal"
+              ? "sticky bottom-0 -mx-4 md:-mx-6 -mb-4 md:-mb-6 mt-8 bg-white/95 dark:bg-gray-900/95 backdrop-blur-xl border-t border-gray-200 dark:border-gray-800 p-4 md:p-6 rounded-b-2xl"
+              : ""
+          }`}
+        >
           <GlassButton
             type="submit"
             variant="primary"
@@ -738,6 +606,7 @@ export function VehicleFormUnified({
           >
             {isSubmitting ? "Saving..." : "Save Changes"}
           </GlassButton>
+
           <GlassButton
             type="button"
             variant="secondary"
@@ -750,6 +619,7 @@ export function VehicleFormUnified({
             {layout === "modal" ? "Cancel" : "Back"}
           </GlassButton>
         </div>
+
         {hasChanges && !isSubmitting && layout !== "compact" && (
           <p className="text-center text-sm text-amber-600 dark:text-amber-400 mt-2">
             You have unsaved changes

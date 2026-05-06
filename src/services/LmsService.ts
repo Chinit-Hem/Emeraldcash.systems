@@ -754,11 +754,10 @@ export class LmsService extends BaseService<LmsCategoryEntity, LmsCategoryDB> {
     const startTime = Date.now();
 
     try {
-      const [statsResult, categoriesResult, allLessonsResult] = await Promise.all([
-        this.getDashboardStats(),
-        this.getCategories(),
-        this.getAllLessons()
-      ]);
+      // Avoid heavy parallel DB queries to reduce Neon pool pressure/timeouts
+      const statsResult = await this.getDashboardStats();
+      const categoriesResult = await this.getCategories();
+      const allLessonsResult = await this.getAllLessons();
 
       if (
         !statsResult.success ||
