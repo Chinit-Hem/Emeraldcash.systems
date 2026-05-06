@@ -652,13 +652,23 @@ export const vehicleApi = {
 
   // Update vehicle
   async updateVehicle(id: string, vehicleData: Partial<Vehicle>): Promise<Vehicle> {
-    const result = await apiRequest<Vehicle>(`/api/vehicles/${encodeURIComponent(id)}`, {
-      method: "PUT",
-      body: JSON.stringify(vehicleData),
-    });
-    // Record mutation to invalidate client-side cache
-    recordMutation();
-    return result;
+    try {
+      const result = await apiRequest<Vehicle>(`/api/vehicles/${encodeURIComponent(id)}`, {
+        method: "PUT",
+        body: JSON.stringify(vehicleData),
+      });
+      console.log('[api.updateVehicle] SUCCESS - recording mutation');
+      // Record mutation to invalidate client-side cache
+      recordMutation();
+      return result;
+    } catch (error) {
+      console.error('[api.updateVehicle] FAILED:', {
+        id,
+        image_id: (vehicleData as Partial<Vehicle> & { image_id?: string | null }).image_id || vehicleData.Image,
+        error: error instanceof Error ? error.message : String(error)
+      });
+      throw error;
+    }
   },
 
   // Delete vehicle

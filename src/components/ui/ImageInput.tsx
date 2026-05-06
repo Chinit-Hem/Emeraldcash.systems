@@ -44,6 +44,8 @@ export interface ImageInputProps {
   className?: string;
   /** Whether the input is disabled */
   disabled?: boolean;
+  /** Notifies parent while client-side image processing is running */
+  onProcessingChange?: (isProcessing: boolean) => void;
   /** Placeholder text for URL input */
   urlPlaceholder?: string;
 }
@@ -68,6 +70,7 @@ export function ImageInput({
   accept = "image/*",
   className = "",
   disabled = false,
+  onProcessingChange,
   urlPlaceholder = "Paste image URL or press Ctrl+V",
 }: ImageInputProps) {
   // ============================================================================
@@ -99,6 +102,10 @@ export function ImageInput({
   useEffect(() => {
     setIsMounted(true);
   }, []);
+
+  useEffect(() => {
+    onProcessingChange?.(isLoading);
+  }, [isLoading, onProcessingChange]);
 
   // Update preview when value changes
   useEffect(() => {
@@ -280,13 +287,13 @@ export function ImageInput({
       return "Please upload an image file (JPG, PNG, GIF, etc.)";
     }
     
-    const maxSizeBytes = 5 * 1024 * 1024; // Use default 5MB
+    const maxSizeBytes = maxSizeMB * 1024 * 1024;
     if (file.size > maxSizeBytes) {
-      return `File size must be less than 5MB (current: ${formatFileSize(file.size)})`;
+      return `File size must be less than ${maxSizeMB}MB (current: ${formatFileSize(file.size)})`;
     }
     
     return null;
-  }, []);
+  }, [maxSizeMB]);
 
   const readFileAsDataUrl = (file: File): Promise<string> => {
     return fileToDataUrl(file);

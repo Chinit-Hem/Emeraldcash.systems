@@ -7,8 +7,67 @@
 import { createErrorResponse, createSuccessResponse, withErrorHandling } from "@/lib/api-error-wrapper";
 import { requirePermission } from "@/lib/auth-helpers";
 import { vehicleService } from "@/services/VehicleService";
+import { normalizeImageUrl } from "@/lib/cloudinary";
 import { NextRequest, NextResponse } from "next/server";
-import type { Vehicle } from "@/lib/types";
+
+type VehicleUpdatePayload = {
+  Category?: string;
+  category?: string;
+  Brand?: string;
+  brand?: string;
+  Model?: string;
+  model?: string;
+  Year?: number | string | null;
+  year?: number | string | null;
+  Plate?: string;
+  plate?: string;
+  PriceNew?: number | string | null;
+  market_price?: number | string | null;
+  TaxType?: string;
+  tax_type?: string;
+  Condition?: string;
+  condition?: string;
+  BodyType?: string;
+  body_type?: string;
+  Color?: string;
+  color?: string;
+  Image?: string | null;
+  image_id?: string | null;
+  thumbnail_url?: string | null;
+};
+
+function firstDefined<T>(...values: Array<T | undefined>): T | undefined {
+  return values.find((value) => value !== undefined);
+}
+
+function normalizeOptionalNumber(value: unknown): number | undefined {
+  if (value === null || value === undefined || value === "") return undefined;
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : undefined;
+}
+
+function normalizeOptionalString(value: string | null | undefined): string | null | undefined {
+  if (value === null) return null;
+  if (value === undefined) return undefined;
+  const trimmed = value.trim();
+  return trimmed === "" ? null : trimmed;
+}
+
+function normalizeUpdatePayload(payload: VehicleUpdatePayload) {
+  return {
+    category: firstDefined(payload.Category, payload.category)?.trim(),
+    brand: firstDefined(payload.Brand, payload.brand)?.trim(),
+    model: firstDefined(payload.Model, payload.model)?.trim(),
+    year: normalizeOptionalNumber(firstDefined(payload.Year, payload.year)),
+    plate: firstDefined(payload.Plate, payload.plate)?.trim(),
+    market_price: normalizeOptionalNumber(firstDefined(payload.PriceNew, payload.market_price)),
+    tax_type: firstDefined(payload.TaxType, payload.tax_type)?.trim(),
+    condition: firstDefined(payload.Condition, payload.condition)?.trim(),
+    body_type: firstDefined(payload.BodyType, payload.body_type)?.trim(),
+    color: firstDefined(payload.Color, payload.color)?.trim(),
+    image_id: normalizeOptionalString(firstDefined(payload.Image, payload.image_id)),
+  };
+}
 
 // ============================================================================
 // CORS Configuration
@@ -112,43 +171,69 @@ const putHandler = withErrorHandling(async (req: NextRequest, { logger, requestI
 
   const id = parseInt(idStr, 10);
 
-  let payload;
+  let payload: VehicleUpdatePayload;
   try {
     payload = await req.json();
   } catch {
     return createErrorResponse("Invalid JSON payload", requestId, Date.now() - startTime, 400, buildCorsHeaders(req));
   }
 
+  const dbPayload = normalizeUpdatePayload(payload);
+
+  // Log incoming payload for debugging image update issues
+  console.log('[🚀 API UPDATE FULL PAYLOAD]:', JSON.stringify({ 
+    vehicleId: id, 
+    dbPayload,
+    payloadKeys: Object.keys(payload)
+  }, null, 2));
+
+  // 🚀 IMAGE SAVE FIX: Normalize image_id (public_id → URL)
+  if (dbPayload.image_id) {
+    const normalizedImageId = await normalizeImageUrl(dbPayload.image_id);
+    console.log(`[API UPDATE ${id}] Image normalized: "${dbPayload.image_id.substring(0,30)}..." → "${normalizedImageId.substring(0,50)}..."`);
+    dbPayload.image_id = normalizedImageId;
+  }
+
   // Required fields validation
-  const required = ["Category", "Brand", "Model", "Plate"];
-  for (const field of required) {
-    if (!payload[field]) {
+  const requiredFields = [
+    ["category", dbPayload.category],
+    ["brand", dbPayload.brand],
+    ["model", dbPayload.model],
+    ["plate", dbPayload.plate],
+  ] as const;
+
+  for (const [field, value] of requiredFields) {
+    if (!value) {
       return createErrorResponse(`Missing required: ${field}`, requestId, Date.now() - startTime, 400, buildCorsHeaders(req));
     }
   }
 
-// Convert to DB format for service
-  const dbPayload = {
-    category: payload.Category as string,
-    brand: payload.Brand as string,
-    model: payload.Model as string,
-    year: payload.Year ?? undefined,
-    plate: payload.Plate as string,
-    market_price: payload.PriceNew as number,
-    tax_type: payload.TaxType || undefined,
-    condition: payload.Condition as string,
-    body_type: payload.BodyType || undefined,
-    color: payload.Color || undefined,
-    image_id: payload.Image || undefined,
-  };
+  logger.debug("[UPDATE]", { vehicleId: id, plate: dbPayload.plate, hasImage: !!dbPayload.image_id });
 
-  logger.debug("[UPDATE]", { vehicleId: id, plate: payload.Plate });
-
+  console.error('[🚀 VEHICLE API UPDATE START]', { 
+    vehicleId: id, 
+    image_id: dbPayload.image_id ? `${dbPayload.image_id.substring(0,50)}...` : null,
+    image_format: dbPayload.image_id ? (dbPayload.image_id.startsWith('http') ? 'URL' : dbPayload.image_id.startsWith('data:') ? 'DATA' : 'PUBLIC_ID') : null,
+    plate: dbPayload.plate,
+    requestId 
+  });
+  
   const result = await vehicleService.updateVehicle(id, dbPayload);
+  
+  console.error('[🚀 VEHICLE API UPDATE RESULT]', { 
+    success: result.success, 
+    error: result.error,
+    image_saved: dbPayload.image_id,
+    requestId 
+  });
 
   if (!result.success) {
-    logger.error("[UPDATE FAILED]", { error: result.error, vehicleId: id });
-    return createErrorResponse(result.error || "Update failed", requestId, Date.now() - startTime, 500, buildCorsHeaders(req));
+    const errorMsg = result.error || 'Unknown database error (no error message returned)';
+    logger.error("[UPDATE FAILED]", { error: errorMsg, vehicleId: id, dbPayloadKeys: Object.keys(dbPayload), requestId });
+    return createErrorResponse(
+      `Update failed: ${errorMsg}`, 
+      requestId, Date.now() - startTime, 500, buildCorsHeaders(req)
+    );
   }
 
   logger.info("[UPDATE OK]", { vehicleId: id });

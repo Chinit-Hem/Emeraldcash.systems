@@ -31,6 +31,7 @@ import type { VehicleFilters } from "@/types/vehicle";
 // Re-export VehicleFilters for backwards compatibility
 export type { VehicleFilters };
 import { BaseService, ServiceResult } from "./BaseService";
+import { isCloudinaryPublicId } from "@/lib/cloudinary";
 
 
 
@@ -894,19 +895,75 @@ conditions.push(`(NULLIF(TRIM(COALESCE(image_id, '')), '') IS NULL AND NULLIF(TR
     id: number,
     vehicle: Partial<VehicleDB>
   ): Promise<ServiceResult<Vehicle>> {
+    const logPrefix = `[VehicleService.updateVehicle #${id}]`;
+    console.error(`${logPrefix} INPUT:`, { 
+      image_id: vehicle.image_id ? vehicle.image_id.substring(0, 100) + '...' : null, 
+      keys: Object.keys(vehicle),
+      plate: vehicle.plate 
+    });
+    
+    // 🚀 IMAGE SAVE FIX: Accept public_id/URL/data URL (sync validation)
+    if (vehicle.image_id != null) {
+      const img = String(vehicle.image_id).trim();
+      
+      console.log(`${logPrefix} IMAGE SAVE:`, {
+        length: img.length,
+        format: img.startsWith('http') ? 'URL' : 
+                img.startsWith('data:') ? 'DATA' : 
+                isCloudinaryPublicId(img) ? 'PUBLIC_ID' : 'RAW',
+        preview: img.substring(0, 50)
+      });
+      
+      // Store raw: public_id, full URL, or data URL - toEntity() will normalize on read
+      if (img.length > 1000) {
+        const err = `Image ID too long (${img.length}/1000 chars max)`;
+        console.error(`${logPrefix} ${err}`);
+        return { success: false, error: err, meta: { durationMs: 0, queryCount: 0 } };
+      }
+      
+      // ✅ FIXED: No format rejection - accepts ANY valid string <=1000 chars
+      vehicle.image_id = img;
+    }
+
     // Normalize category if provided
     const data = vehicle.category
-      ? { ...vehicle, category: VehicleService.normalizeCategory(vehicle.category) }
+      ? { ...vehicle, category: VehicleService.normalizeCategory(vehicle.category as string) }
       : vehicle;
 
-    const result = await this.update(id, data);
-    if (result.success && result.data) {
+    try {
+      console.error(`${logPrefix} Calling base update...`);
+      const result = await this.update(id, data);
+      console.error(`${logPrefix} Base result:`, { 
+        success: result.success, 
+        error: result.error,
+        affectedRows: (result.meta as typeof result.meta & { affectedRows?: number })?.affectedRows 
+      });
+      
+      if (result.success && result.data) {
+        return {
+          ...result,
+          data: this.toVehicle(result.data),
+        };
+      }
+      
+      const baseError = result.error || 'BaseService.update returned success:false without error message';
+      console.error(`${logPrefix} Base service failed:`, baseError);
       return {
-        ...result,
-        data: this.toVehicle(result.data),
+        success: false,
+        error: `Update failed in base service: ${baseError}`,
+        meta: result.meta || { durationMs: 0, queryCount: 0 }
+      };
+    } catch (error) {
+      const errMsg = error instanceof Error ? error.message : String(error);
+      console.error(`${logPrefix} CRITICAL ERROR:`, {
+        id, dataKeys: Object.keys(data), errMsg, stack: error instanceof Error ? error.stack?.substring(0,500) : undefined
+      });
+      return {
+        success: false,
+        error: `Critical update error: ${errMsg}`,
+        meta: { durationMs: 0, queryCount: 0 }
       };
     }
-    return result as ServiceResult<Vehicle>;
   }
 
   /**

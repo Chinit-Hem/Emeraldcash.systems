@@ -7,36 +7,25 @@ import { recordMutation } from "@/lib/vehicleCache";
 import { safeBase64ToFile } from "@/lib/fileToDataUrl";
 import type { Vehicle } from "@/lib/types";
 
-/**
- * Clean base64 data URL to remove problematic characters
- * This is a defensive measure to handle data that may have been corrupted
- */
 function cleanBase64DataUrl(dataUrl: string): string {
   if (!dataUrl || typeof dataUrl !== 'string') return dataUrl;
   
-  // Only process data URLs
   if (!dataUrl.startsWith('data:')) return dataUrl;
   
-  // Find the comma separator
   const commaIndex = dataUrl.indexOf(',');
   if (commaIndex === -1) return dataUrl;
   
   const header = dataUrl.substring(0, commaIndex);
   let base64Data = dataUrl.substring(commaIndex + 1);
   
-  // Remove all whitespace and control characters (including zero-width chars)
   base64Data = base64Data.replace(/[\s\u0000-\u001F\u007F-\u009F\u200B-\u200D\uFEFF]/g, '');
   
-  // Convert URL-safe base64 to standard
   base64Data = base64Data.replace(/-/g, "+").replace(/_/g, "/");
   
-  // Remove ellipsis characters
   base64Data = base64Data.replace(/…/g, '').replace(/\u2026/g, '');
   
-  // Remove all non-base64 characters
   base64Data = base64Data.replace(/[^A-Za-z0-9+/]/g, '');
   
-  // Add padding if needed
   const remainder = base64Data.length % 4;
   if (remainder !== 0) {
     base64Data += "=".repeat(4 - remainder);
@@ -61,30 +50,23 @@ interface UseUpdateVehicleOptimisticReturn {
   isUpdating: boolean;
 }
 
-// Maximum retry attempts for transient errors - ULTRA-OPTIMIZED for minimal delay
-const MAX_RETRY_ATTEMPTS = 1; // Single retry for fastest response
-const RETRY_DELAY_MS = 100; // Minimal retry delay - reduced from 300ms
-const MAX_CLOUDINARY_RETRIES = 2; // Increased retries for direct Cloudinary upload
-const CLOUDINARY_RETRY_DELAY = 500; // Slightly longer delay for Cloudinary
+const MAX_RETRY_ATTEMPTS = 1;
+const RETRY_DELAY_MS = 100;
+const MAX_CLOUDINARY_RETRIES = 2;
+const CLOUDINARY_RETRY_DELAY = 500;
 
-// Image compression settings - ULTRA-OPTIMIZED for speed
-const COMPRESSION_MAX_WIDTH = 800; // Optimized width
-const COMPRESSION_QUALITY = 0.7; // Optimized quality
+const COMPRESSION_MAX_WIDTH = 800;
+const COMPRESSION_QUALITY = 0.7;
 
-// Skip compression if file is already small enough (under 800KB)
-// This prevents double compression when VehicleForm already compressed the image
 const SKIP_COMPRESSION_THRESHOLD_KB = 800;
 
-// Cloudinary configuration - CLIENT-SIDE UNSIGNED UPLOAD
-// These MUST be set in environment variables with NEXT_PUBLIC_ prefix for direct uploads
 const CLOUDINARY_CLOUD_NAME = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
 const CLOUDINARY_UPLOAD_PRESET = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET || "vehicle_uploads";
 
-// Helper function to delay
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-// Helper to check if error is retryable
-const isRetryableError = (error: Error): boolean => {
+const isRetryableError = (error: Error | null): boolean => {
+  if (!error) return false;
   const message = error.message.toLowerCase();
   const has502 = message.includes('502') || message.includes('[http 502]');
   const has504 = message.includes('504') || message.includes('[http 504]');
@@ -100,14 +82,10 @@ const isRetryableError = (error: Error): boolean => {
   return has502 || has504 || hasTimeout || hasNetworkError || isRetryableStatus;
 };
 
-/**
- * Validate Cloudinary configuration for direct uploads
- */
 function validateCloudinaryConfig(): { valid: boolean; error?: string; useSignedUpload?: boolean } {
   if (!CLOUDINARY_CLOUD_NAME) {
-    // If no direct upload config, we'll use signed upload via API instead
     return {
-      valid: true, // Don't block - we'll use signed upload fallback
+      valid: true,
       useSignedUpload: true
     };
   }
@@ -122,9 +100,6 @@ function validateCloudinaryConfig(): { valid: boolean; error?: string; useSigned
   return { valid: true, useSignedUpload: false };
 }
 
-/**
- * Get Cloudinary signature from server API
- */
 async function getCloudinarySignature(
   folder: string,
   publicId: string,
@@ -167,10 +142,6 @@ async function getCloudinarySignature(
   return result.data;
 }
 
-/**
- * Upload image file to Cloudinary using unsigned upload preset with retry logic
- * CLIENT-SIDE: Uploads directly from browser to Cloudinary (bypasses Vercel server)
- */
 async function uploadImageToCloudinaryWithRetry(
   file: File,
   category: string,
@@ -186,7 +157,6 @@ async function uploadImageToCloudinaryWithRetry(
     } catch (error) {
       lastError = error instanceof Error ? error : new Error("Unknown upload error");
       
-      // Don't retry on configuration errors
       if (lastError.message.includes('configuration error') || 
           lastError.message.includes('Upload Preset Error') ||
           lastError.message.includes('Cloud Name Error')) {
@@ -202,27 +172,19 @@ async function uploadImageToCloudinaryWithRetry(
   throw lastError || new Error("Cloudinary upload failed after retries");
 }
 
-/**
- * Upload image file to Cloudinary using SIGNED upload (server-generated signature)
- * Used when NEXT_PUBLIC_ environment variables are not available
- */
 async function uploadImageToCloudinarySigned(
   file: File,
   category: string,
   vehicleId: string
 ): Promise<string> {
-  // Get folder based on category
   const folder = getCloudinaryFolder(category);
   const publicId = `vehicle_${vehicleId}_${Date.now()}`;
   const tags = [category, "vms", "vehicle"];
 
-  // Get signature from server
   const signatureData = await getCloudinarySignature(folder, publicId, tags);
 
-  // Build Cloudinary upload URL using cloud name from server response
   const cloudinaryUrl = `https://api.cloudinary.com/v1_1/${signatureData.cloud_name || 'unknown'}/image/upload`;
   
-  // Create form data for Cloudinary SIGNED upload
   const formData = new FormData();
   formData.append("file", file);
   formData.append("upload_preset", signatureData.upload_preset);
@@ -270,22 +232,13 @@ async function uploadImageToCloudinarySigned(
   }
 }
 
-/**
- * Upload image file directly to Cloudinary from the browser using UNSIGNED upload
- * Uses upload preset configured in Cloudinary dashboard (no signature needed)
- * This bypasses Vercel entirely and prevents 502/504 errors
- * 
- * Falls back to SIGNED upload if NEXT_PUBLIC_ environment variables are not set
- */
 async function uploadImageToCloudinary(
   file: File,
   category: string,
   vehicleId: string
 ): Promise<string> {
-  // Check if direct upload is available
   const configValidation = validateCloudinaryConfig();
   
-  // If no direct upload config, use signed upload via API
   if (configValidation.useSignedUpload) {
     return uploadImageToCloudinarySigned(file, category, vehicleId);
   }
@@ -294,15 +247,12 @@ async function uploadImageToCloudinary(
     throw new Error(`Configuration Error: ${configValidation.error}`);
   }
 
-  // Build Cloudinary upload URL
   const cloudinaryUrl = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`;
   
-  // Get folder based on category
   const folder = getCloudinaryFolder(category);
   const publicId = `vehicle_${vehicleId}_${Date.now()}`;
   const tags = [category, "vms", "vehicle"];
 
-  // Create form data for Cloudinary UNSIGNED upload
   const formData = new FormData();
   formData.append("file", file);
   formData.append("upload_preset", CLOUDINARY_UPLOAD_PRESET);
@@ -363,23 +313,20 @@ export function useUpdateVehicleOptimistic(
       let attempts = 0;
       let cloudinaryImageUrl: string | null = null;
 
-      // Helper to report progress
       const reportProgress = (stage: 'compressing' | 'uploading' | 'processing' | 'saving', progress: number) => {
         onProgress?.(stage, progress);
       };
 
-      // Step 1: Handle image upload to Cloudinary (OUTSIDE retry loop - do this once)
+      // Image upload
       try {
-        // Case A: We have a File object from file input
         if (imageFile) {
           const fileSizeKB = imageFile.size / 1024;
           
-          // Skip compression if file is already small enough (prevents double compression)
           let fileToUpload: File;
           
           if (fileSizeKB < SKIP_COMPRESSION_THRESHOLD_KB) {
             fileToUpload = imageFile;
-            reportProgress('compressing', 100); // Skip compression, mark as complete
+            reportProgress('compressing', 100);
           } else {
             reportProgress('compressing', 0);
             const compressedResult = await compressImage(imageFile, {
@@ -398,11 +345,9 @@ export function useUpdateVehicleOptimistic(
           );
           reportProgress('uploading', 100);
         }
-        // Case B: We have a Base64 string in data.Image
         else if (data.Image && data.Image.startsWith("data:image/")) {
-          reportProgress('compressing', 50); // Converting base64
+          reportProgress('compressing', 50);
           
-          // Clean the base64 data to remove any problematic characters
           const cleanedImage = cleanBase64DataUrl(data.Image);
           
           console.log("[useUpdateVehicleOptimistic] Converting base64 image:", {
@@ -439,12 +384,10 @@ export function useUpdateVehicleOptimistic(
           );
           reportProgress('uploading', 100);
         }
-        // Case C: We have an existing URL in data.Image
         else if (data.Image && (data.Image.startsWith("http://") || data.Image.startsWith("https://"))) {
           cloudinaryImageUrl = data.Image;
-          reportProgress('uploading', 100); // No upload needed
+          reportProgress('uploading', 100);
         } else {
-          // No image to upload
           reportProgress('uploading', 100);
         }
       } catch (uploadError) {
@@ -454,8 +397,7 @@ export function useUpdateVehicleOptimistic(
         throw error;
       }
 
-      // Step 2: Validate image upload result
-      // CRITICAL: If an image was provided but upload failed, block update
+      // Validate image result
       const imageWasProvided = !!imageFile || (data.Image && data.Image.startsWith("data:image/"));
       const imageUploadFailed = imageWasProvided && !cloudinaryImageUrl;
       const imageUrlIsInvalid = cloudinaryImageUrl === "undefined" || 
@@ -473,7 +415,7 @@ export function useUpdateVehicleOptimistic(
         throw error;
       }
 
-      // Step 3: Prepare payload with Cloudinary URL (never send Base64)
+      // Prepare payload
       const payload: Record<string, unknown> = {
         id: vehicleId,
         category: data.Category || originalVehicle.Category,
@@ -488,12 +430,9 @@ export function useUpdateVehicleOptimistic(
         market_price: data.PriceNew || originalVehicle.PriceNew,
       };
 
-      // Only add image_id if we have a valid Cloudinary URL
-      // CRITICAL: Never send Base64 strings to the API - they cause 502/503 errors
-      if (cloudinaryImageUrl && 
-          (cloudinaryImageUrl.startsWith('http://') || 
+      if (cloudinaryImageUrl &&
+          (cloudinaryImageUrl.startsWith('http://') ||
            cloudinaryImageUrl.startsWith('https://'))) {
-        // Double-check that we're not accidentally sending a Base64 string
         if (cloudinaryImageUrl.startsWith('data:image/')) {
           setIsUpdating(false);
           const error = new Error("Image upload failed: Invalid image format detected. Please try again.");
@@ -501,16 +440,16 @@ export function useUpdateVehicleOptimistic(
           throw error;
         }
         payload.image_id = cloudinaryImageUrl;
+      } else if (data.Image === "" && originalVehicle.Image) {
+        payload.image_id = null;
       }
 
-      // Remove undefined values
       Object.keys(payload).forEach(key => {
         if (payload[key] === undefined) {
           delete payload[key];
         }
       });
 
-      // Final safety check: ensure no Base64 data in any payload field
       const payloadString = JSON.stringify(payload);
       if (payloadString.includes('data:image/')) {
         setIsUpdating(false);
@@ -519,9 +458,8 @@ export function useUpdateVehicleOptimistic(
         throw error;
       }
 
-      // Step 4: Send to API with retry logic (only for the API call, not upload)
-      reportProgress('processing', 0); // Cloudinary processing + API preparation
-      await delay(100); // Small delay to allow Cloudinary processing to start
+      reportProgress('processing', 0);
+      await delay(100);
       reportProgress('processing', 50);
       
       while (attempts < MAX_RETRY_ATTEMPTS) {
@@ -529,6 +467,14 @@ export function useUpdateVehicleOptimistic(
 
         try {
           reportProgress('saving', 0);
+          console.log('[🚀 SENDING PAYLOAD]:', JSON.stringify(payload, null, 2));
+          console.log('[🚀 SENDING UPDATE PAYLOAD]:', {
+            vehicleId,
+            payloadKeys: Object.keys(payload),
+            hasImage: !!payload.image_id,
+            imagePreview: payload.image_id ? String(payload.image_id).substring(0, 50) : null
+          });
+          
           const res = await fetch(`/api/vehicles/${encodeURIComponent(vehicleId)}`, {
             method: "PUT",
             headers: {
@@ -540,25 +486,41 @@ export function useUpdateVehicleOptimistic(
 
           if (!res.ok) {
             const json = await res.json().catch(() => ({}));
-            const errorMessage = json.error || `Failed to update vehicle: ${res.status}`;
-            throw new Error(`[HTTP ${res.status}] ${errorMessage}`);
+            const errorMessage = json.error || `HTTP ${res.status}`;
+            throw new Error(`[HTTP ${res.status}] ${errorMessage} (Vehicle ID: ${vehicleId})`);
           }
 
           const result = await res.json();
+          
+          console.log('[🚀 API RESPONSE]:', {
+            success: result.success,
+            ok: result.ok,
+            error: result.error,
+            hasData: !!result.data,
+            vehicleId
+          });
 
-          if (!result.ok) {
-            throw new Error(result.error || "API returned error");
+          // ✅ FIXED: Check both success AND ok for compatibility
+          if (!result.success && !result.ok) {
+            console.error('[API RESPONSE ERROR]', {
+              status: result.status,
+              success: result.success,
+              ok: result.ok,
+              error: result.error,
+              vehicleId,
+              payloadKeys: Object.keys(payload)
+            });
+            const serverError = result.error || result.message || 'Unknown server error';
+            throw new Error(`${serverError} (Vehicle ID: ${vehicleId})`);
           }
 
           reportProgress('saving', 100);
           const updatedVehicle = result.data || { ...originalVehicle, ...data, Image: cloudinaryImageUrl };
 
-          // Record mutation to trigger auto-refresh - ASYNC to not block success response
           setTimeout(() => {
             recordMutation();
           }, 0);
 
-          // Call success callback immediately (don't wait for cache)
           onSuccess?.(updatedVehicle);
           
           setIsUpdating(false);
@@ -567,7 +529,6 @@ export function useUpdateVehicleOptimistic(
         } catch (err) {
           lastError = err instanceof Error ? err : new Error("Failed to update vehicle");
 
-          // Check if we should retry
           if (attempts < MAX_RETRY_ATTEMPTS && isRetryableError(lastError)) {
             await delay(RETRY_DELAY_MS);
             continue;
@@ -580,13 +541,12 @@ export function useUpdateVehicleOptimistic(
       // All retries exhausted
       setIsUpdating(false);
       
-      if (lastError) {
-        const enhancedError = new Error(
-          `${lastError.message}\n\n(Attempted ${attempts} time${attempts > 1 ? 's' : ''})`
-        );
-        onError?.(enhancedError, originalVehicle);
-        throw enhancedError;
-      }
+      const errorMessage = lastError ? lastError.message : 'Unknown error';
+      const enhancedError = new Error(
+        `${errorMessage}\n\n(Attempted ${attempts} time${attempts > 1 ? 's' : ''})`
+      );
+      onError?.(enhancedError, originalVehicle);
+      throw enhancedError;
     },
     [onSuccess, onError, onProgress]
   );

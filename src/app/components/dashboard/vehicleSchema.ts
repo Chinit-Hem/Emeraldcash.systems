@@ -20,7 +20,7 @@ export const vehicleSchema = z.object({
   PriceNew: z.number().min(0).nullable(),
   Price40: z.number().min(0).nullable(),
   Price70: z.number().min(0).nullable(),
-  Image: z.string().url().optional(),
+  Image: z.union([z.string().url(), z.literal('')]).optional(),
   Description: z.string().max(500).optional()
 });
 

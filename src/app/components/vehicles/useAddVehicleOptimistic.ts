@@ -132,7 +132,7 @@ async function uploadImageToCloudinary(
     const errorData = await response.json().catch(() => ({}));
     const errorMessage = errorData.error || errorData.details || `Upload failed: ${response.status}`;
 
-    console.error('[uploadImageToCloudinary] Server upload error:', {
+    console.warn('[uploadImageToCloudinary] Server upload failed:', {
       status: response.status,
       error: errorMessage,
       errorData,
@@ -154,6 +154,75 @@ async function uploadImageToCloudinary(
   });
 
   return result.data.url;
+}
+
+async function prepareImageForUpload(
+  data: Partial<Vehicle>,
+  imageFile: File | null | undefined,
+  tempId: string
+): Promise<File | string | null> {
+  if (imageFile) {
+    const fileSizeKB = imageFile.size / 1024;
+
+    if (fileSizeKB < SKIP_COMPRESSION_THRESHOLD_KB) {
+      console.log(`[addVehicle] File already small (${fileSizeKB.toFixed(2)}KB < ${SKIP_COMPRESSION_THRESHOLD_KB}KB), skipping compression`);
+      return imageFile;
+    }
+
+    console.log(`[addVehicle] Compressing image file (${fileSizeKB.toFixed(2)}KB)...`);
+    const compressedResult = await compressImage(imageFile, {
+      maxWidth: COMPRESSION_MAX_WIDTH,
+      quality: COMPRESSION_QUALITY,
+    });
+
+    console.log(`[addVehicle] Image compressed:`, {
+      originalSize: `${(imageFile.size / 1024).toFixed(2)}KB`,
+      compressedSize: `${(compressedResult.compressedSize / 1024).toFixed(2)}KB`,
+    });
+
+    return compressedResult.file;
+  }
+
+  if (data.Image?.startsWith("data:image/")) {
+    const cleanedImage = cleanBase64DataUrl(data.Image);
+    const { file: fileFromBase64, error: conversionError } = safeBase64ToFile(
+      cleanedImage,
+      `vehicle_${tempId}_${Date.now()}.jpg`
+    );
+
+    if (conversionError || !fileFromBase64) {
+      throw new Error(conversionError || "Failed to convert image data");
+    }
+
+    return fileFromBase64;
+  }
+
+  if (data.Image?.startsWith("http://") || data.Image?.startsWith("https://")) {
+    return data.Image;
+  }
+
+  return null;
+}
+
+async function updateVehicleImage(vehicleId: string | number, imageUrl: string): Promise<void> {
+  const res = await fetch(`/api/vehicles/${encodeURIComponent(String(vehicleId))}`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ Image: imageUrl }),
+    credentials: "include",
+  });
+
+  if (!res.ok) {
+    const json = await res.json().catch(() => ({}));
+    throw new Error(json.error || `Failed to attach image: ${res.status}`);
+  }
+
+  const result = await res.json().catch(() => null);
+  if (result && result.success === false) {
+    throw new Error(result.error || "Image update failed");
+  }
 }
 
 export function useAddVehicleOptimistic(
@@ -192,129 +261,10 @@ export function useAddVehicleOptimistic(
 
       console.log(`[addVehicle] Starting optimistic add with temp ID: ${tempId}`);
 
-      // Start background processing
-      setIsProcessing(true);
+      const pendingImage = await prepareImageForUpload(data, imageFile, tempId);
 
-      let cloudinaryImageUrl: string | null = null;
-
-      // Step 1: Handle image upload to Cloudinary (if provided)
-      try {
-        // Case A: We have a File object from file input
-        if (imageFile) {
-          const fileSizeKB = imageFile.size / 1024;
-
-          // Skip compression if file is already small enough (prevents double compression)
-          let fileToUpload: File;
-
-          if (fileSizeKB < SKIP_COMPRESSION_THRESHOLD_KB) {
-            console.log(`[addVehicle] File already small (${fileSizeKB.toFixed(2)}KB < ${SKIP_COMPRESSION_THRESHOLD_KB}KB), skipping compression`);
-            fileToUpload = imageFile;
-          } else {
-            console.log(`[addVehicle] Compressing image file (${fileSizeKB.toFixed(2)}KB)...`);
-
-            const compressedResult = await compressImage(imageFile, {
-              maxWidth: COMPRESSION_MAX_WIDTH,
-              quality: COMPRESSION_QUALITY,
-            });
-
-            console.log(`[addVehicle] Image compressed:`, {
-              originalSize: `${(imageFile.size / 1024).toFixed(2)}KB`,
-              compressedSize: `${(compressedResult.compressedSize / 1024).toFixed(2)}KB`,
-            });
-
-            fileToUpload = compressedResult.file;
-          }
-
-          console.log(`[addVehicle] Uploading image to Cloudinary...`);
-          cloudinaryImageUrl = await uploadImageToCloudinary(
-            fileToUpload,
-            data.Category || "Cars",
-            tempId
-          );
-
-          console.log(`[addVehicle] Cloudinary upload complete:`, {
-            url: cloudinaryImageUrl.substring(0, 100) + "...",
-          });
-        }
-        // Case B: We have a Base64 string in data.Image
-        else if (data.Image && data.Image.startsWith("data:image/")) {
-          console.log(`[addVehicle] Converting Base64 to File and uploading to Cloudinary...`);
-
-          // Clean the base64 data to remove any problematic characters
-          const cleanedImage = cleanBase64DataUrl(data.Image);
-
-          console.log(`[addVehicle] Base64 cleaned:`, {
-            originalLength: data.Image.length,
-            cleanedLength: cleanedImage.length,
-          });
-
-          const { file: fileFromBase64, error: conversionError } = safeBase64ToFile(
-            cleanedImage,
-            `vehicle_${tempId}_${Date.now()}.jpg`
-          );
-
-          if (conversionError || !fileFromBase64) {
-            console.error(`[addVehicle] Base64 conversion failed:`, conversionError);
-            throw new Error(conversionError || "Failed to convert image data");
-          }
-
-          console.log(`[addVehicle] Base64 converted to File:`, {
-            size: `${(fileFromBase64.size / 1024).toFixed(2)}KB`,
-          });
-
-          cloudinaryImageUrl = await uploadImageToCloudinary(
-            fileFromBase64,
-            data.Category || "Cars",
-            tempId
-          );
-
-          console.log(`[addVehicle] Cloudinary upload complete:`, {
-            url: cloudinaryImageUrl.substring(0, 100) + "...",
-          });
-        }
-        // Case C: We have an existing URL in data.Image
-        else if (data.Image && (data.Image.startsWith("http://") || data.Image.startsWith("https://"))) {
-          console.log(`[addVehicle] Using existing URL:`, {
-            url: data.Image.substring(0, 100) + "...",
-          });
-          cloudinaryImageUrl = data.Image;
-        }
-      } catch (uploadError) {
-        console.error(`[addVehicle] Image upload failed:`, uploadError);
-        setIsAdding(false);
-        setIsProcessing(false);
-        const error = uploadError instanceof Error ? uploadError : new Error("Image upload failed");
-        onError?.(error);
-        throw error;
-      }
-
-      // Step 2: Validate image upload result
-      // CRITICAL: If an image was provided but upload failed, block submission
-      const imageWasProvided = !!imageFile || (data.Image && data.Image.startsWith("data:image/"));
-      const imageUploadFailed = imageWasProvided && !cloudinaryImageUrl;
-      const imageUrlIsInvalid = cloudinaryImageUrl === "undefined" ||
-                                cloudinaryImageUrl === "null" ||
-                                (cloudinaryImageUrl && cloudinaryImageUrl.includes("/undefined"));
-
-      if (imageUploadFailed || imageUrlIsInvalid) {
-        console.error(`[addVehicle] Image upload failed or returned invalid URL:`, {
-          cloudinaryImageUrl,
-          imageWasProvided,
-          imageUploadFailed,
-          imageUrlIsInvalid,
-        });
-        setIsAdding(false);
-        setIsProcessing(false);
-        const error = new Error(
-          imageUrlIsInvalid
-            ? "Image upload returned an invalid URL. Please try uploading the image again."
-            : "Image upload failed. Please check your internet connection and try again."
-        );
-        onError?.(error);
-        throw error;
-      }
-
-      // Step 3: Prepare payload with Cloudinary URL
+      // Step 1: Prepare payload without image. The vehicle should be created
+      // even if image upload is slow or Cloudinary has a transient failure.
       const payload: Record<string, unknown> = {
         category: data.Category,
         brand: data.Brand,
@@ -328,26 +278,6 @@ export function useAddVehicleOptimistic(
         market_price: data.PriceNew,
       };
 
-      // Only add image_id if we have a valid Cloudinary URL
-      if (cloudinaryImageUrl &&
-          (cloudinaryImageUrl.startsWith("http://") ||
-           cloudinaryImageUrl.startsWith("https://"))) {
-        // Double-check that we're not accidentally sending a Base64 string
-        if (cloudinaryImageUrl.startsWith('data:image/')) {
-          console.error(`[addVehicle] CRITICAL: Attempted to send Base64 in payload! Blocking.`);
-          setIsAdding(false);
-          setIsProcessing(false);
-          const error = new Error("Image upload failed: Invalid image format detected. Please try again.");
-          onError?.(error);
-          throw error;
-        }
-        payload.image_id = cloudinaryImageUrl;
-        optimisticVehicle.Image = cloudinaryImageUrl;
-        console.log(`[addVehicle] Payload will include Cloudinary URL`);
-      } else {
-        console.log(`[addVehicle] No image to save - payload has no image_id`);
-      }
-
       // Remove undefined values
       Object.keys(payload).forEach(key => {
         if (payload[key] === undefined) {
@@ -355,7 +285,7 @@ export function useAddVehicleOptimistic(
         }
       });
 
-      // Step 3: Send to API with retry logic
+      // Step 2: Send to API with retry logic
       let lastError: Error | null = null;
       let attempts = 0;
       let createdVehicle: Vehicle | null = null;
@@ -404,7 +334,43 @@ export function useAddVehicleOptimistic(
           onSuccess?.(finalVehicle);
 
           setIsAdding(false);
-          setIsProcessing(false);
+          if (pendingImage) {
+            setIsProcessing(true);
+            void (async () => {
+              try {
+                const imageUrl = typeof pendingImage === "string"
+                  ? pendingImage
+                  : await uploadImageToCloudinary(
+                      pendingImage,
+                      data.Category || "Cars",
+                      String(finalVehicle.VehicleId || tempId)
+                    );
+
+                if (
+                  !imageUrl ||
+                  imageUrl === "undefined" ||
+                  imageUrl === "null" ||
+                  imageUrl.includes("/undefined")
+                ) {
+                  throw new Error("Image upload returned an invalid URL");
+                }
+
+                await updateVehicleImage(finalVehicle.VehicleId || tempId, imageUrl);
+                recordMutation();
+                console.log(`[addVehicle] Background image attached to vehicle ${finalVehicle.VehicleId || tempId}`);
+              } catch (uploadError) {
+                const error = uploadError instanceof Error
+                  ? uploadError
+                  : new Error("Image upload failed");
+                console.warn(`[addVehicle] Background image upload failed:`, error);
+                onError?.(new Error(`Vehicle created, but image upload failed: ${error.message}`));
+              } finally {
+                setIsProcessing(false);
+              }
+            })();
+          } else {
+            setIsProcessing(false);
+          }
           return finalVehicle;
 
         } catch (err) {

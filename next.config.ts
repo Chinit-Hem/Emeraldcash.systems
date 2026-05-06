@@ -1,6 +1,6 @@
 import type { NextConfig } from 'next';
 
-const devLanIp = process.env.DEV_LAN_IP?.trim() || "";
+const devLanIp = process.env.DEV_LAN_IP?.trim() || "192.168.0.68";
 
 const contentSecurityPolicy = [
   "default-src 'self'",
@@ -56,6 +56,7 @@ const nextConfig: NextConfig = {
     "[::1]",
     "192.168.0.102",
     "http://192.168.0.102",
+    "192.168.0.68",
     "192.168.1.5",
     "192.168.1.100",
     "192.168.195.1",
@@ -68,6 +69,21 @@ const nextConfig: NextConfig = {
       {
         protocol: 'https',
         hostname: 'res.cloudinary.com',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'drive.google.com',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'lh3.googleusercontent.com', 
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: '*.googleusercontent.com',
         pathname: '/**',
       },
     ],

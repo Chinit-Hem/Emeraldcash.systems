@@ -4,7 +4,7 @@ import { useLanguage } from "@/lib/LanguageContext";
 import { useTranslation, type Translations } from "@/lib/i18n";
 import { useAuthUser } from "@/app/components/AuthContext";
 import { getQuickFilterCategory } from "@/lib/categoryMapping";
-import AddVehicleModal from "@/app/components/vehicles/AddVehicleModal";
+import AddVehicleModalOptimistic from "@/app/components/vehicles/AddVehicleModalOptimistic";
 
 import { ConfirmDeleteModal } from "@/app/components/vehicles/ConfirmDeleteModal";
 
@@ -2334,8 +2334,9 @@ const getVehicleImageUrl = useCallback((imageValue: string | undefined): string 
         )}
 
         {/* Add Vehicle Modal */}
-        <AddVehicleModal
+<AddVehicleModalOptimistic
           isOpen={showAddModal}
+
           onClose={() => setShowAddModal(false)}
           onSuccess={() => {
             refresh();

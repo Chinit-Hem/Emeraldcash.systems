@@ -216,6 +216,7 @@ function CategorySelector({ value, onChange }: { value: string; onChange: (value
 }
 
 // Main Component
+// DEPRECATED - use AddVehicleModalOptimistic
 export default function AddVehicleModal({ isOpen, onClose, onSuccess }: AddVehicleModalProps) {
   const { success: toastSuccess, error: toastError } = useToast();
 
@@ -428,6 +429,7 @@ export default function AddVehicleModal({ isOpen, onClose, onSuccess }: AddVehic
                 value={imagePreview || formData.Image || ""}
                 onChange={handleImageChange}
                 className="w-full"
+                maxSizeMB={10}
               />
               {imageFile && (
                 <p className="text-xs text-emerald-500 mt-2 flex items-center gap-1">

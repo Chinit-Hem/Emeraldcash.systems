@@ -8,15 +8,13 @@ import { Button } from '@/components/ui/button';
 import { GlassInput as Input } from '@/components/ui/glass/GlassInput';
 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-// import { Label } from '@/components/ui/label';
 
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Loader2, X } from 'lucide-react';
+import { Car, DollarSign, FileText, ImagePlus, Loader2, ShieldCheck, X } from 'lucide-react';
 import { compressImage } from '@/lib/compressImage';
 import { TAX_TYPE_OPTIONS, COLOR_OPTIONS } from '@/lib/types';
 import type { Vehicle } from '@/lib/types';
 import { vehicleSchema, type VehicleFormData } from './vehicleSchema';
-import type { SubmitHandler, UseFormReturn } from 'react-hook-form';
+import type { SubmitHandler } from 'react-hook-form';
 import { useEffect } from 'react';
 
 function Label({ className = '', ...props }: LabelHTMLAttributes<HTMLLabelElement>) {
@@ -25,6 +23,37 @@ function Label({ className = '', ...props }: LabelHTMLAttributes<HTMLLabelElemen
       className={`text-sm font-medium text-slate-700 dark:text-slate-300 ${className}`}
       {...props}
     />
+  );
+}
+
+function FormSection({
+  title,
+  description,
+  icon,
+  children,
+}: {
+  title: string;
+  description?: string;
+  icon: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="rounded-2xl border border-slate-200/80 bg-white/75 p-4 shadow-sm dark:border-slate-800 dark:bg-slate-950/50 md:p-5">
+      <div className="mb-5 flex items-start gap-3">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100 dark:bg-emerald-500/10 dark:text-emerald-300 dark:ring-emerald-500/20">
+          {icon}
+        </div>
+        <div>
+          <h2 className="text-sm font-semibold text-slate-950 dark:text-white">{title}</h2>
+          {description && (
+            <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400">
+              {description}
+            </p>
+          )}
+        </div>
+      </div>
+      {children}
+    </section>
   );
 }
 
@@ -74,18 +103,32 @@ export default function BasicVehicleForm({
 
 
   const { handleSubmit, register, formState: { errors, isDirty }, watch, setValue } = form;
+  const optionalNumber = {
+    setValueAs: (value: string) => value === '' ? null : Number(value),
+  };
 
   // Watch PriceNew for auto-calc
   const priceNew = watch('PriceNew');
+  const price40 = watch('Price40');
+  const price70 = watch('Price70');
   useEffect(() => {
-
-    if (priceNew) {
+    if (typeof priceNew === 'number' && Number.isFinite(priceNew) && priceNew > 0) {
       const price40 = Math.round(priceNew * 0.4 * 100) / 100;
       const price70 = Math.round(priceNew * 0.7 * 100) / 100;
       setValue('Price40', price40);
       setValue('Price70', price70);
+      return;
     }
+
+    setValue('Price40', null);
+    setValue('Price70', null);
   }, [priceNew, setValue]);
+
+  const formatCalculatedPrice = (value: number | null) => (
+    typeof value === 'number' && Number.isFinite(value)
+      ? `$${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+      : "Auto calculated"
+  );
 
   const handleImageChange = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -102,7 +145,7 @@ export default function BasicVehicleForm({
       const preview = URL.createObjectURL(processedFile);
       setImagePreview(preview);
       setImageFile(processedFile);
-      setValue('Image', preview);
+      setValue('Image', preview, { shouldDirty: true, shouldValidate: true });
     } catch (err) {
       console.error('Image processing failed:', err);
     } finally {
@@ -113,7 +156,7 @@ export default function BasicVehicleForm({
   const handleRemoveImage = useCallback(() => {
     setImagePreview(null);
     setImageFile(null);
-    setValue('Image', '');
+    setValue('Image', '', { shouldDirty: true, shouldValidate: true });
   if (fileInputRef.current) fileInputRef.current.value = '';
 
 
@@ -129,29 +172,40 @@ export default function BasicVehicleForm({
   }, [onSubmit, imageFile]);
 
   return (
-    <form onSubmit={handleSubmit(onFormSubmit)} className="space-y-6">
-      <CardHeader>
-        <CardTitle>{modalTitle}</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-6 p-0">
-        {/* Row 1: Brand, Model, Category */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+    <form onSubmit={handleSubmit(onFormSubmit)} className="space-y-5">
+      <div>
+        <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-300">
+          {modalTitle}
+        </p>
+        <h2 className="mt-1 text-lg font-semibold text-slate-950 dark:text-white">
+          Vehicle information
+        </h2>
+      </div>
+
+      <FormSection
+        title="Vehicle details"
+        description="Core information used in search, records, and vehicle display."
+        icon={<Car className="h-5 w-5" />}
+      >
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
           <div className="space-y-2">
             <Label htmlFor="Brand">Brand</Label>
-            <Input id="Brand" {...register('Brand')} />
+            <Input id="Brand" autoComplete="off" {...register('Brand')} />
             {errors.Brand && <p className="text-sm text-red-500">{errors.Brand.message}</p>}
           </div>
           <div className="space-y-2">
             <Label htmlFor="Model">Model</Label>
-            <Input id="Model" {...register('Model')} />
+            <Input id="Model" autoComplete="off" {...register('Model')} />
             {errors.Model && <p className="text-sm text-red-500">{errors.Model.message}</p>}
           </div>
           <div className="space-y-2">
             <Label htmlFor="Category">Category</Label>
-            <Select onValueChange={(val) => setValue('Category', val as 'Cars' | 'Motorcycles' | 'TukTuks')}>
-
-              <SelectTrigger>
-                <SelectValue />
+            <Select
+              defaultValue={vehicle.Category || 'Cars'}
+              onValueChange={(val) => setValue('Category', val as 'Cars' | 'Motorcycles' | 'TukTuks', { shouldDirty: true, shouldValidate: true })}
+            >
+              <SelectTrigger id="Category" className="h-10 rounded-xl border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950">
+                <SelectValue placeholder="Select category" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="Cars">Cars</SelectItem>
@@ -161,26 +215,24 @@ export default function BasicVehicleForm({
             </Select>
             {errors.Category && <p className="text-sm text-red-500">{errors.Category.message}</p>}
           </div>
-        </div>
-
-        {/* Row 2: Plate, Year, Color */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="space-y-2">
             <Label htmlFor="Plate">Plate #</Label>
-            <Input id="Plate" {...register('Plate')} />
+            <Input id="Plate" autoComplete="off" {...register('Plate')} />
             {errors.Plate && <p className="text-sm text-red-500">{errors.Plate.message}</p>}
           </div>
           <div className="space-y-2">
             <Label htmlFor="Year">Year</Label>
-            <Input id="Year" type="number" {...register('Year', { valueAsNumber: true })} />
+            <Input id="Year" type="number" inputMode="numeric" {...register('Year', optionalNumber)} />
             {errors.Year && <p className="text-sm text-red-500">{errors.Year.message}</p>}
           </div>
           <div className="space-y-2">
             <Label htmlFor="Color">Color</Label>
-            <Select onValueChange={(val) => setValue('Color', val)}>
-
-              <SelectTrigger>
-                <SelectValue />
+            <Select
+              defaultValue={vehicle.Color || 'White'}
+              onValueChange={(val) => setValue('Color', val, { shouldDirty: true, shouldValidate: true })}
+            >
+              <SelectTrigger id="Color" className="h-10 rounded-xl border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950">
+                <SelectValue placeholder="Select color" />
               </SelectTrigger>
               <SelectContent>
                 {COLOR_OPTIONS.map((color) => (
@@ -191,64 +243,104 @@ export default function BasicVehicleForm({
             {errors.Color && <p className="text-sm text-red-500">{errors.Color.message}</p>}
           </div>
         </div>
+      </FormSection>
 
-        {/* Row 3: Prices */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <FormSection
+        title="Pricing"
+        description="40% and 70% values are recalculated automatically when the new price changes."
+        icon={<DollarSign className="h-5 w-5" />}
+      >
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
           <div className="space-y-2">
             <Label htmlFor="PriceNew">Price New ($)</Label>
-            <Input id="PriceNew" type="number" {...register('PriceNew', { valueAsNumber: true })} />
+            <Input id="PriceNew" type="number" inputMode="decimal" {...register('PriceNew', optionalNumber)} />
+          </div>
+          <input type="hidden" {...register('Price40', optionalNumber)} />
+          <input type="hidden" {...register('Price70', optionalNumber)} />
+          <div className="space-y-2">
+            <Label>Price 40% ($)</Label>
+            <div className="flex h-10 items-center rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-medium text-slate-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200">
+              {formatCalculatedPrice(price40)}
+            </div>
           </div>
           <div className="space-y-2">
-            <Label htmlFor="Price40">Price 40% ($)</Label>
-            <Input id="Price40" type="number" {...register('Price40', { valueAsNumber: true })} />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="Price70">Price 70% ($)</Label>
-            <Input id="Price70" type="number" {...register('Price70', { valueAsNumber: true })} />
+            <Label>Price 70% ($)</Label>
+            <div className="flex h-10 items-center rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-medium text-slate-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200">
+              {formatCalculatedPrice(price70)}
+            </div>
           </div>
         </div>
+      </FormSection>
 
-        {/* Image Upload */}
-        <div>
-          <Label>Image</Label>
-          <div className="mt-2 space-y-3">
+      <FormSection
+        title="Image"
+        description="Upload a clear vehicle image. Large files are compressed before saving."
+        icon={<ImagePlus className="h-5 w-5" />}
+      >
+        <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_280px] md:items-start">
+          <div className="space-y-2">
+            <Label htmlFor="Image">Vehicle image</Label>
             <input
+              id="Image"
               ref={fileInputRef}
               type="file"
               accept="image/*"
               onChange={handleImageChange}
-              className="w-full p-3 border border-gray-300 rounded-xl file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-semibold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100"
+              className="w-full rounded-xl border border-slate-200 bg-white p-3 text-sm text-slate-700 file:mr-4 file:rounded-lg file:border-0 file:bg-emerald-50 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-emerald-700 hover:file:bg-emerald-100 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-200"
             />
-            {imageLoading && <p className="text-sm text-gray-500">Compressing image...</p>}
-            {imagePreview && (
-              <div className="relative mt-4 group">
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              JPG, PNG, or WebP. Keep the vehicle centered and readable.
+            </p>
+            {imageLoading && (
+              <p className="inline-flex items-center gap-2 text-sm text-slate-500">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Compressing image...
+              </p>
+            )}
+          </div>
+          <div className="relative min-h-40 overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-900">
+            {imagePreview ? (
+              <>
                 <Image
                   src={imagePreview}
-                  alt="Preview"
-                  width={300}
-                  height={200}
-                  className="w-full max-w-md h-48 object-cover rounded-2xl shadow-lg"
+                  alt="Vehicle preview"
+                  width={560}
+                  height={360}
+                  className="h-44 w-full object-cover"
                 />
                 <button
                   type="button"
                   onClick={handleRemoveImage}
-                  className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-8 h-8 flex items-center justify-center shadow-lg hover:bg-red-600 transition-all opacity-0 group-hover:opacity-100"
+                  className="absolute right-3 top-3 flex h-9 w-9 items-center justify-center rounded-full bg-red-600 text-white shadow-lg transition hover:bg-red-700"
+                  aria-label="Remove image"
                 >
-                  <X className="w-4 h-4" />
+                  <X className="h-4 w-4" />
                 </button>
+              </>
+            ) : (
+              <div className="flex h-44 flex-col items-center justify-center gap-2 text-slate-400">
+                <ImagePlus className="h-8 w-8" />
+                <span className="text-sm">No image selected</span>
               </div>
             )}
           </div>
         </div>
+      </FormSection>
 
-        {/* Additional Fields */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <FormSection
+        title="Status"
+        description="Operational classification for tax and condition reporting."
+        icon={<ShieldCheck className="h-5 w-5" />}
+      >
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <div className="space-y-2">
             <Label htmlFor="TaxType">Tax Type</Label>
-            <Select onValueChange={(val) => setValue('TaxType', val)}>
-
-              <SelectTrigger>
-                <SelectValue />
+            <Select
+              defaultValue={vehicle.TaxType || 'Standard'}
+              onValueChange={(val) => setValue('TaxType', val, { shouldDirty: true, shouldValidate: true })}
+            >
+              <SelectTrigger id="TaxType" className="h-10 rounded-xl border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950">
+                <SelectValue placeholder="Select tax type" />
               </SelectTrigger>
               <SelectContent>
                 {TAX_TYPE_OPTIONS.map((type) => (
@@ -259,10 +351,12 @@ export default function BasicVehicleForm({
           </div>
           <div className="space-y-2">
             <Label htmlFor="Condition">Condition</Label>
-            <Select onValueChange={(val) => setValue('Condition', val)}>
-
-              <SelectTrigger>
-                <SelectValue />
+            <Select
+              defaultValue={vehicle.Condition || 'New'}
+              onValueChange={(val) => setValue('Condition', val, { shouldDirty: true, shouldValidate: true })}
+            >
+              <SelectTrigger id="Condition" className="h-10 rounded-xl border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950">
+                <SelectValue placeholder="Select condition" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="New">New</SelectItem>
@@ -274,59 +368,65 @@ export default function BasicVehicleForm({
             </Select>
           </div>
         </div>
+      </FormSection>
 
+      <FormSection
+        title="Notes"
+        description="Optional internal description for this vehicle record."
+        icon={<FileText className="h-5 w-5" />}
+      >
         <div className="space-y-2">
           <Label htmlFor="Description">Description</Label>
           <textarea
             id="Description"
-            rows={3}
+            rows={4}
             {...register('Description')}
-            className="w-full p-3 border border-gray-300 rounded-xl resize-vertical"
+            className="w-full resize-y rounded-xl border border-slate-200 bg-white p-3 text-sm text-slate-800 outline-none transition focus-visible:ring-2 focus-visible:ring-emerald-500 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100"
           />
         </div>
+      </FormSection>
 
-        {submitError && (
-          <div className="p-4 bg-red-100 border border-red-200 rounded-2xl text-red-800">
-            {submitError}
-            <Button variant="ghost" size="sm" onClick={onClearError} className="mt-2">
-              Dismiss
-            </Button>
-          </div>
-        )}
-
-        {/* Actions */}
-        <div className="flex flex-col sm:flex-row gap-3 pt-4">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={onCancel}
-            disabled={isSubmitting}
-            className="flex-1"
-          >
-            Cancel
-          </Button>
-          <Button
-            type="submit"
-            disabled={!isDirty || isSubmitting}
-            className="flex-1"
-          >
-            {isSubmitting ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Saving...
-              </>
-            ) : (
-              'Save Vehicle'
-            )}
+      {submitError && (
+        <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-800 dark:border-red-900/40 dark:bg-red-950/30 dark:text-red-200">
+          <p>{submitError}</p>
+          <Button type="button" variant="ghost" size="sm" onClick={onClearError} className="mt-2">
+            Dismiss
           </Button>
         </div>
+      )}
 
-        {isDirty && (
-          <p className="text-sm text-emerald-600 text-center">
-            Unsaved changes detected ✓
+      <div className="sticky bottom-0 z-10 -mx-4 border-t border-slate-200 bg-white/90 p-4 backdrop-blur-xl dark:border-slate-800 dark:bg-slate-950/90 md:-mx-6">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <p className="min-h-5 text-sm text-slate-500 dark:text-slate-400">
+            {isDirty ? "Unsaved changes detected" : "No unsaved changes"}
           </p>
-        )}
-      </CardContent>
+          <div className="flex flex-col gap-3 sm:flex-row">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={onCancel}
+              disabled={isSubmitting}
+              className="min-w-32"
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              disabled={!isDirty || isSubmitting}
+              className="min-w-40"
+            >
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                'Save Vehicle'
+              )}
+            </Button>
+          </div>
+        </div>
+      </div>
     </form>
   );
 }

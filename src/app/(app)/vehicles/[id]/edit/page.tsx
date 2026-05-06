@@ -82,7 +82,7 @@ function EditVehicleInner() {
     return { nextVehicle: next, prevVehicle: prev };
   }, [allVehicles, vehicle]);
 
-  const handleUpdateSuccess = useCallback((updatedVehicle?: Vehicle) => {
+  const handleUpdateSuccess = useCallback((_updatedVehicle?: Vehicle) => {
     success("Vehicle updated successfully");
 
     // Refresh vehicle data (hook handles optimistic update)
@@ -124,14 +124,11 @@ function EditVehicleInner() {
 
     setSubmitError(null);
 
-    // Exclude Image data URL
-    const { Image: _Image, ...data } = formData;
-
     const imageFile = image instanceof File ? image : undefined;
 
     await updateVehicle(
       currentVehicle.VehicleId,
-      data,
+      formData,
       currentVehicle,
       imageFile
     );
@@ -245,9 +242,8 @@ function EditVehicleInner() {
     );
   }
 
-// Permission check
+  // Permission check
   if (!isAdmin) {
-    const vehicleForView = currentVehicle;
     return (
       <div className="p-4 sm:p-6 lg:p-8">
         <div className="max-w-2xl mx-auto">
@@ -297,42 +293,18 @@ function EditVehicleInner() {
         {/* Main Glass Card */}
         <GlassCard
           variant="elevated"
-          className="overflow-hidden bg-gradient-to-br from-white/70 via-emerald-50/10 via-red-50/5 via-emerald-50/10 to-white/70 dark:from-white/8 dark:via-emerald-500/10 dark:via-red-900/5 dark:via-emerald-900/8 dark:to-white/8 border-white/20 dark:border-white/10"
+          className="overflow-hidden border-slate-200/70 bg-slate-50/80 dark:border-slate-800 dark:bg-slate-950/80"
         >
           {/* Header */}
-          <div className="sticky top-0 z-10 bg-white/80 dark:bg-gray-900/80 backdrop-blur-xl border-b border-gray-200/50 dark:border-gray-800/50 p-4 md:p-6">
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-              <div className="flex items-center gap-3">
-                <GlassButton
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleCancel}
-                  className="flex items-center gap-2"
-                >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth={2}
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    className="h-4 w-4"
-                  >
-                    <path d="m15 18-6-6 6-6" />
-                  </svg>
-                  Back
-                </GlassButton>
-
-                {/* Navigation Buttons */}
-                <div className="flex items-center gap-1 border-l border-gray-300 dark:border-gray-600 pl-3">
+          <div className="sticky top-0 z-10 border-b border-slate-200/80 bg-white/90 p-4 backdrop-blur-xl dark:border-slate-800 dark:bg-slate-950/90 md:p-6">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+              <div className="space-y-4">
+                <div className="flex flex-wrap items-center gap-2">
                   <GlassButton
                     variant="ghost"
                     size="sm"
-                    onClick={() => prevVehicle && router.push(`/vehicles/${prevVehicle.VehicleId}/edit`)}
-                    disabled={!prevVehicle}
-                    className="flex items-center gap-1 px-2"
-                    title={prevVehicle ? `Previous: ${prevVehicle.Brand} ${prevVehicle.Model}` : 'No previous vehicle'}
+                    onClick={handleCancel}
+                    className="flex items-center gap-2"
                   >
                     <svg
                       xmlns="http://www.w3.org/2000/svg"
@@ -346,56 +318,82 @@ function EditVehicleInner() {
                     >
                       <path d="m15 18-6-6 6-6" />
                     </svg>
-                    <span className="hidden sm:inline">Prev</span>
+                    Back
                   </GlassButton>
-                  <GlassButton
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => nextVehicle && router.push(`/vehicles/${nextVehicle.VehicleId}/edit`)}
-                    disabled={!nextVehicle}
-                    className="flex items-center gap-1 px-2"
-                    title={nextVehicle ? `Next: ${nextVehicle.Brand} ${nextVehicle.Model}` : 'No next vehicle'}
-                  >
-                    <span className="hidden sm:inline">Next</span>
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth={2}
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      className="h-4 w-4"
+                  <div className="flex items-center gap-1 rounded-xl border border-slate-200 bg-slate-50 p-1 dark:border-slate-800 dark:bg-slate-900">
+                    <GlassButton
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => prevVehicle && router.push(`/vehicles/${prevVehicle.VehicleId}/edit`)}
+                      disabled={!prevVehicle}
+                      className="flex items-center gap-1 px-2"
+                      title={prevVehicle ? `Previous: ${prevVehicle.Brand} ${prevVehicle.Model}` : 'No previous vehicle'}
                     >
-                      <path d="m9 18 6-6-6-6" />
-                    </svg>
-                  </GlassButton>
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth={2}
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        className="h-4 w-4"
+                      >
+                        <path d="m15 18-6-6 6-6" />
+                      </svg>
+                      <span className="hidden sm:inline">Prev</span>
+                    </GlassButton>
+                    <GlassButton
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => nextVehicle && router.push(`/vehicles/${nextVehicle.VehicleId}/edit`)}
+                      disabled={!nextVehicle}
+                      className="flex items-center gap-1 px-2"
+                      title={nextVehicle ? `Next: ${nextVehicle.Brand} ${nextVehicle.Model}` : 'No next vehicle'}
+                    >
+                      <span className="hidden sm:inline">Next</span>
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth={2}
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        className="h-4 w-4"
+                      >
+                        <path d="m9 18 6-6-6-6" />
+                      </svg>
+                    </GlassButton>
+                  </div>
                 </div>
 
                 <div>
-<h1 className="text-xl md:text-2xl font-bold text-gray-900 dark:text-white">
-                    Edit Vehicle
-                  </h1>
-                  <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
-                    ID: {formatVehicleId(currentVehicle?.VehicleId ?? "")}
+                  <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-300">
+                    Edit record
                   </p>
+                  <h1 className="mt-1 text-2xl font-semibold tracking-normal text-slate-950 dark:text-white md:text-3xl">
+                    {currentVehicle?.Brand || "Vehicle"} {currentVehicle?.Model || ""}
+                  </h1>
                 </div>
               </div>
 
-{/* Status Chips */}
-              <div className="flex items-center gap-2 flex-wrap">
+              <div className="flex flex-wrap items-center gap-2 lg:justify-end">
+                <span className="inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-sm font-medium text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                  ID {formatVehicleId(currentVehicle?.VehicleId ?? "")}
+                </span>
                 {currentVehicle?.Category && (
-                  <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400">
+                  <span className="inline-flex items-center rounded-full bg-emerald-100 px-3 py-1 text-sm font-medium text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300">
                     {currentVehicle.Category}
                   </span>
                 )}
                 {currentVehicle?.Condition && (
-                  <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400">
+                  <span className="inline-flex items-center rounded-full bg-blue-100 px-3 py-1 text-sm font-medium text-blue-800 dark:bg-blue-900/30 dark:text-blue-300">
                     {currentVehicle.Condition}
                   </span>
                 )}
                 {currentVehicle?.Time && (
-                  <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-400">
+                  <span className="inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-sm font-medium text-slate-700 dark:bg-slate-800 dark:text-slate-300">
                     Updated: {formatVehicleTime(currentVehicle.Time)}
                   </span>
                 )}
@@ -403,8 +401,8 @@ function EditVehicleInner() {
             </div>
           </div>
 
-{/* Form Content */}
-          <div className="p-4 md:p-6 space-y-6">
+          {/* Form Content */}
+          <div className="space-y-6 p-4 md:p-6">
             <BasicVehicleForm
               vehicle={vehicle}
               onSubmit={handleSubmit}
@@ -417,15 +415,15 @@ function EditVehicleInner() {
           </div>
 
           {/* Delete Section - Only for Admin */}
-          <div className="px-4 md:px-6 pb-4 md:pb-6">
-            <div className="pt-6 border-t border-gray-200 dark:border-gray-800">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div className="px-4 pb-4 md:px-6 md:pb-6">
+            <div className="rounded-2xl border border-red-200 bg-red-50/70 p-4 dark:border-red-900/40 dark:bg-red-950/20 md:p-5">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div>
-                  <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
+                  <h3 className="text-sm font-semibold text-red-900 dark:text-red-200">
                     Danger Zone
                   </h3>
-                  <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                    Permanently delete this vehicle and all associated data
+                  <p className="mt-1 text-sm text-red-700/80 dark:text-red-200/70">
+                    Permanently delete this vehicle and all associated data.
                   </p>
                 </div>
                 <GlassButton
