@@ -17,6 +17,7 @@ import { lmsService } from "@/services/LmsService";
 import { canAccessLMS, canManageLMS, getSession } from "@/lib/auth-helpers";
 import { dbManager } from "@/lib/db-singleton";
 import { resolveLmsStaffContext } from "@/lib/lms-auth";
+import { invalidateSequentialLessonsCache } from "@/lib/lms-cache";
 
 const REQUIRED_WATCH_PERCENTAGE = 95;
 
@@ -179,6 +180,20 @@ const isAdmin = canManageLMS(session);
         { success: false, error: result.error },
         { status: 500 }
       );
+    }
+
+    const lessonRows = await dbManager.executeUnsafe<{ category_id: number | string | null }>(
+      `
+        SELECT category_id
+        FROM lms_lessons
+        WHERE id = $1
+        LIMIT 1
+      `,
+      [lessonId]
+    );
+    const categoryId = Number(lessonRows[0]?.category_id);
+    if (Number.isInteger(categoryId) && categoryId > 0) {
+      await invalidateSequentialLessonsCache(categoryId, staffId);
     }
 
     return NextResponse.json({

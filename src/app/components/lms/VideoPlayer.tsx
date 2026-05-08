@@ -478,6 +478,8 @@ export function VideoPlayer({
                 event.target.seekTo(resumeAt, true);
               }
 
+              void saveProgress();
+
               saveIntervalRef.current = setInterval(
                 () => saveProgress(),
                 PROGRESS_SAVE_INTERVAL_MS

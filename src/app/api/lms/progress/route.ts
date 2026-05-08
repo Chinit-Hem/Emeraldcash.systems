@@ -141,6 +141,9 @@ export async function GET(request: NextRequest) {
         FROM lms_last_watched lw
         JOIN lms_lessons l ON l.id = lw.lesson_id
         LEFT JOIN lms_categories c ON c.id = l.category_id
+        LEFT JOIN lms_lesson_progress lp
+          ON lp.staff_id = lw.staff_id
+          AND lp.lesson_id = lw.lesson_id
         WHERE lw.staff_id = $1
         LIMIT 1
       `,

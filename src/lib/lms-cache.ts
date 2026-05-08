@@ -142,6 +142,7 @@ export async function setCachedSequentialLessons(
   lessons: LmsLesson[]
 ): Promise<boolean> {
   const cacheKey = `${CACHE_PREFIX}lessons-seq:${categoryId}:${staffId}`;
+  await ensureKv();
 
   if (!kv) return false;
 
@@ -176,6 +177,24 @@ export async function invalidateCategoryCache(categoryId: number): Promise<void>
     );
   } catch (error) {
     console.error('[LmsCache] Invalidate error:', error);
+  }
+}
+
+/**
+ * Invalidate one staff member's sequential lesson status for a category.
+ * Called when completion state changes, because unlock/replay status is user-specific.
+ */
+export async function invalidateSequentialLessonsCache(
+  categoryId: number,
+  staffId: number
+): Promise<void> {
+  await ensureKv();
+  if (!kv) return;
+
+  try {
+    await kv.del(`${CACHE_PREFIX}lessons-seq:${categoryId}:${staffId}`);
+  } catch (error) {
+    console.error('[LmsCache] Invalidate sequential lessons error:', error);
   }
 }
 
@@ -239,6 +258,7 @@ const lmsCache = {
   getCachedSequentialLessons,
   setCachedSequentialLessons,
   invalidateCategoryCache,
+  invalidateSequentialLessonsCache,
   clearAllLmsCache,
   getCacheStats,
 };
