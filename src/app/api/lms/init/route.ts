@@ -68,6 +68,12 @@ export async function POST(request: NextRequest) {
       )
     `;
     await dbManager.executeUnsafe(createLessonsTable);
+    await dbManager.executeUnsafe(
+      `ALTER TABLE lms_lessons ADD COLUMN IF NOT EXISTS thumbnail_url VARCHAR(500)`
+    );
+    await dbManager.executeUnsafe(
+      `ALTER TABLE lms_lessons ADD COLUMN IF NOT EXISTS thumbnail_cloudinary_public_id VARCHAR(255)`
+    );
 
     // Create LMS Staff Table
     const createStaffTable = `
@@ -101,12 +107,34 @@ export async function POST(request: NextRequest) {
     `;
     await dbManager.executeUnsafe(createCompletionsTable);
 
+    // Create LMS Lesson Progress Table
+    const createProgressTable = `
+      CREATE TABLE IF NOT EXISTS lms_lesson_progress (
+        id SERIAL PRIMARY KEY,
+        staff_id INTEGER NOT NULL REFERENCES lms_staff(id) ON DELETE CASCADE,
+        lesson_id INTEGER NOT NULL REFERENCES lms_lessons(id) ON DELETE CASCADE,
+        current_time_seconds INTEGER DEFAULT 0,
+        max_watched_seconds INTEGER DEFAULT 0,
+        duration_seconds INTEGER DEFAULT 0,
+        watch_percentage NUMERIC(5,2) DEFAULT 0,
+        playback_rate_violations INTEGER DEFAULT 0,
+        tab_hidden_count INTEGER DEFAULT 0,
+        last_watched_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(staff_id, lesson_id)
+      )
+    `;
+    await dbManager.executeUnsafe(createProgressTable);
+
     // Create indexes for performance
     const createIndexes = [
       `CREATE INDEX IF NOT EXISTS idx_lms_lessons_category ON lms_lessons(category_id)`,
       `CREATE INDEX IF NOT EXISTS idx_lms_lessons_order ON lms_lessons(order_index)`,
       `CREATE INDEX IF NOT EXISTS idx_lms_completions_staff ON lms_lesson_completions(staff_id)`,
       `CREATE INDEX IF NOT EXISTS idx_lms_completions_lesson ON lms_lesson_completions(lesson_id)`,
+      `CREATE INDEX IF NOT EXISTS idx_lms_progress_staff_lesson ON lms_lesson_progress(staff_id, lesson_id)`,
+      `CREATE INDEX IF NOT EXISTS idx_lms_progress_last_watched ON lms_lesson_progress(last_watched_at)`,
       `CREATE INDEX IF NOT EXISTS idx_lms_staff_branch ON lms_staff(branch_location)`,
       `CREATE INDEX IF NOT EXISTS idx_lms_staff_user ON lms_staff(user_id)`,
       `CREATE INDEX IF NOT EXISTS idx_lms_categories_active ON lms_categories(is_active)`,
@@ -133,6 +161,7 @@ export async function POST(request: NextRequest) {
       { table: 'lms_categories', trigger: 'update_lms_categories_updated_at' },
       { table: 'lms_lessons', trigger: 'update_lms_lessons_updated_at' },
       { table: 'lms_staff', trigger: 'update_lms_staff_updated_at' },
+      { table: 'lms_lesson_progress', trigger: 'update_lms_lesson_progress_updated_at' },
     ];
 
     for (const { table, trigger } of createTriggers) {

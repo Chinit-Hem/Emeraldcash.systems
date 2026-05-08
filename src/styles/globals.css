@@ -422,6 +422,35 @@ textarea::placeholder {
   -webkit-text-size-adjust: 100%;
 }
 
+@keyframes lms-video-watermark-drift {
+  0% {
+    left: 8%;
+    top: 14%;
+  }
+  25% {
+    left: 68%;
+    top: 24%;
+  }
+  50% {
+    left: 42%;
+    top: 58%;
+  }
+  75% {
+    left: 12%;
+    top: 44%;
+  }
+  100% {
+    left: 8%;
+    top: 14%;
+  }
+}
+
+.lms-video-watermark {
+  animation: lms-video-watermark-drift 18s linear infinite;
+  max-width: min(70%, 360px);
+  white-space: nowrap;
+}
+
 *:focus-visible {
   outline: 2px solid rgba(16, 185, 129, 0.7);
   outline-offset: 2px;

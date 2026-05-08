@@ -1,5 +1,7 @@
 import type { Role } from "./types";
+import { getClientIp, getClientUserAgent } from "./network";
 
+// Session configuration
 const SESSION_MAX_AGE_MS = 8 * 60 * 60 * 1000;
 const SESSION_VERSION = 1;
 
@@ -98,12 +100,5 @@ export async function getSessionFromRequestEdge(
   return parseSessionCookieEdge(sessionCookie);
 }
 
-export function getClientIp(headers: Headers): string {
-  const forwardedFor = headers.get("x-forwarded-for");
-  if (forwardedFor) return forwardedFor.split(",")[0].trim();
-  return headers.get("x-real-ip") || "unknown";
-}
-
-export function getClientUserAgent(headers: Headers): string {
-  return headers.get("user-agent") || "unknown";
-}
+// Re-export network utilities for backwards compatibility
+export { getClientIp, getClientUserAgent } from "./network";

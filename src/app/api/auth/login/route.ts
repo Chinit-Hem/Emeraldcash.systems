@@ -3,6 +3,7 @@ import {
   getClientIp,
   getClientUserAgent,
 } from "@/lib/auth";
+import { findLmsStaffForSession } from "@/lib/lms-auth";
 import { authenticateUser } from "@/lib/userStore";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -119,7 +120,21 @@ export async function POST(req: NextRequest) {
   let sessionCookie = "";
 
   try {
-    sessionCookie = createSessionCookie(user, userAgent, ip);
+    const lmsStaff = await findLmsStaffForSession({
+      ...user,
+      ts: Date.now(),
+      version: 1,
+      fingerprint: "",
+    });
+
+    sessionCookie = createSessionCookie(
+      {
+        ...user,
+        ...(lmsStaff ? { staffId: Number(lmsStaff.id) } : {}),
+      },
+      userAgent,
+      ip
+    );
     console.log(`[LOGIN_API] Session created for ${username}`);
   } catch (err) {
     console.error("[LOGIN_API] Failed to create session:", err);

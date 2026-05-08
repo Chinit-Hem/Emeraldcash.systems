@@ -60,6 +60,8 @@ export interface LmsLesson {
   description: string | null;
   youtube_url: string;
   youtube_video_id: string; // Extracted from URL for embed
+  thumbnail_url?: string | null; // Cloudinary optimized image URL
+  thumbnail_cloudinary_public_id?: string | null; // Cloudinary public ID
   step_by_step_instructions: string | null; // Markdown content
   duration_minutes: number | null; // Estimated duration
   order_index: number;
@@ -361,6 +363,8 @@ CREATE TABLE IF NOT EXISTS lms_lessons (
   description TEXT,
   youtube_url VARCHAR(500) NOT NULL,
   youtube_video_id VARCHAR(20) NOT NULL,
+  thumbnail_url VARCHAR(500),
+  thumbnail_cloudinary_public_id VARCHAR(255),
   step_by_step_instructions TEXT,
   duration_minutes INTEGER,
   order_index INTEGER DEFAULT 0,

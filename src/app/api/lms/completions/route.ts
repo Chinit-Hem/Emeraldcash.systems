@@ -15,6 +15,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { lmsService } from "@/services/LmsService";
 import { canAccessLMS, canManageLMS, getSession } from "@/lib/auth-helpers";
+import { dbManager } from "@/lib/db-singleton";
+import { resolveLmsStaffContext } from "@/lib/lms-auth";
+
+const REQUIRED_WATCH_PERCENTAGE = 95;
 
 // ============================================================================
 // GET /api/lms/completions?staffId=1
@@ -41,25 +45,12 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const staffId = searchParams.get("staffId") ?? searchParams.get("staff_id");
 
-  if (!staffId) {
-    return NextResponse.json(
-      { success: false, error: "staffId is required" },
-      { status: 400 }
-    );
+  const staffContext = await resolveLmsStaffContext(request, session, staffId);
+  if (!staffContext.ok) {
+    return staffContext.response;
   }
 
-  const staffIdNum = parseInt(staffId);
-  const isAdmin = canManageLMS(session);
-
-  // Staff can only view their own completions
-  // Admin can view any staff member's completions
-  if (!isAdmin) {
-    // TODO: In a real implementation, we'd look up the staff record by username
-    // and verify it matches the requested staffId
-    // For now, we'll allow Staff to view any (they can only mark their own complete)
-  }
-
-  const result = await lmsService.getStaffCompletions(staffIdNum);
+  const result = await lmsService.getStaffCompletions(staffContext.staffId);
 
   if (!result.success) {
     return NextResponse.json(
@@ -111,18 +102,69 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // TODO: Get actual staff ID from session
-    // For now, using staff ID 1 as default
-    const staffId = typeof incomingStaffId === "number" ? incomingStaffId : (session.staffId ?? session.userId ?? 1);
+const isAdmin = canManageLMS(session);
+    const staffContext = await resolveLmsStaffContext(request, session, incomingStaffId);
+    if (!staffContext.ok) {
+      return staffContext.response;
+    }
+    const staffId = staffContext.staffId;
 
-    const isAdmin = canManageLMS(session);
+    // Admins without staff profile can still mark their own lessons complete
+    // staffId = 0 means admin without staff profile, allow completion without checking percentage
+    if (staffId === 0 && isAdmin) {
+      console.log('[COMPLETIONS API] Admin without staff profile - allowing completion');
+      return NextResponse.json({
+        success: true,
+        data: {
+          completed_at: new Date().toISOString(),
+          time_spent_seconds: null,
+        }
+      }, { status: 201 });
+    }
 
-    // Staff can only mark lessons complete for themselves
-    // Admin can mark lessons complete for any staff
-    if (!isAdmin) {
-      // TODO: In a real implementation, we'd verify the staff_id matches
-      // the logged-in user's staff record
-      // For now, we'll allow it (frontend should enforce this)
+    await dbManager.executeUnsafe(`
+      CREATE TABLE IF NOT EXISTS lms_lesson_progress (
+        id SERIAL PRIMARY KEY,
+        staff_id INTEGER NOT NULL REFERENCES lms_staff(id) ON DELETE CASCADE,
+        lesson_id INTEGER NOT NULL REFERENCES lms_lessons(id) ON DELETE CASCADE,
+        current_time_seconds INTEGER DEFAULT 0,
+        max_watched_seconds INTEGER DEFAULT 0,
+        duration_seconds INTEGER DEFAULT 0,
+        watch_percentage NUMERIC(5,2) DEFAULT 0,
+        playback_rate_violations INTEGER DEFAULT 0,
+        tab_hidden_count INTEGER DEFAULT 0,
+        last_watched_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(staff_id, lesson_id)
+      )
+    `);
+
+    const progressRows = await dbManager.executeUnsafe<{ watch_percentage: number | string | null }>(
+      `
+        SELECT watch_percentage
+        FROM lms_lesson_progress
+        WHERE staff_id = $1 AND lesson_id = $2
+        LIMIT 1
+      `,
+      [staffId, lessonId]
+    );
+    const watchPercentage = Number(progressRows[0]?.watch_percentage ?? 0);
+
+    if (watchPercentage < REQUIRED_WATCH_PERCENTAGE) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: `Please watch at least ${REQUIRED_WATCH_PERCENTAGE}% of the lesson before marking it complete.`,
+          data: {
+            watchPercentage,
+            requiredPercentage: REQUIRED_WATCH_PERCENTAGE,
+            staffId,
+            isAdmin,
+          },
+        },
+        { status: 403 }
+      );
     }
 
     const result = await lmsService.markLessonComplete({

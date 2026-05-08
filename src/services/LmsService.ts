@@ -1114,6 +1114,8 @@ export class LmsService extends BaseService<LmsCategoryEntity, LmsCategoryDB> {
       description: dbRecord.description,
       youtubeUrl: dbRecord.youtube_url,
       youtubeVideoId: dbRecord.youtube_video_id,
+      thumbnailUrl: dbRecord.thumbnail_url ?? null,
+      thumbnailCloudinaryPublicId: dbRecord.thumbnail_cloudinary_public_id ?? null,
       stepByStepInstructions: dbRecord.step_by_step_instructions,
       durationMinutes: dbRecord.duration_minutes,
       orderIndex: dbRecord.order_index,

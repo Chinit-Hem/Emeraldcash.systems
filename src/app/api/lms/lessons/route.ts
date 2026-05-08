@@ -8,6 +8,7 @@
  */
 
 import { canAccessLMS, canManageLMS, getSession } from "@/lib/auth-helpers";
+import { getRequestedStaffId, resolveLmsStaffContext } from "@/lib/lms-auth";
 import { getCachedLessonsByCategory, getCachedSequentialLessons, invalidateCategoryCache, setCachedLessonsByCategory, setCachedSequentialLessons } from "@/lib/lms-cache";
 import { type LmsLesson, type SequentialLesson } from "@/lib/lms-schema";
 import { lmsService } from "@/services/LmsService";
@@ -20,6 +21,8 @@ type LessonEntityLike = {
   description: string | null;
   youtubeUrl: string;
   youtubeVideoId: string;
+  thumbnailUrl?: string | null;
+  thumbnailCloudinaryPublicId?: string | null;
   stepByStepInstructions: string | null;
   durationMinutes: number | null;
   orderIndex: number;
@@ -39,6 +42,8 @@ function toLegacyLesson(lesson: LessonEntityLike): LmsLesson & Partial<Sequentia
     description: lesson.description,
     youtube_url: lesson.youtubeUrl,
     youtube_video_id: lesson.youtubeVideoId,
+    thumbnail_url: lesson.thumbnailUrl ?? null,
+    thumbnail_cloudinary_public_id: lesson.thumbnailCloudinaryPublicId ?? null,
     step_by_step_instructions: lesson.stepByStepInstructions,
     duration_minutes: lesson.durationMinutes,
     order_index: lesson.orderIndex,
@@ -129,9 +134,53 @@ export async function GET(request: NextRequest) {
 
   const categoryIdNum = parseInt(categoryId);
 
-  // If sequential mode, return lessons with unlock status
+// If sequential mode, return lessons with unlock status
   if (sequential) {
-    const staffId = session?.staffId || session?.userId || 1;
+    const staffContext = await resolveLmsStaffContext(
+      request,
+      session,
+      getRequestedStaffId(request)
+    );
+    if (!staffContext.ok) {
+      return staffContext.response;
+    }
+    const staffId = staffContext.staffId;
+    
+// If staffId is 0 (admin without staff profile), return all lessons as unlocked
+    // Admins can access all lessons regardless of completion status
+    if (staffId === 0) {
+      console.log('[LESSONS API] Admin without staff profile - all lessons unlocked');
+      const cacheResult = await getCachedLessonsByCategory(categoryIdNum);
+      let lessons: LmsLesson[];
+      
+      if (cacheResult.success) {
+        lessons = cacheResult.data as LmsLesson[];
+      } else {
+        const result = await lmsService.getLessonsByCategory(categoryIdNum);
+        if (!result.success) {
+          return NextResponse.json(
+            { success: false, error: result.error },
+            { status: 500 }
+          );
+        }
+lessons = (result.data ?? []).map(l => toLegacyLesson(l)) as LmsLesson[];
+        await setCachedLessonsByCategory(categoryIdNum, lessons);
+      }
+      
+      // Add is_unlocked=true and is_completed=false for all lessons for admins
+      const lessonsWithStatus = lessons.map((lesson) => ({
+        ...lesson,
+        is_unlocked: true,
+        is_completed: false,
+        completed_at: null,
+      }));
+      
+      return NextResponse.json({
+        success: true,
+        data: lessonsWithStatus,
+        meta: { staffId: 0 }
+      });
+    }
     
     // TRY CACHE FIRST (99% hit rate expected)
     const cacheResult = await getCachedSequentialLessons(categoryIdNum, staffId);
@@ -166,9 +215,9 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const legacySequentialLessons = (result.data ?? []).map((lesson) =>
+const legacySequentialLessons = (result.data ?? []).map((lesson) =>
       toLegacyLesson(lesson as LessonEntityLike)
-    );
+    ) as SequentialLesson[];
 
     return NextResponse.json({
       success: true,

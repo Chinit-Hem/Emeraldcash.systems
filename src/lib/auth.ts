@@ -1,6 +1,7 @@
 import crypto from "crypto";
 import type { Role } from "./types";
 import { globalLogger } from "./logger";
+import { getClientIp, getClientUserAgent } from "./network";
 
 // Session configuration
 const SESSION_MAX_AGE_MS = 8 * 60 * 60 * 1000; // 8 hours
@@ -281,29 +282,8 @@ function timingSafeEqual_(a: string, b: string): boolean {
   }
 }
 
-/**
- * Get client IP from request headers
- */
-export function getClientIp(headers: Headers): string {
-  const forwardedFor = headers.get("x-forwarded-for");
-  if (forwardedFor) {
-    return forwardedFor.split(",")[0].trim();
-  }
-
-  const realIp = headers.get("x-real-ip");
-  if (realIp) {
-    return realIp;
-  }
-
-  return "unknown";
-}
-
-/**
- * Get client user-agent from request headers
- */
-export function getClientUserAgent(headers: Headers): string {
-  return headers.get("user-agent") || "unknown";
-}
+// Re-export network utilities for backwards compatibility
+export { getClientIp, getClientUserAgent } from "./network";
 
 // ============ Role-Based Permissions ============
 

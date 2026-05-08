@@ -9,6 +9,46 @@
  */
 
 import { neon, type NeonQueryFunction } from "@neondatabase/serverless";
+import { readFileSync } from "fs";
+import { join } from "path";
+
+// Workaround: VSCode extension env injection masks DATABASE_URL in process.env
+// Read directly from .env file to bypass the masking
+function getDatabaseUrlFromFile(): string | null {
+  let rawUrl: string | null = null;
+  
+  // First try .env.local (may be masked by VSCode extension)
+  try {
+    const envLocalPath = join(process.cwd(), '.env.local');
+    const content = readFileSync(envLocalPath, 'utf-8');
+    const match = content.match(/^DATABASE_URL=(.+)$/m);
+    if (match && match[1]) {
+      const candidate = match[1].trim();
+      // Only use if not masked
+      if (!candidate.includes('[username]')) {
+        rawUrl = candidate;
+      }
+    }
+  } catch (e) {
+    // Ignore - fall back to .env
+  }
+  
+  // If still masked, try .env
+  if (!rawUrl) {
+    try {
+      const envPath = join(process.cwd(), '.env');
+      const content = readFileSync(envPath, 'utf-8');
+      const match = content.match(/^DATABASE_URL=(.+)$/m);
+      if (match && match[1]) {
+        rawUrl = match[1].trim();
+      }
+    } catch (e) {
+      // Ignore - will fall back to process.env
+    }
+  }
+  
+  return rawUrl;
+}
 
 // ============================================================================
 // Types & Interfaces
@@ -86,12 +126,13 @@ class DatabaseManager {
     return DatabaseManager.instance;
   }
 
-  /**
+/**
    * Initialize connection configuration from environment
    * Lazy initialization - only called when database is actually needed
    */
   private initializeConfig(): ConnectionConfig {
-    const url = process.env.DATABASE_URL;
+    // First try to get from file (bypasses VSCode extension masking)
+    const url = getDatabaseUrlFromFile() || process.env.DATABASE_URL;
 
     if (!url) {
       // During build time, return a placeholder config
@@ -101,7 +142,7 @@ class DatabaseManager {
         return {
           url: 'postgresql://placeholder:placeholder@localhost:5432/placeholder',
           maxConnections: 10,
-          connectionTimeoutMs: 30000, // Increased from 10000
+          connectionTimeoutMs: 30000,
           idleTimeoutMs: 30000,
           enableKeepalive: true,
         };
@@ -112,7 +153,7 @@ class DatabaseManager {
     return {
       url,
       maxConnections: parseInt(process.env.DB_MAX_CONNECTIONS || "10", 10),
-      connectionTimeoutMs: parseInt(process.env.DB_CONNECTION_TIMEOUT || "30000", 10), // Increased from 10000 to 30000
+      connectionTimeoutMs: parseInt(process.env.DB_CONNECTION_TIMEOUT || "30000", 10),
       idleTimeoutMs: parseInt(process.env.DB_IDLE_TIMEOUT || "30000", 10),
       enableKeepalive: process.env.DB_ENABLE_KEEPALIVE !== "false",
     };
@@ -128,7 +169,7 @@ class DatabaseManager {
     return this.config;
   }
 
-  /**
+/**
    * Initialize the SQL client with optimized settings
    */
   private initializeClient(): NeonQueryFunction<false, false> {
@@ -140,19 +181,10 @@ class DatabaseManager {
     const config = this.ensureConfig();
 
     // Add sdk_semver query parameter to satisfy Neon API requirement
-    // This is required by Neon SDK 1.0.2+ to identify the client version
-    // Parse the URL properly to handle existing query parameters
-    const baseUrl = config.url;
-    const urlObj = new URL(baseUrl);
-
-    // Add sdk_semver parameter
+    const urlObj = new URL(config.url);
     urlObj.searchParams.set('sdk_semver', '1.0.2');
 
-    const urlWithSdkVersion = urlObj.toString();
-
-    // Connection logging removed for production
-
-    this.sqlClient = neon(urlWithSdkVersion, {
+    this.sqlClient = neon(urlObj.toString(), {
       fetchOptions: {
         keepalive: this.config.enableKeepalive,
       },
@@ -161,8 +193,6 @@ class DatabaseManager {
     // Mark as healthy on successful initialization
     this.health.healthy = true;
     this.health.lastCheck = new Date();
-
-    // Initialization logging removed for production
 
     return this.sqlClient;
   }

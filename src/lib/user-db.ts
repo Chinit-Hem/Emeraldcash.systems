@@ -98,6 +98,11 @@ async function checkUserExists(username: string): Promise<UserDB> {
 export async function ensureUsersTable(): Promise<void> {
   log("INFO", "Checking if users table exists");
 
+  if (!process.env.DATABASE_URL) {
+    log("ERROR", "DATABASE_URL environment variable is not set.");
+    throw new DatabaseError("Database connection string (DATABASE_URL) is missing.");
+  }
+
   try {
     await queryWithRetry(
       async () => sql`
@@ -570,4 +575,3 @@ export async function updateUserProfileInDB(params: {
     throw new DatabaseError("Failed to update user profile in database");
   }
 }
-

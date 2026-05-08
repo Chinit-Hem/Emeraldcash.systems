@@ -53,6 +53,16 @@ import LmsErrorBoundary from "./LmsErrorBoundary";
 
 type TabType = "learning" | "progress" | "achievements" | "my-process";
 
+// Type for last watched lesson
+type LastWatchedLesson = {
+  lessonId: number;
+  title: string;
+  categoryId: number | null;
+  categoryName: string | null;
+  watchedAt: string | null;
+  watchPercentage: number;
+};
+
 // API Service
 class LmsApiService {
   private static readonly BASE_URL = "/api/lms";
@@ -121,6 +131,19 @@ class LmsApiService {
       if (a.category_id !== b.category_id) return a.category_id - b.category_id;
       return a.order_index - b.order_index;
     });
+  }
+
+  // Fetch last watched lesson - enables "Continue Learning" to show last video user watched
+  static async fetchLastWatched(): Promise<LastWatchedLesson | null> {
+    try {
+      const response = await this.fetchWithTimeout(`${this.BASE_URL}/progress`);
+      if (!response.ok) return null;
+      const data = await response.json();
+      return data.success ? data.data : null;
+    } catch (error) {
+      console.error("Last watched fetch error:", error);
+      return null;
+    }
   }
 }
 
@@ -344,6 +367,7 @@ function LmsDashboard({ initialData }: LmsDashboardProps) {
   const [stats, setStats] = useState<LmsDashboardStats | null>(initialData?.stats || null);
   const [categories, setCategories] = useState<LmsCategory[]>(initialData?.categories || []);
   const [lessons, setLessons] = useState<LessonWithStatus[]>(initialData?.lessons || []);
+  const [lastWatched, setLastWatched] = useState<LastWatchedLesson | null>(null);
   const [loading, setLoading] = useState(!initialData);
   const [_activeTab, _setActiveTab] = useState<TabType>("learning");
   const [isExporting, setIsExporting] = useState(false);
@@ -363,14 +387,16 @@ function LmsDashboard({ initialData }: LmsDashboardProps) {
     }
 
     try {
-      const [statsData, categoriesData] = await Promise.all([
+      const [statsData, categoriesData, lastWatchedData] = await Promise.all([
         LmsApiService.fetchDashboardData(),
         LmsApiService.fetchCategories(),
+        LmsApiService.fetchLastWatched(),
       ]);
       const lessonsData = categoriesData.length > 0 ? await LmsApiService.fetchAllLessons(categoriesData) : [];
       setStats(statsData);
       setCategories(categoriesData);
       setLessons(lessonsData);
+      setLastWatched(lastWatchedData);
     } catch (error) {
       console.error("Error loading dashboard data:", error);
     } finally {
@@ -605,8 +631,8 @@ function LmsDashboard({ initialData }: LmsDashboardProps) {
               )}
             </div>
 
-            {/* Continue Learning */}
-            {currentLesson && (
+{/* Continue Learning - Show last watched lesson first, fallback to first incomplete lesson */}
+            {(lastWatched || currentLesson) && (
               <div className="p-6 bg-gradient-to-br from-emerald-50 to-emerald-100/50 rounded-3xl shadow-sm border border-emerald-200/50">
                 <div className="flex items-center gap-3 mb-4">
                   <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-500 to-emerald-600 shadow-lg shadow-emerald-500/30 flex items-center justify-center">
@@ -619,11 +645,20 @@ function LmsDashboard({ initialData }: LmsDashboardProps) {
                 </div>
                 <div className="flex items-center justify-between p-4 bg-white rounded-2xl shadow-sm">
                   <div>
-                    <p className="font-semibold text-slate-800">{currentLesson.title}</p>
-                    <p className="text-sm text-slate-500">{currentLesson.category_name} • {currentLesson.duration_minutes || 0} min</p>
+                    <p className="font-semibold text-slate-800">{lastWatched?.title || currentLesson?.title}</p>
+                    <p className="text-sm text-slate-500">
+                      {lastWatched?.categoryName || currentLesson?.category_name}
+                      {lastWatched?.watchPercentage ? ` • ${lastWatched.watchPercentage}% watched` : ` • ${currentLesson?.duration_minutes || 0} min`}
+                    </p>
                   </div>
-                  <button onClick={() => handleResumeLesson(currentLesson.id)} className="px-6 py-2.5 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white font-medium rounded-xl shadow-lg shadow-emerald-500/30 hover:shadow-xl hover:shadow-emerald-500/40 transition-all active:scale-95">
-                    Resume
+<button 
+                    onClick={() => {
+                      const lessonId = lastWatched?.lessonId || currentLesson?.id;
+                      if (lessonId) handleResumeLesson(lessonId);
+                    }} 
+                    className="px-6 py-2.5 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white font-medium rounded-xl shadow-lg shadow-emerald-500/30 hover:shadow-xl hover:shadow-emerald-500/40 transition-all active:scale-95"
+                  >
+                   Resume
                   </button>
                 </div>
               </div>

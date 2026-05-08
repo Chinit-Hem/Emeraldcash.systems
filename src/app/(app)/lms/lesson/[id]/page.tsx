@@ -44,6 +44,8 @@ interface LmsLesson {
   description: string | null;
   youtube_url: string;
   youtube_video_id: string;
+  thumbnail_url?: string | null;
+  thumbnail_cloudinary_public_id?: string | null;
   duration_minutes: number | null;
   step_by_step_instructions: string | null;
   order_index: number;
@@ -236,6 +238,13 @@ export default function LessonPlayerPage() {
   const [markingComplete, setMarkingComplete] = useState(false);
   const [showGuard, setShowGuard] = useState(false);
   const [previousLessonTitle, setPreviousLessonTitle] = useState<string>("");
+  const [completionError, setCompletionError] = useState<string | null>(null);
+  const [watchProgress, setWatchProgress] = useState({
+    watchPercentage: 0,
+    canComplete: false,
+    currentTimeSeconds: 0,
+    maxWatchedSeconds: 0,
+  });
   
   // Fetch lesson data with sequential status
   const fetchLessonData = useCallback(async (id: number) => {
@@ -322,17 +331,25 @@ export default function LessonPlayerPage() {
   
   // Mark lesson as complete
   const handleMarkComplete = async () => {
-    if (!currentLesson || markingComplete || currentLesson.is_completed) return;
+    if (
+      !currentLesson ||
+      markingComplete ||
+      currentLesson.is_completed ||
+      !watchProgress.canComplete
+    ) {
+      return;
+    }
     
     try {
       setMarkingComplete(true);
+      setCompletionError(null);
       
       const response = await fetch("/api/lms/completions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           lesson_id: currentLesson.id,
-          time_spent_seconds: currentLesson.duration_minutes ? currentLesson.duration_minutes * 60 : 0,
+          time_spent_seconds: Math.floor(watchProgress.maxWatchedSeconds),
         }),
       });
       
@@ -353,6 +370,9 @@ export default function LessonPlayerPage() {
             idx === currentIndex + 1 ? { ...l, is_unlocked: true } : l
           ));
         }
+      } else {
+        const data = await response.json().catch(() => null);
+        setCompletionError(data?.error || "Please watch at least 95% before marking complete.");
       }
     } catch (err) {
       console.error("Failed to mark complete:", err);
@@ -468,8 +488,14 @@ export default function LessonPlayerPage() {
               <GlassButton
                 variant={currentLesson.is_completed ? "secondary" : "primary"}
                 onClick={handleMarkComplete}
-                disabled={currentLesson.is_completed || markingComplete || !currentLesson.is_unlocked}
+                disabled={
+                  currentLesson.is_completed ||
+                  markingComplete ||
+                  !currentLesson.is_unlocked ||
+                  !watchProgress.canComplete
+                }
                 className={currentLesson.is_completed ? "bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300" : ""}
+                title={watchProgress.canComplete ? "Mark Complete" : "Watch 95% to unlock completion"}
               >
                 {markingComplete ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
@@ -492,20 +518,29 @@ export default function LessonPlayerPage() {
       
       {/* Main Content */}
       <main className="max-w-[1600px] mx-auto px-4 sm:px-6 py-6">
+        {completionError && (
+          <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-900/50 dark:bg-amber-900/20 dark:text-amber-200">
+            {completionError}
+          </div>
+        )}
+
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Left Column - Video Player */}
           <div className="lg:col-span-2 space-y-6">
             {/* Video Player */}
             <VideoPlayer 
+              lessonId={currentLesson.id}
               title={currentLesson.title}
               description={currentLesson.description}
               youtubeUrl={currentLesson.youtube_url}
               youtubeVideoId={currentLesson.youtube_video_id}
+              thumbnailUrl={currentLesson.thumbnail_url}
               stepByStepInstructions={currentLesson.step_by_step_instructions}
               durationMinutes={currentLesson.duration_minutes}
               isCompleted={currentLesson.is_completed}
               onComplete={handleMarkComplete}
               onBack={() => router.push("/lms")}
+              onProgressChange={setWatchProgress}
             />
             
             {/* Video Info */}

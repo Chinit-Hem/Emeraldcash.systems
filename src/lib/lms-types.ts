@@ -31,6 +31,8 @@ export interface LmsLesson {
   description: string | null;
   youtube_url: string;
   youtube_video_id: string;
+  thumbnail_url?: string | null;
+  thumbnail_cloudinary_public_id?: string | null;
   step_by_step_instructions: string | null;
   duration_minutes: number | null;
   order_index: number;

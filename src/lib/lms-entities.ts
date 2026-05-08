@@ -36,6 +36,8 @@ export interface LmsLessonDB extends BaseDBRecord {
   description: string | null;
   youtube_url: string;
   youtube_video_id: string;
+  thumbnail_url?: string | null;
+  thumbnail_cloudinary_public_id?: string | null;
   step_by_step_instructions: string | null;
   duration_minutes: number | null;
   order_index: number;
@@ -91,6 +93,8 @@ export interface LmsLessonEntity extends BaseEntity {
   description: string | null;
   youtubeUrl: string;
   youtubeVideoId: string;
+  thumbnailUrl?: string | null;
+  thumbnailCloudinaryPublicId?: string | null;
   stepByStepInstructions: string | null;
   durationMinutes: number | null;
   orderIndex: number;
@@ -347,6 +351,8 @@ export function toLessonEntity(db: LmsLessonDB): LmsLessonEntity {
     description: db.description,
     youtubeUrl: db.youtube_url,
     youtubeVideoId: db.youtube_video_id,
+    thumbnailUrl: db.thumbnail_url ?? null,
+    thumbnailCloudinaryPublicId: db.thumbnail_cloudinary_public_id ?? null,
     stepByStepInstructions: db.step_by_step_instructions,
     durationMinutes: db.duration_minutes,
     orderIndex: db.order_index,
