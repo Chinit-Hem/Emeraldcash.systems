@@ -104,6 +104,7 @@ const YOUTUBE_IFRAME_API_SRC = "https://www.youtube.com/iframe_api";
 const PROGRESS_SAVE_INTERVAL_MS = 10_000;
 const MAX_PLAYBACK_RATE = 1.25;
 const SEEK_GRACE_SECONDS = 2;
+const PLAYBACK_RATES = [0.5, 1, 1.25, 1.5, 2];
 
 let youtubeApiPromise: Promise<YouTubeNamespace> | null = null;
 
@@ -274,6 +275,7 @@ export function VideoPlayer({
   const [hasError, setHasError] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isReady, setIsReady] = useState(false);
+  const [playbackRate, setPlaybackRate] = useState(1);
   const [warning, setWarning] = useState<string | null>(null);
   const [watermarkName, setWatermarkName] = useState(staffName ?? "Staff");
 
@@ -286,6 +288,7 @@ export function VideoPlayer({
   const currentTimeRef = useRef(0);
   const maxWatchedRef = useRef(0);
   const durationRef = useRef(0);
+  const playbackUnlockedRef = useRef(initialCompleted);
 
   const instructionSteps = useMemo(
     () => parseInstructionSteps(stepByStepInstructions),
@@ -293,6 +296,7 @@ export function VideoPlayer({
   );
 
   const completionAllowed = isCompleted || watchPercentage >= completionThreshold;
+  const playbackUnlocked = isCompleted;
   const progressPercent =
     videoDuration > 0 ? clamp((currentTime / videoDuration) * 100, 0, 100) : 0;
   const maxSeekPercent =
@@ -306,6 +310,10 @@ export function VideoPlayer({
     setWarning(message);
     window.setTimeout(() => setWarning(null), 3500);
   }, []);
+
+  useEffect(() => {
+    playbackUnlockedRef.current = playbackUnlocked;
+  }, [playbackUnlocked]);
 
   const updateWatchState = useCallback(
     (nextCurrentTime: number, nextMaxWatched: number, nextDuration: number) => {
@@ -491,9 +499,11 @@ export function VideoPlayer({
             },
             onPlaybackRateChange: (event) => {
               const playbackRate = event.target.getPlaybackRate();
+              setPlaybackRate(playbackRate);
 
-              if (playbackRate > MAX_PLAYBACK_RATE) {
+              if (!playbackUnlockedRef.current && playbackRate > MAX_PLAYBACK_RATE) {
                 event.target.setPlaybackRate(1);
+                setPlaybackRate(1);
                 showWarning("Playback speed above 1.25x is not allowed. Speed reset to 1x.");
                 saveProgress({ playbackRateViolation: true });
               }
@@ -567,7 +577,7 @@ export function VideoPlayer({
     }
   }, [isPlaying, isReady, saveProgress]);
 
-const handleSeek = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleSeek = (event: React.ChangeEvent<HTMLInputElement>) => {
     // Use refs for duration to ensure we have the most up-to-date value, not stale state
     const safeDuration = durationRef.current;
     if (!playerRef.current || safeDuration <= 0) {
@@ -579,7 +589,7 @@ const handleSeek = (event: React.ChangeEvent<HTMLInputElement>) => {
     const requestedTime = (requestedProgress / 100) * safeDuration;
     const maxAllowedTime = maxWatchedRef.current + SEEK_GRACE_SECONDS;
 
-    if (requestedTime > maxAllowedTime) {
+    if (!playbackUnlocked && requestedTime > maxAllowedTime) {
       playerRef.current.seekTo(maxWatchedRef.current, true);
       updateWatchState(maxWatchedRef.current, maxWatchedRef.current, safeDuration);
       showWarning("Seeking forward is locked until you watch that part of the lesson.");
@@ -587,11 +597,34 @@ const handleSeek = (event: React.ChangeEvent<HTMLInputElement>) => {
     }
 
     playerRef.current.seekTo(requestedTime, true);
-    updateWatchState(requestedTime, maxWatchedRef.current, safeDuration);
+    updateWatchState(
+      requestedTime,
+      playbackUnlocked ? Math.max(maxWatchedRef.current, requestedTime) : maxWatchedRef.current,
+      safeDuration
+    );
     saveProgress();
   };
 
-const restartVideo = () => {
+  const handlePlaybackRateChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
+    const nextRate = Number(event.target.value);
+
+    if (!playerRef.current || !Number.isFinite(nextRate)) {
+      return;
+    }
+
+    if (!playbackUnlocked && nextRate > MAX_PLAYBACK_RATE) {
+      playerRef.current.setPlaybackRate(1);
+      setPlaybackRate(1);
+      showWarning("Higher playback speeds unlock after you finish watching this lesson.");
+      saveProgress({ playbackRateViolation: true });
+      return;
+    }
+
+    playerRef.current.setPlaybackRate(nextRate);
+    setPlaybackRate(nextRate);
+  };
+
+  const restartVideo = () => {
     // Use refs to get the most accurate duration value
     const safeDuration = durationRef.current;
     playerRef.current?.seekTo(0, true);
@@ -731,7 +764,9 @@ const restartVideo = () => {
                             Watched {watchPercentage.toFixed(0)}%
                           </span>
                           <span>
-                            Complete unlocks at {completionThreshold}%
+                            {playbackUnlocked
+                              ? "Replay unlocked"
+                              : `Complete unlocks at ${completionThreshold}%`}
                           </span>
                         </div>
 
@@ -783,6 +818,29 @@ const restartVideo = () => {
                             >
                               <RotateCcw className="h-5 w-5" />
                             </button>
+
+                            <select
+                              value={playbackRate}
+                              onChange={handlePlaybackRateChange}
+                              disabled={!isReady}
+                              className="h-10 rounded-full border border-white/20 bg-white/10 px-3 text-xs font-semibold text-white outline-none transition hover:bg-white/20 disabled:cursor-wait disabled:opacity-60"
+                              aria-label="Playback speed"
+                              title={
+                                playbackUnlocked
+                                  ? "Playback speed"
+                                  : "Speeds above 1.25x unlock after completing"
+                              }
+                            >
+                              {PLAYBACK_RATES.map((rate) => (
+                                <option
+                                  key={rate}
+                                  value={rate}
+                                  disabled={!playbackUnlocked && rate > MAX_PLAYBACK_RATE}
+                                >
+                                  {rate}x
+                                </option>
+                              ))}
+                            </select>
                           </div>
 
                           <button
