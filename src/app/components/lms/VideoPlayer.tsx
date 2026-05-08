@@ -301,6 +301,15 @@ export function VideoPlayer({
     videoDuration > 0 ? clamp((currentTime / videoDuration) * 100, 0, 100) : 0;
   const maxSeekPercent =
     videoDuration > 0 ? clamp((maxWatchedSeconds / videoDuration) * 100, 0, 100) : 0;
+  const durationLabel =
+    videoDuration > 0
+      ? formatTime(videoDuration)
+      : durationMinutes
+        ? `${durationMinutes} min`
+        : "Loading";
+  const playbackStatusLabel = playbackUnlocked
+    ? "Replay: seek and speed unlocked"
+    : "First watch: seek and speed protected";
   const lessonProgress =
     instructionSteps.length > 0
       ? ((currentStep + 1) / instructionSteps.length) * 100
@@ -878,15 +887,13 @@ export function VideoPlayer({
 
                 <div className="flex items-center justify-between border-t border-gray-200 p-4 dark:border-gray-700">
                   <div className="flex flex-wrap items-center gap-4 text-sm text-gray-500 dark:text-gray-400">
-                    {durationMinutes && (
-                      <div className="flex items-center gap-1">
-                        <Clock className="h-4 w-4" />
-                        <span>{durationMinutes} min</span>
-                      </div>
-                    )}
                     <div className="flex items-center gap-1">
-                      <MonitorPlay className="h-4 w-4" />
-                      <span>Protected YouTube embed</span>
+                      <Clock className="h-4 w-4" />
+                      <span>{durationLabel}</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <ShieldCheck className="h-4 w-4" />
+                      <span>{playbackStatusLabel}</span>
                     </div>
                   </div>
 
