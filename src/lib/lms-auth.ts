@@ -40,6 +40,19 @@ async function findStaffById(staffId: number) {
   return rows[0] ?? null;
 }
 
+async function createStaffForSession(session: SessionPayload) {
+  const rows = await dbManager.executeUnsafe<StaffRow>(
+    `
+      INSERT INTO lms_staff (full_name, email, branch_location, role, phone, is_active)
+      VALUES ($1, NULL, NULL, $2, NULL, true)
+      RETURNING id, full_name, email
+    `,
+    [session.username, session.role]
+  );
+
+  return rows[0] ?? null;
+}
+
 export async function findLmsStaffForSession(session: SessionPayload) {
   try {
     const sessionStaffId = toPositiveInteger(session.staffId);
@@ -132,6 +145,16 @@ export async function resolveLmsStaffContext(
       };
     }
     
+    const createdStaff = await createStaffForSession(session);
+    if (createdStaff) {
+      return {
+        ok: true,
+        staffId: Number(createdStaff.id),
+        staffName: createdStaff.full_name || createdStaff.email || session.username,
+        isAdmin,
+      };
+    }
+
     return {
       ok: false,
       response: NextResponse.json(

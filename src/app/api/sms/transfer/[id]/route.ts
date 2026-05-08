@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/auth-helpers';
 import { smsService } from '@/services/SmsService';
+import type { SmsTransferEntity } from '@/services/SmsService';
+
+function canUpdateTransfer(transfer: SmsTransferEntity, username: string, role: string): boolean {
+  return role === 'Admin' || transfer.receiverId === username;
+}
 
 export async function POST(
   req: NextRequest,
@@ -27,6 +32,27 @@ export async function POST(
     }
 
     const status = action === 'accept' ? 'accepted' : 'rejected';
+
+    const transfersResult = await smsService.getTransfers();
+    if (!transfersResult.success) {
+      return NextResponse.json(
+        { success: false, error: transfersResult.error || 'Failed to verify transfer permissions' },
+        { status: 500 }
+      );
+    }
+
+    const transfer = (transfersResult.data || []).find((item) => item.id === transferId);
+    if (!transfer) {
+      return NextResponse.json({ success: false, error: 'Transfer not found' }, { status: 404 });
+    }
+
+    if (!canUpdateTransfer(transfer, userId, auth.session.role)) {
+      return NextResponse.json(
+        { success: false, error: 'Only the receiver or an admin can accept or reject this transfer' },
+        { status: 403 }
+      );
+    }
+
     const result = await smsService.updateTransferStatus(transferId, status, userId);
     if (!result.success) {
       return NextResponse.json(

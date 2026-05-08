@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { GlassToast, useToast } from '@/components/ui/glass/GlassToast';
+import { useAuthUser } from '@/app/components/AuthContext';
 import type { SmsTransfer as PendingTransfer } from '@/lib/sms-types';
 import { formatDistanceToNow } from 'date-fns';
 import { ArrowLeft, CheckCircle2, Clock, Loader2, Package, RefreshCw, Users, XCircle } from 'lucide-react';
@@ -54,6 +55,7 @@ const UserAvatar = ({ userId, users }: { userId: string; users: LocalUser[] }) =
 };
 
 export default function PendingPage() {
+  const currentUser = useAuthUser();
   const [pending, setPending] = useState<LocalPendingTransfer[]>([]);
   const [users, setUsers] = useState<LocalUser[]>([]);
   const [loading, setLoading] = useState(true);
@@ -117,6 +119,10 @@ export default function PendingPage() {
     
     return remark.length <= 500;
   };
+
+  const canManageTransfer = useCallback((transfer: LocalPendingTransfer) => {
+    return currentUser.role === 'Admin' || transfer.receiverId === currentUser.username;
+  }, [currentUser.role, currentUser.username]);
 
 
   const handleAction = async (transferId: string, action: 'accept' | 'reject', remark?: string) => {
@@ -384,6 +390,7 @@ export default function PendingPage() {
                   </div>
                 </CardContent>
                 <div className="px-6 pb-6 relative z-10 bg-gradient-to-t from-slate-50/80 to-transparent rounded-b-3xl pt-4">
+                  {canManageTransfer(transfer) ? (
                   <div className="flex gap-3 justify-end">
                     <AlertDialog>
                       <AlertDialogTrigger asChild>
@@ -506,6 +513,11 @@ export default function PendingPage() {
                       </AlertDialogContent>
                     </AlertDialog>
                   </div>
+                  ) : (
+                    <div className="rounded-2xl border border-slate-200 bg-white/70 px-4 py-3 text-sm font-medium text-slate-600">
+                      Waiting for {getUserDisplay(transfer.receiverId)} or an admin to review this transfer.
+                    </div>
+                  )}
                 </div>
               </Card>
             ))

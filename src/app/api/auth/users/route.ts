@@ -1,4 +1,4 @@
-import { getSession } from "@/lib/auth-helpers";
+import { getSession, hasAppPermission, requirePermission } from "@/lib/auth-helpers";
 import {
   isDuplicateError,
   isNotFoundError,
@@ -115,27 +115,12 @@ export const dynamic = 'force-dynamic';
 
 export async function GET(req: NextRequest) {
   try {
-    // Authenticate session with detailed logging for debugging
-    const session = getSession(req);
-    
-    // Debug logging to help diagnose access issues
-    if (!session) {
-      log("WARN", "GET /api/auth/users - No session found", {
+    const auth = requirePermission(req, "users:view");
+    if (auth.response) {
+      log("WARN", "GET /api/auth/users - Access denied", {
         cookies: req.cookies.get("session")?.value ? "present" : "missing",
       });
-      return createErrorResponse("Authentication required. Please log in as admin (username: admin, password: 1234)", "unauthorized", 401);
-    }
-    
-    if (session.role !== "Admin") {
-      log("WARN", "GET /api/auth/users - Non-admin access attempt", {
-        username: session.username,
-        role: session.role,
-      });
-      return createErrorResponse(
-        `Access denied. You are logged in as "${session.role}". Please log in as "Admin" to manage users. Default admin: admin / 1234`, 
-        "forbidden", 
-        403
-      );
+      return auth.response;
     }
 
     // Fetch users (cached in userStore)
@@ -157,29 +142,15 @@ export async function POST(req: NextRequest) {
   log("INFO", "POST /api/auth/users - Request started", { requestId });
   
   try {
-    // Authenticate session
-    const session = getSession(req);
-    if (!session) {
-      log("WARN", "POST /api/auth/users - No session found", { 
-        requestId,
+    const auth = requirePermission(req, "users:create");
+    if (auth.response) {
+      log("WARN", "POST /api/auth/users - Insufficient permission", {
+        requestId, 
         cookies: req.cookies.get("session")?.value ? "present" : "missing",
       });
-      return createErrorResponse("Authentication required. Please log in.", "unauthorized", 401);
+      return auth.response;
     }
-
-    // Authorize admin access
-    if (session.role !== "Admin") {
-      log("WARN", "POST /api/auth/users - Non-admin access attempt", { 
-        requestId, 
-        username: session.username,
-        role: session.role 
-      });
-      return createErrorResponse(
-        `Access denied. Admin role required. Current role: ${session.role}`, 
-        "forbidden", 
-        403
-      );
-    }
+    const session = auth.session;
 
     // Parse request body
     let body: Record<string, unknown>;
@@ -325,8 +296,8 @@ export async function PUT(req: NextRequest) {
 
     const targetUsername = (body.username as string) || session.username;
     
-    // Users can only update their own profile unless they're an admin
-    if (session.username !== targetUsername && session.role !== "Admin") {
+    // Users can only update their own profile unless their role can edit users.
+    if (session.username !== targetUsername && !hasAppPermission(session.role, "users:edit")) {
       log("WARN", "PUT /api/auth/users - Forbidden: can only update own profile", { 
         requestId,
         username: session.username,
@@ -401,26 +372,14 @@ export async function PUT(req: NextRequest) {
 export async function DELETE(req: NextRequest) {
   import("@/lib/userStore").then(m => m.invalidateUsersCache());
   
-  const session = getSession(req);
-  
-  if (!session) {
-    log("WARN", "DELETE /api/auth/users - No session found", {
+  const auth = requirePermission(req, "users:delete");
+  if (auth.response) {
+    log("WARN", "DELETE /api/auth/users - Insufficient permission", {
       cookies: req.cookies.get("session")?.value ? "present" : "missing",
     });
-    return createErrorResponse("Authentication required. Please log in.", "unauthorized", 401);
+    return auth.response;
   }
-  
-  if (session.role !== "Admin") {
-    log("WARN", "DELETE /api/auth/users - Non-admin access attempt", {
-      username: session.username,
-      role: session.role,
-    });
-    return createErrorResponse(
-      `Access denied. Admin role required. Current role: ${session.role}`, 
-      "forbidden", 
-      403
-    );
-  }
+  const session = auth.session;
 
   let body;
   try {

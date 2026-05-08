@@ -12,9 +12,29 @@ export async function GET(request: NextRequest) {
     const duration = Date.now() - startTime;
 
     if (result.success) {
+      let data = result.data;
+
+      if (auth.session.role !== 'Admin' && data) {
+        const transfersResult = await smsService.getTransfers();
+        if (!transfersResult.success) {
+          return NextResponse.json({
+            success: false,
+            error: transfersResult.error || 'Failed to fetch transfer stats'
+          }, { status: 500 });
+        }
+
+        data = {
+          ...data,
+          pendingTransfers: (transfersResult.data || []).filter((transfer) =>
+            transfer.status === 'pending' &&
+            (transfer.senderId === auth.session.username || transfer.receiverId === auth.session.username)
+          ).length,
+        };
+      }
+
       return NextResponse.json({
         success: true,
-        data: result.data,
+        data,
         meta: { durationMs: duration }
       });
     } else {

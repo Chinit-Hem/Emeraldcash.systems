@@ -1,16 +1,11 @@
-import {
-  getClientIp,
-  getClientUserAgent,
-  getSessionFromRequest,
-  validateSession,
-} from "@/lib/auth";
+import { requirePermission } from "@/lib/auth-helpers";
 import { NextRequest, NextResponse } from "next/server";
 import { appsScriptUrl, fetchAppsScript } from "../../vehicles/_shared";
 
 // POST /api/market-price/update
 // Body: { vehicleId, marketData: { priceLow, priceMedian, priceHigh, source, samples, confidence } }
 // Updates the vehicle's market price fields in Google Sheets
-// Requires Admin authentication
+// Requires vehicle edit permission.
 
 // Input validation helper
 function sanitizeString(value: unknown, maxLength = 1000): string {
@@ -67,33 +62,9 @@ function validateMarketData(data: Record<string, unknown>): { valid: boolean; er
 }
 
 export async function POST(request: NextRequest) {
-  // Require authentication
-  const ip = getClientIp(request.headers);
-  const userAgent = getClientUserAgent(request.headers);
-  const sessionCookie = request.cookies.get("session")?.value;
-  
-  if (!sessionCookie) {
-    return NextResponse.json(
-      { ok: false, error: "Authentication required" },
-      { status: 401 }
-    );
-  }
-
-  const session = getSessionFromRequest(userAgent, ip, sessionCookie);
-  if (!session || !validateSession(session)) {
-    return NextResponse.json(
-      { ok: false, error: "Invalid or expired session" },
-      { status: 401 }
-    );
-  }
-
-  // Only Admins can update market prices
-  if (session.role !== "Admin") {
-    return NextResponse.json(
-      { ok: false, error: "Forbidden. Admin access required." },
-      { status: 403 }
-    );
-  }
+  const auth = requirePermission(request, "vehicles:edit");
+  if (auth.response) return auth.response;
+  const session = auth.session;
 
   try {
     const body = await request.json();
@@ -229,4 +200,3 @@ export async function POST(request: NextRequest) {
     );
   }
 }
-
