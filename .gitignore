@@ -72,8 +72,14 @@ LIQUID_GLASS*.md
 # Build logs
 build.log
 
-# Scripts (development only)
-/scripts/
+# Scripts
+/scripts/*
+!/scripts/dev-reset.mjs
+!/scripts/test-neon-connection.mjs
+!/scripts/deploy/
+!/scripts/deploy/**
+!/scripts/migrations/
+!/scripts/migrations/**
 
 # Apps Script (Google integration)
 /apps-script/

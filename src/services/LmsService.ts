@@ -44,8 +44,11 @@ import { BaseFilters, BaseService, ServiceResult } from "./BaseService";
 
 export interface LmsDashboardStats {
   total_staff: number;
+  staff_added_this_week: number;
   total_categories: number;
   total_lessons: number;
+  completed_lessons_total: number;
+  total_possible_completions: number;
   overall_completion_rate: number;
   staff_progress: {
     staff_id: number;
@@ -838,8 +841,11 @@ export class LmsService extends BaseService<LmsCategoryEntity, LmsCategoryDB> {
 
       const dashboardStats: LmsDashboardStats = {
         total_staff: stats.totalStaff,
+        staff_added_this_week: stats.staffAddedThisWeek,
         total_categories: stats.totalCategories,
         total_lessons: stats.totalLessons,
+        completed_lessons_total: stats.completedLessonsTotal,
+        total_possible_completions: totalPossibleCompletions,
         overall_completion_rate: totalPossibleCompletions > 0
           ? Math.round((stats.completedLessonsTotal / totalPossibleCompletions) * 100)
           : 0,

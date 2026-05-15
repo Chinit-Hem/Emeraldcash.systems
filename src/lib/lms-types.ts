@@ -86,8 +86,11 @@ export interface CategoryCompletion {
 
 export interface LmsDashboardStats {
   total_staff: number;
+  staff_added_this_week?: number;
   total_categories: number;
   total_lessons: number;
+  completed_lessons_total?: number;
+  total_possible_completions?: number;
   overall_completion_rate: number;
   staff_progress: StaffProgress[];
   category_completion: CategoryCompletion[];

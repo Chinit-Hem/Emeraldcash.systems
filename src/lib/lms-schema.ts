@@ -17,7 +17,7 @@
 import type { Role } from "@/lib/types";
 
 // Unified role system - same as settings/users
-export const LMS_ROLES: Role[] = ["Admin", "Staff"];
+export const LMS_ROLES: Role[] = ["Admin", "Staff", "Transfer"];
 
 export type LmsRole = Role;
 
@@ -152,8 +152,11 @@ export interface LmsCategoryWithLessons extends LmsCategory {
  */
 export interface LmsDashboardStats {
   total_staff: number;
+  staff_added_this_week?: number;
   total_categories: number;
   total_lessons: number;
+  completed_lessons_total?: number;
+  total_possible_completions?: number;
   overall_completion_rate: number;
   staff_progress: {
     staff_id: number;

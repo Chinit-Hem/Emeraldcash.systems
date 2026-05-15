@@ -356,16 +356,34 @@ class DatabaseManager {
         // Dynamically construct the template literal parts and values
         // This is the correct way to use neon's sql function when you have
         // a query string with $N placeholders and a separate params array.
-        const parts = query.split(/\$\d+/); // Split by $1, $2, etc. This is a loop.
+        const placeholders = [...query.matchAll(/\$(\d+)/g)].map((match) =>
+          Number.parseInt(match[1], 10),
+        );
+        const parts = query.split(/\$\d+/);
         const strings = Object.assign(parts, { raw: parts }) as TemplateStringsArray;
 
-        // Ensure the number of parts matches the number of parameters + 1
-        if (params && parts.length !== params.length + 1) {
-          throw new Error(`Mismatched parameters for query: "${query}". Expected ${parts.length - 1} parameters, got ${params.length}.`);
+        if (placeholders.length === 0) {
+          const result = await sql(strings);
+          return result as T[];
+        }
+
+        const values = placeholders.map((placeholder) => {
+          if (!params || placeholder < 1 || placeholder > params.length) {
+            throw new Error(
+              `Mismatched parameters for query: "${query}". Placeholder $${placeholder} has no matching parameter. Got ${params?.length || 0} parameters.`,
+            );
+          }
+
+          return params[placeholder - 1];
+        });
+
+        const maxPlaceholder = Math.max(...placeholders);
+        if (params && maxPlaceholder < params.length) {
+          throw new Error(`Mismatched parameters for query: "${query}". Expected ${maxPlaceholder} parameters, got ${params.length}.`);
         }
 
         // Call the sql function with the dynamically created template literal parts and values
-        const result = await sql(strings, ...(params || []));
+        const result = await sql(strings, ...values);
         return result as T[];
       },
       { operationName: "unsafe SQL query", timeoutMs }

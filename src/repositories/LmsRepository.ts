@@ -342,6 +342,7 @@ export class LmsDashboardRepository {
    */
   public async getStats(): Promise<{
     totalStaff: number;
+    staffAddedThisWeek: number;
     totalCategories: number;
     totalLessons: number;
     staffWithCompletions: number;
@@ -350,14 +351,16 @@ export class LmsDashboardRepository {
     const query = `
       SELECT
         (SELECT COUNT(*) FROM lms_staff WHERE is_active = true) as total_staff,
+        (SELECT COUNT(*) FROM lms_staff WHERE is_active = true AND created_at >= CURRENT_DATE - INTERVAL '7 days') as staff_added_this_week,
         (SELECT COUNT(*) FROM lms_categories WHERE is_active = true) as total_categories,
         (SELECT COUNT(*) FROM lms_lessons WHERE is_active = true) as total_lessons,
         (SELECT COUNT(DISTINCT staff_id) FROM lms_lesson_completions) as staff_with_completions,
-        (SELECT COUNT(DISTINCT lesson_id) FROM lms_lesson_completions) as completed_lessons_total
+        (SELECT COUNT(*) FROM lms_lesson_completions) as completed_lessons_total
     `;
 
     const result = await this.executeQuery<{
       total_staff: number;
+      staff_added_this_week: number;
       total_categories: number;
       total_lessons: number;
       staff_with_completions: number;
@@ -367,6 +370,7 @@ export class LmsDashboardRepository {
     const row = result[0];
     return {
       totalStaff: parseInt(String(row?.total_staff || 0)),
+      staffAddedThisWeek: parseInt(String(row?.staff_added_this_week || 0)),
       totalCategories: parseInt(String(row?.total_categories || 0)),
       totalLessons: parseInt(String(row?.total_lessons || 0)),
       staffWithCompletions: parseInt(String(row?.staff_with_completions || 0)),

@@ -105,6 +105,11 @@ export interface PaginatedSmsResult<T> {
   totalPages: number;
 }
 
+interface SmsHistoryVisibility {
+  username: string;
+  isAdmin: boolean;
+}
+
 // ============================================================================
 // SMS Asset Service Singleton Class
 // ============================================================================
@@ -183,10 +188,18 @@ export class SmsAssetService extends BaseService<SmsAssetEntity, SmsAssetDB> {
     let _query = baseQuery;
     let paramIndex = 1;
 
-    // Search in name and description
+    // Search across the fields visible in the asset inventory table.
     if (filters?.search) {
       const searchPattern = SmsAssetService.buildIlikePattern(filters.search);
-      conditions.push(`(name ILIKE $${paramIndex} OR description ILIKE $${paramIndex})`);
+      conditions.push(`(
+        name ILIKE $${paramIndex}
+        OR description ILIKE $${paramIndex}
+        OR item_code ILIKE $${paramIndex}
+        OR type ILIKE $${paramIndex}
+        OR category ILIKE $${paramIndex}
+        OR location ILIKE $${paramIndex}
+        OR assigned_to ILIKE $${paramIndex}
+      )`);
       params.push(searchPattern);
       paramIndex++;
     }
@@ -566,7 +579,10 @@ export class SmsAssetService extends BaseService<SmsAssetEntity, SmsAssetDB> {
 
 
 
-  public async getAssetHistory(assetId: string): Promise<ServiceResult<Record<string, unknown>>> {
+  public async getAssetHistory(
+    assetId: string,
+    visibility: SmsHistoryVisibility
+  ): Promise<ServiceResult<Record<string, unknown>>> {
     const startTime = Date.now();
     try {
       // Get asset info
@@ -575,29 +591,53 @@ export class SmsAssetService extends BaseService<SmsAssetEntity, SmsAssetDB> {
       ` as Array<Record<string, string>>;
       const assetName = assetResult[0]?.name || 'Unknown';
 
-      // Get transfers
-      const transfersResult = await dbManager.execute`
+      // Get transfers. Admin sees all transfer events; other users only see
+      // events where they are sender or receiver.
+      const transferQuery = `
         SELECT
           'transfer' as type,
-          id, asset_id as assetId, sender_id as senderId,
-          receiver_id as receiverId, location, status, remark as description,
-          created_at as timestamp, accepted_at
+          id, asset_id as "assetId", sender_id as "senderId",
+          receiver_id as "receiverId", location, status,
+          COALESCE(NULLIF(remark, ''), 'Transfer ' || status) as description,
+          created_at as timestamp, accepted_at as "acceptedAt"
         FROM sms_transfers
-        WHERE asset_id = ${assetId}
+        WHERE asset_id = $1::uuid
+        ${visibility.isAdmin ? "" : "AND (sender_id = $2 OR receiver_id = $2)"}
         ORDER BY created_at DESC
-      ` as Array<Record<string, unknown>>;
+      `;
+      const transferParams = visibility.isAdmin
+        ? [assetId]
+        : [assetId, visibility.username];
+      const transfersResult = await dbManager.executeUnsafe<Record<string, unknown>>(
+        transferQuery,
+        transferParams,
+      );
 
-      // Get audits
-      const auditsResult = await dbManager.execute`
+      // Get audits directly attached to the asset or to transfers for the asset.
+      // Admin sees all audit rows; other users only see their own audit rows.
+      const auditQuery = `
         SELECT
           'audit' as type,
           id, user_id, action as description, metadata,
           created_at as timestamp
         FROM sms_audit_logs
-        WHERE (metadata->>'assetId') = ${assetId}
-          OR metadata @> ${`{ "assetId": "${assetId}" }`}::jsonb
+        WHERE (
+          metadata->>'assetId' = $1::text
+          OR metadata @> jsonb_build_object('assetId', $1::text)
+          OR metadata->>'transferId' IN (
+            SELECT id::text FROM sms_transfers WHERE asset_id = $1::uuid
+          )
+        )
+        ${visibility.isAdmin ? "" : "AND user_id = $2"}
         ORDER BY created_at DESC
-      ` as Array<Record<string, unknown>>;
+      `;
+      const auditParams = visibility.isAdmin
+        ? [assetId]
+        : [assetId, visibility.username];
+      const auditsResult = await dbManager.executeUnsafe<Record<string, unknown>>(
+        auditQuery,
+        auditParams,
+      );
 
       // Combine and sort by timestamp DESC
       const events = [
@@ -605,13 +645,16 @@ export class SmsAssetService extends BaseService<SmsAssetEntity, SmsAssetDB> {
           type: t.type as string,
           id: t.id as string,
           assetId: t.assetId as string,
-        userId: String(t.senderId || t.receiverId || ''),
+          userId: String(t.senderId || t.receiverId || ''),
           description: t.description as string,
           location: t.location as string,
           status: t.status as string,
           timestamp: t.timestamp as string,
           acceptedAt: t.acceptedAt as string | null,
-          metadata: t.metadata,
+          metadata: {
+            senderId: t.senderId,
+            receiverId: t.receiverId,
+          },
         })),
         ...auditsResult.map((a) => ({
           type: a.type as string,
@@ -630,6 +673,7 @@ export class SmsAssetService extends BaseService<SmsAssetEntity, SmsAssetDB> {
           assetId,
           assetName,
           totalEvents: events.length,
+          scope: visibility.isAdmin ? 'all' : 'own',
           events
         },
         meta: { durationMs: Date.now() - startTime, queryCount: 3 }

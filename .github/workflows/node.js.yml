@@ -11,7 +11,6 @@ on:
 
 jobs:
   build:
-
     runs-on: ubuntu-latest
 
     strategy:
@@ -27,6 +26,8 @@ jobs:
         node-version: ${{ matrix.node-version }}
         cache: 'npm'
     - run: npm ci
+    - run: npm run structure:check
+    - run: npm run lint
     - name: Build with dummy env vars
       env:
         # Dummy values for CI build - real values are set in Vercel/production

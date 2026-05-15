@@ -136,7 +136,12 @@ class LmsApiService {
   // Fetch last watched lesson - enables "Continue Learning" to show last video user watched
   static async fetchLastWatched(): Promise<LastWatchedLesson | null> {
     try {
-      const response = await this.fetchWithTimeout(`${this.BASE_URL}/progress`);
+      const response = await this.fetchWithTimeout(`${this.BASE_URL}/progress?scope=last-watched&t=${Date.now()}`, {
+        cache: "no-store",
+        headers: {
+          "Cache-Control": "no-cache",
+        },
+      });
       if (!response.ok) return null;
       const data = await response.json();
       return data.success ? data.data : null;
@@ -190,12 +195,12 @@ function StatCard({
   };
 
   return (
-    <div className="relative overflow-hidden rounded-3xl p-6 bg-gradient-to-br from-[#f0f4f8] to-[#e6e9ef] shadow-sm transition-all duration-300 hover:bg-slate-50 group">
+    <div className="relative overflow-hidden rounded-2xl sm:rounded-3xl p-4 sm:p-6 bg-gradient-to-br from-[#f0f4f8] to-[#e6e9ef] shadow-sm transition-all duration-300 hover:bg-slate-50 group">
       <div className={`absolute top-0 right-0 w-32 h-32 bg-gradient-to-br ${colorClasses[color]} opacity-10 rounded-full blur-3xl transform translate-x-16 -translate-y-16 transition-opacity group-hover:opacity-20`} />
       <div className="relative flex items-start justify-between">
         <div className="flex-1 min-w-0">
           <p className="text-sm font-semibold text-slate-500 uppercase tracking-wider">{title}</p>
-          <p className="mt-2 text-3xl font-bold text-slate-800 tracking-tight">{value}</p>
+          <p className="mt-2 text-2xl sm:text-3xl font-bold text-slate-800 tracking-tight">{value}</p>
           {trend && (
             <div className={`mt-2 flex items-center gap-1 text-sm font-medium ${trendUp ? 'text-emerald-600' : 'text-red-600'}`}>
               <TrendingUp className={`w-4 h-4 ${trendUp ? '' : 'rotate-180'}`} />
@@ -204,7 +209,7 @@ function StatCard({
           )}
           {subtitle && <p className="mt-2 text-sm text-slate-500">{subtitle}</p>}
         </div>
-        <div className={`flex-shrink-0 p-3 rounded-2xl bg-gradient-to-br ${colorClasses[color]} text-white shadow-lg transform transition-transform group-hover:scale-110`}>
+        <div className={`flex-shrink-0 p-2.5 sm:p-3 rounded-2xl bg-gradient-to-br ${colorClasses[color]} text-white shadow-lg transform transition-transform group-hover:scale-110`}>
           <Icon className="w-6 h-6" />
         </div>
       </div>
@@ -368,6 +373,7 @@ function LmsDashboard({ initialData }: LmsDashboardProps) {
   const [categories, setCategories] = useState<LmsCategory[]>(initialData?.categories || []);
   const [lessons, setLessons] = useState<LessonWithStatus[]>(initialData?.lessons || []);
   const [lastWatched, setLastWatched] = useState<LastWatchedLesson | null>(null);
+  const [lastWatchedLoaded, setLastWatchedLoaded] = useState(false);
   const [loading, setLoading] = useState(!initialData);
   const [_activeTab, _setActiveTab] = useState<TabType>("learning");
   const [isExporting, setIsExporting] = useState(false);
@@ -397,8 +403,10 @@ function LmsDashboard({ initialData }: LmsDashboardProps) {
       setCategories(categoriesData);
       setLessons(lessonsData);
       setLastWatched(lastWatchedData);
+      setLastWatchedLoaded(true);
     } catch (error) {
       console.error("Error loading dashboard data:", error);
+      setLastWatchedLoaded(true);
     } finally {
       if (showSkeleton) {
         setLoading(false);
@@ -409,7 +417,28 @@ function LmsDashboard({ initialData }: LmsDashboardProps) {
   useEffect(() => {
     if (!initialData) {
       void loadData();
+      return;
     }
+
+    let isMounted = true;
+
+    LmsApiService.fetchLastWatched()
+      .then((lastWatchedData) => {
+        if (isMounted) {
+          setLastWatched(lastWatchedData);
+          setLastWatchedLoaded(true);
+        }
+      })
+      .catch((error) => {
+        console.error("Last watched refresh error:", error);
+        if (isMounted) {
+          setLastWatchedLoaded(true);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
   }, [initialData, loadData]);
 
   useEffect(() => {
@@ -452,6 +481,13 @@ function LmsDashboard({ initialData }: LmsDashboardProps) {
   const completedLessons = useMemo(() => lessons.filter((l) => l.is_completed).length, [lessons]);
   const totalLessons = lessons.length;
   const overallProgress = totalLessons > 0 ? Math.round((completedLessons / totalLessons) * 100) : 0;
+  const staffAddedTrend = (stats?.staff_added_this_week ?? 0) > 0
+    ? `+${stats?.staff_added_this_week} this week`
+    : undefined;
+  const completionRateSubtitle =
+    stats?.completed_lessons_total !== undefined && stats?.total_possible_completions !== undefined
+      ? `${stats.completed_lessons_total} of ${stats.total_possible_completions} staff-lessons`
+      : undefined;
 
   const filteredCategories = useMemo(() => {
     if (!debouncedSearch.trim()) return categories;
@@ -460,13 +496,15 @@ function LmsDashboard({ initialData }: LmsDashboardProps) {
   }, [categories, debouncedSearch]);
 
   const currentLesson = useMemo(() => lessons.find((l) => l.is_unlocked && !l.is_completed), [lessons]);
+  const continueLesson = lastWatched || (lastWatchedLoaded ? currentLesson : null);
+  const continueLessonId = lastWatched?.lessonId || currentLesson?.id;
 
   // Instant render with skeleton if no initial data or refreshing
   const isSkeleton = loading || !stats || !categories.length;
 
   if (isSkeleton) {
     return (
-      <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-5 sm:py-8">
         <div className="space-y-8">
           <div className="h-8 w-48 bg-slate-200 rounded-lg animate-pulse" />
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -554,22 +592,22 @@ function LmsDashboard({ initialData }: LmsDashboardProps) {
         </div>
 
         {/* Stats Grid */}
-        <div className={`grid gap-4 sm:gap-6 ${isAdmin ? 'grid-cols-2 lg:grid-cols-4' : 'grid-cols-2 lg:grid-cols-3'}`}>
+        <div className={`grid gap-4 sm:gap-6 ${isAdmin ? 'grid-cols-1 min-[420px]:grid-cols-2 lg:grid-cols-4' : 'grid-cols-1 min-[420px]:grid-cols-2 lg:grid-cols-3'}`}>
           {isAdmin && (
-            <StatCard title="Total Staff" value={stats.total_staff} icon={Users} color="blue" trend="+3 this week" trendUp={true} />
+            <StatCard title="Total Staff" value={stats.total_staff} icon={Users} color="blue" trend={staffAddedTrend} trendUp={true} />
           )}
           <StatCard title="Categories" value={stats.total_categories} subtitle={`${categories.length} active`} icon={BookOpen} color="emerald" />
-          <StatCard title="Your Progress" value={`${overallProgress}%`} subtitle={`${completedLessons} of ${totalLessons} lessons`} icon={Trophy} color="purple" trend="+12% this month" trendUp={true} />
-          <StatCard title="Completion Rate" value={`${stats.overall_completion_rate}%`} icon={TrendingUp} color="amber" />
+          <StatCard title="Your Progress" value={`${overallProgress}%`} subtitle={`${completedLessons} of ${totalLessons} lessons`} icon={Trophy} color="purple" />
+          <StatCard title="Completion Rate" value={`${stats.overall_completion_rate}%`} subtitle={completionRateSubtitle} icon={TrendingUp} color="amber" />
         </div>
 
         {/* Tab Navigation */}
-        <div className="flex flex-wrap gap-2 p-2 bg-white rounded-2xl shadow-sm">
+        <div className="flex gap-2 overflow-x-auto p-2 bg-white rounded-2xl shadow-sm sm:flex-wrap">
           {tabs.map((tab) => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.id;
             return (
-              <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all ${isActive ? 'bg-gradient-to-r from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/30' : 'text-slate-600 hover:bg-slate-100'}`}>
+              <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`flex shrink-0 items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all ${isActive ? 'bg-gradient-to-r from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/30' : 'text-slate-600 hover:bg-slate-100'}`}>
                 <Icon className="w-4 h-4" />{tab.label}
               </button>
             );
@@ -631,8 +669,8 @@ function LmsDashboard({ initialData }: LmsDashboardProps) {
               )}
             </div>
 
-{/* Continue Learning - Show last watched lesson first, fallback to first incomplete lesson */}
-            {(lastWatched || currentLesson) && (
+{/* Continue Learning - Show last watched lesson first, fallback after lookup finishes */}
+            {continueLesson && (
               <div className="p-6 bg-gradient-to-br from-emerald-50 to-emerald-100/50 rounded-3xl shadow-sm border border-emerald-200/50">
                 <div className="flex items-center gap-3 mb-4">
                   <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-500 to-emerald-600 shadow-lg shadow-emerald-500/30 flex items-center justify-center">
@@ -643,22 +681,21 @@ function LmsDashboard({ initialData }: LmsDashboardProps) {
                     <p className="text-sm text-slate-500">Pick up where you left off</p>
                   </div>
                 </div>
-                <div className="flex items-center justify-between p-4 bg-white rounded-2xl shadow-sm">
-                  <div>
-                    <p className="font-semibold text-slate-800">{lastWatched?.title || currentLesson?.title}</p>
+                <div className="flex flex-col gap-4 p-4 bg-white rounded-2xl shadow-sm sm:flex-row sm:items-center sm:justify-between">
+                  <div className="min-w-0">
+                    <p className="font-semibold text-slate-800">{continueLesson.title}</p>
                     <p className="text-sm text-slate-500">
                       {lastWatched?.categoryName || currentLesson?.category_name}
-                      {lastWatched?.watchPercentage ? ` • ${lastWatched.watchPercentage}% watched` : ` • ${currentLesson?.duration_minutes || 0} min`}
+                      {lastWatched ? ` • ${lastWatched.watchPercentage}% watched` : ` • ${currentLesson?.duration_minutes || 0} min`}
                     </p>
                   </div>
-<button 
+                  <button 
                     onClick={() => {
-                      const lessonId = lastWatched?.lessonId || currentLesson?.id;
-                      if (lessonId) handleResumeLesson(lessonId);
+                      if (continueLessonId) handleResumeLesson(continueLessonId);
                     }} 
-                    className="px-6 py-2.5 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white font-medium rounded-xl shadow-lg shadow-emerald-500/30 hover:shadow-xl hover:shadow-emerald-500/40 transition-all active:scale-95"
+                    className="w-full px-6 py-2.5 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white font-medium rounded-xl shadow-lg shadow-emerald-500/30 hover:shadow-xl hover:shadow-emerald-500/40 transition-all active:scale-95 sm:w-auto"
                   >
-                   Resume
+                    Resume
                   </button>
                 </div>
               </div>
@@ -695,7 +732,7 @@ function LmsDashboard({ initialData }: LmsDashboardProps) {
             {/* Overall Progress */}
             <div className="p-6 bg-white rounded-3xl shadow-sm">
               <h3 className="text-lg font-bold text-slate-800 mb-6">Overall Progress</h3>
-              <div className="grid grid-cols-3 gap-4 mb-6">
+              <div className="grid grid-cols-1 min-[520px]:grid-cols-3 gap-4 mb-6">
                 <div className="text-center p-4 bg-emerald-50 rounded-2xl">
                   <p className="text-3xl font-bold text-emerald-600">{completedLessons}</p>
                   <p className="text-sm text-slate-600">Completed</p>
@@ -837,7 +874,7 @@ function LmsDashboard({ initialData }: LmsDashboardProps) {
               </div>
 
               {/* Personal Stats */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+              <div className="grid grid-cols-1 min-[420px]:grid-cols-2 md:grid-cols-4 gap-4 mb-6">
                 <div className="text-center p-4 bg-emerald-50 rounded-2xl">
                   <p className="text-2xl font-bold text-emerald-600">{completedLessons}</p>
                   <p className="text-sm text-slate-600">Completed</p>
@@ -860,8 +897,8 @@ function LmsDashboard({ initialData }: LmsDashboardProps) {
               <div className="p-4 bg-slate-50 rounded-2xl">
                 <h4 className="font-semibold text-slate-800 mb-3">Current Status</h4>
                 {currentLesson ? (
-                  <div className="flex items-center justify-between p-3 bg-white rounded-xl shadow-sm">
-                    <div className="flex items-center gap-3">
+                  <div className="flex flex-col gap-3 p-3 bg-white rounded-xl shadow-sm sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex min-w-0 items-center gap-3">
                       <div className="w-10 h-10 rounded-lg bg-emerald-100 flex items-center justify-center">
                         <PlayCircle className="w-5 h-5 text-emerald-600" />
                       </div>
@@ -870,7 +907,7 @@ function LmsDashboard({ initialData }: LmsDashboardProps) {
                         <p className="text-xs text-slate-500">{currentLesson.category_name}</p>
                       </div>
                     </div>
-                    <span className="text-xs px-2 py-1 bg-emerald-100 text-emerald-700 rounded-full">In Progress</span>
+                      <span className="self-start whitespace-nowrap text-xs px-2 py-1 bg-emerald-100 text-emerald-700 rounded-full sm:self-auto">In Progress</span>
                   </div>
                 ) : (
                   <div className="text-center p-4 text-slate-500">

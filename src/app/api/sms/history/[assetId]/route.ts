@@ -11,7 +11,10 @@ export async function GET(
     if (auth.response) return auth.response;
 
     const { assetId } = await params;
-    const result = await smsService.getAssetHistory(assetId);
+    const result = await smsService.getAssetHistory(assetId, {
+      username: auth.session.username,
+      isAdmin: auth.session.role === 'Admin',
+    });
 
     if (!result.success) {
       return NextResponse.json(
