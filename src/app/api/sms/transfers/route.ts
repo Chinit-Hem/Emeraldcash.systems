@@ -14,8 +14,12 @@ function resolveStatus(error: string | undefined): number {
 }
 
 function canViewTransfer(transfer: SmsTransferEntity, session: SessionPayload): boolean {
+  // Admin and Transfer roles can see all transfers
+  if (session.role === 'Admin' || session.role === 'Transfer') {
+    return true;
+  }
+  // Staff and other roles can only see their own transfers
   return (
-    session.role === 'Admin' ||
     transfer.senderId === session.username ||
     transfer.receiverId === session.username
   );

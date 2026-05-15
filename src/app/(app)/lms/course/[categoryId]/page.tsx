@@ -260,7 +260,7 @@ export default function CourseOverviewPage() {
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       {/* Hero Section */}
       <div className={`relative bg-gradient-to-br ${colors.gradient} dark:from-gray-800 dark:to-gray-900`}>
-        <div className="max-w-[1400px] mx-auto px-4 sm:px-6 py-8 sm:py-12">
+        <div className="max-w-[1400px] mx-auto px-4 sm:px-6 py-6 sm:py-12">
           {/* Back Button */}
           <button
             onClick={() => router.push("/lms")}
@@ -282,7 +282,7 @@ export default function CourseOverviewPage() {
                 </span>
               </div>
               
-              <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 dark:text-white mb-3">
+              <h1 className="text-2xl sm:text-4xl font-bold text-gray-900 dark:text-white mb-3 break-words">
                 {category.name}
               </h1>
               
@@ -312,7 +312,7 @@ export default function CourseOverviewPage() {
             </div>
             
             {/* Progress Card */}
-            <GlassCard className="p-6 flex items-center gap-6 min-w-[280px]">
+            <GlassCard className="w-full p-4 sm:p-6 flex items-center gap-4 sm:gap-6 lg:w-auto lg:min-w-[280px]">
               <ProgressRing percentage={progressPercentage} color={category.color || "emerald"} />
               <div>
                 <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">Your Progress</p>
@@ -357,7 +357,7 @@ export default function CourseOverviewPage() {
       
       {/* Lessons Grid */}
       <main className="max-w-[1400px] mx-auto px-4 sm:px-6 py-8 sm:py-12">
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex flex-col gap-3 mb-6 sm:flex-row sm:items-center sm:justify-between">
           <h2 className="text-xl font-semibold text-gray-900 dark:text-white flex items-center gap-2">
             <BarChart3 className="w-5 h-5 text-emerald-500" />
             Course Content

@@ -104,6 +104,7 @@ const YOUTUBE_IFRAME_API_SRC = "https://www.youtube.com/iframe_api";
 const PROGRESS_SAVE_INTERVAL_MS = 10_000;
 const MAX_PLAYBACK_RATE = 1.25;
 const SEEK_GRACE_SECONDS = 2;
+const COMPLETE_END_TOLERANCE_SECONDS = 5;
 const PLAYBACK_RATES = [0.5, 1, 1.25, 1.5, 2];
 
 let youtubeApiPromise: Promise<YouTubeNamespace> | null = null;
@@ -288,6 +289,7 @@ export function VideoPlayer({
   const currentTimeRef = useRef(0);
   const maxWatchedRef = useRef(0);
   const durationRef = useRef(0);
+  const isCompletedRef = useRef(initialCompleted);
   const playbackUnlockedRef = useRef(initialCompleted);
 
   const instructionSteps = useMemo(
@@ -296,11 +298,15 @@ export function VideoPlayer({
   );
 
   const completionAllowed = isCompleted || watchPercentage >= completionThreshold;
-  const playbackUnlocked = isCompleted;
+  const playbackUnlocked = completionAllowed;
   const progressPercent =
     videoDuration > 0 ? clamp((currentTime / videoDuration) * 100, 0, 100) : 0;
   const maxSeekPercent =
-    videoDuration > 0 ? clamp((maxWatchedSeconds / videoDuration) * 100, 0, 100) : 0;
+    playbackUnlocked
+      ? 100
+      : videoDuration > 0
+        ? clamp((maxWatchedSeconds / videoDuration) * 100, 0, 100)
+        : 0;
   const durationLabel =
     videoDuration > 0
       ? formatTime(videoDuration)
@@ -321,6 +327,12 @@ export function VideoPlayer({
   }, []);
 
   useEffect(() => {
+    setIsCompleted(initialCompleted);
+    isCompletedRef.current = initialCompleted;
+    playbackUnlockedRef.current = initialCompleted;
+  }, [initialCompleted, lessonId]);
+
+  useEffect(() => {
     playbackUnlockedRef.current = playbackUnlocked;
   }, [playbackUnlocked]);
 
@@ -333,10 +345,16 @@ export function VideoPlayer({
         safeDuration > 0
           ? clamp(Number(((safeMax / safeDuration) * 100).toFixed(2)), 0, 100)
           : 0;
+      const reachedVideoEnd =
+        safeDuration > 0 &&
+        safeMax >= Math.max(0, safeDuration - COMPLETE_END_TOLERANCE_SECONDS);
 
       currentTimeRef.current = safeCurrent;
       maxWatchedRef.current = safeMax;
       durationRef.current = safeDuration;
+      const nextCanComplete =
+        isCompletedRef.current || nextPercentage >= completionThreshold || reachedVideoEnd;
+      playbackUnlockedRef.current = nextCanComplete;
 
       setCurrentTime(safeCurrent);
       setMaxWatchedSeconds(safeMax);
@@ -345,7 +363,7 @@ export function VideoPlayer({
 
       onProgressChange?.({
         watchPercentage: nextPercentage,
-        canComplete: nextPercentage >= completionThreshold,
+        canComplete: nextCanComplete,
         currentTimeSeconds: safeCurrent,
         maxWatchedSeconds: safeMax,
       });
@@ -379,6 +397,8 @@ export function VideoPlayer({
 
         const result = (await response.json()) as ProgressResponse;
         if (result.success && result.data) {
+          playbackUnlockedRef.current =
+            playbackUnlockedRef.current || result.data.canComplete || isCompletedRef.current;
           setWatermarkName(result.data.staffName || staffName || "Staff");
           updateWatchState(
             result.data.currentTimeSeconds,
@@ -442,6 +462,8 @@ export function VideoPlayer({
 
         if (savedProgress) {
           resumeTimeRef.current = savedProgress.currentTimeSeconds || 0;
+          playbackUnlockedRef.current =
+            playbackUnlockedRef.current || savedProgress.canComplete || isCompletedRef.current;
           setWatermarkName(savedProgress.staffName || staffName || "Staff");
           updateWatchState(
             savedProgress.currentTimeSeconds,
@@ -493,6 +515,15 @@ export function VideoPlayer({
               const isNowPlaying = event.data === yt.PlayerState.PLAYING;
               setIsPlaying(isNowPlaying);
               clearProgressInterval();
+
+              if (event.data === yt.PlayerState.ENDED) {
+                const duration = event.target.getDuration() || durationRef.current;
+                const completedDuration = Math.max(duration, durationRef.current);
+                playbackUnlockedRef.current = true;
+                updateWatchState(completedDuration, completedDuration, completedDuration);
+                void saveProgress();
+                return;
+              }
 
               if (isNowPlaying) {
                 progressIntervalRef.current = setInterval(() => {
@@ -599,8 +630,13 @@ export function VideoPlayer({
     // Fix: Use durationRef.current instead of videoDuration (which can be stale state)
     const requestedTime = (requestedProgress / 100) * safeDuration;
     const maxAllowedTime = maxWatchedRef.current + SEEK_GRACE_SECONDS;
+    const isUnlockedForReplay =
+      playbackUnlockedRef.current ||
+      (safeDuration > 0 &&
+        ((maxWatchedRef.current / safeDuration) * 100 >= completionThreshold ||
+          maxWatchedRef.current >= Math.max(0, safeDuration - COMPLETE_END_TOLERANCE_SECONDS)));
 
-    if (!playbackUnlocked && requestedTime > maxAllowedTime) {
+    if (!isUnlockedForReplay && requestedTime > maxAllowedTime) {
       playerRef.current.seekTo(maxWatchedRef.current, true);
       updateWatchState(maxWatchedRef.current, maxWatchedRef.current, safeDuration);
       showWarning("Seeking forward is locked until you watch that part of the lesson.");
@@ -610,7 +646,7 @@ export function VideoPlayer({
     playerRef.current.seekTo(requestedTime, true);
     updateWatchState(
       requestedTime,
-      playbackUnlocked ? Math.max(maxWatchedRef.current, requestedTime) : maxWatchedRef.current,
+      isUnlockedForReplay ? Math.max(maxWatchedRef.current, requestedTime) : maxWatchedRef.current,
       safeDuration
     );
     saveProgress();
@@ -623,7 +659,7 @@ export function VideoPlayer({
       return;
     }
 
-    if (!playbackUnlocked && nextRate > MAX_PLAYBACK_RATE) {
+    if (!playbackUnlockedRef.current && nextRate > MAX_PLAYBACK_RATE) {
       playerRef.current.setPlaybackRate(1);
       setPlaybackRate(1);
       showWarning("Higher playback speeds unlock after you finish watching this lesson.");
@@ -660,13 +696,15 @@ export function VideoPlayer({
       return;
     }
 
+    isCompletedRef.current = true;
+    playbackUnlockedRef.current = true;
     setIsCompleted(true);
     saveProgress();
     onComplete();
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 p-4 dark:bg-gray-900 sm:p-6 lms-lesson-page">
+    <div className="bg-gray-50 p-0 dark:bg-gray-900 sm:p-0 lms-lesson-page">
       <div className="mx-auto max-w-[1600px] space-y-6">
         <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex min-w-0 items-start gap-4">
@@ -701,6 +739,7 @@ export function VideoPlayer({
               variant="primary"
               onClick={handleComplete}
               disabled={!completionAllowed}
+              className="w-full sm:w-auto"
               title={
                 completionAllowed
                   ? "Mark lesson complete"
@@ -769,7 +808,7 @@ export function VideoPlayer({
                       )}
 
                       <div className="absolute bottom-0 left-0 right-0 z-30 bg-gradient-to-t from-black/90 via-black/60 to-transparent px-4 pb-4 pt-10">
-                        <div className="mb-3 flex items-center justify-between text-xs text-white/80">
+                        <div className="mb-3 flex flex-col gap-1 text-xs text-white/80 min-[420px]:flex-row min-[420px]:items-center min-[420px]:justify-between">
                           <span className="inline-flex items-center gap-1">
                             <ShieldCheck className="h-4 w-4 text-emerald-300" />
                             Watched {watchPercentage.toFixed(0)}%
@@ -804,8 +843,8 @@ export function VideoPlayer({
                           </span>
                         </div>
 
-                        <div className="mt-3 flex items-center justify-between">
-                          <div className="flex items-center gap-2">
+                        <div className="mt-3 flex items-center justify-between gap-2">
+                          <div className="flex min-w-0 items-center gap-2">
                             <button
                               type="button"
                               onClick={togglePlay}
@@ -834,7 +873,7 @@ export function VideoPlayer({
                               value={playbackRate}
                               onChange={handlePlaybackRateChange}
                               disabled={!isReady}
-                              className="h-10 rounded-full border border-white/20 bg-white/10 px-3 text-xs font-semibold text-white outline-none transition hover:bg-white/20 disabled:cursor-wait disabled:opacity-60"
+                              className="h-10 max-w-[74px] rounded-full border border-white/20 bg-white/10 px-2 text-xs font-semibold text-white outline-none transition hover:bg-white/20 disabled:cursor-wait disabled:opacity-60 sm:max-w-none sm:px-3"
                               aria-label="Playback speed"
                               title={
                                 playbackUnlocked
@@ -887,7 +926,7 @@ export function VideoPlayer({
                   )}
                 </div>
 
-                <div className="flex items-center justify-between border-t border-gray-200 p-4 dark:border-gray-700">
+                <div className="flex flex-col gap-3 border-t border-gray-200 p-4 dark:border-gray-700 sm:flex-row sm:items-center sm:justify-between">
                   <div className="flex flex-wrap items-center gap-4 text-sm text-gray-500 dark:text-gray-400">
                     <div className="flex items-center gap-1">
                       <Clock className="h-4 w-4" />
@@ -902,7 +941,7 @@ export function VideoPlayer({
                   <button
                     type="button"
                     onClick={() => setShowInstructions((value) => !value)}
-                    className={`rounded-lg p-2 transition-colors ${
+                    className={`self-start rounded-lg p-2 transition-colors sm:self-auto ${
                       showInstructions
                         ? "bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400"
                         : "text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800"
@@ -917,7 +956,7 @@ export function VideoPlayer({
             </div>
 
             <GlassCard className="rounded-2xl p-4">
-              <div className="mb-2 flex items-center justify-between">
+              <div className="mb-2 flex items-center justify-between gap-3">
                 <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
                   Lesson Progress
                 </span>
@@ -934,7 +973,7 @@ export function VideoPlayer({
             </GlassCard>
 
             <GlassCard className="rounded-2xl p-4">
-              <div className="mb-2 flex items-center justify-between">
+              <div className="mb-2 flex items-center justify-between gap-3">
                 <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
                   Instruction Progress
                 </span>

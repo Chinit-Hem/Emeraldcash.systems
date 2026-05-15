@@ -11,7 +11,7 @@ import {
 } from "./errors";
 import { log } from "./logger";
 
-export type Role = "Admin" | "Staff";
+export type Role = "Admin" | "Staff" | "Transfer";
 
 export interface UserDB {
   username: string;
@@ -30,7 +30,7 @@ export interface UserDB {
 // Validation constants
 const USERNAME_REGEX = /^[a-z0-9._-]{3,32}$/;
 const MAX_PASSWORD_HASH_LENGTH = 255;
-const VALID_ROLES: Role[] = ["Admin", "Staff"];
+const VALID_ROLES: Role[] = ["Admin", "Staff", "Transfer"];
 
 // Input validation functions
 function validateUsername(username: string): void {

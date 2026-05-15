@@ -14,7 +14,7 @@ export async function GET(req: NextRequest) {
     const pageSize = parseInt(searchParams.get('pageSize') || '20');
     const search = searchParams.get('search') || undefined;
     const status = searchParams.get('status') || undefined;
-    const assigned_to = searchParams.get('assigned_to') || undefined;
+    const assigned_to = searchParams.get('assigned_to') || searchParams.get('assignedTo') || undefined;
 
     const filters = {
       search,

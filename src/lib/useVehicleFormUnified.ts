@@ -15,7 +15,7 @@ import type { Vehicle } from "@/lib/types";
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 
 type UploadStage = 'compressing' | 'uploading' | 'processing' | 'saving' | null;
-type StockStatus = 'PENDING' | 'ASSIGNED' | 'ACCEPTED' | 'LOST' | 'RETURNED';
+type StockStatus = 'PENDING' | 'ASSIGNED' | 'ACCEPTED' | 'LOST' | 'RETURNED' | 'OUT' | 'NOT_RETURNED';
 
 interface UnifiedFormState {
   formData: Partial<Vehicle & { SenderId: number | null; ReceiverId: number | null; HandoverDate: string | null; Status: StockStatus; Remarks: string }>;
@@ -126,8 +126,8 @@ export function useVehicleFormUnified(options: UseVehicleFormOptions) {
           error = "Valid price required";
         }
         break;
-      case "Status":
-        if (!value || !['PENDING', 'ASSIGNED', 'ACCEPTED', 'LOST', 'RETURNED'].includes(String(value))) {
+case "Status":
+        if (!value || !['PENDING', 'ASSIGNED', 'ACCEPTED', 'LOST', 'RETURNED', 'OUT', 'NOT_RETURNED'].includes(String(value))) {
           error = "Status is required";
         }
         break;

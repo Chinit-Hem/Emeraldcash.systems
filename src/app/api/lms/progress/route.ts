@@ -11,6 +11,7 @@ import { dbManager } from "@/lib/db-singleton";
 import { getRequestedStaffId, resolveLmsStaffContext } from "@/lib/lms-auth";
 
 const COMPLETE_THRESHOLD_PERCENT = 95;
+const COMPLETE_END_TOLERANCE_SECONDS = 5;
 
 type ProgressRow = {
   staff_id: number;
@@ -19,6 +20,7 @@ type ProgressRow = {
   max_watched_seconds: number | string | null;
   duration_seconds: number | string | null;
   watch_percentage: number | string | null;
+  is_completed?: boolean | null;
   playback_rate_violations: number | string | null;
   tab_hidden_count: number | string | null;
   last_watched_at: string | null;
@@ -30,16 +32,25 @@ function toNumber(value: unknown, fallback = 0) {
 }
 
 function normalizeProgress(row: ProgressRow | undefined, staffName: string) {
+  const isCompleted = Boolean(row?.is_completed);
+  const maxWatchedSeconds = toNumber(row?.max_watched_seconds);
+  const durationSeconds = toNumber(row?.duration_seconds);
+  const watchPercentage = isCompleted
+    ? Math.max(toNumber(row?.watch_percentage), COMPLETE_THRESHOLD_PERCENT)
+    : toNumber(row?.watch_percentage);
+  const reachedVideoEnd =
+    durationSeconds > 0 && maxWatchedSeconds >= Math.max(0, durationSeconds - COMPLETE_END_TOLERANCE_SECONDS);
+
   return {
     staffName,
     currentTimeSeconds: toNumber(row?.current_time_seconds),
-    maxWatchedSeconds: toNumber(row?.max_watched_seconds),
-    durationSeconds: toNumber(row?.duration_seconds),
-    watchPercentage: toNumber(row?.watch_percentage),
+    maxWatchedSeconds,
+    durationSeconds,
+    watchPercentage,
     playbackRateViolations: toNumber(row?.playback_rate_violations),
     tabHiddenCount: toNumber(row?.tab_hidden_count),
     lastWatchedAt: row?.last_watched_at ?? null,
-    canComplete: toNumber(row?.watch_percentage) >= COMPLETE_THRESHOLD_PERCENT,
+    canComplete: isCompleted || watchPercentage >= COMPLETE_THRESHOLD_PERCENT || reachedVideoEnd,
   };
 }
 
@@ -88,6 +99,17 @@ type LastWatchedRow = {
   watch_percentage: number | string | null;
 };
 
+function lastWatchedResponse(data: unknown) {
+  return NextResponse.json(
+    { success: true, data },
+    {
+      headers: {
+        "Cache-Control": "no-store, max-age=0",
+      },
+    }
+  );
+}
+
 export async function GET(request: NextRequest) {
   const session = getSession(request);
 
@@ -123,51 +145,53 @@ export async function GET(request: NextRequest) {
 
     // Admins without staff profile cannot track last watched
     if (staffContext.staffId === 0) {
-      return NextResponse.json({
-        success: true,
-        data: null,
-      });
+      return lastWatchedResponse(null);
     }
 
     const lastWatchedRows = await dbManager.executeUnsafe<LastWatchedRow>(
       `
+        WITH recent_lessons AS (
+          SELECT lesson_id, watched_at
+          FROM lms_last_watched
+          WHERE staff_id = $1
+
+          UNION ALL
+
+          SELECT lesson_id, last_watched_at AS watched_at
+          FROM lms_lesson_progress
+          WHERE staff_id = $1
+        )
         SELECT 
-          lw.lesson_id,
+          recent_lessons.lesson_id,
           l.title,
           l.category_id,
           c.name as category_name,
-          lw.watched_at,
+          recent_lessons.watched_at,
           lp.watch_percentage
-        FROM lms_last_watched lw
-        JOIN lms_lessons l ON l.id = lw.lesson_id
+        FROM recent_lessons
+        JOIN lms_lessons l ON l.id = recent_lessons.lesson_id
         LEFT JOIN lms_categories c ON c.id = l.category_id
         LEFT JOIN lms_lesson_progress lp
-          ON lp.staff_id = lw.staff_id
-          AND lp.lesson_id = lw.lesson_id
-        WHERE lw.staff_id = $1
+          ON lp.staff_id = $1
+          AND lp.lesson_id = recent_lessons.lesson_id
+        ORDER BY recent_lessons.watched_at DESC NULLS LAST
         LIMIT 1
       `,
       [staffContext.staffId]
     );
 
     if (!lastWatchedRows[0]) {
-      return NextResponse.json({
-        success: true,
-        data: null,
-      });
+      return lastWatchedResponse(null);
     }
 
     const row = lastWatchedRows[0];
-    return NextResponse.json({
-      success: true,
-      data: {
-        lessonId: row.lesson_id,
-        title: row.title,
-        categoryId: row.category_id,
-        categoryName: row.category_name,
-        watchedAt: row.watched_at,
-        watchPercentage: toNumber(row.watch_percentage),
-      },
+    return lastWatchedResponse({
+      lessonId: row.lesson_id,
+      title: row.title,
+      categoryId: row.category_id,
+      categoryName: row.category_name,
+      watchedAt: row.watched_at,
+      watchPercentage: toNumber(row.watch_percentage),
     });
   }
 
@@ -192,9 +216,14 @@ export async function GET(request: NextRequest) {
 
   const rows = await dbManager.executeUnsafe<ProgressRow>(
     `
-      SELECT *
-      FROM lms_lesson_progress
-      WHERE staff_id = $1 AND lesson_id = $2
+      SELECT
+        lp.*,
+        CASE WHEN lc.lesson_id IS NULL THEN false ELSE true END AS is_completed
+      FROM lms_lesson_progress lp
+      LEFT JOIN lms_lesson_completions lc
+        ON lc.staff_id = lp.staff_id
+        AND lc.lesson_id = lp.lesson_id
+      WHERE lp.staff_id = $1 AND lp.lesson_id = $2
       LIMIT 1
     `,
     [staffContext.staffId, lessonId]

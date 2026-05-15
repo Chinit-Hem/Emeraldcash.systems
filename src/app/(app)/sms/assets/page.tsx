@@ -63,7 +63,7 @@ export default function AssetsPage() {
         pageSize: pageFilters.pageSize.toString(),
         ...(pageFilters.search && { search: pageFilters.search }),
         ...(pageFilters.status && { status: pageFilters.status }),
-        ...(pageFilters.assignedTo && { assignedTo: pageFilters.assignedTo })
+        ...(pageFilters.assignedTo && { assigned_to: pageFilters.assignedTo })
       });
 
       const response = await fetch(`/api/sms/assets?${params}`);
@@ -235,7 +235,7 @@ const data: ApiResponse<SmsStats> = await response.json();
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
               <input
                 type="text"
-                placeholder="Search assets by name or description..."
+                placeholder="Search assets by name, code, location, assigned person..."
                 value={filters.search}
                 onChange={(e) => handleFilterChange('search', e.target.value)}
                 className="w-full pl-12 pr-6 py-4 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-emerald-500/20 focus:border-emerald-500 bg-white/50 backdrop-blur-sm shadow-inner transition-all"

@@ -1,5 +1,5 @@
-export type SmsStatus = 'Available' | 'In Use' | 'Borrowed';
-export type TransferStatus = 'pending' | 'accepted' | 'rejected';
+export type SmsStatus = 'Available' | 'In Use' | 'Borrowed' | 'Out' | 'Not Returned';
+export type TransferStatus = 'pending' | 'accepted' | 'rejected' | 'returned';
 
 export interface SmsStats {
   totalAssets: number;

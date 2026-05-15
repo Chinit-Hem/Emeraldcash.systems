@@ -4,6 +4,12 @@ This app uses a Google Sheet as the database via a Google Apps Script web app.
 
 ## Getting Started
 
+Project layout and folder conventions are documented in [docs/PROJECT_STRUCTURE.md](docs/PROJECT_STRUCTURE.md).
+
+```bash
+npm run structure:check
+```
+
 ### 1) Configure environment variables
 
 Create (or edit) `.env.local` in the project root (do **not** commit this file):

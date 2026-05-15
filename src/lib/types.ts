@@ -1,5 +1,5 @@
 
-export type Role = "Admin" | "Staff" | string;
+export type Role = "Admin" | "Staff" | "Transfer" | string;
 
 // Role definition for custom roles
 export interface RoleDefinition {
@@ -55,6 +55,12 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<string, Permission[]> = {
     "lms:view",                // Can access LMS
     "reports:view"             // Can view reports
     // Note: Staff CANNOT create/edit/delete vehicles or access settings
+  ],
+  Transfer: [
+    "lms:view",                // Can access LMS
+    "sms:view",                // Can view stock/assets
+    "sms:transfer",            // Can create and manage transfers
+    "users:view"               // Can view users for sender/receiver selection
   ]
 };
 
@@ -213,7 +219,7 @@ export type Vehicle = {
   SenderId?: number | null;
   ReceiverId?: number | null;
   HandoverDate?: string | null;
-  Status?: 'PENDING' | 'ASSIGNED' | 'ACCEPTED' | 'LOST' | 'RETURNED';
+Status?: 'PENDING' | 'ASSIGNED' | 'ACCEPTED' | 'LOST' | 'RETURNED' | 'OUT' | 'NOT_RETURNED';
   Remarks?: string;
 
   // Market price fields (optional, populated from external sources)

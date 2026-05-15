@@ -455,17 +455,17 @@ export default function LessonPlayerPage() {
       )}
       
       {/* Header */}
-      <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 sticky top-0 z-40">
+      <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 sticky top-14 lg:top-0 z-30">
         <div className="max-w-[1600px] mx-auto px-4 sm:px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex min-w-0 items-center gap-3 sm:gap-4">
               <button
                 onClick={() => router.push("/lms")}
-                className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                className="flex-shrink-0 p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
               >
                 <ChevronLeft className="w-5 h-5 text-gray-600 dark:text-gray-400" />
               </button>
-              <div>
+              <div className="min-w-0">
                 <p className="text-sm text-gray-500 dark:text-gray-400">
                   {category?.name || "Training"}
                 </p>
@@ -475,7 +475,7 @@ export default function LessonPlayerPage() {
               </div>
             </div>
             
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center gap-3 sm:flex-nowrap sm:justify-end">
               {/* Progress Badge */}
               <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-emerald-50 dark:bg-emerald-900/20 rounded-full">
                 <Trophy className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
