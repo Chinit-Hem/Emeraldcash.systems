@@ -5,7 +5,7 @@ import ErrorBoundary from "@/app/components/ErrorBoundary";
 import { NeuDashboardSkeleton } from "@/app/components/skeletons";
 import { useVehiclesNeon, useVehicleStats } from "@/lib/useVehiclesNeon";
 import { mutate } from "swr";
-import { Suspense, useEffect } from "react";
+import { Suspense, useEffect, useState } from "react";
 
 type DashboardMeta = {
   total: number;
@@ -22,13 +22,32 @@ type DashboardMeta = {
   avgPrice: number;
 };
 
+function detectIOSSafari(): boolean {
+  if (typeof navigator === "undefined") return false;
+
+  const userAgent = navigator.userAgent || "";
+  const platform = navigator.platform || "";
+  const maxTouchPoints = navigator.maxTouchPoints || 0;
+  const isIOS =
+    /iP(hone|ad|od)/i.test(userAgent) ||
+    (platform === "MacIntel" && maxTouchPoints > 1);
+  const isWebKit = /AppleWebKit/i.test(userAgent);
+  const isNonSafariIOSBrowser = /(CriOS|FxiOS|EdgiOS|OPiOS|DuckDuckGo)/i.test(userAgent);
+
+  return isIOS && isWebKit && !isNonSafariIOSBrowser;
+}
+
 /**
  * Dashboard Page - Client component with data fetching
  * Provides initial props to EnhancedDashboard from useVehiclesNeon
  */
 export default function Page() {
+  const [isIOSSafari, setIsIOSSafari] = useState(detectIOSSafari);
+
   // Clear SWR cache on mount to ensure fresh data
   useEffect(() => {
+    setIsIOSSafari(detectIOSSafari());
+
     // Clear all vehicle-related SWR cache including stats
     mutate(
       (key) => typeof key === "string" && (key.startsWith("/api/vehicles") || key.includes("/stats")),
@@ -37,7 +56,9 @@ export default function Page() {
     );
   }, []);
 
-  const { vehicles, meta, error, loading } = useVehiclesNeon();
+  const { vehicles, meta, error, loading } = useVehiclesNeon({
+    limit: isIOSSafari ? 150 : 500,
+  });
   const { stats, loading: statsLoading } = useVehicleStats();
 
   // DEBUG: Log the values to see what's happening
@@ -77,6 +98,7 @@ export default function Page() {
           initialVehicles={vehicles.slice(0, 50)}
           initialMeta={dashboardMeta}
           initialError={error ? 'Failed to load dashboard data' : null}
+          isIOSSafari={isIOSSafari}
         />
       </Suspense>
     </ErrorBoundary>

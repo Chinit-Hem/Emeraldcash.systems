@@ -83,6 +83,7 @@ type DashboardProps = {
   initialVehicles: Vehicle[];
   initialMeta: DashboardMeta;
   initialError: string | null;
+  isIOSSafari?: boolean;
 };
 
 type StatCardProps = {
@@ -99,6 +100,12 @@ type StatCardProps = {
 
 type ChartSkeletonProps = {
   height?: number;
+};
+
+type ChartDatum = {
+  name: string;
+  value: number;
+  color?: string;
 };
 
 // ============================================================================
@@ -147,6 +154,51 @@ function ChartSkeleton({ height = 300 }: ChartSkeletonProps) {
         </div>
         <span className="text-sm text-[#4a4a5a]">Loading chart...</span>
       </div>
+    </div>
+  );
+}
+
+function MobileSafeChartSummary({
+  data,
+  emptyLabel = "No data available",
+}: {
+  data: ChartDatum[];
+  emptyLabel?: string;
+}) {
+  const visibleData = data.filter((item) => item.value > 0).slice(0, 8);
+  const maxValue = Math.max(...visibleData.map((item) => item.value), 1);
+
+  if (visibleData.length === 0) {
+    return (
+      <div className="h-full min-h-[220px] rounded-[20px] bg-slate-50 p-5 flex items-center justify-center text-sm text-[#4a4a5a]">
+        {emptyLabel}
+      </div>
+    );
+  }
+
+  return (
+    <div className="h-full min-h-[220px] rounded-[20px] bg-slate-50 p-5 flex flex-col justify-center gap-4">
+      {visibleData.map((item) => {
+        const width = Math.max((item.value / maxValue) * 100, 6);
+
+        return (
+          <div key={item.name} className="space-y-2">
+            <div className="flex items-center justify-between gap-3 text-sm">
+              <span className="font-medium text-[#1a1a2e] truncate">{item.name}</span>
+              <span className="font-semibold text-[#1a1a2e] tabular-nums">{item.value.toLocaleString()}</span>
+            </div>
+            <div className="h-2.5 rounded-full bg-slate-200 overflow-hidden">
+              <div
+                className="h-full rounded-full bg-emerald-500"
+                style={{
+                  width: `${width}%`,
+                  backgroundColor: item.color || "#10b981",
+                }}
+              />
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -336,6 +388,7 @@ export default function Dashboard({
   initialVehicles,
   initialMeta,
   initialError,
+  isIOSSafari = false,
 }: DashboardProps) {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(initialError);
@@ -511,6 +564,7 @@ export default function Dashboard({
   const noImageCount = meta.noImageCount;
 
   const isLoading = isRefreshing;
+  const useMobileSafeCharts = isIOSSafari;
 
   return (
     <div className="p-4 sm:p-6 space-y-6 max-w-[1600px] mx-auto bg-slate-100 min-h-screen">
@@ -644,6 +698,8 @@ export default function Dashboard({
           <div className="w-full h-[250px] sm:h-[300px]">
             {isLoading ? (
               <ChartSkeleton height={300} />
+            ) : useMobileSafeCharts ? (
+              <MobileSafeChartSummary data={categoryChartData} />
             ) : (
               <VehiclesByCategoryChart data={categoryChartData} />
             )}
@@ -658,6 +714,8 @@ export default function Dashboard({
           <div className="w-full h-[250px] sm:h-[300px]">
             {isLoading ? (
               <ChartSkeleton height={300} />
+            ) : useMobileSafeCharts ? (
+              <MobileSafeChartSummary data={conditionChartData} />
             ) : (
               <NewVsUsedChart data={conditionChartData} />
             )}
@@ -672,6 +730,8 @@ export default function Dashboard({
           <div className="w-full h-[250px] sm:h-[300px]">
             {isLoading ? (
               <ChartSkeleton height={300} />
+            ) : useMobileSafeCharts ? (
+              <MobileSafeChartSummary data={brandChartData} />
             ) : (
               <VehiclesByBrandChart data={brandChartData} />
             )}
@@ -686,6 +746,8 @@ export default function Dashboard({
           <div className="w-full h-[250px] sm:h-[300px]">
             {isLoading ? (
               <ChartSkeleton height={300} />
+            ) : useMobileSafeCharts ? (
+              <MobileSafeChartSummary data={monthlyChartData} />
             ) : (
               <MonthlyAddedChart data={monthlyChartData} />
             )}

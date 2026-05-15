@@ -122,6 +122,13 @@ type DashboardProps = {
   initialVehicles?: Vehicle[];
   initialMeta?: DashboardMeta;
   initialError?: string | null;
+  isIOSSafari?: boolean;
+};
+
+type ChartDatum = {
+  name: string;
+  value: number;
+  color?: string;
 };
 
 // ============================================================================
@@ -220,6 +227,51 @@ function ChartSkeleton({ height = 320, title = "Loading..." }: { height?: number
         </div>
         <span className="text-sm font-medium text-slate-500">{title}</span>
       </div>
+    </div>
+  );
+}
+
+function MobileSafeChartSummary({
+  data,
+  emptyLabel = "No data available",
+}: {
+  data: ChartDatum[];
+  emptyLabel?: string;
+}) {
+  const visibleData = data.filter((item) => item.value > 0).slice(0, 8);
+  const maxValue = Math.max(...visibleData.map((item) => item.value), 1);
+
+  if (visibleData.length === 0) {
+    return (
+      <div className="h-full min-h-[240px] rounded-2xl bg-slate-50 p-5 flex items-center justify-center text-sm text-slate-500">
+        {emptyLabel}
+      </div>
+    );
+  }
+
+  return (
+    <div className="h-full min-h-[240px] rounded-2xl bg-slate-50 p-5 flex flex-col justify-center gap-4">
+      {visibleData.map((item) => {
+        const width = Math.max((item.value / maxValue) * 100, 6);
+
+        return (
+          <div key={item.name} className="space-y-2">
+            <div className="flex items-center justify-between gap-3 text-sm">
+              <span className="font-medium text-slate-800 truncate">{item.name}</span>
+              <span className="font-semibold text-slate-800 tabular-nums">{item.value.toLocaleString()}</span>
+            </div>
+            <div className="h-2.5 rounded-full bg-slate-200 overflow-hidden">
+              <div
+                className="h-full rounded-full bg-emerald-500"
+                style={{
+                  width: `${width}%`,
+                  backgroundColor: item.color || "#10b981",
+                }}
+              />
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -365,6 +417,7 @@ export default function EnhancedDashboard({
     avgPrice: 0,
   },
   initialError = null,
+  isIOSSafari = false,
 }: DashboardProps) {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(initialError);
@@ -530,6 +583,7 @@ export default function EnhancedDashboard({
   const motorcyclesCount = meta.countsByCategory.Motorcycles;
   const tukTuksCount = meta.countsByCategory.TukTuks;
   const noImageCount = meta.noImageCount;
+  const useMobileSafeCharts = isIOSSafari;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-slate-100 to-slate-200">
@@ -831,7 +885,11 @@ href="/vehicles?withoutImage=true"
               <div className="w-full h-[300px] sm:h-[320px]">
                 <ChartErrorBoundary title="Category Chart" height={320}>
                   <Suspense fallback={<ChartSkeleton height={320} />}>
-                    <VehiclesByCategoryChart data={categoryChartData} />
+                    {useMobileSafeCharts ? (
+                      <MobileSafeChartSummary data={categoryChartData} />
+                    ) : (
+                      <VehiclesByCategoryChart data={categoryChartData} />
+                    )}
                   </Suspense>
                 </ChartErrorBoundary>
               </div>
@@ -851,7 +909,11 @@ href="/vehicles?withoutImage=true"
               <div className="w-full h-[300px] sm:h-[320px]">
                 <ChartErrorBoundary title="Condition Chart" height={320}>
                   <Suspense fallback={<ChartSkeleton height={320} />}>
-                    <NewVsUsedChart data={conditionChartData} />
+                    {useMobileSafeCharts ? (
+                      <MobileSafeChartSummary data={conditionChartData} />
+                    ) : (
+                      <NewVsUsedChart data={conditionChartData} />
+                    )}
                   </Suspense>
                 </ChartErrorBoundary>
               </div>
@@ -871,7 +933,11 @@ href="/vehicles?withoutImage=true"
               <div className="w-full h-[300px] sm:h-[320px]">
                 <ChartErrorBoundary title="Brand Chart" height={320}>
                   <Suspense fallback={<ChartSkeleton height={320} />}>
-                    <VehiclesByBrandChart data={brandChartData} />
+                    {useMobileSafeCharts ? (
+                      <MobileSafeChartSummary data={brandChartData} />
+                    ) : (
+                      <VehiclesByBrandChart data={brandChartData} />
+                    )}
                   </Suspense>
                 </ChartErrorBoundary>
               </div>
@@ -891,7 +957,11 @@ href="/vehicles?withoutImage=true"
               <div className="w-full h-[300px] sm:h-[320px]">
                 <ChartErrorBoundary title="Monthly Trends Chart" height={320}>
                   <Suspense fallback={<ChartSkeleton height={320} />}>
-                    <MonthlyAddedChart data={monthlyChartData} />
+                    {useMobileSafeCharts ? (
+                      <MobileSafeChartSummary data={monthlyChartData} />
+                    ) : (
+                      <MonthlyAddedChart data={monthlyChartData} />
+                    )}
                   </Suspense>
                 </ChartErrorBoundary>
               </div>

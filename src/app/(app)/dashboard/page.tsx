@@ -10,8 +10,9 @@
  * @module DashboardPage
  */
 
-import { vehicleService } from "@/services/VehicleService";
 import Dashboard from "@/app/components/dashboard/Dashboard";
+import { vehicleService } from "@/services/VehicleService";
+import { headers } from "next/headers";
 
 // Disable ISR caching - always fetch fresh data
 export const revalidate = 0;
@@ -19,17 +20,30 @@ export const revalidate = 0;
 // Force dynamic rendering for real-time data
 export const dynamic = "force-dynamic";
 
+function isIOSSafariUserAgent(userAgent: string): boolean {
+  const isIOS = /iP(hone|ad|od)/i.test(userAgent);
+  const isWebKit = /AppleWebKit/i.test(userAgent);
+  const isNonSafariIOSBrowser = /(CriOS|FxiOS|EdgiOS|OPiOS|DuckDuckGo)/i.test(userAgent);
+
+  return isIOS && isWebKit && !isNonSafariIOSBrowser;
+}
+
 /**
  * Dashboard Server Component
  * Fetches initial data server-side with caching for performance
  */
 export default async function DashboardPage() {
+  const requestHeaders = await headers();
+  const userAgent = requestHeaders.get("user-agent") || "";
+  const isIOSSafari = isIOSSafariUserAgent(userAgent);
+  const dashboardVehicleLimit = isIOSSafari ? 300 : 2000;
+
   // Fetch vehicles and stats in parallel
   // Use cache for better performance - stats don't change frequently
   const [vehiclesResult, statsResult] = await Promise.all([
     // Pull enough rows to keep dashboard search/charts aligned with totals.
     // Order newest first so freshly added vehicles appear immediately.
-    vehicleService.getVehicles({ limit: 2000, orderBy: "id", orderDirection: "DESC" }),
+    vehicleService.getVehicles({ limit: dashboardVehicleLimit, orderBy: "id", orderDirection: "DESC" }),
     vehicleService.getVehicleStats(false), // Use cache (30s TTL) - much faster
   ]);
 
@@ -66,6 +80,7 @@ export default async function DashboardPage() {
       initialVehicles={vehicles}
       initialMeta={meta}
       initialError={!vehiclesResult.success ? vehiclesResult.error || "Failed to load vehicles" : null}
+      isIOSSafari={isIOSSafari}
     />
   );
 }

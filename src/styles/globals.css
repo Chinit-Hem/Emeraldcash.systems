@@ -422,6 +422,23 @@ textarea::placeholder {
   -webkit-text-size-adjust: 100%;
 }
 
+.ios-safari .animate-ping,
+.ios-safari .animate-bounce,
+.ios-safari .animate-pulse {
+  animation: none !important;
+}
+
+.ios-safari [class*="backdrop-blur"] {
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}
+
+.ios-safari [class*="blur-3xl"],
+.ios-safari [class*="blur-2xl"],
+.ios-safari [class*="blur-xl"] {
+  filter: none !important;
+}
+
 @keyframes lms-video-watermark-drift {
   0% {
     left: 8%;
