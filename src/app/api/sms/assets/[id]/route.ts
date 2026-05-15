@@ -89,6 +89,13 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
     const auth = requirePermission(req, 'sms:delete');
     if (auth.response) return auth.response;
 
+    if (auth.session.role !== 'Admin') {
+      return NextResponse.json(
+        { success: false, error: 'Only Admin can delete stock assets' },
+        { status: 403 }
+      );
+    }
+
     const { id } = await params;
     const assetId = parseAssetId(id);
     if (assetId === null) {

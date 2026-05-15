@@ -6,7 +6,7 @@ import Sidebar from "@/app/components/Sidebar";
 import TopBar from "@/app/components/TopBar";
 import { useRouter, useParams } from "next/navigation";
 import { useEffect, useState } from "react";
-import { getVehicleFullImageUrl, getVehicleThumbnailUrl, formatPrice } from "@/lib/vehicle-helpers";
+import { getVehicleFullImageUrl, getVehicleThumbnailUrl } from "@/lib/vehicle-helpers";
 import { GlassToast, useToast } from "@/components/ui/glass/GlassToast";
 import { VehicleHeader } from "@/app/components/vehicles/VehicleHeader";
 import { VehicleStatsCard } from "@/app/components/vehicles/VehicleStatsCard";
@@ -63,7 +63,7 @@ export default function VehicleDetailView() {
 
   useEffect(() => {
     if (id) fetchVehicle();
-  }, [id]);
+  }, [fetchVehicle, id]);
 
   if (!user) {
     router.push("/login");

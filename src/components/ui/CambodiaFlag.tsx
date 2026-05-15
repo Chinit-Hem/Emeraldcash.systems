@@ -19,7 +19,7 @@ export const CambodiaFlag: React.FC<CambodiaFlagProps> = ({
   
   return (
     <>
-      {/* eslint-disable-next-line @next/next/no-img-element */}
+      { }
       <img
         src="https://flagcdn.com/kh.svg"
         alt="Cambodia Flag"

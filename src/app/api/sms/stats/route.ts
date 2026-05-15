@@ -13,6 +13,10 @@ export async function GET(request: NextRequest) {
 
     if (result.success) {
       let data = result.data;
+      const notificationsResult = await smsService.getNotifications(auth.session.username, { limit: 1 });
+      const unreadNotifications = notificationsResult.success
+        ? notificationsResult.data?.unreadCount || 0
+        : 0;
 
       if (auth.session.role !== 'Admin' && data) {
         const transfersResult = await smsService.getTransfers();
@@ -34,7 +38,7 @@ export async function GET(request: NextRequest) {
 
       return NextResponse.json({
         success: true,
-        data,
+        data: data ? { ...data, unreadNotifications } : data,
         meta: { durationMs: duration }
       });
     } else {

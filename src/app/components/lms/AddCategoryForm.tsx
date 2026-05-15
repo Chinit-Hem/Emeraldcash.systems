@@ -12,7 +12,7 @@
 
 "use client";
 
-import React, { useState, useCallback, useRef, useEffect } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import {
   Plus,
   BookOpen,

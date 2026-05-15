@@ -7,6 +7,7 @@ export interface SmsStats {
   inUse: number;
   borrowed: number;
   pendingTransfers: number;
+  unreadNotifications?: number;
   todayChange: number;
 }
 

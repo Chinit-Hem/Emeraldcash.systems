@@ -9,7 +9,6 @@ import type { AppRouterInstance } from "next/dist/shared/lib/app-router-context.
 import { useState, useCallback, type CSSProperties, type Dispatch, type SetStateAction } from "react";
 import { formatPrice, getVehicleThumbnailUrl } from "@/lib/vehicle-helpers";
 import { OptimizedImage } from "@/app/components/OptimizedImage";
-import { useOptimisticVehicles } from "@/lib/useOptimisticVehicles";
 
 // Color name to hex mapping for visual indicators
 const getColorHex = (colorName: string): string => {

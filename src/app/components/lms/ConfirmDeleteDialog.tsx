@@ -12,7 +12,7 @@
 "use client";
 
 import React from "react";
-import { AlertTriangle, X, Trash2 } from "lucide-react";
+import { AlertTriangle, Trash2 } from "lucide-react";
 import { GlassCard } from "@/components/ui/glass/GlassCard";
 import { GlassButton } from "@/components/ui/glass/GlassButton";
 

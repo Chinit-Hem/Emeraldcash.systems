@@ -1,17 +1,13 @@
 ﻿"use client";
 
-import { useLanguage } from "@/lib/LanguageContext";
-import { useTranslation } from "@/lib/i18n";
 
 import { NeuInput } from "@/components/ui/neu/NeuInput";
-import { normalizeCambodiaTimeString } from "@/lib/cambodiaTime";
 import { driveThumbnailUrl, extractDriveFileId } from "@/lib/drive";
 import { derivePrices } from "@/lib/pricing";
 import type { Vehicle } from "@/lib/types";
 import { onVehicleCacheUpdate, readVehicleCache, refreshVehicleCache, writeVehicleCache } from "@/lib/vehicleCache";
 import { useDebouncedValue } from "@/lib/useDebouncedValue";
-import { tokenizeQuery, vehicleSearchText } from "@/lib/vehicleSearch";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import React, { useEffect, useMemo, useState } from "react";
 import { useAuthUser } from "@/app/components/AuthContext";
 import { getFuzzySuggestions } from "@/lib/fuzzySearch";

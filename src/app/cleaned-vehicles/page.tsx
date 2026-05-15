@@ -1,7 +1,6 @@
  "use client";
 
 import { useAuthUser } from '@/app/components/AuthContext';
-import { clearCachedUser } from '@/app/components/authCache';
 
 export default function CleanedVehiclesPage() {
   const authUser = useAuthUser();

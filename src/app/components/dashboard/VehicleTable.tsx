@@ -5,7 +5,7 @@ import { useTranslation } from "@/lib/i18n";
 
 import { derivePrices } from "@/lib/pricing";
 import type { Vehicle } from "@/lib/types";
-import { cn, ui } from "@/lib/ui";
+import { cn } from "@/lib/ui";
 import { useRouter } from "next/navigation";
 import { useState, useRef, useEffect, useCallback } from "react";
 import { formatPrice, getVehicleThumbnailUrl } from "@/lib/vehicle-helpers";
@@ -846,7 +846,11 @@ export default function VehicleTable({
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
-                              onEdit ? onEdit(vehicle) : router.push(`/vehicles/${encodeURIComponent(vehicleId)}/edit`);
+                              if (onEdit) {
+                                onEdit(vehicle);
+                              } else {
+                                router.push(`/vehicles/${encodeURIComponent(vehicleId)}/edit`);
+                              }
                             }}
                             className="rounded-lg p-2 text-[#10b981] transition-all duration-200 hover:bg-slate-50"
                             title="Edit"

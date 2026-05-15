@@ -7,7 +7,7 @@ import {
 import { log } from "./logger";
 import type { Role } from "./types";
 import {
-  countAdminUsers,
+  
   createUserInDB,
   deleteUserFromDB,
   ensureUsersTable,

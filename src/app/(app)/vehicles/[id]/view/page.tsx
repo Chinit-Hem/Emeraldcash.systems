@@ -847,6 +847,7 @@ setImagePreview(undefined);
                   className="relative h-64 lg:h-80 cursor-pointer group"
                   onClick={() => setIsImageModalOpen(true)}
                 >
+                  { }
                   <img
                     src={displayImageUrl}
                     alt={`${currentVehicle.Brand} ${currentVehicle.Model}`}

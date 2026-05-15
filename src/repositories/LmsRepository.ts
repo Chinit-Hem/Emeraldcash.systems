@@ -12,7 +12,7 @@
  * @module repositories/LmsRepository
  */
 
-import { BaseRepository, FilterCondition, QueryOptions } from "./BaseRepository";
+import { BaseRepository } from "./BaseRepository";
 import type {
   LmsCategoryDB,
   LmsLessonDB,

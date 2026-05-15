@@ -102,7 +102,7 @@ function IOSVehicleCard({ vehicle, isAdmin, onEdit, onDelete }: IOSVehicleCardPr
         {/* Vehicle Image */}
         <div className="flex-shrink-0">
           {thumbUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
+             
             <img
               src={thumbUrl}
               alt={`${vehicle.Brand} ${vehicle.Model}`}

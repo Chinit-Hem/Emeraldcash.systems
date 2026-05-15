@@ -31,7 +31,7 @@ export interface StockItemTable {
 export interface StockMovementTable {
   id: number;
   stock_item_id: number;
-  type: "IN" | "OUT" | "ADJUST" | "TRANSFER" | string;
+  type: "IN" | "OUT" | "ADJUST" | "TRANSFER" | "RETURN" | string;
   quantity: number;
   reason: string | null;
   user_id: number | null;

@@ -232,7 +232,7 @@ Status?: 'PENDING' | 'ASSIGNED' | 'ACCEPTED' | 'LOST' | 'RETURNED' | 'OUT' | 'NO
   MarketPriceConfidence?: "High" | "Medium" | "Low" | null;
 };
 
-export type StockMovementType = 'IN' | 'OUT' | 'ADJUST' | 'TRANSFER';
+export type StockMovementType = 'IN' | 'OUT' | 'ADJUST' | 'TRANSFER' | 'RETURN';
 
 export interface StockItem {
   id: number;

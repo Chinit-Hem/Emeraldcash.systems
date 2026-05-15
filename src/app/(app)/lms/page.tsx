@@ -16,7 +16,6 @@
 import { Suspense } from "react";
 import { Metadata } from "next";
 import dynamic from "next/dynamic";
-import { lmsService } from "@/services/LmsService";
 import { NeuLmsSkeleton } from "@/app/components/skeletons/NeuLmsSkeleton";
 import type { InitialLmsData } from "@/lib/lms-types";
 

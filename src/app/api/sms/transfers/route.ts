@@ -32,7 +32,8 @@ export async function GET(req: NextRequest) {
 
     const { searchParams } = new URL(req.url);
     const assetId = searchParams.get('assetId') || undefined;
-    const status = searchParams.get('status') || 'pending';
+    const statusParam = searchParams.get('status');
+    const status = statusParam === 'all' ? undefined : statusParam || 'pending';
 
     const result = await smsService.getTransfers(assetId);
     if (!result.success) {
@@ -62,9 +63,14 @@ export async function POST(req: NextRequest) {
     if (auth.response) return auth.response;
 
     const { assetId, senderId, receiverId, location, remark } = await req.json();
+    const resolvedSenderId =
+      auth.session.role === 'Admin' || auth.session.role === 'Transfer'
+        ? String(senderId || auth.session.username)
+        : auth.session.username;
+
     const result = await smsService.createTransfer({
       assetId,
-      senderId: String(senderId || ''),
+      senderId: resolvedSenderId,
       receiverId: String(receiverId || ''),
       location,
       remark,

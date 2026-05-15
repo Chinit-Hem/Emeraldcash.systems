@@ -13,7 +13,7 @@
  */
 
 import { dbManager } from "@/lib/db-singleton";
-import { getCache, setCache } from "@/lib/redis";
+import { delCache, getCache, setCache } from "@/lib/redis";
 import type {
   SmsStatus, TransferStatus
 } from "@/lib/sms-types";
@@ -83,6 +83,19 @@ export interface SmsTransferEntity {
   acceptedAt: string | null;
 }
 
+export interface SmsNotificationEntity {
+  id: number;
+  type: string;
+  title: string;
+  message: string;
+  recipientId: string;
+  actorId: string | null;
+  assetId: string | null;
+  transferId: string | null;
+  readAt: string | null;
+  createdAt: string;
+}
+
 /**
  * SMS filters extending BaseFilters
  */
@@ -110,6 +123,19 @@ interface SmsHistoryVisibility {
   isAdmin: boolean;
 }
 
+interface SmsNotificationDB {
+  id: number;
+  type: string;
+  title: string;
+  message: string;
+  recipient_id: string;
+  actor_id: string | null;
+  asset_id: string | null;
+  transfer_id: string | null;
+  read_at: string | null;
+  created_at: string;
+}
+
 // ============================================================================
 // SMS Asset Service Singleton Class
 // ============================================================================
@@ -128,6 +154,58 @@ export class SmsAssetService extends BaseService<SmsAssetEntity, SmsAssetDB> {
       SmsAssetService.instance = new SmsAssetService();
     }
     return SmsAssetService.instance;
+  }
+
+  private async ensureNotificationsTable(): Promise<void> {
+    await dbManager.executeUnsafe(
+      `
+        CREATE TABLE IF NOT EXISTS sms_notifications (
+          id SERIAL PRIMARY KEY,
+          type VARCHAR(64) NOT NULL,
+          title VARCHAR(200) NOT NULL,
+          message TEXT NOT NULL,
+          recipient_id VARCHAR(128) NOT NULL,
+          actor_id VARCHAR(128),
+          asset_id UUID,
+          transfer_id UUID,
+          read_at TIMESTAMP WITH TIME ZONE,
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+        )
+      `,
+      [],
+      5000
+    );
+
+    await dbManager.executeUnsafe(
+      `CREATE INDEX IF NOT EXISTS idx_sms_notifications_recipient_read ON sms_notifications(recipient_id, read_at, created_at DESC)`,
+      [],
+      5000
+    );
+  }
+
+  private toNotificationEntity(row: SmsNotificationDB): SmsNotificationEntity {
+    return {
+      id: Number(row.id),
+      type: row.type,
+      title: row.title,
+      message: row.message,
+      recipientId: row.recipient_id,
+      actorId: row.actor_id,
+      assetId: row.asset_id,
+      transferId: row.transfer_id,
+      readAt: row.read_at,
+      createdAt: row.created_at,
+    };
+  }
+
+  private async getAssetName(assetId: string): Promise<string> {
+    const rows = await dbManager.executeUnsafe<{ name: string }>(
+      `SELECT name FROM sms_assets WHERE id = $1::uuid LIMIT 1`,
+      [assetId],
+      5000
+    );
+
+    return rows[0]?.name || "SMS asset";
   }
 
   /**
@@ -298,6 +376,7 @@ export class SmsAssetService extends BaseService<SmsAssetEntity, SmsAssetDB> {
 
       const entity = this.toEntity(result[0]);
       this.invalidateCache();
+      await delCache('sms:stats');
       return { success: true, data: entity, meta: { durationMs: Date.now() - startTime, queryCount: 1 } };
     } catch (error) {
       return this.handleError(error, 'updateAsset');
@@ -313,6 +392,7 @@ export class SmsAssetService extends BaseService<SmsAssetEntity, SmsAssetDB> {
       const query = `DELETE FROM ${this.tableName} WHERE id = $1 RETURNING *`;
       const result = await dbManager.executeUnsafe(query, [id]);
       await this.invalidateCache();
+      await delCache('sms:stats');
       return { success: true, data: result.length > 0, meta: { durationMs: Date.now() - startTime, queryCount: 1 } };
     } catch (error) {
       return this.handleError(error, 'deleteAsset');
@@ -333,6 +413,7 @@ export class SmsAssetService extends BaseService<SmsAssetEntity, SmsAssetDB> {
     const data: Omit<SmsAssetDB, "id" | "created_at" | "updated_at"> = { ...assetData, status: assetData.status || 'Available' };
     const result = await this.create(data);
     if (result.success) {
+      await delCache('sms:stats');
       await this.logAudit('system', 'create_asset', { assetId: result.data!.id, data: assetData.name || 'unknown' });
     }
     return result;
@@ -430,6 +511,19 @@ export class SmsAssetService extends BaseService<SmsAssetEntity, SmsAssetDB> {
       };
 
       await this.logAudit(transferData.senderId, 'create_transfer', { transferId: transfer.id as string });
+      if (transferData.receiverId && transferData.receiverId !== transferData.senderId) {
+        const assetName = await this.getAssetName(transferEntity.assetId);
+        await this.createNotification({
+          type: "transfer_request",
+          title: "New transfer request",
+          message: `${transferData.senderId} wants to transfer ${assetName} to you.${transferData.remark ? ` Message: ${transferData.remark}` : ""}`,
+          recipientId: transferData.receiverId,
+          actorId: transferData.senderId,
+          assetId: transferEntity.assetId,
+          transferId: transferEntity.id,
+        });
+      }
+      await delCache('sms:stats');
 
       return {
         success: true,
@@ -457,11 +551,16 @@ export class SmsAssetService extends BaseService<SmsAssetEntity, SmsAssetDB> {
     const startTime = Date.now();
     try {
       const result = await dbManager.executeUnsafe(
-        `UPDATE sms_transfers
-         SET status = $1,
-             accepted_at = CASE WHEN $1 = 'accepted' THEN NOW() ELSE NULL END
-         WHERE id = $2
-         RETURNING id`,
+        `WITH updated_transfer AS (
+           UPDATE sms_transfers
+           SET status = $1,
+               accepted_at = CASE WHEN $1 = 'accepted' THEN NOW() ELSE NULL END
+           WHERE id = $2
+           RETURNING id, asset_id, sender_id, receiver_id, location
+         )
+         SELECT updated_transfer.*, sms_assets.name AS asset_name
+         FROM updated_transfer
+         JOIN sms_assets ON sms_assets.id = updated_transfer.asset_id`,
         [status, transferId],
         8000
       ) as Array<Record<string, unknown>>;
@@ -474,7 +573,41 @@ export class SmsAssetService extends BaseService<SmsAssetEntity, SmsAssetDB> {
         };
       }
 
+      if (status === 'accepted') {
+        const transfer = result[0];
+        await dbManager.executeUnsafe(
+          `UPDATE sms_assets
+           SET status = 'Borrowed',
+               assigned_to = $1,
+               location = $2,
+               updated_at = NOW()
+           WHERE id = $3::uuid`,
+          [
+            String(transfer.receiver_id || ''),
+            String(transfer.location || ''),
+            String(transfer.asset_id || ''),
+          ],
+          8000
+        );
+        await this.invalidateCache();
+      }
+
       await this.logAudit(userId, 'update_transfer_status', { transferId, status });
+      const updatedTransfer = result[0];
+      const senderId = String(updatedTransfer.sender_id || "");
+      if (senderId && senderId !== userId) {
+        const assetName = String(updatedTransfer.asset_name || "SMS asset");
+        await this.createNotification({
+          type: status === "accepted" ? "transfer_accepted" : "transfer_rejected",
+          title: status === "accepted" ? "Transfer accepted" : "Transfer rejected",
+          message: `${userId} ${status === "accepted" ? "accepted" : "rejected"} your ${assetName} transfer request.`,
+          recipientId: senderId,
+          actorId: userId,
+          assetId: String(updatedTransfer.asset_id || ""),
+          transferId,
+        });
+      }
+      await delCache('sms:stats');
 
       return {
         success: true,
@@ -483,6 +616,131 @@ export class SmsAssetService extends BaseService<SmsAssetEntity, SmsAssetDB> {
       };
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to update transfer';
+      return {
+        success: false,
+        error: errorMessage,
+        meta: { durationMs: Date.now() - startTime, queryCount: 1 },
+      };
+    }
+  }
+
+  public async createNotification(notification: {
+    type: string;
+    title: string;
+    message: string;
+    recipientId: string;
+    actorId?: string | null;
+    assetId?: string | null;
+    transferId?: string | null;
+  }): Promise<ServiceResult<SmsNotificationEntity>> {
+    const startTime = Date.now();
+    try {
+      await this.ensureNotificationsTable();
+      const rows = await dbManager.executeUnsafe<SmsNotificationDB>(
+        `
+          INSERT INTO sms_notifications (
+            type, title, message, recipient_id, actor_id, asset_id, transfer_id
+          )
+          VALUES ($1, $2, $3, $4, $5, NULLIF($6, '')::uuid, NULLIF($7, '')::uuid)
+          RETURNING *
+        `,
+        [
+          notification.type,
+          notification.title,
+          notification.message,
+          notification.recipientId,
+          notification.actorId || null,
+          notification.assetId || "",
+          notification.transferId || "",
+        ],
+        8000
+      );
+
+      return {
+        success: true,
+        data: this.toNotificationEntity(rows[0]),
+        meta: { durationMs: Date.now() - startTime, queryCount: 2 },
+      };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Failed to create SMS notification";
+      console.error("[SmsAssetService.createNotification] Error:", error);
+      return {
+        success: false,
+        error: errorMessage,
+        meta: { durationMs: Date.now() - startTime, queryCount: 1 },
+      };
+    }
+  }
+
+  public async getNotifications(
+    recipientId: string,
+    options: { unreadOnly?: boolean; limit?: number } = {}
+  ): Promise<ServiceResult<{ notifications: SmsNotificationEntity[]; unreadCount: number }>> {
+    const startTime = Date.now();
+    try {
+      await this.ensureNotificationsTable();
+      const limit = Math.min(Math.max(options.limit || 20, 1), 100);
+      const rows = await dbManager.executeUnsafe<SmsNotificationDB>(
+        `
+          SELECT *
+          FROM sms_notifications
+          WHERE recipient_id = $1
+            AND ($2::boolean = false OR read_at IS NULL)
+          ORDER BY created_at DESC
+          LIMIT $3
+        `,
+        [recipientId, !!options.unreadOnly, limit],
+        8000
+      );
+      const countRows = await dbManager.executeUnsafe<{ count: number }>(
+        `SELECT COUNT(*)::integer AS count FROM sms_notifications WHERE recipient_id = $1 AND read_at IS NULL`,
+        [recipientId],
+        5000
+      );
+
+      return {
+        success: true,
+        data: {
+          notifications: rows.map((row) => this.toNotificationEntity(row)),
+          unreadCount: Number(countRows[0]?.count || 0),
+        },
+        meta: { durationMs: Date.now() - startTime, queryCount: 3 },
+      };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Failed to fetch SMS notifications";
+      return {
+        success: false,
+        error: errorMessage,
+        meta: { durationMs: Date.now() - startTime, queryCount: 1 },
+      };
+    }
+  }
+
+  public async markNotificationsRead(
+    recipientId: string,
+    notificationId?: number
+  ): Promise<ServiceResult<boolean>> {
+    const startTime = Date.now();
+    try {
+      await this.ensureNotificationsTable();
+      await dbManager.executeUnsafe(
+        `
+          UPDATE sms_notifications
+          SET read_at = COALESCE(read_at, NOW())
+          WHERE recipient_id = $1
+            AND ($2::integer IS NULL OR id = $2::integer)
+        `,
+        [recipientId, notificationId || null],
+        8000
+      );
+
+      return {
+        success: true,
+        data: true,
+        meta: { durationMs: Date.now() - startTime, queryCount: 2 },
+      };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Failed to mark SMS notifications read";
       return {
         success: false,
         error: errorMessage,
@@ -508,6 +766,181 @@ export class SmsAssetService extends BaseService<SmsAssetEntity, SmsAssetDB> {
       );
     } catch (error) {
       console.error('[SmsAssetService.logAudit] Failed to log audit:', error);
+    }
+  }
+
+  /**
+   * Clear transfer and audit history for one asset.
+   * Keeps one replacement audit entry so admin cleanup remains traceable.
+   */
+  public async clearAssetHistory(
+    assetId: string,
+    adminUsername: string
+  ): Promise<ServiceResult<{ deletedTransfers: number; deletedAuditLogs: number }>> {
+    const startTime = Date.now();
+
+    try {
+      const result = await dbManager.executeUnsafe<{
+        deletedTransfers: string | number;
+        deletedAuditLogs: string | number;
+      }>(
+        `
+          WITH deleted_audits AS (
+            DELETE FROM sms_audit_logs
+            WHERE (
+              metadata->>'assetId' = $1::text
+              OR metadata @> jsonb_build_object('assetId', $1::text)
+              OR metadata->>'transferId' IN (
+                SELECT id::text FROM sms_transfers WHERE asset_id = $1::uuid
+              )
+            )
+            RETURNING 1
+          ),
+          deleted_transfers AS (
+            DELETE FROM sms_transfers
+            WHERE asset_id = $1::uuid
+            RETURNING 1
+          )
+          SELECT
+            (SELECT COUNT(*) FROM deleted_transfers)::integer AS "deletedTransfers",
+            (SELECT COUNT(*) FROM deleted_audits)::integer AS "deletedAuditLogs"
+        `,
+        [assetId],
+      );
+
+      const deletedTransfers = Number(result[0]?.deletedTransfers || 0);
+      const deletedAuditLogs = Number(result[0]?.deletedAuditLogs || 0);
+
+      await this.logAudit(adminUsername, "Cleared asset history", {
+        assetId,
+        deletedTransfers,
+        deletedAuditLogs,
+      });
+
+      return {
+        success: true,
+        data: { deletedTransfers, deletedAuditLogs },
+        meta: { durationMs: Date.now() - startTime, queryCount: 2 },
+      };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Failed to clear asset history";
+      console.error("[SmsAssetService.clearAssetHistory] Error:", error);
+      return {
+        success: false,
+        error: errorMessage,
+        meta: { durationMs: Date.now() - startTime, queryCount: 1 },
+      };
+    }
+  }
+
+  /**
+   * Return an SMS asset back to stock.
+   */
+  public async returnAsset(
+    assetId: string,
+    returnedBy: string,
+    location?: string,
+    remark?: string
+  ): Promise<ServiceResult<SmsTransferEntity>> {
+    const startTime = Date.now();
+    try {
+      const result = await dbManager.executeUnsafe(
+        `
+          WITH selected_asset AS (
+            SELECT id, assigned_to, location
+            FROM sms_assets
+            WHERE id = $1::uuid
+            FOR UPDATE
+          ),
+          updated_asset AS (
+            UPDATE sms_assets
+            SET status = 'Available',
+                assigned_to = NULL,
+                location = COALESCE(NULLIF($3, ''), sms_assets.location),
+                updated_at = NOW()
+            FROM selected_asset
+            WHERE sms_assets.id = selected_asset.id
+            RETURNING sms_assets.id
+          ),
+          inserted_transfer AS (
+            INSERT INTO sms_transfers (
+              id, asset_id, sender_id, receiver_id, location, status, remark, created_at, accepted_at
+            )
+            SELECT
+              gen_random_uuid(),
+              selected_asset.id,
+              COALESCE(NULLIF($2, ''), selected_asset.assigned_to, 'stock'),
+              'stock',
+              COALESCE(NULLIF($3, ''), selected_asset.location, 'Stock'),
+              'returned',
+              COALESCE(NULLIF($4, ''), 'Returned to stock'),
+              NOW(),
+              NOW()
+            FROM selected_asset
+            JOIN updated_asset ON updated_asset.id = selected_asset.id
+            RETURNING *
+          )
+          SELECT
+            inserted_transfer.*,
+            selected_asset.assigned_to AS previous_assigned_to,
+            sms_assets.name AS asset_name
+          FROM inserted_transfer
+          JOIN selected_asset ON selected_asset.id = inserted_transfer.asset_id
+          JOIN sms_assets ON sms_assets.id = inserted_transfer.asset_id
+        `,
+        [assetId, returnedBy, location || '', remark || 'Returned to stock'],
+        8000
+      ) as Array<Record<string, unknown>>;
+
+      if (result.length === 0) {
+        return {
+          success: false,
+          error: 'Asset not found',
+          meta: { durationMs: Date.now() - startTime, queryCount: 1 },
+        };
+      }
+
+      const transfer = result[0];
+      const transferEntity: SmsTransferEntity = {
+        id: transfer.id as string,
+        assetId: transfer.asset_id as string,
+        senderId: String(transfer.sender_id || ''),
+        receiverId: String(transfer.receiver_id || ''),
+        location: String(transfer.location || ''),
+        status: 'returned',
+        remark: transfer.remark as string | null,
+        createdAt: transfer.created_at as string,
+        acceptedAt: transfer.accepted_at as string | null,
+      };
+
+      await this.logAudit(returnedBy, 'return_asset', { assetId, transferId: transferEntity.id });
+      const previousAssignedTo = String(transfer.previous_assigned_to || "");
+      if (previousAssignedTo && previousAssignedTo !== returnedBy) {
+        await this.createNotification({
+          type: "asset_returned",
+          title: "Asset returned to stock",
+          message: `${returnedBy} returned ${String(transfer.asset_name || "SMS asset")} to stock.`,
+          recipientId: previousAssignedTo,
+          actorId: returnedBy,
+          assetId,
+          transferId: transferEntity.id,
+        });
+      }
+      await this.invalidateCache();
+      await delCache('sms:stats');
+
+      return {
+        success: true,
+        data: transferEntity,
+        meta: { durationMs: Date.now() - startTime, queryCount: 3 },
+      };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to return asset';
+      return {
+        success: false,
+        error: errorMessage,
+        meta: { durationMs: Date.now() - startTime, queryCount: 1 },
+      };
     }
   }
 
@@ -550,7 +983,7 @@ export class SmsAssetService extends BaseService<SmsAssetEntity, SmsAssetDB> {
       const todayChange = todayResult[0]?.count || 0;
 
       const stats: Record<string, number> = {
-        totalAssets: (statusCounts.Available || 0) + (statusCounts['In Use'] || 0) + (statusCounts.Borrowed || 0),
+        totalAssets: Object.values(statusCounts).reduce((sum, count) => sum + count, 0),
         available: statusCounts.Available || 0,
         inUse: statusCounts['In Use'] || 0,
         borrowed: statusCounts.Borrowed || 0,

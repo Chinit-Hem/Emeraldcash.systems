@@ -65,7 +65,7 @@ export default function ImageModal({ isOpen, imageUrl, alt, onClose }: ImageModa
 
         {/* Image container */}
         <div className="relative bg-black rounded-2xl overflow-hidden shadow-2xl">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
+          { }
           <img
             src={imageUrl}
             alt={alt}

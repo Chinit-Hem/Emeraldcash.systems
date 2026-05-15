@@ -1,5 +1,4 @@
 import type { Role } from "./types";
-import { getClientIp, getClientUserAgent } from "./network";
 
 // Session configuration
 const SESSION_MAX_AGE_MS = 8 * 60 * 60 * 1000;

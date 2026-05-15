@@ -41,13 +41,37 @@ async function findStaffById(staffId: number) {
 }
 
 async function createStaffForSession(session: SessionPayload) {
+  const sessionUserId = toPositiveInteger(session.userId);
+  const normalizedUsername = session.username.trim().toLowerCase();
+
   const rows = await dbManager.executeUnsafe<StaffRow>(
     `
-      INSERT INTO lms_staff (full_name, email, branch_location, role, phone, is_active)
-      VALUES ($1, NULL, NULL, $2, NULL, true)
-      RETURNING id, full_name, email
+      WITH existing_staff AS (
+        SELECT id, full_name, email
+        FROM lms_staff
+        WHERE is_active = true
+          AND (
+            ($2::integer IS NOT NULL AND user_id = $2::integer)
+            OR LOWER(TRIM(full_name)) = $1
+            OR LOWER(TRIM(COALESCE(email, ''))) = $1
+          )
+        ORDER BY
+          CASE WHEN $2::integer IS NOT NULL AND user_id = $2::integer THEN 0 ELSE 1 END,
+          id
+        LIMIT 1
+      ),
+      inserted_staff AS (
+        INSERT INTO lms_staff (user_id, full_name, email, branch_location, role, phone, is_active)
+        SELECT $2::integer, $3, NULL, NULL, $4, NULL, true
+        WHERE NOT EXISTS (SELECT 1 FROM existing_staff)
+        RETURNING id, full_name, email
+      )
+      SELECT id, full_name, email FROM existing_staff
+      UNION ALL
+      SELECT id, full_name, email FROM inserted_staff
+      LIMIT 1
     `,
-    [session.username, session.role]
+    [normalizedUsername, sessionUserId, session.username, session.role]
   );
 
   return rows[0] ?? null;

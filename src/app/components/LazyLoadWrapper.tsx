@@ -10,7 +10,7 @@
 
 "use client";
 
-import React, { useState, useEffect, useRef, useCallback, Suspense } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 
 interface LazyLoadWrapperProps {
   children: React.ReactNode;

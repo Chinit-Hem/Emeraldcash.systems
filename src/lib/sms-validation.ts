@@ -13,7 +13,7 @@ export const smsAssetSchema = z.object({
   documentUrl: z.string().max(512, 'Document URL too long').optional(),
   description: z.string().max(1000, 'Description too long').optional(),
   refId: z.string().max(128, 'Reference ID too long').optional(),
-  status: z.enum(['Available', 'In Use', 'Borrowed'] as [SmsStatus, ...SmsStatus[]]),
+  status: z.enum(['Available', 'In Use', 'Borrowed', 'Out', 'Not Returned'] as [SmsStatus, ...SmsStatus[]]),
 });
 
 export const smsTransferSchema = z.object({

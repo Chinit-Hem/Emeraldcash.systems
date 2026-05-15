@@ -5,8 +5,9 @@
   "scripts": {
     "dev": "npm run dev:reset",
     "dev:stable": "npm run dev:reset:stable",
-    "dev:reset": "node scripts/dev-reset.mjs && next dev --turbopack --port 3000",
-    "dev:reset:stable": "node scripts/dev-reset.mjs && next dev --turbopack --port 3000",
+    "dev:reset": "node scripts/dev-reset.mjs && node -e \"console.log('\\nOpen web: http://localhost:3000/\\n')\" && next dev --turbopack --hostname localhost --port 3000",
+    "dev:reset:stable": "node scripts/dev-reset.mjs && node -e \"console.log('\\nOpen web: http://localhost:3000/\\n')\" && next dev --turbopack --hostname localhost --port 3000",
+    "dev:lan": "node scripts/dev-reset.mjs && next dev --turbopack --hostname 0.0.0.0 --port 3000",
     "build": "next build",
     "start": "next start",
     "preview": "npm run build && next start",

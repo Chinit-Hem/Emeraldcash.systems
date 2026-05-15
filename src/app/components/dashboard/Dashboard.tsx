@@ -13,14 +13,11 @@
 
 "use client";
 
-import { useLanguage } from "@/lib/LanguageContext";
-import { useTranslation } from "@/lib/i18n";
 
 import { useState, useCallback, useMemo, useEffect } from "react";
 import dynamic from "next/dynamic";
 import type { Vehicle } from "@/lib/types";
 import { useDebouncedValue } from "@/lib/useDebouncedValue";
-import { normalizeCategoryLabel } from "@/lib/analytics";
 import { CATEGORY_COLORS } from "@/lib/categoryColors";
 import { safeGetMonthKey } from "@/lib/safeDate";
 

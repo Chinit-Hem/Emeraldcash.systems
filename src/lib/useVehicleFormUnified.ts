@@ -85,7 +85,7 @@ export function useVehicleFormUnified(options: UseVehicleFormOptions) {
         initialVehicleRef.current = initialVehicle;
       });
     }
-  }, [initialVehicle.VehicleId]);
+  }, [initialVehicle, initialVehicle.VehicleId]);
 
   // Computed values
   const derivedPrices = useMemo(() => derivePrices(state.formData.PriceNew ?? null), [state.formData.PriceNew]);

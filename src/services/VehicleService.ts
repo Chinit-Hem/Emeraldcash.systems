@@ -114,6 +114,18 @@ export interface PaginatedResult<T> {
   totalPages: number;
 }
 
+/**
+ * Stock notification types
+ * Moved to class-level (outside method) - interfaces cannot be inside method bodies
+ */
+export interface StockNotification {
+  type: 'return' | 'transfer' | 'adjust';
+  title: string;
+  message: string;
+  recipientId: string;
+  relatedModelKey?: string;
+}
+
 // ============================================================================
 // Vehicle Service Singleton Class
 // ============================================================================
@@ -173,9 +185,8 @@ export class VehicleService extends BaseService<VehicleEntity, VehicleDB> {
       imageId.startsWith("https://") ||
       imageId.startsWith("data:")
     );
-    const normalizedImage = hasValidThumbnail
-      ? thumbnailUrl
-      : (isImageIdUrl ? imageId : imageId); // Return as-is, Cloudinary URL generation happens elsewhere
+    // If thumbnail is valid, use it; otherwise fallback to the raw imageId
+    const normalizedImage = hasValidThumbnail ? thumbnailUrl : imageId;
 
     // Create entity with both BaseEntity and Vehicle properties
     const vehicle: VehicleEntity = {
@@ -673,7 +684,7 @@ conditions.push(`(NULLIF(TRIM(COALESCE(image_id, '')), '') IS NULL AND NULLIF(TR
     }
   }
 
-  /**
+/**
    * Transfer stock between locations
    */
   public async transferStock(
@@ -698,6 +709,166 @@ conditions.push(`(NULLIF(TRIM(COALESCE(image_id, '')), '') IS NULL AND NULLIF(TR
 
     const inResult = await this.adjustStock(modelKey, quantity, reason, toLocation, userId, 'TRANSFER');
     return inResult;
+  }
+
+/**
+   * Return stock - adds items back to stock (e.g., returned from customer/employee)
+   * This is used when items are returned to inventory after being checked out
+   */
+  public async returnStock(
+    modelKey: string,
+    quantity: number,
+    reason: string,
+    location: string,
+    userId: number
+): Promise<ServiceResult<boolean>> {
+    if (quantity <= 0) {
+      return {
+        success: false,
+        error: 'Quantity must be positive',
+        meta: { durationMs: 0, queryCount: 0 },
+      };
+    }
+
+    // Use RETURN type to add stock back
+    const result = await this.adjustStock(modelKey, quantity, reason, location, userId, 'RETURN');
+    return result;
+  }
+
+  /**
+   * Create stock notification - sends notification to user about stock operations
+   * This creates a notification record that can be viewed in the app
+   */
+  public async createStockNotification(
+    notification: StockNotification
+  ): Promise<ServiceResult<boolean>> {
+    const startTime = Date.now();
+    try {
+      const sql = dbManager.getClient();
+
+      // Create notifications table if not exists
+      await sql`
+        CREATE TABLE IF NOT EXISTS stock_notifications (
+          id SERIAL PRIMARY KEY,
+          type VARCHAR(20) NOT NULL,
+          title VARCHAR(200) NOT NULL,
+          message TEXT NOT NULL,
+          recipient_id VARCHAR(100) NOT NULL,
+          related_model_key VARCHAR(200),
+          is_read BOOLEAN DEFAULT false,
+          created_at TIMESTAMP DEFAULT NOW()
+        )
+      `;
+
+      // Insert notification
+      await sql`
+        INSERT INTO stock_notifications (type, title, message, recipient_id, related_model_key)
+        VALUES (
+          ${notification.type},
+          ${notification.title},
+          ${notification.message},
+          ${notification.recipientId},
+          ${notification.relatedModelKey || null}
+        )
+      `;
+
+      console.log(`[VehicleService] Notification created: ${notification.title} for ${notification.recipientId}`);
+
+      return {
+        success: true,
+        data: true,
+        meta: { durationMs: Date.now() - startTime, queryCount: 2 },
+      };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to create notification';
+      console.error('[VehicleService.createStockNotification] Error:', errorMessage);
+      return {
+        success: false,
+        error: errorMessage,
+        meta: { durationMs: Date.now() - startTime, queryCount: 1 },
+      };
+    }
+  }
+
+  /**
+   * Get stock notifications for a user
+   */
+  public async getStockNotifications(
+    recipientId: string,
+    limit: number = 20
+  ): Promise<ServiceResult<Array<{
+    id: number;
+    type: string;
+    title: string;
+    message: string;
+    isRead: boolean;
+    createdAt: string;
+  }>>> {
+    const startTime = Date.now();
+    try {
+      const sql = dbManager.getClient();
+
+      const result = await sql`
+        SELECT id, type, title, message, is_read, created_at
+        FROM stock_notifications
+        WHERE recipient_id = ${recipientId}
+        ORDER BY created_at DESC
+        LIMIT ${limit}
+      `;
+
+      const notifications = result.map(row => ({
+        id: row.id,
+        type: row.type,
+        title: row.title,
+        message: row.message,
+        isRead: row.is_read,
+        createdAt: row.created_at,
+      }));
+
+      return {
+        success: true,
+        data: notifications,
+        meta: { durationMs: Date.now() - startTime, queryCount: 1 },
+      };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to fetch notifications';
+      console.error('[VehicleService.getStockNotifications] Error:', errorMessage);
+      return {
+        success: false,
+        error: errorMessage,
+        meta: { durationMs: Date.now() - startTime, queryCount: 1 },
+      };
+    }
+  }
+
+  /**
+   * Mark notification as read
+   */
+  public async markNotificationRead(id: number): Promise<ServiceResult<boolean>> {
+    const startTime = Date.now();
+    try {
+      const sql = dbManager.getClient();
+
+      await sql`
+        UPDATE stock_notifications
+        SET is_read = true
+        WHERE id = ${id}
+      `;
+
+      return {
+        success: true,
+        data: true,
+        meta: { durationMs: Date.now() - startTime, queryCount: 1 },
+      };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to mark notification read';
+      console.error('[VehicleService.markNotificationRead] Error:', errorMessage);
+      return {
+        success: false,
+        error: errorMessage,
+        meta: { durationMs: Date.now() - startTime, queryCount: 1 },
+      };
+    }
   }
 
   /**

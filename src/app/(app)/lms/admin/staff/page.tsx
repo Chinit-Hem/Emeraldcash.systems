@@ -605,7 +605,7 @@ const lmsProgress = getLMSProgress(managedUser.email ?? null);
                     {/* Avatar */}
                     <div className="relative shrink-0">
                       {managedUser.profile_picture ? (
-                        // eslint-disable-next-line @next/next/no-img-element
+                         
                         <img
                           src={managedUser.profile_picture}
                           alt={managedUser.username}
@@ -737,7 +737,7 @@ const lmsProgress = getLMSProgress(managedUser.email ?? null);
               <div className="flex flex-col items-center mb-6">
                 <div className="relative">
                   {editProfilePicture ? (
-                    // eslint-disable-next-line @next/next/no-img-element
+                     
                     <img
                       src={editProfilePicture}
                       alt="Profile"

@@ -1,6 +1,5 @@
 "use client";
 
-import dynamic from "next/dynamic";
 import BasicForm from "./BasicVehicleForm";
 // Removed HeavyForm to fix module error
 import { useUI } from "@/app/components/UIContext";

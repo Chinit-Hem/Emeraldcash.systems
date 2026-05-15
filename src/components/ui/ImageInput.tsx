@@ -654,7 +654,7 @@ export function ImageInput({
           </div>
         ) : preview ? (
           <div className="relative">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
+            { }
             <img
               key={cacheKey} // Force re-render when image changes
               src={isUsingFallback ? "/placeholder-car.svg" : preview.url}

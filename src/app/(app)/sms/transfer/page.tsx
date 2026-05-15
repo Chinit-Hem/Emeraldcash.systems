@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, AlertCircle, CheckCircle, Loader2, Users } from "lucide-react";
+import { useAuthUser } from "@/app/components/AuthContext";
+import { ArrowLeft, AlertCircle, CheckCircle, Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { validateTransferForm } from "@/lib/sms-validation";
 
@@ -27,6 +28,8 @@ interface SettingsUser {
 }
 
 export default function TransferPage() {
+  const user = useAuthUser();
+  const canChooseSender = user.role === "Admin" || user.role === "Transfer";
   const router = useRouter();
 
   const [form, setForm] = useState({
@@ -73,6 +76,12 @@ export default function TransferPage() {
       })
       .finally(() => setUsersLoading(false));
   }, []);
+
+  useEffect(() => {
+    if (!canChooseSender && user.username) {
+      setForm((prev) => ({ ...prev, senderId: user.username }));
+    }
+  }, [canChooseSender, user.username]);
 
   const handleChange = (field: string, value: string | number) => {
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -230,7 +239,14 @@ export default function TransferPage() {
           <label className="block text-sm font-semibold text-slate-700 mb-2">
             Sender <span className="text-red-500">*</span>
           </label>
-          {usersLoading ? (
+          {!canChooseSender ? (
+            <input
+              type="text"
+              value={user.full_name ? `${user.full_name} (@${user.username})` : `@${user.username}`}
+              className="w-full border rounded-lg p-3 bg-slate-100 text-slate-600 border-slate-200"
+              disabled
+            />
+          ) : usersLoading ? (
             <div className="w-full border border-slate-200 rounded-lg p-3 flex items-center gap-2 text-slate-500">
               <Loader2 className="w-4 h-4 animate-spin" />
               Loading users...
@@ -344,10 +360,10 @@ export default function TransferPage() {
           )}
         </div>
 
-        {/* Remark */}
+        {/* Message */}
         <div>
           <label className="block text-sm font-semibold text-slate-700 mb-2">
-            Remark (Optional)
+            Message to receiver (Optional)
           </label>
           <textarea
             value={form.remark}
@@ -357,7 +373,7 @@ export default function TransferPage() {
                 ? "border-red-300 focus:ring-red-500 bg-red-50"
                 : "border-slate-300 focus:ring-emerald-500"
             }`}
-            placeholder="Additional notes about this transfer..."
+            placeholder="Example: Please accept this projector for the Sen Sok meeting room..."
             disabled={loading}
             maxLength={500}
           />

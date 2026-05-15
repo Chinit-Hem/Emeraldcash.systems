@@ -69,7 +69,7 @@ const UserAvatar = memo(({
   return (
     <div className="relative shrink-0">
       {user.profile_picture ? (
-        // eslint-disable-next-line @next/next/no-img-element
+         
         <img
           src={user.profile_picture}
           alt={user.username}
@@ -837,7 +837,7 @@ export default function SettingsContent() {
               <div className="flex flex-col items-center mb-6">
                 <div className="relative">
                   {editProfilePicture ? (
-                    // eslint-disable-next-line @next/next/no-img-element
+                     
                     <img
                       src={editProfilePicture}
                       alt="Profile"

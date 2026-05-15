@@ -1,7 +1,6 @@
 
 import React from "react";
 import { GlassCard } from "@/components/ui/glass/GlassCard";
-import { CardSkeleton } from "@/app/components/LoadingSkeleton";
 
 export function VehicleFormSkeleton() {
   return (

@@ -21,7 +21,6 @@ import {
   Phone,
   AlertCircle,
   X,
-  Briefcase,
 } from "lucide-react";
 import { LMS_ROLES, type LmsRole } from "@/lib/lms-schema";
 import { NeuInput, NeuSelect } from "@/components/ui/neu/NeuInput";

@@ -19,7 +19,7 @@ interface SmsAsset {
   documentUrl?: string | null;
   description?: string | null;
   refId?: string | null;
-  status: "Available" | "In Use" | "Borrowed";
+  status: "Available" | "In Use" | "Borrowed" | "Out" | "Not Returned";
 }
 
 export default function EditAssetPage() {
@@ -139,4 +139,3 @@ export default function EditAssetPage() {
     </div>
   );
 }
-

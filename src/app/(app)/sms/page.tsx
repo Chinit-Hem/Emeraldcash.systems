@@ -5,15 +5,27 @@ import Link from 'next/link';
 import { SmsStats } from '@/lib/sms-types';
 import { useLanguage } from "@/lib/LanguageContext";
 import { useTranslation } from "@/lib/i18n";
+import { Bell, CheckCheck } from 'lucide-react';
 
 interface StatsData extends SmsStats {
   totalTodayChange: number;
+}
+
+interface SmsNotification {
+  id: number;
+  title: string;
+  message: string;
+  transferId?: string | null;
+  readAt?: string | null;
+  createdAt: string;
 }
 
 export default function SmsDashboard() {
   const [stats, setStats] = useState<StatsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [notifications, setNotifications] = useState<SmsNotification[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
   const { language } = useLanguage();
   const { t } = useTranslation(language);
 
@@ -33,6 +45,13 @@ export default function SmsDashboard() {
           ...data.data,
           totalTodayChange: 2
         });
+        setUnreadCount(data.data?.unreadNotifications || 0);
+        const notificationResponse = await fetch('/api/sms/notifications?limit=3');
+        const notificationData = await notificationResponse.json().catch(() => ({}));
+        if (notificationData.success) {
+          setNotifications(notificationData.data?.notifications || []);
+          setUnreadCount(notificationData.data?.unreadCount || data.data?.unreadNotifications || 0);
+        }
       } else {
         setError(data.error || 'Failed to load stats');
       }
@@ -89,12 +108,21 @@ export default function SmsDashboard() {
   const inUse = stats?.inUse || 0;
   const borrowed = stats?.borrowed || 0;
   const pending = stats?.pendingTransfers || 0;
+  const markNotificationsRead = async () => {
+    await fetch('/api/sms/notifications', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({}),
+    });
+    setUnreadCount(0);
+    setNotifications((items) => items.map((item) => ({ ...item, readAt: item.readAt || new Date().toISOString() })));
+  };
 
   return (
     <div className='p-6'>
 
 
-      <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8'>
+      <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8'>
         <Link href='/sms/assets' className='group p-8 bg-gradient-to-br from-emerald-500/10 to-emerald-600/10 border border-emerald-200/50 rounded-3xl shadow-xl hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 block relative overflow-hidden'>
           <div className='absolute top-4 right-4 w-20 h-20 bg-emerald-500 rounded-2xl -rotate-12 opacity-20'></div>
           <div className='relative z-10'>
@@ -125,7 +153,57 @@ export default function SmsDashboard() {
             <p className='text-slate-600'>{t.auditTrail}</p>
           </div>
         </Link>
+        <Link href='/sms/pending' className='group p-8 bg-gradient-to-br from-blue-500/10 to-blue-600/10 border border-blue-200/50 rounded-3xl shadow-xl hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 block relative overflow-hidden'>
+          <div className='absolute top-4 right-4 w-20 h-20 bg-blue-500 rounded-2xl opacity-20'></div>
+          <div className='relative z-10'>
+            <div className='flex items-center justify-between gap-3'>
+              <h3 className='text-2xl font-bold mb-3 bg-gradient-to-r from-blue-600 to-blue-700 bg-clip-text text-transparent'>Inbox</h3>
+              {unreadCount > 0 && (
+                <span className='rounded-full bg-red-500 px-2 py-0.5 text-xs font-bold text-white'>{unreadCount}</span>
+              )}
+            </div>
+            <p className='text-slate-600'>Transfer messages</p>
+          </div>
+        </Link>
       </div>
+
+      {notifications.length > 0 && (
+        <div className='mb-8 rounded-3xl border border-slate-200 bg-white/80 p-5 shadow-xl backdrop-blur-xl'>
+          <div className='mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between'>
+            <div className='flex items-center gap-3'>
+              <div className='flex h-10 w-10 items-center justify-center rounded-2xl bg-blue-50 text-blue-600'>
+                <Bell className='h-5 w-5' />
+              </div>
+              <div>
+                <h2 className='font-bold text-slate-900'>Transfer Inbox</h2>
+                <p className='text-sm text-slate-500'>{unreadCount} unread notification{unreadCount === 1 ? '' : 's'}</p>
+              </div>
+            </div>
+            <button
+              type='button'
+              onClick={markNotificationsRead}
+              className='inline-flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-50'
+            >
+              <CheckCheck className='h-4 w-4' />
+              Mark read
+            </button>
+          </div>
+          <div className='grid gap-3 md:grid-cols-3'>
+            {notifications.map((notification) => (
+              <Link
+                key={notification.id}
+                href='/sms/pending'
+                className={`rounded-2xl border p-4 transition hover:bg-slate-50 ${
+                  notification.readAt ? 'border-slate-200 bg-white' : 'border-blue-200 bg-blue-50/70'
+                }`}
+              >
+                <div className='mb-1 text-sm font-bold text-slate-900'>{notification.title}</div>
+                <p className='line-clamp-2 text-sm text-slate-600'>{notification.message}</p>
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className='grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6'>
         <div className='p-8 bg-white/70 backdrop-blur-xl rounded-3xl border border-slate-200 shadow-2xl text-center group hover:-translate-y-1 transition-all duration-300'>

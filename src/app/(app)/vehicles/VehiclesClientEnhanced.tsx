@@ -3,7 +3,6 @@
 import { useLanguage } from "@/lib/LanguageContext";
 import { useTranslation, type Translations } from "@/lib/i18n";
 import { useAuthUser } from "@/app/components/AuthContext";
-import { getQuickFilterCategory } from "@/lib/categoryMapping";
 import AddVehicleModalOptimistic from "@/app/components/vehicles/AddVehicleModalOptimistic";
 
 import { ConfirmDeleteModal } from "@/app/components/vehicles/ConfirmDeleteModal";
@@ -14,7 +13,7 @@ import { driveThumbnailUrl, extractDriveFileId } from "@/lib/drive";
 import type { Vehicle } from "@/lib/types";
 import { cn } from "@/lib/ui";
 import { useVehiclesNeon, useVehicleStats } from "@/lib/useVehiclesNeon";
-import { getFuzzySuggestions, type FuzzySuggestion } from "@/lib/fuzzySearch";
+import { getFuzzySuggestions } from "@/lib/fuzzySearch";
 import SearchSuggestions from "@/components/SearchSuggestions";
 import {
   AlertCircle,
@@ -625,6 +624,7 @@ return (
       {/* Image */}
       <div className="relative aspect-[4/3] overflow-hidden bg-slate-100">
 {imageUrl ? (
+             
             <img
               src={imageUrl}
               alt={`${vehicle.Brand} ${vehicle.Model}`}
@@ -635,6 +635,7 @@ return (
               }}
             />
           ) : (
+             
             <img
               src="/placeholder-car.svg"
               alt="No image"
@@ -902,20 +903,7 @@ export default function VehiclesClientEnhanced() {
     refreshInterval: 0,
   });
 
-  // Convert quick filter to category - LOCAL filtering only for instant response!
-  // This avoids server fetches when switching categories
-const categoryFilter = useMemo(() => {
-    if (!quickFilter) return null;
-    // Map quick filter values to category names that match the database
-    switch (quickFilter) {
-      case "cars": return "Cars";
-      case "motorcycles": return "Motorcycles";
-      case "tuktuks": return "TukTuks";
-      default: return undefined;
-    }
-  }, [quickFilter]);
-
-  const { stats, loading: statsLoading } = useVehicleStats(30000); // 30s refresh
+  const { stats } = useVehicleStats(30000); // 30s refresh
 
   // Safe stats access with fallbacks (BUG FIX)
   const safeStats = useMemo(() => ({
@@ -1001,10 +989,6 @@ const categoryFilter = useMemo(() => {
   // ==========================================================================
   // Helper Functions
   // ==========================================================================
-
-  const normalizeCategory = useCallback((cat: string | undefined): string => {
-    return cat?.toLowerCase().trim() || "";
-  }, []);
 
 const isCarCategory = useCallback((cat: string | undefined): boolean => {
     return cat?.toLowerCase().includes('car') || false;
@@ -1259,7 +1243,7 @@ const isTukTukCategory = useCallback((cat: string | undefined): boolean => {
     setIsRefreshing(false);
     setLastSync(new Date());
     success(t.syncSuccess);
-  }, [refresh, success]);
+  }, [refresh, success, t.syncSuccess]);
 
   const handleSort = useCallback((field: keyof Vehicle) => {
     if (sortField === field) {
@@ -2077,6 +2061,7 @@ const getVehicleImageUrl = useCallback((imageValue: string | undefined): string 
                                 {(() => {
                                   const imageUrl = getVehicleImageUrl(vehicle.Image);
                                   return imageUrl ? (
+                                     
                                     <img
                                       src={imageUrl}
                                       alt={vehicle.Model || "Vehicle"}

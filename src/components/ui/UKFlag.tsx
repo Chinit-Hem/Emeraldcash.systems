@@ -19,7 +19,7 @@ export const UKFlag: React.FC<UKFlagProps> = ({
   
   return (
     <>
-      {/* eslint-disable-next-line @next/next/no-img-element */}
+      { }
       <img
         src="https://flagcdn.com/gb.svg"
         alt="UK Flag"

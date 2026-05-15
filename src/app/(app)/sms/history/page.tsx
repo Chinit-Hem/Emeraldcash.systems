@@ -2,13 +2,12 @@
 
 import { useLanguage } from "@/lib/LanguageContext";
 import { useTranslation } from "@/lib/i18n";
-import { useRouter } from "next/navigation";
+import { useAuthUser } from "@/app/components/AuthContext";
 import Link from "next/link";
 import {
   ArrowLeft,
   History,
   Search,
-  Loader2,
   RefreshCw,
   ArrowLeftRight,
   ShieldCheck,
@@ -26,6 +25,8 @@ import {
   Tag,
   AlertCircle,
   Inbox,
+  Loader2,
+  Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -164,9 +165,10 @@ const AssetSkeleton = () => (
 // ============================================================================
 
 export default function HistoryPage() {
-  const router = useRouter();
+  const user = useAuthUser();
   const { language } = useLanguage();
   const { t } = useTranslation(language);
+  const isAdmin = user?.role === "Admin";
 
   // -- Data State --
   const [assets, setAssets] = useState<SmsAsset[]>([]);
@@ -182,6 +184,7 @@ export default function HistoryPage() {
   const [eventFilter, setEventFilter] = useState<EventFilter>("all");
   const [expandedEvents, setExpandedEvents] = useState<Set<string>>(new Set());
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [clearingHistory, setClearingHistory] = useState(false);
 
   // -- Fetch Users --
   const fetchUsers = useCallback(async () => {
@@ -305,6 +308,32 @@ export default function HistoryPage() {
   const getUserDisplay = (userId?: string) => {
     const user = users.find((u) => u.username === userId);
     return user ? user.full_name || user.username || userId : userId || "—";
+  };
+
+  const clearSelectedHistory = async () => {
+    if (!selectedAsset || !history || clearingHistory) return;
+
+    const confirmed = window.confirm(
+      `Clear transfer history and audit logs for "${history.assetName}"?\n\nThis is Admin-only and will keep one cleanup audit entry.`
+    );
+    if (!confirmed) return;
+
+    setClearingHistory(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/sms/history/${selectedAsset}`, {
+        method: "DELETE",
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data.success === false) {
+        throw new Error(data.error || "Failed to clear history");
+      }
+      await fetchHistory(selectedAsset);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to clear history");
+    } finally {
+      setClearingHistory(false);
+    }
   };
 
   // -- Render --
@@ -618,6 +647,21 @@ export default function HistoryPage() {
                         : t.events || "events"}
                     </span>
                   </div>
+                  {isAdmin && (
+                    <Button
+                      variant="outline"
+                      onClick={clearSelectedHistory}
+                      disabled={clearingHistory || !history.events.length}
+                      className="gap-2 border-red-200 bg-white/70 text-red-600 hover:bg-red-50 hover:text-red-700 disabled:opacity-50"
+                    >
+                      {clearingHistory ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Trash2 className="w-4 h-4" />
+                      )}
+                      Clear history
+                    </Button>
+                  )}
                 </div>
 
                 {/* Timeline */}
@@ -867,4 +911,3 @@ export default function HistoryPage() {
     </div>
   );
 }
-

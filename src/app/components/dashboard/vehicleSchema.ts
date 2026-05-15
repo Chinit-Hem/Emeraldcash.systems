@@ -1,6 +1,4 @@
 import { z } from 'zod';
-import type { Vehicle, TaxType } from '@/lib/types';
-import { TAX_TYPE_OPTIONS, COLOR_OPTIONS } from '@/lib/types';
 
 export const vehicleSchema = z.object({
   Brand: z.string().min(1, 'Brand is required').max(50),

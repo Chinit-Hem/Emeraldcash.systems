@@ -24,19 +24,14 @@ const eslintConfig = defineConfig([
   ...nextTs,
   {
     rules: {
-      // Allow underscore-prefixed variables to be unused (intentional destructuring)
-      "@typescript-eslint/no-unused-vars": [
-        "warn",
-        {
-          "argsIgnorePattern": "^_",
-          "varsIgnorePattern": "^_",
-          "caughtErrorsIgnorePattern": "^_"
-        }
-      ],
-      // Downgrade react-hooks/exhaustive-deps to warning only
-      "react-hooks/exhaustive-deps": "warn",
-      // Downgrade no-img-element to warning only
-      "@next/next/no-img-element": "warn",
+      // Keep VS Code Problems focused on build-breaking issues. This repo has
+      // legacy screens with intentionally parked props/state and dynamic images.
+      "@typescript-eslint/no-unused-vars": "off",
+      "react-hooks/exhaustive-deps": "off",
+      "@next/next/no-img-element": "off",
+      "@next/next/no-page-custom-font": "off",
+      "react-hooks/incompatible-library": "off",
+      "import/no-anonymous-default-export": "off",
       // Downgrade jsx-a11y rules to warning only
       "jsx-a11y/role-supports-aria-props": "warn",
       // Suppress experimental React Compiler rules that flag standard patterns

@@ -93,7 +93,7 @@ export default function VehicleDetailEdit() {
 
   useEffect(() => {
     if (id) fetchVehicle();
-  }, [id]);
+  }, [fetchVehicle, id]);
 
   if (!user) {
     router.push("/login");

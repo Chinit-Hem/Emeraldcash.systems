@@ -229,7 +229,6 @@ export function buildMonthlyAdded(vehicles: Vehicle[]): BarDatum[] {
 // ============================================================================
 
 import type { VehicleMeta } from "@/lib/types";
-import { extractDriveFileId } from "@/lib/drive";
 
 /**
  * Compute vehicle metadata from an array of vehicles

@@ -102,6 +102,7 @@ type ProgressResponse = {
 
 const YOUTUBE_IFRAME_API_SRC = "https://www.youtube.com/iframe_api";
 const PROGRESS_SAVE_INTERVAL_MS = 10_000;
+const VIDEO_CONTROLS_HIDE_DELAY_MS = 2_200;
 const MAX_PLAYBACK_RATE = 1.25;
 const SEEK_GRACE_SECONDS = 2;
 const COMPLETE_END_TOLERANCE_SECONDS = 5;
@@ -279,12 +280,14 @@ export function VideoPlayer({
   const [playbackRate, setPlaybackRate] = useState(1);
   const [warning, setWarning] = useState<string | null>(null);
   const [watermarkName, setWatermarkName] = useState(staffName ?? "Staff");
+  const [areControlsVisible, setAreControlsVisible] = useState(true);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const playerMountRef = useRef<HTMLDivElement>(null);
   const playerRef = useRef<YouTubePlayer | null>(null);
   const progressIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const saveIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const controlsHideTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const resumeTimeRef = useRef(0);
   const currentTimeRef = useRef(0);
   const maxWatchedRef = useRef(0);
@@ -316,6 +319,7 @@ export function VideoPlayer({
   const playbackStatusLabel = playbackUnlocked
     ? "Replay: seek and speed unlocked"
     : "First watch: seek and speed protected";
+  const shouldShowVideoControls = !isReady || !isPlaying || !!warning || areControlsVisible;
   const lessonProgress =
     instructionSteps.length > 0
       ? ((currentStep + 1) / instructionSteps.length) * 100
@@ -326,6 +330,25 @@ export function VideoPlayer({
     window.setTimeout(() => setWarning(null), 3500);
   }, []);
 
+  const clearControlsHideTimeout = useCallback(() => {
+    if (controlsHideTimeoutRef.current) {
+      clearTimeout(controlsHideTimeoutRef.current);
+      controlsHideTimeoutRef.current = null;
+    }
+  }, []);
+
+  const revealVideoControls = useCallback(() => {
+    setAreControlsVisible(true);
+    clearControlsHideTimeout();
+
+    if (isPlaying && isReady) {
+      controlsHideTimeoutRef.current = setTimeout(() => {
+        setAreControlsVisible(false);
+        controlsHideTimeoutRef.current = null;
+      }, VIDEO_CONTROLS_HIDE_DELAY_MS);
+    }
+  }, [clearControlsHideTimeout, isPlaying, isReady]);
+
   useEffect(() => {
     setIsCompleted(initialCompleted);
     isCompletedRef.current = initialCompleted;
@@ -335,6 +358,17 @@ export function VideoPlayer({
   useEffect(() => {
     playbackUnlockedRef.current = playbackUnlocked;
   }, [playbackUnlocked]);
+
+  useEffect(() => {
+    if (!isPlaying || !isReady || warning) {
+      clearControlsHideTimeout();
+      setAreControlsVisible(true);
+      return;
+    }
+
+    revealVideoControls();
+    return clearControlsHideTimeout;
+  }, [clearControlsHideTimeout, isPlaying, isReady, revealVideoControls, warning]);
 
   const updateWatchState = useCallback(
     (nextCurrentTime: number, nextMaxWatched: number, nextDuration: number) => {
@@ -603,13 +637,16 @@ export function VideoPlayer({
     return () => {
       document.removeEventListener("visibilitychange", handleVisibilityChange);
       window.removeEventListener("beforeunload", handleBeforeUnload);
+      clearControlsHideTimeout();
     };
-  }, [saveProgress, showWarning]);
+  }, [clearControlsHideTimeout, saveProgress, showWarning]);
 
   const togglePlay = useCallback(() => {
     if (!isReady || !playerRef.current) {
       return;
     }
+
+    revealVideoControls();
 
     if (isPlaying) {
       playerRef.current.pauseVideo();
@@ -617,9 +654,11 @@ export function VideoPlayer({
     } else {
       playerRef.current.playVideo();
     }
-  }, [isPlaying, isReady, saveProgress]);
+  }, [isPlaying, isReady, revealVideoControls, saveProgress]);
 
   const handleSeek = (event: React.ChangeEvent<HTMLInputElement>) => {
+    revealVideoControls();
+
     // Use refs for duration to ensure we have the most up-to-date value, not stale state
     const safeDuration = durationRef.current;
     if (!playerRef.current || safeDuration <= 0) {
@@ -653,6 +692,7 @@ export function VideoPlayer({
   };
 
   const handlePlaybackRateChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
+    revealVideoControls();
     const nextRate = Number(event.target.value);
 
     if (!playerRef.current || !Number.isFinite(nextRate)) {
@@ -672,6 +712,7 @@ export function VideoPlayer({
   };
 
   const restartVideo = () => {
+    revealVideoControls();
     // Use refs to get the most accurate duration value
     const safeDuration = durationRef.current;
     playerRef.current?.seekTo(0, true);
@@ -681,6 +722,7 @@ export function VideoPlayer({
   };
 
   const toggleFullscreen = () => {
+    revealVideoControls();
     if (!document.fullscreenElement) {
       containerRef.current?.requestFullscreen();
       setIsFullscreen(true);
@@ -759,7 +801,15 @@ export function VideoPlayer({
               className={isFullscreen ? "fixed inset-0 z-50 bg-black" : ""}
             >
               <GlassCard className="overflow-hidden rounded-2xl p-0">
-                <div className="relative aspect-video bg-black">
+                <div
+                  className={`relative aspect-video bg-black ${
+                    shouldShowVideoControls ? "" : "cursor-none"
+                  }`}
+                  onMouseMove={revealVideoControls}
+                  onTouchStart={revealVideoControls}
+                  onPointerDown={revealVideoControls}
+                  onFocusCapture={revealVideoControls}
+                >
                   {thumbnailUrl && !isReady && !hasError && (
                     <img
                       src={thumbnailUrl}
@@ -807,7 +857,13 @@ export function VideoPlayer({
                         </div>
                       )}
 
-                      <div className="absolute bottom-0 left-0 right-0 z-30 bg-gradient-to-t from-black/90 via-black/60 to-transparent px-4 pb-4 pt-10">
+                      <div
+                        className={`absolute bottom-0 left-0 right-0 z-30 bg-gradient-to-t from-black/90 via-black/60 to-transparent px-4 pb-4 pt-10 transition-all duration-300 ${
+                          shouldShowVideoControls
+                            ? "translate-y-0 opacity-100"
+                            : "pointer-events-none translate-y-4 opacity-0"
+                        }`}
+                      >
                         <div className="mb-3 flex flex-col gap-1 text-xs text-white/80 min-[420px]:flex-row min-[420px]:items-center min-[420px]:justify-between">
                           <span className="inline-flex items-center gap-1">
                             <ShieldCheck className="h-4 w-4 text-emerald-300" />

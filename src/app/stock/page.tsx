@@ -59,14 +59,14 @@ export default function StockPage() {
     fetchStock();
   }, []);
 
-  const handleAdjust = async (modelKey: string, delta: number) => {
+const handleAdjust = async (modelKey: string, delta: number) => {
     setLoading(true);
     try {
       setError('');
-      const res = await fetch('/api/stock/adjust', {
+      const res = await fetch('/api/stock', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ modelKey, delta, reason: `Quick adjust ${delta > 0 ? '+' : ''}${delta}`, location: 'Warehouse A', userId: 1 })
+        body: JSON.stringify({ action: 'adjust', modelKey, quantity: delta, reason: `Quick adjust ${delta > 0 ? '+' : ''}${delta}`, location: 'Warehouse A', userId: 1 })
       });
       if (!res.ok) throw new Error('Adjustment API failed');
       fetchStock();
@@ -78,7 +78,26 @@ export default function StockPage() {
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleReturn = async (modelKey: string) => {
+    setLoading(true);
+    try {
+      setError('');
+      const res = await fetch('/api/stock', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'return', modelKey, quantity: 1, reason: 'Returned to inventory', location: 'Warehouse A', userId: 1 })
+      });
+      if (!res.ok) throw new Error('Return API failed');
+      fetchStock();
+    } catch (e: unknown) {
+      console.error('Return error:', e);
+      setError(getErrorMessage(e, 'Return failed'));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.modelKey || form.quantity === 0) {
       setError('Please enter model key and quantity');
@@ -87,10 +106,10 @@ export default function StockPage() {
     setLoading(true);
     setError('');
     try {
-      const res = await fetch('/api/stock/adjust', {
+      const res = await fetch('/api/stock', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ modelKey: form.modelKey, delta: form.quantity, reason: 'Manual adjustment', location: form.location, userId: 1 })
+        body: JSON.stringify({ action: 'adjust', modelKey: form.modelKey, quantity: form.quantity, reason: 'Manual adjustment', location: form.location, userId: 1 })
       });
       if (!res.ok) throw new Error('Adjustment failed');
       fetchStock();
@@ -105,10 +124,13 @@ export default function StockPage() {
 
   return (
     <div className="p-6 space-y-6 max-w-6xl mx-auto">
-      <div className="flex items-center gap-4 mb-6">
+<div className="flex items-center gap-4 mb-6">
         <h1 className="text-3xl font-bold text-slate-900 flex-1">Stock Management</h1>
         <Link href="/stock/edit" className="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-2 rounded-xl font-medium transition-all shadow-sm hover:shadow-md whitespace-nowrap">
           + New Adjustment
+        </Link>
+        <Link href="/stock/edit" className="bg-amber-500 hover:bg-amber-600 text-white px-6 py-2 rounded-xl font-medium transition-all shadow-sm hover:shadow-md whitespace-nowrap">
+          Return Stock
         </Link>
       </div>
 
@@ -191,12 +213,15 @@ export default function StockPage() {
                         <div className="font-semibold text-slate-900 truncate" title={item.model_key}>{item.brand} {item.model} ({item.year})</div>
                         <div className="text-sm text-slate-500">{item.location} • Available: {item.available || item.quantity} • Reserved: {item.reserved || 0}</div>
                       </div>
-                      <div className="flex gap-2 ml-4 flex-shrink-0">
+<div className="flex gap-2 ml-4 flex-shrink-0">
                         <button onClick={() => handleAdjust(item.model_key, 1)} className="px-3 py-1 text-sm border bg-white hover:bg-slate-50 text-slate-700 rounded-lg font-medium shadow-sm transition-all" disabled={loading}>
                           +1
                         </button>
                         <button onClick={() => handleAdjust(item.model_key, -1)} className="px-3 py-1 text-sm border bg-white hover:bg-slate-50 text-slate-700 rounded-lg font-medium shadow-sm transition-all" disabled={loading}>
                           -1
+                        </button>
+                        <button onClick={() => handleReturn(item.model_key)} className="px-3 py-1 text-sm border bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-lg font-medium shadow-sm transition-all" disabled={loading} title="Return stock">
+                          Return
                         </button>
                       </div>
                     </div>

@@ -316,7 +316,7 @@ export function useVehicles(options: UseVehiclesOptions = {}): UseVehiclesReturn
         abortControllerRef.current.abort();
       }
     }; // End of cleanup
-  }, [filters]); // Depend on filters to re-trigger fetch when filters change
+  }, [autoFetch, fetchVehicles, filters]); // Depend on filters to re-trigger fetch when filters change
 
   // Listen for cache updates from other components (e.g., after adding a vehicle)
   // This effect runs ONCE on mount and stays active - no dependency changes
@@ -353,7 +353,7 @@ export function useVehicles(options: UseVehiclesOptions = {}): UseVehiclesReturn
     return unsubscribe;
     // EMPTY DEPENDENCY ARRAY - this effect runs once on mount and stays active
     // Using refs to access current values without causing re-renders
-  }, []);
+  }, [fetchVehicles]);
 
   // Memoized vehicles list to prevent unnecessary re-renders
   const memoizedVehicles = useMemo(() => vehicles, [vehicles]);

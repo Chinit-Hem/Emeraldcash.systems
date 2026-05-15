@@ -1,6 +1,7 @@
 "use client";
 
-import { AlertCircle, ArrowLeft, Edit3, Eye, Filter, Loader2, Plus, Search, Trash2 } from 'lucide-react';
+import { useAuthUser } from '@/app/components/AuthContext';
+import { AlertCircle, ArrowLeft, Edit3, Eye, Filter, Loader2, Plus, RotateCcw, Search, Trash2 } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
@@ -16,7 +17,7 @@ interface SmsAsset {
   location?: string;
   assignedTo?: string;
   imageUrl?: string;
-  status: 'Available' | 'In Use' | 'Borrowed';
+  status: 'Available' | 'In Use' | 'Borrowed' | 'Out' | 'Not Returned';
 }
 
 interface SmsStats {
@@ -38,6 +39,8 @@ interface ApiResponse<T> {
 }
 
 export default function AssetsPage() {
+  const user = useAuthUser();
+  const isAdmin = user?.role === 'Admin';
   const [assets, setAssets] = useState<SmsAsset[]>([]);
   const [stats, setStats] = useState<SmsStats | null>(null);
   const [loading, setLoading] = useState(true);
@@ -158,10 +161,35 @@ const data: ApiResponse<SmsStats> = await response.json();
     }
   };
 
+  const handleReturn = async (asset: SmsAsset) => {
+    if (!confirm(`Return ${asset.name} to stock?`)) return;
+
+    try {
+      const response = await fetch(`/api/sms/assets/${asset.id}/return`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          location: asset.location || undefined,
+          remark: 'Returned from asset inventory',
+        }),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || result.success === false) {
+        throw new Error(result.error || 'Return failed');
+      }
+      fetchAssets();
+      fetchStats();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Return failed');
+    }
+  };
+
   const statusColor = (status: string) => ({
     'Available': 'bg-emerald-100 text-emerald-800 ring-emerald-200',
     'In Use': 'bg-amber-100 text-amber-800 ring-amber-200',
-    'Borrowed': 'bg-red-100 text-red-800 ring-red-200'
+    'Borrowed': 'bg-red-100 text-red-800 ring-red-200',
+    'Out': 'bg-red-100 text-red-800 ring-red-200',
+    'Not Returned': 'bg-slate-100 text-slate-800 ring-slate-200'
   }[status] || 'bg-slate-100 text-slate-800 ring-slate-200');
 
   return (
@@ -254,6 +282,8 @@ const data: ApiResponse<SmsStats> = await response.json();
                   <option value="Available">Available</option>
                   <option value="In Use">In Use</option>
                   <option value="Borrowed">Borrowed</option>
+                  <option value="Out">Out</option>
+                  <option value="Not Returned">Not Returned</option>
                 </select>
               </div>
               <input
@@ -381,13 +411,25 @@ const data: ApiResponse<SmsStats> = await response.json();
                             >
                               <Edit3 className="w-4 h-4" />
                             </button>
-                            <button
-                              onClick={() => handleDelete(asset.id)}
-                              className="p-2 text-red-600 hover:text-red-700 hover:bg-red-100 rounded-xl transition-all"
-                              title="Delete"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
+                            {asset.status !== 'Available' && (
+                              <button
+                                onClick={() => handleReturn(asset)}
+                                className="p-2 text-blue-600 hover:text-blue-700 hover:bg-blue-100 rounded-xl transition-all"
+                                title="Return to stock"
+                              >
+                                <RotateCcw className="w-4 h-4" />
+                                <span className="sr-only">Return to stock</span>
+                              </button>
+                            )}
+                            {isAdmin && (
+                              <button
+                                onClick={() => handleDelete(asset.id)}
+                                className="p-2 text-red-600 hover:text-red-700 hover:bg-red-100 rounded-xl transition-all"
+                                title="Delete"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            )}
                           </div>
                         </td>
                       </tr>

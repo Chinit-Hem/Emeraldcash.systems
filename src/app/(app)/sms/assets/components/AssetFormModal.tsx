@@ -19,7 +19,7 @@ interface SmsAsset {
   documentUrl?: string;
   description?: string;
   refId?: string;
-  status: 'Available' | 'In Use' | 'Borrowed';
+  status: 'Available' | 'In Use' | 'Borrowed' | 'Out' | 'Not Returned';
 }
 
 interface AssetFormModalProps {
@@ -390,7 +390,7 @@ export default function AssetFormModal({
           <div>
             <label className="block text-sm font-semibold text-slate-700 mb-4">Status</label>
             <div className="flex flex-wrap gap-3">
-              {(['Available', 'In Use', 'Borrowed'] as const).map((status) => (
+              {(['Available', 'In Use', 'Borrowed', 'Out', 'Not Returned'] as const).map((status) => (
                 <label key={status} className="flex items-center space-x-2 cursor-pointer group">
                   <input
                     type="radio"

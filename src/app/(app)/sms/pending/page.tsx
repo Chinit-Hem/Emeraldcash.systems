@@ -388,6 +388,12 @@ export default function PendingPage() {
                       </div>
                     </div>
                   </div>
+                  {transfer.remark && (
+                    <div className="mt-6 rounded-2xl border border-blue-200/60 bg-blue-50/70 p-4">
+                      <div className="mb-1 text-sm font-semibold text-blue-950">Message from sender</div>
+                      <p className="text-sm leading-6 text-blue-900">{transfer.remark}</p>
+                    </div>
+                  )}
                 </CardContent>
                 <div className="px-6 pb-6 relative z-10 bg-gradient-to-t from-slate-50/80 to-transparent rounded-b-3xl pt-4">
                   {canManageTransfer(transfer) ? (

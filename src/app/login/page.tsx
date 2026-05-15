@@ -184,7 +184,7 @@ function LoginForm() {
             {/* Logo */}
             <div className="absolute -bottom-8 left-1/2 -translate-x-1/2">
               <div className="w-16 h-16 rounded-2xl bg-white shadow-lg shadow-emerald-500/25 flex items-center justify-center p-2 ring-4 ring-white/50">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
+                { }
                 <img
                   src="/logo.png"
                   alt="Emerald Cash"

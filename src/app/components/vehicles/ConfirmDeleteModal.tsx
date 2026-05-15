@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useCallback, useState, useRef } from "react";
+import React, { useEffect, useCallback } from "react";
 import { GlassCard } from "@/components/ui/glass/GlassCard";
 import { GlassButton } from "@/components/ui/glass/GlassButton";
 import { formatCurrency } from "@/lib/format";
