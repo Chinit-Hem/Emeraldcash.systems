@@ -4,7 +4,6 @@ import EnhancedDashboard from "@/app/components/dashboard/EnhancedDashboard";
 import ErrorBoundary from "@/app/components/ErrorBoundary";
 import { NeuDashboardSkeleton } from "@/app/components/skeletons";
 import { useVehiclesNeon, useVehicleStats } from "@/lib/useVehiclesNeon";
-import { mutate } from "swr";
 import { Suspense, useEffect, useState } from "react";
 
 type DashboardMeta = {
@@ -47,29 +46,12 @@ export default function Page() {
   // Clear SWR cache on mount to ensure fresh data
   useEffect(() => {
     setIsIOSSafari(detectIOSSafari());
-
-    // Clear all vehicle-related SWR cache including stats
-    mutate(
-      (key) => typeof key === "string" && (key.startsWith("/api/vehicles") || key.includes("/stats")),
-      undefined,
-      { revalidate: true }
-    );
   }, []);
 
   const { vehicles, meta, error, loading } = useVehiclesNeon({
     limit: isIOSSafari ? 150 : 500,
   });
-  const { stats, loading: statsLoading } = useVehicleStats();
-
-  // DEBUG: Log the values to see what's happening
-  useEffect(() => {
-    console.log('[DEBUG] stats:', stats);
-    console.log('[DEBUG] dashboardMeta:', {
-      total: stats?.total ?? meta?.total ?? 0,
-      noImageCount: (stats?.noImageCount ?? meta?.noImageCount) || 0,
-      avgPrice: stats?.avgPrice || 0,
-    });
-  }, [stats, meta]);
+  const { stats } = useVehicleStats(120000);
 
   const dashboardMeta: DashboardMeta = {
     // Use stats.total if available (accurate count from DB), otherwise show loading state
@@ -87,7 +69,7 @@ export default function Page() {
     avgPrice: stats?.avgPrice || 0,
   };
 
-  if (loading || statsLoading) {
+  if (loading && vehicles.length === 0) {
     return <NeuDashboardSkeleton />;
   }
 

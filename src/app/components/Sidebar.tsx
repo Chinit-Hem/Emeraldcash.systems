@@ -8,6 +8,7 @@ import { useTranslation } from "@/lib/i18n";
 import { OptimizedLink } from "./OptimizedLink";
 import { useVehicleStats } from "@/lib/useVehiclesNeon";
 import { Car, Bike, Boxes } from "lucide-react";
+import { startTransition, useCallback, useEffect, useMemo, useState } from "react";
 
 function normalizeCategory(value: unknown) {
   return String(value ?? "").trim().toLowerCase();
@@ -95,6 +96,7 @@ interface NavItemProps {
   active: boolean;
   onClick: () => void;
   count?: number;
+  priority?: "high" | "normal" | "low";
 }
 
 
@@ -104,7 +106,8 @@ function NavItem({
   label, 
   active, 
   onClick, 
-  count
+  count,
+  priority = "normal"
 }: NavItemProps) {
 
   return (
@@ -112,7 +115,7 @@ function NavItem({
       href={href || "#"}
       onClick={onClick}
       className="flex items-center gap-4 w-full group"
-      priority={active ? "high" : "normal"}
+      priority={priority}
     >
 
       <div className={`w-12 h-12 flex items-center justify-center rounded-2xl transition-all duration-200 ease-out ${
@@ -237,9 +240,10 @@ export default function Sidebar({ user, onNavigate }: SidebarProps) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const { stats } = useVehicleStats();
+  const { stats } = useVehicleStats(300000);
   const { language } = useLanguage();
   const { t } = useTranslation(language);
+  const [pendingHref, setPendingHref] = useState<string | null>(null);
 
   const isAdmin = user.role === "Admin";
   const activeCategory = pathname === "/vehicles" ? searchParams?.get("category") || "" : "";
@@ -256,10 +260,43 @@ export default function Sidebar({ user, onNavigate }: SidebarProps) {
   const isStockActive = pathname.startsWith("/stock");
   const isSettingsActive = pathname === "/settings";
 
-  const handleNavigate = (href: string) => {
+  useEffect(() => {
+    setPendingHref(null);
+  }, [pathname, searchParams]);
+
+  const sidebarRoutes = useMemo(
+    () => ["/", "/lms", "/sms", "/vehicles", "/vehicles?category=cars", "/vehicles?category=motorcycles", "/vehicles?category=tuktuks", "/settings"],
+    []
+  );
+
+  useEffect(() => {
+    const prefetchRoutes = () => {
+      sidebarRoutes.forEach((href, index) => {
+        globalThis.setTimeout(() => router.prefetch(href), index * 60);
+      });
+    };
+
+    if ("requestIdleCallback" in window) {
+      window.requestIdleCallback(prefetchRoutes, { timeout: 1500 });
+    } else {
+      globalThis.setTimeout(prefetchRoutes, 500);
+    }
+  }, [router, sidebarRoutes]);
+
+  const handleNavigate = useCallback((href: string) => {
+    setPendingHref(href);
     onNavigate?.();
-    router.push(href);
-  };
+    startTransition(() => {
+      router.push(href);
+    });
+  }, [onNavigate, router]);
+
+  const handleLinkClick = useCallback((href: string) => {
+    setPendingHref(href);
+    onNavigate?.();
+  }, [onNavigate]);
+
+  const isPendingActive = useCallback((href: string) => pendingHref === href, [pendingHref]);
 
   // Get counts
   const allVehiclesCount = stats?.total ?? 0;
@@ -294,27 +331,30 @@ export default function Sidebar({ user, onNavigate }: SidebarProps) {
       <nav className="flex-1 px-6 py-4 flex flex-col gap-6" aria-label="Main navigation">
         {/* Main Section */}
         <div className="flex flex-col gap-4">
-  <NavItem
+          <NavItem
             href="/"
             icon={IconDashboard}
             label={t.dashboard}
-            active={isDashboardActive}
-            onClick={() => handleNavigate("/")}
+            active={isDashboardActive || isPendingActive("/")}
+            onClick={() => handleLinkClick("/")}
+            priority="high"
           />
           <NavItem
             href="/lms"
             icon={IconLms}
             label={language === 'km' ? 'ការបណ្តុះបណ្តាល' : 'LMS'}
-            active={isLmsActive || isAdminLmsActive}
-            onClick={() => handleNavigate("/lms")}
+            active={isLmsActive || isAdminLmsActive || isPendingActive("/lms")}
+            onClick={() => handleLinkClick("/lms")}
+            priority="high"
           />
 
           <NavItem
             href="/sms"
             icon={IconSms}
             label={language === 'km' ? 'គ្រប់គ្រងស្តុក' : 'SMS'}
-            active={isSmsActive}
-            onClick={() => handleNavigate("/sms")}
+            active={isSmsActive || isPendingActive("/sms")}
+            onClick={() => handleLinkClick("/sms")}
+            priority="high"
           />
 
 
@@ -333,7 +373,7 @@ export default function Sidebar({ user, onNavigate }: SidebarProps) {
               icon={IconFleet}
               label={t.vehicles}
               count={allVehiclesCount}
-              isActive={isVehiclesActive}
+              isActive={isVehiclesActive || isPendingActive("/vehicles")}
               onClick={() => handleNavigate("/vehicles")}
               color="emerald"
             />
@@ -341,9 +381,9 @@ export default function Sidebar({ user, onNavigate }: SidebarProps) {
             {/* Cars */}
             <QuickFilterButton
               icon={IconCar}
-label={language === 'km' ? 'រថយន្ត' : 'Cars'}
+              label={language === 'km' ? 'រថយន្ត' : 'Cars'}
               count={carsCount}
-              isActive={isCarsActive}
+              isActive={isCarsActive || isPendingActive("/vehicles?category=cars")}
               onClick={() => handleNavigate("/vehicles?category=cars")}
               color="blue"
             />
@@ -351,9 +391,9 @@ label={language === 'km' ? 'រថយន្ត' : 'Cars'}
             {/* Motorcycles */}
             <QuickFilterButton
               icon={IconMotorcycle}
-label={language === 'km' ? 'ម៉ូតូ' : 'Motorcycles'}
+              label={language === 'km' ? 'ម៉ូតូ' : 'Motorcycles'}
               count={motorcyclesCount}
-              isActive={isMotorcyclesActive}
+              isActive={isMotorcyclesActive || isPendingActive("/vehicles?category=motorcycles")}
               onClick={() => handleNavigate("/vehicles?category=motorcycles")}
               color="purple"
             />
@@ -363,7 +403,7 @@ label={language === 'km' ? 'ម៉ូតូ' : 'Motorcycles'}
               icon={IconTukTuk}
               label={language === 'km' ? 'កង់បី' : 'TukTuks'}
               count={tukTuksCount}
-              isActive={isTukTuksActive}
+              isActive={isTukTuksActive || isPendingActive("/vehicles?category=tuktuks")}
               onClick={() => handleNavigate("/vehicles?category=tuktuks")}
               color="orange"
             />
@@ -373,8 +413,15 @@ label={language === 'km' ? 'ម៉ូតូ' : 'Motorcycles'}
             {isAdmin && (
               <button
                 onClick={() => {
-                  window.dispatchEvent(new CustomEvent('openAddVehicleModal'));
-                  onNavigate?.();
+                  if (pathname !== "/vehicles") {
+                    handleNavigate("/vehicles");
+                    window.setTimeout(() => {
+                      window.dispatchEvent(new CustomEvent('openAddVehicleModal'));
+                    }, 120);
+                  } else {
+                    window.dispatchEvent(new CustomEvent('openAddVehicleModal'));
+                    onNavigate?.();
+                  }
                 }}
                 className="group relative flex items-center justify-between w-full p-3 rounded-2xl transition-colors duration-200 overflow-hidden bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm hover:bg-slate-50 dark:hover:bg-slate-700/60"
               >
@@ -397,8 +444,9 @@ label={language === 'km' ? 'ម៉ូតូ' : 'Motorcycles'}
             href="/settings"
             icon={IconSettings}
             label={t.settings}
-            active={isSettingsActive}
-            onClick={() => handleNavigate("/settings")}
+            active={isSettingsActive || isPendingActive("/settings")}
+            onClick={() => handleLinkClick("/settings")}
+            priority="high"
           />
 
         </div>

@@ -152,8 +152,12 @@ limit = 500, // Increased for dashboard pagination fix (total 1218 vehicles)
     // Check immediately
     checkMutation();
 
-    // Check every 5 seconds for mutations
-    const interval = setInterval(checkMutation, 5000);
+    // Check occasionally as a fallback; direct cache update events handle the
+    // common case immediately without a tight background polling loop.
+    const interval = setInterval(() => {
+      if (typeof document !== "undefined" && document.hidden) return;
+      checkMutation();
+    }, 30000);
     return () => clearInterval(interval);
   }, []);
 

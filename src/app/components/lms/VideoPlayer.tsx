@@ -102,6 +102,7 @@ type ProgressResponse = {
 
 const YOUTUBE_IFRAME_API_SRC = "https://www.youtube.com/iframe_api";
 const PROGRESS_SAVE_INTERVAL_MS = 10_000;
+const PROGRESS_POLL_INTERVAL_MS = 250;
 const VIDEO_CONTROLS_HIDE_DELAY_MS = 2_200;
 const MAX_PLAYBACK_RATE = 1.25;
 const SEEK_GRACE_SECONDS = 2;
@@ -281,6 +282,7 @@ export function VideoPlayer({
   const [warning, setWarning] = useState<string | null>(null);
   const [watermarkName, setWatermarkName] = useState(staffName ?? "Staff");
   const [areControlsVisible, setAreControlsVisible] = useState(true);
+  const [seekPreviewPercent, setSeekPreviewPercent] = useState<number | null>(null);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const playerMountRef = useRef<HTMLDivElement>(null);
@@ -294,6 +296,7 @@ export function VideoPlayer({
   const durationRef = useRef(0);
   const isCompletedRef = useRef(initialCompleted);
   const playbackUnlockedRef = useRef(initialCompleted);
+  const isScrubbingRef = useRef(false);
 
   const instructionSteps = useMemo(
     () => parseInstructionSteps(stepByStepInstructions),
@@ -302,8 +305,13 @@ export function VideoPlayer({
 
   const completionAllowed = isCompleted || watchPercentage >= completionThreshold;
   const playbackUnlocked = completionAllowed;
-  const progressPercent =
+  const currentProgressPercent =
     videoDuration > 0 ? clamp((currentTime / videoDuration) * 100, 0, 100) : 0;
+  const progressPercent = seekPreviewPercent ?? currentProgressPercent;
+  const displayTime =
+    seekPreviewPercent !== null && videoDuration > 0
+      ? (seekPreviewPercent / 100) * videoDuration
+      : currentTime;
   const maxSeekPercent =
     playbackUnlocked
       ? 100
@@ -566,11 +574,15 @@ export function VideoPlayer({
                     return;
                   }
 
+                  if (isScrubbingRef.current) {
+                    return;
+                  }
+
                   const nextCurrent = player.getCurrentTime();
                   const duration = player.getDuration() || durationRef.current || 1;
                   const nextMax = Math.max(maxWatchedRef.current, nextCurrent);
                   updateWatchState(nextCurrent, nextMax, duration);
-                }, 1000);
+                }, PROGRESS_POLL_INTERVAL_MS);
               }
             },
             onPlaybackRateChange: (event) => {
@@ -656,39 +668,67 @@ export function VideoPlayer({
     }
   }, [isPlaying, isReady, revealVideoControls, saveProgress]);
 
-  const handleSeek = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const commitSeek = useCallback(
+    (requestedProgress: number) => {
+      const safeDuration = durationRef.current;
+      if (!playerRef.current || safeDuration <= 0) {
+        setSeekPreviewPercent(null);
+        return;
+      }
+
+      const safeProgress = clamp(requestedProgress, 0, 100);
+      const requestedTime = (safeProgress / 100) * safeDuration;
+      const maxAllowedTime = maxWatchedRef.current + SEEK_GRACE_SECONDS;
+      const isUnlockedForReplay =
+        playbackUnlockedRef.current ||
+        (safeDuration > 0 &&
+          ((maxWatchedRef.current / safeDuration) * 100 >= completionThreshold ||
+            maxWatchedRef.current >= Math.max(0, safeDuration - COMPLETE_END_TOLERANCE_SECONDS)));
+
+      setSeekPreviewPercent(null);
+
+      if (!isUnlockedForReplay && requestedTime > maxAllowedTime) {
+        playerRef.current.seekTo(maxWatchedRef.current, true);
+        updateWatchState(maxWatchedRef.current, maxWatchedRef.current, safeDuration);
+        showWarning("Seeking forward is locked until you watch that part of the lesson.");
+        return;
+      }
+
+      playerRef.current.seekTo(requestedTime, true);
+      updateWatchState(
+        requestedTime,
+        isUnlockedForReplay
+          ? Math.max(maxWatchedRef.current, requestedTime)
+          : maxWatchedRef.current,
+        safeDuration
+      );
+      saveProgress();
+    },
+    [completionThreshold, saveProgress, showWarning, updateWatchState]
+  );
+
+  const handleSeekChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     revealVideoControls();
+    const requestedProgress = clamp(Number(event.target.value), 0, 100);
+    setSeekPreviewPercent(requestedProgress);
 
-    // Use refs for duration to ensure we have the most up-to-date value, not stale state
-    const safeDuration = durationRef.current;
-    if (!playerRef.current || safeDuration <= 0) {
+    if (!isScrubbingRef.current) {
+      commitSeek(requestedProgress);
+    }
+  };
+
+  const handleSeekStart = () => {
+    isScrubbingRef.current = true;
+    revealVideoControls();
+  };
+
+  const handleSeekCommit = (event: React.PointerEvent<HTMLInputElement>) => {
+    if (!isScrubbingRef.current) {
       return;
     }
 
-    const requestedProgress = Number(event.target.value);
-    // Fix: Use durationRef.current instead of videoDuration (which can be stale state)
-    const requestedTime = (requestedProgress / 100) * safeDuration;
-    const maxAllowedTime = maxWatchedRef.current + SEEK_GRACE_SECONDS;
-    const isUnlockedForReplay =
-      playbackUnlockedRef.current ||
-      (safeDuration > 0 &&
-        ((maxWatchedRef.current / safeDuration) * 100 >= completionThreshold ||
-          maxWatchedRef.current >= Math.max(0, safeDuration - COMPLETE_END_TOLERANCE_SECONDS)));
-
-    if (!isUnlockedForReplay && requestedTime > maxAllowedTime) {
-      playerRef.current.seekTo(maxWatchedRef.current, true);
-      updateWatchState(maxWatchedRef.current, maxWatchedRef.current, safeDuration);
-      showWarning("Seeking forward is locked until you watch that part of the lesson.");
-      return;
-    }
-
-    playerRef.current.seekTo(requestedTime, true);
-    updateWatchState(
-      requestedTime,
-      isUnlockedForReplay ? Math.max(maxWatchedRef.current, requestedTime) : maxWatchedRef.current,
-      safeDuration
-    );
-    saveProgress();
+    isScrubbingRef.current = false;
+    commitSeek(seekPreviewPercent ?? Number(event.currentTarget.value));
   };
 
   const handlePlaybackRateChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
@@ -878,7 +918,7 @@ export function VideoPlayer({
 
                         <div className="flex items-center gap-3">
                           <span className="w-11 text-xs font-medium tabular-nums text-white/80">
-                            {formatTime(currentTime)}
+                            {formatTime(displayTime)}
                           </span>
                           <input
                             type="range"
@@ -886,7 +926,10 @@ export function VideoPlayer({
                             max="100"
                             step="0.1"
                             value={progressPercent}
-                            onChange={handleSeek}
+                            onChange={handleSeekChange}
+                            onPointerDown={handleSeekStart}
+                            onPointerUp={handleSeekCommit}
+                            onPointerCancel={handleSeekCommit}
                             disabled={!isReady}
                             className="h-1 flex-1 cursor-pointer appearance-none rounded-full bg-white/25 accent-emerald-500 disabled:cursor-wait"
                             style={{

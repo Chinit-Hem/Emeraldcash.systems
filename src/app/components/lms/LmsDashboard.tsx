@@ -388,6 +388,8 @@ function LmsDashboard({ initialData }: LmsDashboardProps) {
   const debouncedSearch = useDebouncedValue(searchQuery, 300);
 
   const loadData = useCallback(async ({ showSkeleton = true } = {}) => {
+    let primaryDataLoaded = false;
+
     if (showSkeleton) {
       setLoading(true);
     }
@@ -398,17 +400,29 @@ function LmsDashboard({ initialData }: LmsDashboardProps) {
         LmsApiService.fetchCategories(),
         LmsApiService.fetchLastWatched(),
       ]);
-      const lessonsData = categoriesData.length > 0 ? await LmsApiService.fetchAllLessons(categoriesData) : [];
       setStats(statsData);
       setCategories(categoriesData);
-      setLessons(lessonsData);
       setLastWatched(lastWatchedData);
       setLastWatchedLoaded(true);
+      primaryDataLoaded = true;
+      if (showSkeleton) {
+        setLoading(false);
+      }
+
+      if (categoriesData.length > 0) {
+        void LmsApiService.fetchAllLessons(categoriesData)
+          .then(setLessons)
+          .catch((lessonError) => {
+            console.error("Error loading LMS lessons:", lessonError);
+          });
+      } else {
+        setLessons([]);
+      }
     } catch (error) {
       console.error("Error loading dashboard data:", error);
       setLastWatchedLoaded(true);
     } finally {
-      if (showSkeleton) {
+      if (showSkeleton && !primaryDataLoaded) {
         setLoading(false);
       }
     }
@@ -498,6 +512,15 @@ function LmsDashboard({ initialData }: LmsDashboardProps) {
   const currentLesson = useMemo(() => lessons.find((l) => l.is_unlocked && !l.is_completed), [lessons]);
   const continueLesson = lastWatched || (lastWatchedLoaded ? currentLesson : null);
   const continueLessonId = lastWatched?.lessonId || currentLesson?.id;
+
+  useEffect(() => {
+    categories.slice(0, 8).forEach((category) => {
+      router.prefetch(`/lms/course/${category.id}`);
+    });
+    if (continueLessonId) {
+      router.prefetch(`/lms/lesson/${continueLessonId}`);
+    }
+  }, [categories, continueLessonId, router]);
 
   // Instant render with skeleton if no initial data or refreshing
   const isSkeleton = loading || !stats || !categories.length;

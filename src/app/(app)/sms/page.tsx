@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { SmsStats } from '@/lib/sms-types';
 import { useLanguage } from "@/lib/LanguageContext";
@@ -29,16 +29,16 @@ export default function SmsDashboard() {
   const { language } = useLanguage();
   const { t } = useTranslation(language);
 
-  useEffect(() => {
-    fetchStats();
-  }, []);
-
-  const fetchStats = async () => {
+  const fetchStats = useCallback(async (signal?: AbortSignal) => {
     try {
       setLoading(true);
       setError(null);
-      const response = await fetch('/api/sms/stats');
+      const [response, notificationResponse] = await Promise.all([
+        fetch('/api/sms/stats', { signal }),
+        fetch('/api/sms/notifications?limit=3', { signal }),
+      ]);
       const data = await response.json();
+      const notificationData = await notificationResponse.json().catch(() => ({}));
       
       if (data.success) {
         setStats({
@@ -46,8 +46,6 @@ export default function SmsDashboard() {
           totalTodayChange: 2
         });
         setUnreadCount(data.data?.unreadNotifications || 0);
-        const notificationResponse = await fetch('/api/sms/notifications?limit=3');
-        const notificationData = await notificationResponse.json().catch(() => ({}));
         if (notificationData.success) {
           setNotifications(notificationData.data?.notifications || []);
           setUnreadCount(notificationData.data?.unreadCount || data.data?.unreadNotifications || 0);
@@ -56,35 +54,22 @@ export default function SmsDashboard() {
         setError(data.error || 'Failed to load stats');
       }
     } catch (_err) {
+      if (signal?.aborted) return;
       setError('Failed to fetch stats');
     } finally {
-      setLoading(false);
+      if (!signal?.aborted) setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    void fetchStats(controller.signal);
+    return () => controller.abort();
+  }, [fetchStats]);
 
   const calculatePercentage = (part: number, total: number) => {
     return total > 0 ? Math.round((part / total) * 100) : 0;
   };
-
-  if (loading) {
-    return (
-      <div className='p-6'>
-        <div className='animate-pulse space-y-8'>
-          <div className='h-8 w-64 bg-slate-200 rounded-lg'></div>
-          <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6'>
-            {Array.from({ length: 4 }).map((_, i) => (
-              <div key={i} className='p-8 bg-slate-200/50 rounded-3xl h-32'></div>
-            ))}
-          </div>
-          <div className='grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6'>
-            {Array.from({ length: 4 }).map((_, i) => (
-              <div key={i} className='p-8 bg-slate-200/50 rounded-3xl h-32'></div>
-            ))}
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   if (error) {
     return (
@@ -93,7 +78,7 @@ export default function SmsDashboard() {
           <h1 className='text-3xl font-bold mb-4'>SMS - {t.sms}</h1>
           <p className='text-amber-800 mb-4'>{error}</p>
           <button 
-            onClick={fetchStats}
+            onClick={() => void fetchStats()}
             className='bg-emerald-600 text-white px-6 py-3 rounded-2xl font-bold hover:bg-emerald-700 transition-all'
           >
             {t.retry}
@@ -121,8 +106,13 @@ export default function SmsDashboard() {
   return (
     <div className='p-6'>
 
+      {loading && (
+        <div className='mb-4 h-1 overflow-hidden rounded-full bg-slate-100'>
+          <div className='h-full w-1/3 animate-pulse rounded-full bg-emerald-500' />
+        </div>
+      )}
 
-      <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8'>
+      <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8'>
         <Link href='/sms/assets' className='group p-8 bg-gradient-to-br from-emerald-500/10 to-emerald-600/10 border border-emerald-200/50 rounded-3xl shadow-xl hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 block relative overflow-hidden'>
           <div className='absolute top-4 right-4 w-20 h-20 bg-emerald-500 rounded-2xl -rotate-12 opacity-20'></div>
           <div className='relative z-10'>
@@ -151,18 +141,6 @@ export default function SmsDashboard() {
           <div className='relative z-10'>
             <h3 className='text-2xl font-bold mb-3 bg-gradient-to-r from-purple-600 to-purple-700 bg-clip-text text-transparent'>{t.history}</h3>
             <p className='text-slate-600'>{t.auditTrail}</p>
-          </div>
-        </Link>
-        <Link href='/sms/pending' className='group p-8 bg-gradient-to-br from-blue-500/10 to-blue-600/10 border border-blue-200/50 rounded-3xl shadow-xl hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 block relative overflow-hidden'>
-          <div className='absolute top-4 right-4 w-20 h-20 bg-blue-500 rounded-2xl opacity-20'></div>
-          <div className='relative z-10'>
-            <div className='flex items-center justify-between gap-3'>
-              <h3 className='text-2xl font-bold mb-3 bg-gradient-to-r from-blue-600 to-blue-700 bg-clip-text text-transparent'>Inbox</h3>
-              {unreadCount > 0 && (
-                <span className='rounded-full bg-red-500 px-2 py-0.5 text-xs font-bold text-white'>{unreadCount}</span>
-              )}
-            </div>
-            <p className='text-slate-600'>Transfer messages</p>
           </div>
         </Link>
       </div>

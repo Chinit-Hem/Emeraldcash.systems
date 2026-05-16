@@ -87,6 +87,40 @@ const INITIAL_FORM_DATA: Partial<Vehicle> = {
   Description: "",
 };
 
+const BASIC_INFO_EXAMPLES: Record<CategoryOption, {
+  brand: string;
+  model: string;
+  year: string;
+  plate: string;
+  price: string;
+}> = {
+  Cars: {
+    brand: "Toyota",
+    model: "Camry",
+    year: "2023",
+    plate: "ABC-123",
+    price: "15000",
+  },
+  Motorcycles: {
+    brand: "Honda",
+    model: "Dream",
+    year: "2023",
+    plate: "1AB-1234",
+    price: "1500",
+  },
+  "Tuk Tuk": {
+    brand: "Bajaj",
+    model: "RE",
+    year: "2022",
+    plate: "PP-1234",
+    price: "3500",
+  },
+};
+
+function getBasicInfoExamples(category?: string) {
+  return BASIC_INFO_EXAMPLES[category as CategoryOption] ?? BASIC_INFO_EXAMPLES.Cars;
+}
+
 // UI Components
 function ModalBackdrop({ children, onClose }: { children: React.ReactNode; onClose: () => void }) {
   return (
@@ -314,6 +348,7 @@ export default function AddVehicleModalOptimistic({ isOpen, onClose, onSuccess }
   if (!isOpen) return null;
 
   const isDisabled = isAdding || isImageProcessing;
+  const examples = getBasicInfoExamples(formData.Category);
 
   return (
     <ModalBackdrop onClose={onClose}>
@@ -335,7 +370,7 @@ export default function AddVehicleModalOptimistic({ isOpen, onClose, onSuccess }
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <FormInput
                   label="Brand *"
-                  placeholder="Toyota"
+                  placeholder={examples.brand}
                   value={formData.Brand || ""}
                   onChange={(e) => handleInputChange("Brand", e.target.value)}
                   error={errors.Brand}
@@ -344,7 +379,7 @@ export default function AddVehicleModalOptimistic({ isOpen, onClose, onSuccess }
                 />
                 <FormInput
                   label="Model *"
-                  placeholder="Camry"
+                  placeholder={examples.model}
                   value={formData.Model || ""}
                   onChange={(e) => handleInputChange("Model", e.target.value)}
                   error={errors.Model}
@@ -359,11 +394,12 @@ export default function AddVehicleModalOptimistic({ isOpen, onClose, onSuccess }
                   icon={Calendar}
                   min={1900}
                   max={new Date().getFullYear() + 1}
+                  placeholder={examples.year}
                   disabled={isDisabled}
                 />
                 <FormInput
                   label="Plate *"
-                  placeholder="ABC-123"
+                  placeholder={examples.plate}
                   value={formData.Plate || ""}
                   onChange={(e) => handleInputChange("Plate", e.target.value.toUpperCase())}
                   error={errors.Plate}
@@ -379,7 +415,7 @@ export default function AddVehicleModalOptimistic({ isOpen, onClose, onSuccess }
                 <FormInput
                   label="New Price *"
                   type="number"
-                  placeholder="15000"
+                  placeholder={examples.price}
                   value={formData.PriceNew || ""}
                   onChange={(e) => handlePriceChange(e.target.value)}
                   error={errors.PriceNew}

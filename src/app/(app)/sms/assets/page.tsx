@@ -4,7 +4,7 @@ import { useAuthUser } from '@/app/components/AuthContext';
 import { AlertCircle, ArrowLeft, Edit3, Eye, Filter, Loader2, Plus, RotateCcw, Search, Trash2 } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import AssetFormModal from './components/AssetFormModal';
 
 interface SmsAsset {
@@ -38,6 +38,16 @@ interface ApiResponse<T> {
   error?: string;
 }
 
+type AssetFilters = {
+  search: string;
+  status: string;
+  assignedTo: string;
+  page: number;
+  pageSize: number;
+};
+
+type AssetFilterKey = keyof AssetFilters;
+
 export default function AssetsPage() {
   const user = useAuthUser();
   const isAdmin = user?.role === 'Admin';
@@ -45,7 +55,7 @@ export default function AssetsPage() {
   const [stats, setStats] = useState<SmsStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [filters, setFilters] = useState({
+  const [filters, setFilters] = useState<AssetFilters>({
     search: '',
     status: '',
     assignedTo: '',
@@ -56,7 +66,7 @@ export default function AssetsPage() {
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [editingAsset, setEditingAsset] = useState<SmsAsset | null>(null);
 
-  const fetchAssets = useCallback(async (pageFilters = filters) => {
+  const fetchAssets = useCallback(async (pageFilters: AssetFilters, signal?: AbortSignal) => {
     try {
       setLoading(true);
       setError(null);
@@ -69,7 +79,7 @@ export default function AssetsPage() {
         ...(pageFilters.assignedTo && { assigned_to: pageFilters.assignedTo })
       });
 
-      const response = await fetch(`/api/sms/assets?${params}`);
+      const response = await fetch(`/api/sms/assets?${params}`, { signal });
       const data: ApiResponse<SmsAsset[]> = await response.json();
 
       if (data.success) {
@@ -82,12 +92,13 @@ export default function AssetsPage() {
         setAssets([]); // Reset to empty array on error
       }
     } catch (err) {
+      if (signal?.aborted) return;
       setError(`Failed to fetch assets: ${err instanceof Error ? err.message : 'Unknown error'}`);
       setAssets([]); // Reset to empty array on error
     } finally {
-      setLoading(false);
+      if (!signal?.aborted) setLoading(false);
     }
-  }, [filters]);
+  }, []);
 
   const fetchStats = useCallback(async () => {
     try {
@@ -102,24 +113,29 @@ const data: ApiResponse<SmsStats> = await response.json();
   }, []);
 
   useEffect(() => {
-    fetchStats();
-    fetchAssets();
-  }, [fetchAssets, fetchStats]);
+    void fetchStats();
+  }, [fetchStats]);
 
-  const handleFilterChange = (key: string, value: string) => {
+  const handleFilterChange = <K extends AssetFilterKey>(key: K, value: AssetFilters[K]) => {
     setFilters(prev => ({
       ...prev,
       [key]: value,
-      page: 1 // Reset to first page
+      page: key === 'page' ? Number(value) : 1
     }));
   };
 
+  const filtersKey = useMemo(() => JSON.stringify(filters), [filters]);
+
   useEffect(() => {
+    const controller = new AbortController();
     const timeout = setTimeout(() => {
-      fetchAssets();
+      void fetchAssets(filters, controller.signal);
     }, 300);
-    return () => clearTimeout(timeout);
-  }, [filters, fetchAssets]);
+    return () => {
+      clearTimeout(timeout);
+      controller.abort();
+    };
+  }, [filters, filtersKey, fetchAssets]);
 
   const handleSaveAsset = async (data: Omit<SmsAsset, 'id'>): Promise<{ success: boolean; error?: string }> => {
     try {
@@ -135,8 +151,8 @@ const data: ApiResponse<SmsStats> = await response.json();
       const result = await response.json();
 
       if (result.success) {
-        fetchAssets();
-        fetchStats();
+        void fetchAssets(filters);
+        void fetchStats();
         setCreateModalOpen(false);
         setEditingAsset(null);
         return { success: true };
@@ -153,8 +169,8 @@ const data: ApiResponse<SmsStats> = await response.json();
     try {
       const response = await fetch(`/api/sms/assets/${assetId}`, { method: 'DELETE' });
       if (response.ok) {
-        fetchAssets();
-        fetchStats();
+        setAssets((current) => current.filter((asset) => asset.id !== assetId));
+        void fetchStats();
       }
     } catch (_err) {
       alert('Delete failed');
@@ -177,8 +193,8 @@ const data: ApiResponse<SmsStats> = await response.json();
       if (!response.ok || result.success === false) {
         throw new Error(result.error || 'Return failed');
       }
-      fetchAssets();
-      fetchStats();
+      void fetchAssets(filters);
+      void fetchStats();
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Return failed');
     }
@@ -310,7 +326,7 @@ const data: ApiResponse<SmsStats> = await response.json();
               <h3 className="text-xl font-bold text-slate-800 mb-2">Error</h3>
               <p className="text-slate-600 mb-6">{error}</p>
               <button
-                onClick={() => fetchAssets()}
+                onClick={() => fetchAssets(filters)}
                 className="bg-emerald-600 text-white px-8 py-3 rounded-2xl font-bold hover:bg-emerald-700 transition-all"
               >
                 Retry
@@ -447,14 +463,14 @@ const data: ApiResponse<SmsStats> = await response.json();
                     </div>
                     <div className="flex gap-2">
                       <button
-                        onClick={() => handleFilterChange('page', (filters.page - 1).toString())}
+                        onClick={() => handleFilterChange('page', filters.page - 1)}
                         disabled={filters.page === 1}
                         className="px-4 py-2 text-sm font-semibold text-slate-700 bg-white border border-slate-200 rounded-2xl hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-sm"
                       >
                         Previous
                       </button>
                       <button
-                        onClick={() => handleFilterChange('page', (filters.page + 1).toString())}
+                        onClick={() => handleFilterChange('page', filters.page + 1)}
                         disabled={filters.page === totalPages}
                         className="px-4 py-2 text-sm font-semibold text-slate-700 bg-white border border-slate-200 rounded-2xl hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-sm"
                       >

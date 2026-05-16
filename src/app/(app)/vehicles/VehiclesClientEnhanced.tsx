@@ -39,7 +39,7 @@ import {
   X
 } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 
 // ============================================================================
 // Types & Interfaces
@@ -903,7 +903,7 @@ export default function VehiclesClientEnhanced() {
     refreshInterval: 0,
   });
 
-  const { stats } = useVehicleStats(30000); // 30s refresh
+  const { stats } = useVehicleStats(120000); // Keep stats warm without frequent background refetching.
 
   // Safe stats access with fallbacks (BUG FIX)
   const safeStats = useMemo(() => ({
@@ -1081,14 +1081,17 @@ const isTukTukCategory = useCallback((cat: string | undefined): boolean => {
   // Filtering Logic
   // ==========================================================================
 
+  const deferredFilters = useDeferredValue(filters);
+  const deferredQuickFilter = useDeferredValue(quickFilter);
+
   const filteredVehicles = useMemo(() => {
     if (!vehicles) return [];
 
     let result = [...vehicles];
 
     // Apply quick filter
-    if (quickFilter) {
-      switch (quickFilter) {
+    if (deferredQuickFilter) {
+      switch (deferredQuickFilter) {
         case "cars":
           result = result.filter(v => isCarCategory(v.Category));
           break;
@@ -1102,8 +1105,8 @@ const isTukTukCategory = useCallback((cat: string | undefined): boolean => {
     }
 
     // Apply advanced filters
-    if (filters.search) {
-      const searchTerms = filters.search.toLowerCase().trim().split(/\s+/).filter(term => term.length > 0);
+    if (deferredFilters.search) {
+      const searchTerms = deferredFilters.search.toLowerCase().trim().split(/\s+/).filter(term => term.length > 0);
 
       if (searchTerms.length > 0) {
         result = result.filter(v => {
@@ -1126,50 +1129,50 @@ const isTukTukCategory = useCallback((cat: string | undefined): boolean => {
       }
     }
 
-    if (filters.category && filters.category !== "all") {
-      result = result.filter(v => v.Category?.toLowerCase() === filters.category.toLowerCase());
+    if (deferredFilters.category && deferredFilters.category !== "all") {
+      result = result.filter(v => v.Category?.toLowerCase() === deferredFilters.category.toLowerCase());
     }
 
-    if (filters.condition && filters.condition !== "all") {
-      result = result.filter(v => v.Condition?.toLowerCase() === filters.condition.toLowerCase());
+    if (deferredFilters.condition && deferredFilters.condition !== "all") {
+      result = result.filter(v => v.Condition?.toLowerCase() === deferredFilters.condition.toLowerCase());
     }
 
-    if (filters.brand) {
-      result = result.filter(v => v.Brand?.toLowerCase().includes(filters.brand.toLowerCase()));
+    if (deferredFilters.brand) {
+      result = result.filter(v => v.Brand?.toLowerCase().includes(deferredFilters.brand.toLowerCase()));
     }
 
-    if (filters.model) {
-      result = result.filter(v => v.Model?.toLowerCase().includes(filters.model.toLowerCase()));
+    if (deferredFilters.model) {
+      result = result.filter(v => v.Model?.toLowerCase().includes(deferredFilters.model.toLowerCase()));
     }
 
-    if (filters.year) {
-      result = result.filter(v => v.Year?.toString().includes(filters.year));
+    if (deferredFilters.year) {
+      result = result.filter(v => v.Year?.toString().includes(deferredFilters.year));
     }
 
-    if (filters.plate) {
-      result = result.filter(v => v.Plate?.toLowerCase().includes(filters.plate.toLowerCase()));
+    if (deferredFilters.plate) {
+      result = result.filter(v => v.Plate?.toLowerCase().includes(deferredFilters.plate.toLowerCase()));
     }
 
-    if (filters.minPrice) {
-      const minPrice = parseFloat(filters.minPrice);
+    if (deferredFilters.minPrice) {
+      const minPrice = parseFloat(deferredFilters.minPrice);
       if (!isNaN(minPrice)) {
         result = result.filter(v => (v.PriceNew || 0) >= minPrice);
       }
     }
 
-    if (filters.maxPrice) {
-      const maxPrice = parseFloat(filters.maxPrice);
+    if (deferredFilters.maxPrice) {
+      const maxPrice = parseFloat(deferredFilters.maxPrice);
       if (!isNaN(maxPrice)) {
         result = result.filter(v => (v.PriceNew || 0) <= maxPrice);
       }
     }
 
-    if (filters.taxType) {
-      result = result.filter(v => v.TaxType?.toLowerCase().includes(filters.taxType.toLowerCase()));
+    if (deferredFilters.taxType) {
+      result = result.filter(v => v.TaxType?.toLowerCase().includes(deferredFilters.taxType.toLowerCase()));
     }
 
     // Apply image filter
-    if (filters.hasImage === 'no') {
+    if (deferredFilters.hasImage === 'no') {
       result = result.filter(v => !v.Image || v.Image === '');
     }
 
@@ -1187,7 +1190,7 @@ const isTukTukCategory = useCallback((cat: string | undefined): boolean => {
     });
 
     return result;
-  }, [vehicles, quickFilter, filters, sortField, sortDirection, isCarCategory, isMotorcycleCategory, isTukTukCategory]);
+  }, [vehicles, deferredQuickFilter, deferredFilters, sortField, sortDirection, isCarCategory, isMotorcycleCategory, isTukTukCategory]);
 
   // ==========================================================================
   // Fuzzy Suggestions (when search returns no exact matches)
@@ -1216,9 +1219,15 @@ const isTukTukCategory = useCallback((cat: string | undefined): boolean => {
     // Calculate from filtered vehicles (local counts)
     return {
       total: filteredVehicles.length,
-      cars: filteredVehicles.filter(v => isCarCategory(v.Category)).length,
-      motorcycles: filteredVehicles.filter(v => isMotorcycleCategory(v.Category)).length,
-      tuktuks: filteredVehicles.filter(v => isTukTukCategory(v.Category)).length,
+      ...filteredVehicles.reduce(
+        (counts, vehicle) => {
+          if (isCarCategory(vehicle.Category)) counts.cars += 1;
+          else if (isMotorcycleCategory(vehicle.Category)) counts.motorcycles += 1;
+          else if (isTukTukCategory(vehicle.Category)) counts.tuktuks += 1;
+          return counts;
+        },
+        { cars: 0, motorcycles: 0, tuktuks: 0 }
+      ),
     };
   }, [totalsMode, safeStats, filteredVehicles, isCarCategory, isMotorcycleCategory, isTukTukCategory]);
 
@@ -1232,6 +1241,11 @@ const isTukTukCategory = useCallback((cat: string | undefined): boolean => {
   }, [filteredVehicles, currentPage, itemsPerPage]);
 
   const totalPages = Math.ceil(filteredVehicles.length / itemsPerPage);
+
+  const visibleVehicleGroups = useMemo(
+    () => groupVehicles(groupBy === "none" && !deferredFilters.search ? paginatedVehicles : filteredVehicles, groupBy),
+    [deferredFilters.search, filteredVehicles, groupBy, paginatedVehicles]
+  );
 
   // ==========================================================================
   // Event Handlers
@@ -1321,12 +1335,12 @@ const getVehicleImageUrl = useCallback((imageValue: string | undefined): string 
       console.debug('[Image]', trimmed.substring(0, 50) + '...');
     }
 
-    // Full URL (Cloudinary/Drive)
-    if (trimmed.match(/^https?:\/\//) || trimmed.startsWith('data:')) {
+    if (trimmed.startsWith('data:')) {
       return trimmed;
     }
 
-    // Drive ID
+    // Google Drive share/view links are not direct image URLs. Convert any Drive
+    // format to a thumbnail URL before falling back to generic URL handling.
     const driveFileId = extractDriveFileId(trimmed);
     if (driveFileId) {
       const thumbUrl = driveThumbnailUrl(driveFileId, "w400-h300");
@@ -1334,6 +1348,11 @@ const getVehicleImageUrl = useCallback((imageValue: string | undefined): string 
         console.debug('[Image] Drive thumb:', thumbUrl);
       }
       return thumbUrl;
+    }
+
+    // Full direct image URL (Cloudinary or another public image host)
+    if (trimmed.match(/^https?:\/\//)) {
+      return trimmed;
     }
 
     // Cloudinary public ID (path format)
@@ -1971,7 +1990,7 @@ const getVehicleImageUrl = useCallback((imageValue: string | undefined): string 
         {viewMode === "grid" ? (
           // Grid View with Grouping
           <div className="space-y-8">
-            {groupVehicles(groupBy === "none" && !filters.search ? paginatedVehicles : filteredVehicles, groupBy).map((group) => (
+            {visibleVehicleGroups.map((group) => (
               <div key={group.key} className="space-y-4">
                 {/* Group Header */}
                 <div className="flex items-center justify-between px-4 py-3 bg-gradient-to-r from-slate-50 to-slate-100/80 rounded-xl border border-slate-200/60 shadow-sm">
@@ -2006,7 +2025,7 @@ const getVehicleImageUrl = useCallback((imageValue: string | undefined): string 
         ) : (
           // List View (Table) with Grouping
           <div className="space-y-6">
-            {groupVehicles(groupBy === "none" && !filters.search ? paginatedVehicles : filteredVehicles, groupBy).map((group) => (
+            {visibleVehicleGroups.map((group) => (
               <div key={group.key} className="space-y-3">
                 {/* Group Header */}
                 <div className="flex items-center justify-between px-4 py-3 bg-gradient-to-r from-slate-50 to-slate-100/80 rounded-xl border border-slate-200/60 shadow-sm">
@@ -2066,6 +2085,9 @@ const getVehicleImageUrl = useCallback((imageValue: string | undefined): string 
                                       src={imageUrl}
                                       alt={vehicle.Model || "Vehicle"}
                                       className="w-12 h-12 rounded-xl object-cover shadow-sm ring-2 ring-white"
+                                      onError={(e) => {
+                                        (e.currentTarget as HTMLImageElement).src = '/placeholder-car.svg';
+                                      }}
                                     />
                                   ) : (
                                     <div className="w-12 h-12 rounded-xl bg-slate-100 flex items-center justify-center">

@@ -15,39 +15,19 @@
 
 import { Suspense } from "react";
 import { Metadata } from "next";
-import dynamic from "next/dynamic";
 import { NeuLmsSkeleton } from "@/app/components/skeletons/NeuLmsSkeleton";
-import type { InitialLmsData } from "@/lib/lms-types";
-
-const LmsDashboard = dynamic(() => import("@/app/components/lms/LmsDashboard"), {
-  loading: () => <NeuLmsSkeleton />,
-});
-
-// Server prefetch - eliminates client loading spinner
-async function getInitialLmsData(): Promise<InitialLmsData | null> {
-  'use server';
-  const { lmsService } = await import('@/services/LmsService');
-  try {
-    const result = await lmsService.getLmsDashboardInitial();
-return result.success ? result.data ?? null : null;
-  } catch (error) {
-    console.error('[LmsPage] Initial data fetch error:', error);
-    return null;
-  }
-}
+import LmsClientShell from "./LmsClientShell";
 
 export const metadata: Metadata = {
   title: "Training Portal | Emerald Cash VMS",
   description: "Staff training and certification portal",
 };
 
-export default async function LmsPage() {
-  const initialData = await getInitialLmsData();
-
+export default function LmsPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-slate-100 to-slate-200">
       <Suspense fallback={<NeuLmsSkeleton />}>
-        <LmsDashboard initialData={initialData} />
+        <LmsClientShell />
       </Suspense>
     </div>
   );
