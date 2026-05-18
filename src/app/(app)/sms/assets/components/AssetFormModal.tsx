@@ -25,7 +25,7 @@ interface SmsAsset {
 interface AssetFormModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (data: Omit<SmsAsset, 'id'>) => Promise<{ success: boolean; error?: string }>;
+  onSave: (data: Omit<SmsAsset, 'id'>) => Promise<{ success: boolean; error?: string; errors?: Record<string, string> }>;
   initialData?: Partial<SmsAsset>;
   title: string;
   isEdit?: boolean;
@@ -231,7 +231,7 @@ export default function AssetFormModal({
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validateForm()) return;
 
@@ -241,7 +241,15 @@ export default function AssetFormModal({
     if (result.success) {
       onClose();
     } else {
-      setErrors({ ...errors, general: result.error || 'Save failed' });
+      // Merge field-level errors from API response with existing errors
+      const fieldErrors = result.errors || {};
+      setErrors({ 
+        ...errors, 
+        ...fieldErrors,
+        general: fieldErrors && Object.keys(fieldErrors).length > 0 
+          ? 'Please fix the errors below.'
+          : (result.error || 'Save failed')
+      });
     }
     setLoading(false);
   };

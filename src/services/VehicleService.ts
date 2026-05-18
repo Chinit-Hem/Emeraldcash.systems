@@ -600,6 +600,74 @@ conditions.push(`(NULLIF(TRIM(COALESCE(image_id, '')), '') IS NULL AND NULLIF(TR
     }
   }
 
+  public async ensureStockItem(options: {
+    modelKey: string;
+    location: string;
+    brand?: string | null;
+    model?: string | null;
+    year?: number | null;
+    condition?: string | null;
+    color?: string | null;
+    quantity?: number;
+    minStock?: number;
+  }): Promise<ServiceResult<boolean>> {
+    const startTime = Date.now();
+    try {
+      const modelKey = options.modelKey.trim();
+      const location = options.location.trim();
+
+      if (!modelKey || !location) {
+        return {
+          success: false,
+          error: 'Missing model key or location',
+          meta: { durationMs: Date.now() - startTime, queryCount: 0 },
+        };
+      }
+
+      await dbManager.executeUnsafe(
+        `
+          INSERT INTO stock_items (
+            model_key, location, quantity, available, reserved, min_stock,
+            brand, model, year, condition, color
+          )
+          VALUES ($1, $2, $3, $3, 0, $4, $5, $6, $7, $8, $9)
+          ON CONFLICT (model_key, location) DO UPDATE SET
+            brand = CASE WHEN stock_items.brand = '' THEN EXCLUDED.brand ELSE stock_items.brand END,
+            model = CASE WHEN stock_items.model = '' THEN EXCLUDED.model ELSE stock_items.model END,
+            condition = CASE WHEN stock_items.condition = '' THEN EXCLUDED.condition ELSE stock_items.condition END,
+            color = CASE WHEN stock_items.color = '' THEN EXCLUDED.color ELSE stock_items.color END,
+            last_updated = NOW()
+        `,
+        [
+          modelKey,
+          location,
+          Math.max(0, options.quantity ?? 1),
+          options.minStock ?? 5,
+          options.brand || '',
+          options.model || '',
+          options.year ?? null,
+          options.condition || '',
+          options.color || '',
+        ],
+        8000
+      );
+
+      return {
+        success: true,
+        data: true,
+        meta: { durationMs: Date.now() - startTime, queryCount: 1 },
+      };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to ensure stock item';
+      console.error('[VehicleService.ensureStockItem] Error:', errorMessage);
+      return {
+        success: false,
+        error: errorMessage,
+        meta: { durationMs: Date.now() - startTime, queryCount: 1 },
+      };
+    }
+  }
+
   /**
    * Adjust stock quantity (IN/OUT/ADJUST)
    */

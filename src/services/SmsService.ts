@@ -18,6 +18,7 @@ import type {
   SmsStatus, TransferStatus
 } from "@/lib/sms-types";
 import { BaseFilters, BaseService, ServiceResult } from "./BaseService";
+import { vehicleService } from "./VehicleService";
 
 // ============================================================================
 // Types & Interfaces
@@ -79,6 +80,7 @@ export interface SmsTransferEntity {
   location: string;
   status: TransferStatus;
   remark: string | null;
+  imageUrl?: string | null;
   createdAt: string;
   acceptedAt: string | null;
 }
@@ -183,6 +185,26 @@ export class SmsAssetService extends BaseService<SmsAssetEntity, SmsAssetDB> {
     );
   }
 
+  private async ensureTransferImagesTable(): Promise<void> {
+    await dbManager.executeUnsafe(
+      `
+        CREATE TABLE IF NOT EXISTS sms_transfer_images (
+          id SERIAL PRIMARY KEY,
+          transfer_id UUID NOT NULL REFERENCES sms_transfers(id) ON DELETE CASCADE,
+          image_url VARCHAR(512) NOT NULL
+        )
+      `,
+      [],
+      5000
+    );
+
+    await dbManager.executeUnsafe(
+      `CREATE INDEX IF NOT EXISTS idx_sms_transfer_images_transfer_id ON sms_transfer_images(transfer_id)`,
+      [],
+      5000
+    );
+  }
+
   private toNotificationEntity(row: SmsNotificationDB): SmsNotificationEntity {
     return {
       id: Number(row.id),
@@ -206,6 +228,60 @@ export class SmsAssetService extends BaseService<SmsAssetEntity, SmsAssetDB> {
     );
 
     return rows[0]?.name || "SMS asset";
+  }
+
+  private getStockModelKey(asset: { id: string; item_code: string | null }): string {
+    return asset.item_code?.trim() || `sms_asset_${asset.id}`;
+  }
+
+  private async ensureAssetStockRecord(
+    assetId: string,
+    location: string,
+    reason: string
+  ): Promise<void> {
+    try {
+      const rows = await dbManager.executeUnsafe<{
+        id: string;
+        name: string;
+        item_code: string | null;
+        type: string | null;
+        category: string | null;
+        status: string | null;
+        location: string | null;
+      }>(
+        `
+          SELECT id, name, item_code, type, category, status, location
+          FROM sms_assets
+          WHERE id = $1::uuid
+          LIMIT 1
+        `,
+        [assetId],
+        5000
+      );
+      const asset = rows[0];
+      if (!asset) return;
+
+      const result = await vehicleService.ensureStockItem({
+        modelKey: this.getStockModelKey(asset),
+        location: location || asset.location || "Stock",
+        brand: asset.type || "SMS",
+        model: asset.name,
+        condition: asset.status || "Available",
+        color: asset.category || "",
+        quantity: 1,
+      });
+
+      if (!result.success) {
+        console.error("[SmsAssetService.ensureAssetStockRecord] Failed:", {
+          assetId,
+          location,
+          reason,
+          error: result.error,
+        });
+      }
+    } catch (error) {
+      console.error("[SmsAssetService.ensureAssetStockRecord] Error:", error);
+    }
   }
 
   /**
@@ -425,12 +501,21 @@ export class SmsAssetService extends BaseService<SmsAssetEntity, SmsAssetDB> {
   public async getTransfers(assetId?: string): Promise<ServiceResult<SmsTransferEntity[]>> {
     const startTime = Date.now();
     try {
+      await this.ensureTransferImagesTable();
       let query = `
         SELECT
           st.id, st.asset_id as "assetId", st.sender_id as "senderId",
           st.receiver_id as "receiverId", st.location, st.status, st.remark,
+          transfer_image.image_url as "imageUrl",
           st.created_at as "createdAt", st.accepted_at as "acceptedAt"
         FROM sms_transfers st
+        LEFT JOIN LATERAL (
+          SELECT image_url
+          FROM sms_transfer_images
+          WHERE transfer_id = st.id
+          ORDER BY id ASC
+          LIMIT 1
+        ) transfer_image ON true
       `;
 
       const params: string[] = [];
@@ -456,6 +541,7 @@ export class SmsAssetService extends BaseService<SmsAssetEntity, SmsAssetDB> {
         location: row.location as string,
         status: row.status as TransferStatus,
         remark: row.remark as string | null,
+        imageUrl: row.imageUrl as string | null,
         createdAt: row.createdAt as string,
         acceptedAt: row.acceptedAt as string | null,
       }));
@@ -484,9 +570,14 @@ export class SmsAssetService extends BaseService<SmsAssetEntity, SmsAssetDB> {
     receiverId: string;
     location: string;
     remark?: string;
+    imageUrl?: string;
   }): Promise<ServiceResult<SmsTransferEntity>> {
     const startTime = Date.now();
     try {
+      if (transferData.imageUrl) {
+        await this.ensureTransferImagesTable();
+      }
+
       const now = new Date().toISOString();
 
       const result = await dbManager.executeUnsafe(
@@ -506,11 +597,30 @@ export class SmsAssetService extends BaseService<SmsAssetEntity, SmsAssetDB> {
         location: transfer.location as string,
         status: 'pending' as TransferStatus,
         remark: transfer.remark as string | null,
+        imageUrl: transferData.imageUrl || null,
         createdAt: transfer.created_at as string,
         acceptedAt: null,
       };
 
-      await this.logAudit(transferData.senderId, 'create_transfer', { transferId: transfer.id as string });
+      if (transferData.imageUrl) {
+        await dbManager.executeUnsafe(
+          `INSERT INTO sms_transfer_images (transfer_id, image_url)
+           VALUES ($1::uuid, $2)`,
+          [transferEntity.id, transferData.imageUrl],
+          5000
+        );
+      }
+
+      await this.ensureAssetStockRecord(
+        transferEntity.assetId,
+        transferEntity.location,
+        "transfer_created"
+      );
+
+      await this.logAudit(transferData.senderId, 'create_transfer', {
+        transferId: transfer.id as string,
+        imageUrl: transferData.imageUrl || null,
+      });
       if (transferData.receiverId && transferData.receiverId !== transferData.senderId) {
         const assetName = await this.getAssetName(transferEntity.assetId);
         await this.createNotification({
@@ -840,10 +950,15 @@ export class SmsAssetService extends BaseService<SmsAssetEntity, SmsAssetDB> {
     assetId: string,
     returnedBy: string,
     location?: string,
-    remark?: string
+    remark?: string,
+    imageUrl?: string
   ): Promise<ServiceResult<SmsTransferEntity>> {
     const startTime = Date.now();
     try {
+      if (imageUrl) {
+        await this.ensureTransferImagesTable();
+      }
+
       const result = await dbManager.executeUnsafe(
         `
           WITH selected_asset AS (
@@ -909,11 +1024,31 @@ export class SmsAssetService extends BaseService<SmsAssetEntity, SmsAssetDB> {
         location: String(transfer.location || ''),
         status: 'returned',
         remark: transfer.remark as string | null,
+        imageUrl: imageUrl || null,
         createdAt: transfer.created_at as string,
         acceptedAt: transfer.accepted_at as string | null,
       };
 
-      await this.logAudit(returnedBy, 'return_asset', { assetId, transferId: transferEntity.id });
+      if (imageUrl) {
+        await dbManager.executeUnsafe(
+          `INSERT INTO sms_transfer_images (transfer_id, image_url)
+           VALUES ($1::uuid, $2)`,
+          [transferEntity.id, imageUrl],
+          5000
+        );
+      }
+
+      await this.ensureAssetStockRecord(
+        transferEntity.assetId,
+        transferEntity.location,
+        "asset_returned"
+      );
+
+      await this.logAudit(returnedBy, 'return_asset', {
+        assetId,
+        transferId: transferEntity.id,
+        imageUrl: imageUrl || null,
+      });
       const previousAssignedTo = String(transfer.previous_assigned_to || "");
       if (previousAssignedTo && previousAssignedTo !== returnedBy) {
         await this.createNotification({
@@ -1018,6 +1153,7 @@ export class SmsAssetService extends BaseService<SmsAssetEntity, SmsAssetDB> {
   ): Promise<ServiceResult<Record<string, unknown>>> {
     const startTime = Date.now();
     try {
+      await this.ensureTransferImagesTable();
       // Get asset info
       const assetResult = await dbManager.execute`
         SELECT name FROM sms_assets WHERE id = ${assetId}
@@ -1032,8 +1168,16 @@ export class SmsAssetService extends BaseService<SmsAssetEntity, SmsAssetDB> {
           id, asset_id as "assetId", sender_id as "senderId",
           receiver_id as "receiverId", location, status,
           COALESCE(NULLIF(remark, ''), 'Transfer ' || status) as description,
+          transfer_image.image_url as "imageUrl",
           created_at as timestamp, accepted_at as "acceptedAt"
         FROM sms_transfers
+        LEFT JOIN LATERAL (
+          SELECT image_url
+          FROM sms_transfer_images
+          WHERE transfer_id = sms_transfers.id
+          ORDER BY id ASC
+          LIMIT 1
+        ) transfer_image ON true
         WHERE asset_id = $1::uuid
         ${visibility.isAdmin ? "" : "AND (sender_id = $2 OR receiver_id = $2)"}
         ORDER BY created_at DESC
@@ -1087,6 +1231,7 @@ export class SmsAssetService extends BaseService<SmsAssetEntity, SmsAssetDB> {
           metadata: {
             senderId: t.senderId,
             receiverId: t.receiverId,
+            imageUrl: t.imageUrl,
           },
         })),
         ...auditsResult.map((a) => ({

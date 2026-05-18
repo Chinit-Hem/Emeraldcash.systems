@@ -75,26 +75,35 @@ export async function POST(req: NextRequest) {
 
     const body = await req.json();
 
+    // Debug: Log the incoming body for troubleshooting
+    console.log('[SMS Assets POST] Received body:', JSON.stringify(body));
+
     // Validate incoming data
     const { isValid, errors } = validateAssetForm(body);
     if (!isValid) {
+      console.log('[SMS Assets POST] Validation failed:', errors);
       return NextResponse.json(
-        { success: false, error: 'Validation failed', errors },
+        { success: false, error: 'Validation failed. Please check the form fields below.', errors },
         { status: 400 }
       );
     }
 
     const dbPayload = mapToDbPayload(body);
+    console.log('[SMS Assets POST] DB payload:', JSON.stringify(dbPayload));
+
     const result = await smsService.createAsset(dbPayload);
     if (!result.success) {
+      console.log('[SMS Assets POST] Create failed:', result.error);
       return NextResponse.json(
         { success: false, error: result.error || 'Failed to create asset' },
         { status: 500 }
       );
     }
 
+    console.log('[SMS Assets POST] Created successfully:', result.data?.id);
     return NextResponse.json({ success: true, data: result.data, meta: result.meta }, { status: 201 });
   } catch (error) {
+    console.error('[SMS Assets POST] Error:', error);
     return NextResponse.json({ success: false, error: (error as Error).message }, { status: 500 });
   }
 }

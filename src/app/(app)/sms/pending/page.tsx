@@ -32,6 +32,7 @@ interface LocalPendingTransfer {
   location: string;
   status: 'pending';
   remark?: string;
+  imageUrl?: string | null;
   createdAt: string;
 }
 
@@ -392,6 +393,17 @@ export default function PendingPage() {
                     <div className="mt-6 rounded-2xl border border-blue-200/60 bg-blue-50/70 p-4">
                       <div className="mb-1 text-sm font-semibold text-blue-950">Message from sender</div>
                       <p className="text-sm leading-6 text-blue-900">{transfer.remark}</p>
+                    </div>
+                  )}
+                  {transfer.imageUrl && (
+                    <div className="relative mt-6 h-40 w-full overflow-hidden rounded-2xl border border-slate-200 bg-slate-100 sm:w-64">
+                      <Image
+                        src={transfer.imageUrl}
+                        alt="Transfer proof"
+                        fill
+                        sizes="256px"
+                        className="object-cover"
+                      />
                     </div>
                   )}
                 </CardContent>

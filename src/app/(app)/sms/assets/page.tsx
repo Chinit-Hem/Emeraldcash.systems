@@ -1,7 +1,7 @@
 "use client";
 
 import { useAuthUser } from '@/app/components/AuthContext';
-import { AlertCircle, ArrowLeft, Edit3, Eye, Filter, Loader2, Plus, RotateCcw, Search, Trash2 } from 'lucide-react';
+import { AlertCircle, ArrowLeft, Edit3, Eye, Filter, Loader2, Plus, Search, Trash2 } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -137,7 +137,7 @@ const data: ApiResponse<SmsStats> = await response.json();
     };
   }, [filters, filtersKey, fetchAssets]);
 
-  const handleSaveAsset = async (data: Omit<SmsAsset, 'id'>): Promise<{ success: boolean; error?: string }> => {
+const handleSaveAsset = async (data: Omit<SmsAsset, 'id'>): Promise<{ success: boolean; error?: string; errors?: Record<string, string> }> => {
     try {
       const method = editingAsset ? 'PUT' : 'POST';
       const url = editingAsset ? `/api/sms/assets/${editingAsset.id}` : '/api/sms/assets';
@@ -157,7 +157,13 @@ const data: ApiResponse<SmsStats> = await response.json();
         setEditingAsset(null);
         return { success: true };
       }
-      return { success: false, error: result.error };
+      // Return both general error and field-level errors if available
+      const errorMessage = result.error || 'Save failed';
+      const fieldErrors = result.errors;
+      if (fieldErrors && Object.keys(fieldErrors).length > 0) {
+        return { success: false, error: errorMessage, errors: fieldErrors };
+      }
+      return { success: false, error: errorMessage };
     } catch (_err) {
       return { success: false, error: 'Save failed' };
     }
@@ -420,23 +426,13 @@ const data: ApiResponse<SmsStats> = await response.json();
                               <Eye className="w-4 h-4" />
                               <span className="sr-only">View</span>
                             </Link>
-                            <button
+<button
                               onClick={() => setEditingAsset(asset)}
                               className="p-2 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-100 rounded-xl transition-all"
                               title="Edit"
                             >
                               <Edit3 className="w-4 h-4" />
                             </button>
-                            {asset.status !== 'Available' && (
-                              <button
-                                onClick={() => handleReturn(asset)}
-                                className="p-2 text-blue-600 hover:text-blue-700 hover:bg-blue-100 rounded-xl transition-all"
-                                title="Return to stock"
-                              >
-                                <RotateCcw className="w-4 h-4" />
-                                <span className="sr-only">Return to stock</span>
-                              </button>
-                            )}
                             {isAdmin && (
                               <button
                                 onClick={() => handleDelete(asset.id)}

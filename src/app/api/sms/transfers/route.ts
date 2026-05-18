@@ -62,7 +62,7 @@ export async function POST(req: NextRequest) {
     const auth = requirePermission(req, 'sms:transfer');
     if (auth.response) return auth.response;
 
-    const { assetId, senderId, receiverId, location, remark } = await req.json();
+    const { assetId, senderId, receiverId, location, remark, imageUrl } = await req.json();
     const resolvedSenderId =
       auth.session.role === 'Admin' || auth.session.role === 'Transfer'
         ? String(senderId || auth.session.username)
@@ -74,6 +74,7 @@ export async function POST(req: NextRequest) {
       receiverId: String(receiverId || ''),
       location,
       remark,
+      imageUrl: typeof imageUrl === 'string' ? imageUrl : undefined,
     });
 
     if (!result.success) {

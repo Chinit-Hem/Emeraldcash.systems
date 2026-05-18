@@ -4,6 +4,7 @@ import { useLanguage } from "@/lib/LanguageContext";
 import { useTranslation } from "@/lib/i18n";
 import { useAuthUser } from "@/app/components/AuthContext";
 import Link from "next/link";
+import Image from "next/image";
 import {
   ArrowLeft,
   History,
@@ -702,6 +703,10 @@ export default function HistoryPage() {
                             const hasMetadata =
                               event.metadata &&
                               Object.keys(event.metadata).length > 0;
+                            const eventImageUrl =
+                              typeof event.metadata?.imageUrl === "string"
+                                ? event.metadata.imageUrl
+                                : "";
 
                             return (
                               <div
@@ -840,6 +845,18 @@ export default function HistoryPage() {
                                         { addSuffix: true }
                                       )}
                                     </div>
+
+                                    {eventImageUrl && (
+                                      <div className="relative mb-3 h-36 w-full overflow-hidden rounded-2xl border border-slate-200 bg-slate-100 sm:w-60">
+                                        <Image
+                                          src={eventImageUrl}
+                                          alt="Return proof"
+                                          fill
+                                          sizes="240px"
+                                          className="object-cover"
+                                        />
+                                      </div>
+                                    )}
 
                                     {/* Expandable metadata */}
                                     {hasMetadata && (

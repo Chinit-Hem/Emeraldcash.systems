@@ -47,6 +47,7 @@ interface SmsTransfer {
   location: string;
   status: "pending" | "accepted" | "rejected" | "returned";
   remark?: string | null;
+  imageUrl?: string | null;
   createdAt: string;
 }
 
@@ -400,6 +401,17 @@ export default function SmsAssetDetailPage() {
                       </div>
                     </div>
                     {transfer.remark ? <p className="mt-3 text-sm text-slate-600">{transfer.remark}</p> : null}
+                    {transfer.imageUrl ? (
+                      <div className="relative mt-3 h-36 w-full overflow-hidden rounded-lg border border-slate-200 bg-slate-100 sm:w-56">
+                        <Image
+                          src={transfer.imageUrl}
+                          alt="Return proof"
+                          fill
+                          sizes="224px"
+                          className="object-cover"
+                        />
+                      </div>
+                    ) : null}
                   </div>
                 ))}
               </div>

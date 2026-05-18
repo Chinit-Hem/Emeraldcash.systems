@@ -23,7 +23,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       assetId,
       auth.session.username,
       typeof body.location === 'string' ? body.location : undefined,
-      typeof body.remark === 'string' ? body.remark : undefined
+      typeof body.remark === 'string' ? body.remark : undefined,
+      typeof body.imageUrl === 'string' ? body.imageUrl : undefined
     );
 
     if (!result.success) {

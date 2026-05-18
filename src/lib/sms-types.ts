@@ -37,6 +37,7 @@ export type SmsTransfer = {
   location: string;
   status: TransferStatus;
   remark?: string | null;
+  imageUrl?: string | null;
   createdAt: string;
   acceptedAt?: string | null;
 };

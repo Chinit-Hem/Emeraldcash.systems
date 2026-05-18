@@ -5,7 +5,9 @@ import { randomUUID } from 'crypto';
 
 export async function POST(req: NextRequest) {
   try {
-    const auth = requirePermission(req, 'sms:create');
+    const createAuth = requirePermission(req, 'sms:create');
+    const transferAuth = createAuth.response ? requirePermission(req, 'sms:transfer') : createAuth;
+    const auth = createAuth.response ? transferAuth : createAuth;
     if (auth.response) return auth.response;
 
     const formData = await req.formData();

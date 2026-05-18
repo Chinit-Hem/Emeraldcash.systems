@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { SmsStats } from '@/lib/sms-types';
 import { useLanguage } from "@/lib/LanguageContext";
 import { useTranslation } from "@/lib/i18n";
-import { Bell, CheckCheck } from 'lucide-react';
+import { Bell, CheckCheck, RotateCcw } from 'lucide-react';
 
 interface StatsData extends SmsStats {
   totalTodayChange: number;
@@ -112,7 +112,7 @@ export default function SmsDashboard() {
         </div>
       )}
 
-      <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8'>
+      <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8'>
         <Link href='/sms/assets' className='group p-8 bg-gradient-to-br from-emerald-500/10 to-emerald-600/10 border border-emerald-200/50 rounded-3xl shadow-xl hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 block relative overflow-hidden'>
           <div className='absolute top-4 right-4 w-20 h-20 bg-emerald-500 rounded-2xl -rotate-12 opacity-20'></div>
           <div className='relative z-10'>
@@ -134,6 +134,15 @@ export default function SmsDashboard() {
             <h3 className='text-2xl font-bold mb-3 bg-gradient-to-r from-slate-600 to-slate-700 bg-clip-text text-transparent'>{t.pending}</h3>
             <div className='text-amber-600 font-semibold text-lg mb-1'>{pending}</div>
             <p className='text-slate-600'>{t.reviewRequests}</p>
+          </div>
+        </Link>
+        <Link href='/sms/return' className='group p-8 bg-gradient-to-br from-blue-500/10 to-cyan-600/10 border border-blue-200/50 rounded-3xl shadow-xl hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 block relative overflow-hidden'>
+          <div className='absolute top-4 right-4 flex h-20 w-20 items-center justify-center rounded-2xl bg-blue-500/15 text-blue-600'>
+            <RotateCcw className='h-9 w-9' />
+          </div>
+          <div className='relative z-10'>
+            <h3 className='text-2xl font-bold mb-3 bg-gradient-to-r from-blue-600 to-cyan-700 bg-clip-text text-transparent'>Return to Stock</h3>
+            <p className='text-slate-600'>Upload photo and note</p>
           </div>
         </Link>
         <Link href='/sms/history' className='group p-8 bg-gradient-to-br from-purple-500/10 to-purple-600/10 border border-purple-200/50 rounded-3xl shadow-xl hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 block relative overflow-hidden md:col-span-2 lg:col-span-1'>
