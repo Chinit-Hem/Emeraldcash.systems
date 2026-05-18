@@ -1,7 +1,7 @@
 "use client";
 
 import { useAuthUser } from '@/app/components/AuthContext';
-import { AlertCircle, ArrowLeft, Edit3, Eye, Filter, Loader2, Plus, Search, Trash2 } from 'lucide-react';
+import { AlertCircle, ArrowLeft, Edit3, Eye, Filter, ImageIcon, Loader2, Plus, Search, Trash2 } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -25,6 +25,8 @@ interface SmsStats {
   available: number;
   inUse: number;
   borrowed: number;
+  out: number;
+  notReturned: number;
   pendingTransfers: number;
 }
 
@@ -63,8 +65,19 @@ export default function AssetsPage() {
     pageSize: 20
   });
   const [totalPages, setTotalPages] = useState(1);
-  const [createModalOpen, setCreateModalOpen] = useState(false);
+const [createModalOpen, setCreateModalOpen] = useState(false);
   const [editingAsset, setEditingAsset] = useState<SmsAsset | null>(null);
+  const [imageErrors, setImageErrors] = useState<Set<string>>(new Set());
+
+  // Track images that failed to load - reset when assets change
+  useEffect(() => {
+    setImageErrors(new Set());
+  }, [assets]);
+
+  // Handle image load error - show placeholder for broken images
+  const handleImageError = useCallback((assetId: string) => {
+    setImageErrors(prev => new Set(prev).add(assetId));
+  }, []);
 
   const fetchAssets = useCallback(async (pageFilters: AssetFilters, signal?: AbortSignal) => {
     try {
@@ -248,9 +261,9 @@ const handleSaveAsset = async (data: Omit<SmsAsset, 'id'>): Promise<{ success: b
           </div>
         </div>
 
-        {/* Stats Cards */}
+{/* Stats Cards */}
         {stats && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-6 mb-12">
             <div className="group p-8 bg-white/70 backdrop-blur-xl rounded-3xl border border-slate-200 shadow-xl hover:shadow-2xl hover:-translate-y-2 transition-all cursor-pointer">
               <div className="text-4xl font-bold bg-gradient-to-r from-emerald-600 to-emerald-700 bg-clip-text text-transparent mb-3">
                 {stats.totalAssets}
@@ -274,6 +287,18 @@ const handleSaveAsset = async (data: Omit<SmsAsset, 'id'>): Promise<{ success: b
                 {stats.borrowed}
               </div>
               <div className="text-sm font-semibold text-slate-600 uppercase tracking-wide mb-2">Borrowed</div>
+            </div>
+            <div className="group p-8 bg-white/70 backdrop-blur-xl rounded-3xl border border-slate-200 shadow-xl hover:shadow-2xl hover:-translate-y-2 transition-all">
+              <div className="text-4xl font-bold bg-gradient-to-r from-orange-500 to-orange-600 bg-clip-text text-transparent mb-3">
+                {stats.out}
+              </div>
+              <div className="text-sm font-semibold text-slate-600 uppercase tracking-wide mb-2">Out</div>
+            </div>
+            <div className="group p-8 bg-white/70 backdrop-blur-xl rounded-3xl border border-slate-200 shadow-xl hover:shadow-2xl hover:-translate-y-2 transition-all">
+              <div className="text-4xl font-bold bg-gradient-to-r from-rose-500 to-rose-600 bg-clip-text text-transparent mb-3">
+                {stats.notReturned}
+              </div>
+              <div className="text-sm font-semibold text-slate-600 uppercase tracking-wide mb-2">Not Returned</div>
             </div>
           </div>
         )}
@@ -377,7 +402,7 @@ const handleSaveAsset = async (data: Omit<SmsAsset, 'id'>): Promise<{ success: b
                       <tr key={asset.id} className="hover:bg-slate-50/50 transition-colors">
                         <td className="px-6 py-6 whitespace-nowrap">
                           <div className="flex items-center gap-4">
-                            {asset.imageUrl ? (
+{asset.imageUrl && !imageErrors.has(asset.id) ? (
                               <div className="relative w-14 h-14 rounded-2xl overflow-hidden shadow-md bg-slate-100">
                                 <Image
                                   src={asset.imageUrl!}
@@ -385,11 +410,13 @@ const handleSaveAsset = async (data: Omit<SmsAsset, 'id'>): Promise<{ success: b
                                   fill
                                   sizes="56px"
                                   className="object-cover"
+                                  onError={() => handleImageError(asset.id)}
+                                  loading="lazy"
                                 />
                               </div>
                             ) : (
                               <div className="w-14 h-14 bg-gradient-to-br from-slate-200 to-slate-300 rounded-2xl flex items-center justify-center shadow-md">
-                                <div className="w-8 h-8 text-slate-500" />
+                                <ImageIcon className="w-8 h-8 text-slate-500" />
                               </div>
                             )}
                             <div className="min-w-0 flex-1">

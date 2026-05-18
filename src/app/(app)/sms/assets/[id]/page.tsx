@@ -143,11 +143,12 @@ export default function SmsAssetDetailPage() {
   const params = useParams<{ id: string }>();
   const id = typeof params?.id === "string" ? params.id : "";
 
-  const [asset, setAsset] = useState<SmsAsset | null>(null);
+const [asset, setAsset] = useState<SmsAsset | null>(null);
   const [transfers, setTransfers] = useState<SmsTransfer[]>([]);
   const [history, setHistory] = useState<AssetHistory | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [imageError, setImageError] = useState(false);
 
   const loadAsset = async () => {
     if (!id) return;
@@ -276,15 +277,22 @@ const handleDelete = async () => {
 
         <section className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
           <div className="grid gap-0 lg:grid-cols-[280px_1fr]">
-            <div className="flex min-h-64 items-center justify-center border-b border-slate-200 bg-slate-100 lg:border-b-0 lg:border-r">
-              {asset.imageUrl ? (
+<div className="flex min-h-64 items-center justify-center border-b border-slate-200 bg-slate-100 lg:border-b-0 lg:border-r">
+              {asset.imageUrl && !imageError ? (
                 <div className="relative h-full min-h-64 w-full">
-                  <Image src={asset.imageUrl} alt={asset.name} fill sizes="280px" className="object-cover" />
+                  <Image 
+                    src={asset.imageUrl} 
+                    alt={asset.name} 
+                    fill 
+                    sizes="280px" 
+                    className="object-cover"
+                    onError={() => setImageError(true)}
+                  />
                 </div>
               ) : (
                 <div className="flex flex-col items-center gap-3 text-slate-400">
                   <ImageIcon className="h-12 w-12" />
-                  <span className="text-sm font-medium">No image</span>
+                  <span className="text-sm font-medium">{imageError ? 'Image unavailable' : 'No image'}</span>
                 </div>
               )}
             </div>

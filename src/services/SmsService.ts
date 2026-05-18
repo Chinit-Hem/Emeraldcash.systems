@@ -683,22 +683,57 @@ export class SmsAssetService extends BaseService<SmsAssetEntity, SmsAssetDB> {
         };
       }
 
-      if (status === 'accepted') {
+if (status === 'accepted') {
         const transfer = result[0];
-        await dbManager.executeUnsafe(
-          `UPDATE sms_assets
-           SET status = 'Borrowed',
-               assigned_to = $1,
-               location = $2,
-               updated_at = NOW()
-           WHERE id = $3::uuid`,
-          [
-            String(transfer.receiver_id || ''),
-            String(transfer.location || ''),
-            String(transfer.asset_id || ''),
-          ],
-          8000
-        );
+        const receiverId = String(transfer.receiver_id || '');
+        
+        // Check if this is a return-to-stock request (receiver is 'stock')
+        if (receiverId === 'stock') {
+          // For return-to-stock: set asset to Available and clear assigned_to
+          await dbManager.executeUnsafe(
+            `UPDATE sms_assets
+             SET status = 'Available',
+                 assigned_to = NULL,
+                 location = $1,
+                 updated_at = NOW()
+             WHERE id = $2::uuid`,
+            [
+              String(transfer.location || 'Stock'),
+              String(transfer.asset_id || ''),
+            ],
+            8000
+          );
+          
+          // Notify the original sender that the asset is now returned to stock
+          const senderId = String(transfer.sender_id || '');
+          if (senderId) {
+            await this.createNotification({
+              type: "return_approved",
+              title: "Return to stock approved",
+              message: `Admin approved your return to stock request. ${String(transfer.asset_name || "Asset")} is now back in stock.`,
+              recipientId: senderId,
+              actorId: userId,
+              assetId: String(transfer.asset_id || ''),
+              transferId,
+            });
+          }
+        } else {
+          // For regular transfer: set asset to Borrowed and assign to receiver
+          await dbManager.executeUnsafe(
+            `UPDATE sms_assets
+             SET status = 'Borrowed',
+                 assigned_to = $1,
+                 location = $2,
+                 updated_at = NOW()
+             WHERE id = $3::uuid`,
+            [
+              receiverId,
+              String(transfer.location || ''),
+              String(transfer.asset_id || ''),
+            ],
+            8000
+          );
+        }
         await this.invalidateCache();
       }
 
@@ -943,8 +978,9 @@ export class SmsAssetService extends BaseService<SmsAssetEntity, SmsAssetDB> {
     }
   }
 
-  /**
-   * Return an SMS asset back to stock.
+/**
+   * Return an SMS asset back to stock - creates a pending transfer for admin approval.
+   * The asset status stays as-is until admin approves the return request.
    */
   public async returnAsset(
     assetId: string,
@@ -955,59 +991,20 @@ export class SmsAssetService extends BaseService<SmsAssetEntity, SmsAssetDB> {
   ): Promise<ServiceResult<SmsTransferEntity>> {
     const startTime = Date.now();
     try {
-      if (imageUrl) {
-        await this.ensureTransferImagesTable();
-      }
+      // First get the current asset info to preserve sender
+      const assetRows = await dbManager.executeUnsafe<{
+        id: string;
+        name: string;
+        assigned_to: string | null;
+        location: string | null;
+        status: string;
+      }>(
+        `SELECT id, name, assigned_to, location, status FROM sms_assets WHERE id = $1::uuid`,
+        [assetId],
+        5000
+      );
 
-      const result = await dbManager.executeUnsafe(
-        `
-          WITH selected_asset AS (
-            SELECT id, assigned_to, location
-            FROM sms_assets
-            WHERE id = $1::uuid
-            FOR UPDATE
-          ),
-          updated_asset AS (
-            UPDATE sms_assets
-            SET status = 'Available',
-                assigned_to = NULL,
-                location = COALESCE(NULLIF($3, ''), sms_assets.location),
-                updated_at = NOW()
-            FROM selected_asset
-            WHERE sms_assets.id = selected_asset.id
-            RETURNING sms_assets.id
-          ),
-          inserted_transfer AS (
-            INSERT INTO sms_transfers (
-              id, asset_id, sender_id, receiver_id, location, status, remark, created_at, accepted_at
-            )
-            SELECT
-              gen_random_uuid(),
-              selected_asset.id,
-              COALESCE(NULLIF($2, ''), selected_asset.assigned_to, 'stock'),
-              'stock',
-              COALESCE(NULLIF($3, ''), selected_asset.location, 'Stock'),
-              'returned',
-              COALESCE(NULLIF($4, ''), 'Returned to stock'),
-              NOW(),
-              NOW()
-            FROM selected_asset
-            JOIN updated_asset ON updated_asset.id = selected_asset.id
-            RETURNING *
-          )
-          SELECT
-            inserted_transfer.*,
-            selected_asset.assigned_to AS previous_assigned_to,
-            sms_assets.name AS asset_name
-          FROM inserted_transfer
-          JOIN selected_asset ON selected_asset.id = inserted_transfer.asset_id
-          JOIN sms_assets ON sms_assets.id = inserted_transfer.asset_id
-        `,
-        [assetId, returnedBy, location || '', remark || 'Returned to stock'],
-        8000
-      ) as Array<Record<string, unknown>>;
-
-      if (result.length === 0) {
+      if (assetRows.length === 0) {
         return {
           success: false,
           error: 'Asset not found',
@@ -1015,18 +1012,48 @@ export class SmsAssetService extends BaseService<SmsAssetEntity, SmsAssetDB> {
         };
       }
 
+      const asset = assetRows[0];
+      // Only allow returning if asset is currently borrowed/in use
+      if (asset.status === 'Available') {
+        return {
+          success: false,
+          error: 'Asset is already available - cannot return to stock',
+          meta: { durationMs: Date.now() - startTime, queryCount: 1 },
+        };
+      }
+
+      if (imageUrl) {
+        await this.ensureTransferImagesTable();
+      }
+
+      const now = new Date().toISOString();
+      // Create a pending transfer request for admin approval
+      // sender = whoever currently has the asset (assigned_to)
+      // receiver = 'stock' indicates this is a return-to-stock request
+      const senderId = asset.assigned_to || returnedBy;
+      const returnLocation = location || asset.location || 'Stock';
+      const returnRemark = remark || 'Return to stock pending admin approval';
+
+      const result = await dbManager.executeUnsafe(
+        `INSERT INTO sms_transfers (id, asset_id, sender_id, receiver_id, location, status, remark, created_at)
+         VALUES (gen_random_uuid(), $1, $2, 'stock', $3, 'pending', $4, $5)
+         RETURNING *`,
+        [assetId, senderId, returnLocation, returnRemark, now],
+        8000
+      ) as Array<Record<string, unknown>>;
+
       const transfer = result[0];
       const transferEntity: SmsTransferEntity = {
         id: transfer.id as string,
         assetId: transfer.asset_id as string,
         senderId: String(transfer.sender_id || ''),
-        receiverId: String(transfer.receiver_id || ''),
+        receiverId: 'stock',
         location: String(transfer.location || ''),
-        status: 'returned',
+        status: 'pending' as TransferStatus,
         remark: transfer.remark as string | null,
         imageUrl: imageUrl || null,
         createdAt: transfer.created_at as string,
-        acceptedAt: transfer.accepted_at as string | null,
+        acceptedAt: null,
       };
 
       if (imageUrl) {
@@ -1038,36 +1065,29 @@ export class SmsAssetService extends BaseService<SmsAssetEntity, SmsAssetDB> {
         );
       }
 
-      await this.ensureAssetStockRecord(
-        transferEntity.assetId,
-        transferEntity.location,
-        "asset_returned"
-      );
-
-      await this.logAudit(returnedBy, 'return_asset', {
+      await this.logAudit(returnedBy, 'request_return', {
         assetId,
         transferId: transferEntity.id,
         imageUrl: imageUrl || null,
       });
-      const previousAssignedTo = String(transfer.previous_assigned_to || "");
-      if (previousAssignedTo && previousAssignedTo !== returnedBy) {
-        await this.createNotification({
-          type: "asset_returned",
-          title: "Asset returned to stock",
-          message: `${returnedBy} returned ${String(transfer.asset_name || "SMS asset")} to stock.`,
-          recipientId: previousAssignedTo,
-          actorId: returnedBy,
-          assetId,
-          transferId: transferEntity.id,
-        });
-      }
-      await this.invalidateCache();
+
+      // Notify admins about the return request
+      await this.createNotification({
+        type: "return_request",
+        title: "Return to stock requested",
+        message: `${returnedBy} requests to return ${asset.name} to stock. Awaiting admin approval.`,
+        recipientId: 'Admin', // This will need to be sent to admins
+        actorId: returnedBy,
+        assetId,
+        transferId: transferEntity.id,
+      });
+
       await delCache('sms:stats');
 
       return {
         success: true,
         data: transferEntity,
-        meta: { durationMs: Date.now() - startTime, queryCount: 3 },
+        meta: { durationMs: Date.now() - startTime, queryCount: 2 },
       };
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to return asset';
@@ -1117,11 +1137,13 @@ export class SmsAssetService extends BaseService<SmsAssetEntity, SmsAssetDB> {
       const todayResult = await dbManager.execute`SELECT COUNT(*)::integer as count FROM sms_assets WHERE created_at >= CURRENT_DATE` as Array<{count: number}>;
       const todayChange = todayResult[0]?.count || 0;
 
-      const stats: Record<string, number> = {
+const stats: Record<string, number> = {
         totalAssets: Object.values(statusCounts).reduce((sum, count) => sum + count, 0),
         available: statusCounts.Available || 0,
         inUse: statusCounts['In Use'] || 0,
         borrowed: statusCounts.Borrowed || 0,
+        out: statusCounts['Out'] || 0,
+        notReturned: statusCounts['Not Returned'] || 0,
         pendingTransfers: pendingCount,
         todayChange,
       };
