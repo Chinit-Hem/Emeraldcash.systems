@@ -6,7 +6,7 @@ import { derivePrices } from "@/lib/pricing";
 import type { Vehicle } from "@/lib/types";
 import { cn } from "@/lib/ui";
 import type { AppRouterInstance } from "next/dist/shared/lib/app-router-context.shared-runtime";
-import { useState, useCallback, type CSSProperties, type Dispatch, type SetStateAction } from "react";
+import { useState, useCallback, useEffect, type CSSProperties, type Dispatch, type SetStateAction } from "react";
 import { formatPrice, getVehicleThumbnailUrl } from "@/lib/vehicle-helpers";
 import { OptimizedImage } from "@/app/components/OptimizedImage";
 
@@ -100,6 +100,16 @@ export default function VehicleRow({
   const { t } = useTranslation(language);
   const [imageError, setImageError] = useState(false);
   const vehicleId = vehicle.VehicleId;
+
+  useEffect(() => {
+    setImageError(false);
+    setImageErrors((prev) => {
+      if (!prev.has(vehicleId)) return prev;
+      const next = new Set(prev);
+      next.delete(vehicleId);
+      return next;
+    });
+  }, [vehicle.Image, vehicleId, setImageErrors]);
 
   const derived = derivePrices(vehicle.PriceNew);
   const price40 = vehicle.Price40 ?? derived.Price40;

@@ -25,6 +25,20 @@ const priorityWeights = {
   low: 3,
 } as const;
 
+function shouldSkipAggressivePrefetch() {
+  if (typeof navigator === "undefined") return false;
+
+  const userAgent = navigator.userAgent || "";
+  const platform = navigator.platform || "";
+  const maxTouchPoints = navigator.maxTouchPoints || 0;
+  const isIOS =
+    /iP(hone|ad|od)/i.test(userAgent) ||
+    (platform === "MacIntel" && maxTouchPoints > 1);
+  const isMobileSafari = isIOS && /AppleWebKit/i.test(userAgent);
+
+  return isMobileSafari || maxTouchPoints > 1;
+}
+
 /**
  * InstantNavigationProvider - Advanced route prefetching for 0s navigation
  *
@@ -81,6 +95,8 @@ export function InstantNavigationProvider({ children }: { children: React.ReactN
 
   // Prefetch a route with priority
   const prefetchRoute = useCallback((href: string, priority: "high" | "normal" | "low" = "normal") => {
+    if (shouldSkipAggressivePrefetch()) return;
+
     // Don't prefetch current page
     if (href === pathname) return;
 
@@ -108,6 +124,11 @@ export function InstantNavigationProvider({ children }: { children: React.ReactN
 
   // Instant navigation with guaranteed prefetch
   const navigateInstant = useCallback((href: string) => {
+    if (shouldSkipAggressivePrefetch()) {
+      router.push(href);
+      return;
+    }
+
     // Ensure prefetch happens immediately
     if (!prefetchedRoutes.current.has(href)) {
       router.prefetch(href);
@@ -123,6 +144,8 @@ export function InstantNavigationProvider({ children }: { children: React.ReactN
   // Setup lightweight Intersection Observer for automatic prefetching.
   useEffect(() => {
     if (typeof window === "undefined") return;
+    if (shouldSkipAggressivePrefetch()) return;
+
     const observedLinks = new Set<Element>();
 
     observerRef.current = new IntersectionObserver(

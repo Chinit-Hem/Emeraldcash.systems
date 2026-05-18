@@ -106,26 +106,40 @@ function generateTempId(): string {
  * This keeps Cloudinary credentials secure on the server
  */
 async function uploadImageToCloudinary(
-  file: File,
+  image: File | string,
   category: string,
   tempId: string
 ): Promise<string> {
-  const formData = new FormData();
-  formData.append("image", file);
-  formData.append("vehicleId", tempId);
-  formData.append("category", category);
-
   console.log(`[uploadImageToCloudinary] Uploading via server API:`, {
     url: UPLOAD_API_URL,
     tempId,
     category,
-    fileSize: `${(file.size / 1024).toFixed(2)}KB`,
+    source: typeof image === "string" ? "url" : "file",
+    fileSize: typeof image === "string" ? undefined : `${(image.size / 1024).toFixed(2)}KB`,
   });
 
-  const response = await fetch(UPLOAD_API_URL, {
+  const requestInit: RequestInit = {
     method: "POST",
-    body: formData,
-    credentials: "include", // Include cookies for authentication
+    credentials: "include",
+  };
+
+  if (typeof image === "string") {
+    requestInit.headers = { "Content-Type": "application/json" };
+    requestInit.body = JSON.stringify({
+      image,
+      vehicleId: tempId,
+      category,
+    });
+  } else {
+    const formData = new FormData();
+    formData.append("image", image);
+    formData.append("vehicleId", tempId);
+    formData.append("category", category);
+    requestInit.body = formData;
+  }
+
+  const response = await fetch(UPLOAD_API_URL, {
+    ...requestInit,
   });
 
   if (!response.ok) {
@@ -204,27 +218,6 @@ async function prepareImageForUpload(
   return null;
 }
 
-async function updateVehicleImage(vehicleId: string | number, imageUrl: string): Promise<void> {
-  const res = await fetch(`/api/vehicles/${encodeURIComponent(String(vehicleId))}`, {
-    method: "PUT",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ Image: imageUrl }),
-    credentials: "include",
-  });
-
-  if (!res.ok) {
-    const json = await res.json().catch(() => ({}));
-    throw new Error(json.error || `Failed to attach image: ${res.status}`);
-  }
-
-  const result = await res.json().catch(() => null);
-  if (result && result.success === false) {
-    throw new Error(result.error || "Image update failed");
-  }
-}
-
 export function useAddVehicleOptimistic(
   options: UseAddVehicleOptimisticOptions = {}
 ): UseAddVehicleOptimisticReturn {
@@ -261,7 +254,15 @@ export function useAddVehicleOptimistic(
 
       console.log(`[addVehicle] Starting optimistic add with temp ID: ${tempId}`);
 
-      const pendingImage = await prepareImageForUpload(data, imageFile, tempId);
+      let pendingImage: File | string | null = null;
+      try {
+        pendingImage = await prepareImageForUpload(data, imageFile, tempId);
+      } catch (err) {
+        setIsAdding(false);
+        const error = err instanceof Error ? err : new Error("Failed to prepare image");
+        onError?.(error);
+        throw error;
+      }
 
       // Step 1: Prepare payload without image. The vehicle should be created
       // even if image upload is slow or Cloudinary has a transient failure.
@@ -284,6 +285,39 @@ export function useAddVehicleOptimistic(
           delete payload[key];
         }
       });
+
+      if (pendingImage) {
+        setIsProcessing(true);
+        try {
+          const imageUrl = await uploadImageToCloudinary(
+            pendingImage,
+            data.Category || "Cars",
+            tempId
+          );
+
+          if (
+            !imageUrl ||
+            imageUrl === "undefined" ||
+            imageUrl === "null" ||
+            imageUrl.includes("/undefined")
+          ) {
+            throw new Error("Image upload returned an invalid URL");
+          }
+
+          payload.image_id = imageUrl;
+          optimisticVehicle.Image = imageUrl;
+        } catch (uploadError) {
+          const error = uploadError instanceof Error
+            ? uploadError
+            : new Error("Image upload failed");
+          setIsAdding(false);
+          setIsProcessing(false);
+          onError?.(new Error(`Image upload failed: ${error.message}`));
+          throw error;
+        } finally {
+          setIsProcessing(false);
+        }
+      }
 
       // Step 2: Send to API with retry logic
       let lastError: Error | null = null;
@@ -334,43 +368,7 @@ export function useAddVehicleOptimistic(
           onSuccess?.(finalVehicle);
 
           setIsAdding(false);
-          if (pendingImage) {
-            setIsProcessing(true);
-            void (async () => {
-              try {
-                const imageUrl = typeof pendingImage === "string"
-                  ? pendingImage
-                  : await uploadImageToCloudinary(
-                      pendingImage,
-                      data.Category || "Cars",
-                      String(finalVehicle.VehicleId || tempId)
-                    );
-
-                if (
-                  !imageUrl ||
-                  imageUrl === "undefined" ||
-                  imageUrl === "null" ||
-                  imageUrl.includes("/undefined")
-                ) {
-                  throw new Error("Image upload returned an invalid URL");
-                }
-
-                await updateVehicleImage(finalVehicle.VehicleId || tempId, imageUrl);
-                recordMutation();
-                console.log(`[addVehicle] Background image attached to vehicle ${finalVehicle.VehicleId || tempId}`);
-              } catch (uploadError) {
-                const error = uploadError instanceof Error
-                  ? uploadError
-                  : new Error("Image upload failed");
-                console.warn(`[addVehicle] Background image upload failed:`, error);
-                onError?.(new Error(`Vehicle created, but image upload failed: ${error.message}`));
-              } finally {
-                setIsProcessing(false);
-              }
-            })();
-          } else {
-            setIsProcessing(false);
-          }
+          setIsProcessing(false);
           return finalVehicle;
 
         } catch (err) {

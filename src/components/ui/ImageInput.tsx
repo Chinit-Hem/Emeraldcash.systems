@@ -295,6 +295,30 @@ export function ImageInput({
     return null;
   }, [maxSizeMB]);
 
+  const extractImageUrlFromTransfer = (dataTransfer: DataTransfer): string | null => {
+    const uriList = dataTransfer.getData("text/uri-list")?.trim();
+    if (uriList && isValidImageUrl(uriList)) return uriList;
+
+    const plainText = dataTransfer.getData("text/plain")?.trim();
+    if (plainText && isValidImageUrl(plainText)) return plainText;
+
+    const html = dataTransfer.getData("text/html");
+    if (!html) return null;
+
+    try {
+      const doc = new DOMParser().parseFromString(html, "text/html");
+      const imgSrc = doc.querySelector("img")?.getAttribute("src")?.trim();
+      if (imgSrc && isValidImageUrl(imgSrc)) return imgSrc;
+
+      const linkHref = doc.querySelector("a")?.getAttribute("href")?.trim();
+      if (linkHref && isValidImageUrl(linkHref)) return linkHref;
+    } catch {
+      return null;
+    }
+
+    return null;
+  };
+
   const readFileAsDataUrl = (file: File): Promise<string> => {
     return fileToDataUrl(file);
   };
@@ -387,19 +411,6 @@ export function ImageInput({
       setIsLoading(false);
     }
   }, [onChange, validateFile]);
-
-  const handleDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragging(false);
-
-    if (disabled) return;
-
-    const files = e.dataTransfer.files;
-    if (files.length > 0) {
-      handleFileSelect(files[0]);
-    }
-  }, [handleFileSelect, disabled]);
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -511,6 +522,28 @@ export function ImageInput({
       setIsLoading(false);
     }
   }, [onChange]);
+
+  const handleDrop = useCallback(async (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+
+    if (disabled) return;
+
+    const files = e.dataTransfer.files;
+    if (files.length > 0) {
+      await handleFileSelect(files[0]);
+      return;
+    }
+
+    const droppedImageUrl = extractImageUrlFromTransfer(e.dataTransfer);
+    if (droppedImageUrl) {
+      await handleUrlSubmit(droppedImageUrl);
+      return;
+    }
+
+    setError("Drop an image file or a direct image URL.");
+  }, [handleFileSelect, handleUrlSubmit, disabled]);
 
   const handleUrlInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     setUrlInput(e.target.value);

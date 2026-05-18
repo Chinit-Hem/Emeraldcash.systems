@@ -43,6 +43,7 @@ const ALLOWED_MIME_TYPES = [
 ];
 
 const BASE64_DATA_URL_PREFIX = "data:";
+const REMOTE_IMAGE_PROTOCOLS = new Set(["http:", "https:"]);
 
 // ============================================================================
 // Helper Functions
@@ -77,12 +78,12 @@ async function parseFormData(request: NextRequest): Promise<{
       return { file, base64Image: null, vehicleId, category };
     }
 
-    // Fallback: JSON with base64 data URL (edit page)
-    console.log("[Upload API] Processing JSON with base64");
+    // Fallback: JSON with base64 data URL or remote image URL.
+    console.log("[Upload API] Processing JSON image source");
     const jsonBody = await request.json();
     console.log("[Upload API] JSON body keys:", Object.keys(jsonBody ?? {}));
 
-    const base64Image = (jsonBody.file || jsonBody.image || '').toString().trim();
+    const base64Image = (jsonBody.file || jsonBody.image || jsonBody.imageUrl || '').toString().trim();
     const vehicleId = (jsonBody.vehicleId || jsonBody.vehicle_id || '').toString() || null;
     const category = (jsonBody.category || '').toString() || null;
 
@@ -149,6 +150,15 @@ function dataUrlToFile(
   }
 }
 
+function isValidRemoteImageUrl(value: string): boolean {
+  try {
+    const url = new URL(value);
+    return REMOTE_IMAGE_PROTOCOLS.has(url.protocol);
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Validate uploaded file
  */
@@ -211,36 +221,55 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     let uploadResult;
     if (typeof imageData === 'string') {
-      // Base64 data URL upload (convert to File for stable upload path)
-      console.log(`[Upload API ${requestId}] Uploading base64 image (length: ${imageData.length})`);
+      if (imageData.startsWith(BASE64_DATA_URL_PREFIX)) {
+        // Base64 data URL upload (convert to File for stable upload path)
+        console.log(`[Upload API ${requestId}] Uploading base64 image (length: ${imageData.length})`);
 
-      const base64FileName = vehicleId ? `vehicle_${vehicleId}` : `vehicle_${Date.now()}`;
-      const { file: fileFromDataUrl, error: dataUrlError } = dataUrlToFile(imageData, base64FileName);
-      if (dataUrlError || !fileFromDataUrl) {
-        return NextResponse.json(
-          { ok: false, error: dataUrlError || "Invalid base64 image data" },
-          { status: 400 }
-        );
+        const base64FileName = vehicleId ? `vehicle_${vehicleId}` : `vehicle_${Date.now()}`;
+        const { file: fileFromDataUrl, error: dataUrlError } = dataUrlToFile(imageData, base64FileName);
+        if (dataUrlError || !fileFromDataUrl) {
+          return NextResponse.json(
+            { ok: false, error: dataUrlError || "Invalid base64 image data" },
+            { status: 400 }
+          );
+        }
+
+        const validation = validateFile(fileFromDataUrl);
+        if (!validation.valid) {
+          return NextResponse.json(
+            { ok: false, error: validation.error },
+            { status: 400 }
+          );
+        }
+
+        uploadResult = await uploadImage(fileFromDataUrl, {
+          category: category || "vehicles",
+          publicId: vehicleId ? `vehicle_${vehicleId}` : undefined,
+          timeout: 120000,
+          retryAttempts: 2,
+          retryDelay: 1000,
+          compress: true,
+          maxWidth: 1280,
+          quality: 0.8,
+        });
+      } else {
+        if (!isValidRemoteImageUrl(imageData)) {
+          return NextResponse.json(
+            { ok: false, error: "Invalid image URL. Expected http(s) URL or base64 image data." },
+            { status: 400 }
+          );
+        }
+
+        console.log(`[Upload API ${requestId}] Uploading remote image URL`);
+        uploadResult = await uploadImage(imageData, {
+          category: category || "vehicles",
+          publicId: vehicleId ? `vehicle_${vehicleId}` : undefined,
+          timeout: 120000,
+          retryAttempts: 2,
+          retryDelay: 1000,
+          compress: false,
+        });
       }
-
-      const validation = validateFile(fileFromDataUrl);
-      if (!validation.valid) {
-        return NextResponse.json(
-          { ok: false, error: validation.error },
-          { status: 400 }
-        );
-      }
-
-      uploadResult = await uploadImage(fileFromDataUrl, {
-        category: category || "vehicles",
-        publicId: vehicleId ? `vehicle_${vehicleId}` : undefined,
-        timeout: 120000,
-        retryAttempts: 2,
-        retryDelay: 1000,
-        compress: true,
-        maxWidth: 1280,
-        quality: 0.8,
-      });
     } else {
       // File upload
       console.log(`[Upload API ${requestId}] Uploading file: ${file?.name} (${file?.size} bytes)`);

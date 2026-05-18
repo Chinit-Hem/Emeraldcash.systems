@@ -449,7 +449,8 @@ export default function EnhancedDashboard({
     async function fetchSearchResults() {
       setIsSearching(true);
       try {
-        const url = `/api/vehicles/edge?search=${encodeURIComponent(debouncedSearch)}&limit=2000`;
+        const searchLimit = isIOSSafari ? 300 : 2000;
+        const url = `/api/vehicles/edge?search=${encodeURIComponent(debouncedSearch)}&limit=${searchLimit}`;
         const res = await fetch(url, { cache: "no-store" });
         if (!res.ok) throw new Error("Search failed");
         const data = await res.json();
@@ -467,7 +468,7 @@ export default function EnhancedDashboard({
     }
 
     fetchSearchResults();
-  }, [debouncedSearch]);
+  }, [debouncedSearch, isIOSSafari]);
 
   // Compute aggregated stats from real vehicle data
   const aggregatedStats = useMemo(() => {

@@ -9,7 +9,7 @@ import { ConfirmDeleteModal } from "@/app/components/vehicles/ConfirmDeleteModal
 
 import { useDeleteVehicle } from "@/app/components/vehicles/useDeleteVehicle";
 import { useToast } from "@/components/ui/glass/GlassToast";
-import { driveThumbnailUrl, extractDriveFileId } from "@/lib/drive";
+import { getVehicleThumbnailUrl } from "@/lib/vehicle-helpers";
 import type { Vehicle } from "@/lib/types";
 import { cn } from "@/lib/ui";
 import { useVehiclesNeon, useVehicleStats } from "@/lib/useVehiclesNeon";
@@ -97,6 +97,85 @@ const COLUMNS: ColumnConfig[] = [
 
 const ITEMS_PER_PAGE_OPTIONS = [10, 20, 30, 50, 100, 500, 2000];
 const DEFAULT_ITEMS_PER_PAGE = 10;
+const MOBILE_VEHICLE_FETCH_LIMIT = 200;
+const DESKTOP_VEHICLE_FETCH_LIMIT = 2000;
+
+function detectMobileSafariLike(): boolean {
+  if (typeof navigator === "undefined") return false;
+
+  const userAgent = navigator.userAgent || "";
+  const platform = navigator.platform || "";
+  const maxTouchPoints = navigator.maxTouchPoints || 0;
+  const isIOS =
+    /iP(hone|ad|od)/i.test(userAgent) ||
+    (platform === "MacIntel" && maxTouchPoints > 1);
+
+  return isIOS || maxTouchPoints > 1;
+}
+
+function normalizeVehicleImageValue(imageValue: unknown): string {
+  if (Array.isArray(imageValue)) {
+    return normalizeVehicleImageValue(imageValue.find(Boolean));
+  }
+
+  if (typeof imageValue !== "string") return "";
+
+  const trimmed = imageValue.trim();
+  if (!trimmed || trimmed === "null" || trimmed === "undefined") return "";
+
+  const unquoted = trimmed.replace(/^["']|["']$/g, "");
+  if (
+    unquoted.startsWith("http://") ||
+    unquoted.startsWith("https://") ||
+    unquoted.startsWith("data:image/") ||
+    unquoted.startsWith("blob:")
+  ) {
+    return unquoted;
+  }
+
+  if (
+    (trimmed.startsWith("[") && trimmed.endsWith("]")) ||
+    (trimmed.startsWith("{") && trimmed.endsWith("}"))
+  ) {
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (Array.isArray(parsed)) {
+        return normalizeVehicleImageValue(parsed.find(Boolean));
+      }
+      if (parsed && typeof parsed === "object") {
+        const record = parsed as Record<string, unknown>;
+        return normalizeVehicleImageValue(
+          record.url ?? record.src ?? record.image ?? record.Image ?? record.thumbnail
+        );
+      }
+    } catch {
+      // Fall through to delimiter handling for malformed imported values.
+    }
+  }
+
+  const firstValue = unquoted
+    .split(/[\n;]/)
+    .map((value) => value.trim().replace(/^["']|["']$/g, ""))
+    .find(Boolean);
+
+  return firstValue ?? "";
+}
+
+function isTruthyQueryParam(value: string | null): boolean {
+  if (!value) return false;
+  const normalized = value.toLowerCase().trim();
+  return normalized === "1" || normalized === "true" || normalized === "yes";
+}
+
+function vehicleHasDisplayableImage(imageValue: unknown): boolean {
+  const normalizedValue = normalizeVehicleImageValue(imageValue);
+  if (!normalizedValue) return false;
+
+  const resolvedUrl = getVehicleThumbnailUrl(normalizedValue, "w400-h300");
+  if (resolvedUrl) return true;
+
+  return /^[a-zA-Z0-9\-_/\\.]+$/.test(normalizedValue);
+}
 
 // ============================================================================
 // TukTuk Icon Component - From Sidebar Menu (IconTukTuk)
@@ -600,7 +679,7 @@ function VehicleCard({
   onView: (id: string) => void;
   onEdit: (id: string) => void;
   onDelete: (vehicle: Vehicle) => void;
-  getImageUrl: (imageValue: string | undefined) => string | null;
+  getImageUrl: (imageValue: unknown) => string | null;
   t: Translations;
 }) {
   const getCategoryColor = (category: string) => {
@@ -623,24 +702,20 @@ return (
     <div className="group bg-white rounded-2xl shadow-[0_4px_20px_rgba(0,0,0,0.08)] hover:shadow-[0_8px_30px_rgba(0,0,0,0.12)] transition-all duration-150 overflow-hidden border border-slate-100 hover:border-emerald-200">
       {/* Image */}
       <div className="relative aspect-[4/3] overflow-hidden bg-slate-100">
-{imageUrl ? (
-             
+        {imageUrl ? (
             <img
               src={imageUrl}
               alt={`${vehicle.Brand} ${vehicle.Model}`}
               className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
               onError={(e) => {
                 console.warn('[Image onError]', imageUrl);
-                (e.target as HTMLImageElement).src = '/placeholder-car.svg';
+                e.currentTarget.style.display = "none";
               }}
             />
           ) : (
-             
-            <img
-              src="/placeholder-car.svg"
-              alt="No image"
-              className="w-full h-full object-cover opacity-20"
-            />
+            <div className="flex h-full w-full items-center justify-center bg-slate-100">
+              <Car className="h-10 w-10 text-slate-300" aria-hidden="true" />
+            </div>
           )}
         <div className="absolute top-3 left-3">
           <span className={cn(
@@ -790,6 +865,7 @@ export default function VehiclesClientEnhanced() {
   const user = useAuthUser();
   const { success, error: showError } = useToast();
   const isAdmin = user?.role === "Admin";
+  const [isMobileSafeMode, setIsMobileSafeMode] = useState(detectMobileSafariLike);
 
   // ==========================================================================
   // State Management
@@ -815,7 +891,7 @@ export default function VehiclesClientEnhanced() {
     minPrice: "",
     maxPrice: "",
     taxType: "",
-    hasImage: "",
+    hasImage: isTruthyQueryParam(searchParams.get("withoutImage") ?? searchParams.get("noImage")) ? "no" : "",
   });
 
   // Quick filter - read from URL query param
@@ -892,14 +968,19 @@ export default function VehiclesClientEnhanced() {
   const [vehicleToDelete, setVehicleToDelete] = useState<Vehicle | null>(null);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
 
+  useEffect(() => {
+    setIsMobileSafeMode(detectMobileSafariLike());
+  }, []);
+
   // ==========================================================================
   // Data Fetching
   // ==========================================================================
 
-// OPTIMIZATION: Always load ALL data at once (2000 limit covers most deployments)
-  // Then filter locally for instant quick filter switching - no server round-trip!
+  // Desktop can keep the full local dataset. Mobile Safari needs a smaller
+  // payload to avoid tab reloads on memory-constrained devices.
   const { vehicles, meta, loading, error, refresh, isValidating } = useVehiclesNeon({
-    limit: 2000,
+    limit: isMobileSafeMode ? MOBILE_VEHICLE_FETCH_LIMIT : DESKTOP_VEHICLE_FETCH_LIMIT,
+    withoutImage: filters.hasImage === "no",
     refreshInterval: 0,
   });
 
@@ -937,6 +1018,15 @@ export default function VehiclesClientEnhanced() {
   useEffect(() => {
     const timeoutId = setTimeout(() => {
       const categoryParam = searchParams.get("category");
+      const noImageParam = searchParams.get("withoutImage") ?? searchParams.get("noImage");
+      const nextHasImage = isTruthyQueryParam(noImageParam) ? "no" : "";
+
+      setFilters(prev =>
+        prev.hasImage === nextHasImage
+          ? prev
+          : { ...prev, hasImage: nextHasImage }
+      );
+
       if (categoryParam) {
         const normalized = categoryParam.toLowerCase();
         if (normalized.includes("car")) setQuickFilter("cars");
@@ -1173,7 +1263,7 @@ const isTukTukCategory = useCallback((cat: string | undefined): boolean => {
 
     // Apply image filter
     if (deferredFilters.hasImage === 'no') {
-      result = result.filter(v => !v.Image || v.Image === '');
+      result = result.filter(v => !vehicleHasDisplayableImage(v.Image));
     }
 
     // Apply sorting
@@ -1325,38 +1415,21 @@ const isTukTukCategory = useCallback((cat: string | undefined): boolean => {
   // Image URL Helper
   // ==========================================================================
 
-const getVehicleImageUrl = useCallback((imageValue: string | undefined): string | null => {
-    if (!imageValue?.trim()) {
-      return '/placeholder-car.svg';
-    }
+const getVehicleImageUrl = useCallback((imageValue: unknown): string | null => {
+    const normalizedValue = normalizeVehicleImageValue(imageValue);
 
-    const trimmed = imageValue.trim();
+    if (!normalizedValue) return null;
+
+    const trimmed = normalizedValue.trim();
     if (process.env.NODE_ENV === 'development') {
       console.debug('[Image]', trimmed.substring(0, 50) + '...');
     }
 
-    if (trimmed.startsWith('data:')) {
-      return trimmed;
-    }
-
-    // Google Drive share/view links are not direct image URLs. Convert any Drive
-    // format to a thumbnail URL before falling back to generic URL handling.
-    const driveFileId = extractDriveFileId(trimmed);
-    if (driveFileId) {
-      const thumbUrl = driveThumbnailUrl(driveFileId, "w400-h300");
-      if (process.env.NODE_ENV === 'development') {
-        console.debug('[Image] Drive thumb:', thumbUrl);
-      }
-      return thumbUrl;
-    }
-
-    // Full direct image URL (Cloudinary or another public image host)
-    if (trimmed.match(/^https?:\/\//)) {
-      return trimmed;
-    }
+    const resolvedUrl = getVehicleThumbnailUrl(trimmed, "w400-h300");
+    if (resolvedUrl) return resolvedUrl;
 
     // Cloudinary public ID (path format)
-    if (/^[a-z0-9\-_\/]+$/.test(trimmed)) {
+    if (/^[a-zA-Z0-9\-_/\\.]+$/.test(trimmed)) {
       const cloud = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME || 'demo';
       return `https://res.cloudinary.com/${cloud}/image/upload/w400,h300,c_fill/${trimmed}`;
     }
@@ -1364,7 +1437,7 @@ const getVehicleImageUrl = useCallback((imageValue: string | undefined): string 
     if (process.env.NODE_ENV === 'development') {
       console.warn('[Image] Unknown format:', trimmed);
     }
-    return '/placeholder-car.svg';
+    return null;
   }, []);
 
   // ==========================================================================
@@ -1844,10 +1917,11 @@ const getVehicleImageUrl = useCallback((imageValue: string | undefined): string 
                 <div>
                   <label className="block text-xs font-medium text-slate-600 mb-1.5">{t.imageStatus}</label>
                   <button
-                    onClick={() => setFilters(prev => ({
-                      ...prev,
-                      hasImage: prev.hasImage === 'no' ? '' : 'no'
-                    }))}
+                    onClick={() => {
+                      const nextHasImage = filters.hasImage === 'no' ? '' : 'no';
+                      setFilters(prev => ({ ...prev, hasImage: nextHasImage }));
+                      router.push(nextHasImage === 'no' ? "/vehicles?withoutImage=true" : "/vehicles", { scroll: false });
+                    }}
                     className={cn(
                       "w-full px-3 py-2 rounded-xl text-sm font-medium transition-all duration-200 flex items-center justify-center gap-2",
                       filters.hasImage === 'no'
@@ -1948,6 +2022,17 @@ const getVehicleImageUrl = useCallback((imageValue: string | undefined): string 
                   label="Tax"
                   value={filters.taxType}
                   onRemove={() => setFilters(prev => ({ ...prev, taxType: "" }))}
+                />
+              )}
+
+              {filters.hasImage === 'no' && (
+                <FilterTag
+                  label="Image"
+                  value="No Image Only"
+                  onRemove={() => {
+                    setFilters(prev => ({ ...prev, hasImage: "" }));
+                    router.push("/vehicles", { scroll: false });
+                  }}
                 />
               )}
             </div>
@@ -2080,15 +2165,17 @@ const getVehicleImageUrl = useCallback((imageValue: string | undefined): string 
                                 {(() => {
                                   const imageUrl = getVehicleImageUrl(vehicle.Image);
                                   return imageUrl ? (
-                                     
-                                    <img
-                                      src={imageUrl}
-                                      alt={vehicle.Model || "Vehicle"}
-                                      className="w-12 h-12 rounded-xl object-cover shadow-sm ring-2 ring-white"
-                                      onError={(e) => {
-                                        (e.currentTarget as HTMLImageElement).src = '/placeholder-car.svg';
-                                      }}
-                                    />
+                                    <div className="relative h-12 w-12 overflow-hidden rounded-xl bg-slate-100 shadow-sm ring-2 ring-white">
+                                      <Car className="absolute inset-0 m-auto h-5 w-5 text-slate-300" aria-hidden="true" />
+                                      <img
+                                        src={imageUrl}
+                                        alt={vehicle.Model || "Vehicle"}
+                                        className="relative h-full w-full object-cover"
+                                        onError={(e) => {
+                                          e.currentTarget.style.display = "none";
+                                        }}
+                                      />
+                                    </div>
                                   ) : (
                                     <div className="w-12 h-12 rounded-xl bg-slate-100 flex items-center justify-center">
                                       <Car className="w-5 h-5 text-slate-400" />

@@ -46,7 +46,7 @@ async function getCloudinary(): Promise<typeof import("cloudinary").v2> {
         api_key: CLOUDINARY_API_KEY,
         api_secret: CLOUDINARY_API_SECRET,
         secure: true,
-        timeout: 120, // 120 seconds (Cloudinary expects seconds, not milliseconds)
+        timeout: 120000,
       });
 
       // SDK loaded successfully
@@ -202,7 +202,7 @@ export async function uploadImage(
       const uploadOptions = {
         folder: targetFolder || "vehicles",
         resource_type: "image" as const,
-        timeout: Math.floor(timeoutMs / 1000), // Cloudinary expects seconds
+        timeout: timeoutMs,
       } as { // Explicitly define type for uploadOptions
         folder: string;
         resource_type: "image"; // Removed public_id from here

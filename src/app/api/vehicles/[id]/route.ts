@@ -9,6 +9,8 @@ import { requirePermission } from "@/lib/auth-helpers";
 import { vehicleService } from "@/services/VehicleService";
 import { normalizeImageUrl } from "@/lib/cloudinary";
 import { NextRequest, NextResponse } from "next/server";
+import type { VehicleDB } from "@/services/VehicleService";
+import { clearCachedVehicles } from "../_cache";
 
 type VehicleUpdatePayload = {
   Category?: string;
@@ -54,7 +56,7 @@ function normalizeOptionalString(value: string | null | undefined): string | nul
 }
 
 function normalizeUpdatePayload(payload: VehicleUpdatePayload) {
-  return {
+  const normalized = {
     category: firstDefined(payload.Category, payload.category)?.trim(),
     brand: firstDefined(payload.Brand, payload.brand)?.trim(),
     model: firstDefined(payload.Model, payload.model)?.trim(),
@@ -67,6 +69,10 @@ function normalizeUpdatePayload(payload: VehicleUpdatePayload) {
     color: firstDefined(payload.Color, payload.color)?.trim(),
     image_id: normalizeOptionalString(firstDefined(payload.Image, payload.image_id)),
   };
+
+  return Object.fromEntries(
+    Object.entries(normalized).filter(([, value]) => value !== undefined)
+  ) as Partial<VehicleDB>;
 }
 
 // ============================================================================
@@ -194,7 +200,11 @@ const putHandler = withErrorHandling(async (req: NextRequest, { logger, requestI
     dbPayload.image_id = normalizedImageId;
   }
 
-  // Required fields validation
+  if (Object.keys(dbPayload).length === 0) {
+    return createErrorResponse("No valid fields to update", requestId, Date.now() - startTime, 400, buildCorsHeaders(req));
+  }
+
+  // Required fields cannot be blank when they are included in a partial update.
   const requiredFields = [
     ["category", dbPayload.category],
     ["brand", dbPayload.brand],
@@ -203,7 +213,7 @@ const putHandler = withErrorHandling(async (req: NextRequest, { logger, requestI
   ] as const;
 
   for (const [field, value] of requiredFields) {
-    if (!value) {
+    if (field in dbPayload && !value) {
       return createErrorResponse(`Missing required: ${field}`, requestId, Date.now() - startTime, 400, buildCorsHeaders(req));
     }
   }
@@ -237,6 +247,8 @@ const putHandler = withErrorHandling(async (req: NextRequest, { logger, requestI
   }
 
   logger.info("[UPDATE OK]", { vehicleId: id });
+
+  clearCachedVehicles();
 
   return createSuccessResponse(
     result.data,

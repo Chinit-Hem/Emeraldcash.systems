@@ -168,9 +168,8 @@ export class VehicleService extends BaseService<VehicleEntity, VehicleDB> {
     // Normalize category with plural/singular handling
     const normalizedCategory = VehicleService.normalizeCategory(dbVehicle.category);
 
-    // Use thumbnail_url if available and is a valid URL (pre-computed Google Drive thumbnail),
-    // otherwise fall back to image_id (which may be a Cloudinary public_id or Drive ID)
-    // Check if thumbnail_url is a valid URL (starts with http://, https://, or data:)
+    // Prefer a display-ready thumbnail, but do not discard raw IDs/public IDs.
+    // Some imports/uploads store the only usable image value in thumbnail_url.
     const thumbnailUrl = dbVehicle.thumbnail_url?.trim();
     const hasValidThumbnail = thumbnailUrl && (
       thumbnailUrl.startsWith("http://") ||
@@ -185,8 +184,8 @@ export class VehicleService extends BaseService<VehicleEntity, VehicleDB> {
       imageId.startsWith("https://") ||
       imageId.startsWith("data:")
     );
-    // If thumbnail is valid, use it; otherwise fallback to the raw imageId
-    const normalizedImage = hasValidThumbnail ? thumbnailUrl : imageId;
+    const rawThumbnail = thumbnailUrl || "";
+    const normalizedImage = hasValidThumbnail ? thumbnailUrl : (imageId || rawThumbnail);
 
     // Create entity with both BaseEntity and Vehicle properties
     const vehicle: VehicleEntity = {
@@ -228,7 +227,7 @@ export class VehicleService extends BaseService<VehicleEntity, VehicleDB> {
         acc[key] = filters[key as keyof VehicleFilters];
         return acc;
       }, {} as Record<string, unknown>);
-    return `vehicles:${JSON.stringify(sortedFilters)}`;
+    return `vehicles:v2:${JSON.stringify(sortedFilters)}`;
   }
 
   /**
@@ -1042,10 +1041,14 @@ conditions.push(`(NULLIF(TRIM(COALESCE(image_id, '')), '') IS NULL AND NULLIF(TR
   ): Promise<ServiceResult<Vehicle>> {
     // Normalize category before saving
     const normalizedCategory = VehicleService.normalizeCategory(vehicle.category);
+    const imageId = vehicle.image_id?.trim() || null;
+    const thumbnailUrl = vehicle.thumbnail_url?.trim() || null;
 
     const data = {
       ...vehicle,
       category: normalizedCategory,
+      image_id: imageId,
+      thumbnail_url: thumbnailUrl,
     };
 
     const result = await this.create(data);

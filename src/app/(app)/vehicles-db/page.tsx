@@ -1,5 +1,5 @@
 import { sql } from "@/lib/db";
-import { formatPrice } from "@/lib/vehicle-helpers";
+import { formatPrice, getVehicleThumbnailUrl } from "@/lib/vehicle-helpers";
 
 // Vehicle type definition based on the vehicles table schema
 interface Vehicle {
@@ -15,6 +15,7 @@ interface Vehicle {
   body_type: string | null;
   color: string | null;
   image_id: string | null;
+  thumbnail_url: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -51,6 +52,7 @@ export default async function VehiclesDbPage() {
         body_type,
         color,
         image_id,
+        thumbnail_url,
         created_at,
         updated_at
       FROM vehicles
@@ -132,6 +134,9 @@ export default async function VehiclesDbPage() {
                   ID
                 </th>
                 <th className="px-4 py-3 text-left font-semibold text-slate-700 dark:text-slate-300 whitespace-nowrap">
+                  Image
+                </th>
+                <th className="px-4 py-3 text-left font-semibold text-slate-700 dark:text-slate-300 whitespace-nowrap">
                   Category
                 </th>
                 <th className="px-4 py-3 text-left font-semibold text-slate-700 dark:text-slate-300 whitespace-nowrap">
@@ -166,6 +171,23 @@ export default async function VehiclesDbPage() {
                 >
                   <td className="px-4 py-3 font-mono text-slate-600 dark:text-slate-400 whitespace-nowrap">
                     {vehicle.id}
+                  </td>
+                  <td className="px-4 py-3 whitespace-nowrap">
+                    {(() => {
+                      const imageUrl = getVehicleThumbnailUrl(vehicle.thumbnail_url || vehicle.image_id, "w96-h96");
+                      return imageUrl ? (
+                        <img
+                          src={imageUrl}
+                          alt={`${vehicle.brand} ${vehicle.model}`}
+                          className="h-12 w-12 rounded-lg object-cover bg-slate-100 dark:bg-slate-700"
+                          loading="lazy"
+                        />
+                      ) : (
+                        <div className="h-12 w-12 rounded-lg bg-slate-100 dark:bg-slate-700 flex items-center justify-center text-xs text-slate-400">
+                          No image
+                        </div>
+                      );
+                    })()}
                   </td>
 
                   <td className="px-4 py-3 whitespace-nowrap">

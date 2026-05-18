@@ -20,6 +20,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCachedVehicles, setCachedVehicles } from "./_cache";
 import { buildCorsHeaders } from "@/lib/cors"; // Import shared CORS utility
 import type { Vehicle } from "@/lib/types";
+import { normalizeImageUrl } from "@/lib/cloudinary";
 
 type VehiclesMeta = {
   total?: number;
@@ -41,6 +42,16 @@ type StatsResult = {
   data?: VehicleStats | null;
   error?: string;
 };
+
+function firstDefined<T>(...values: Array<T | undefined>): T | undefined {
+  return values.find((value) => value !== undefined);
+}
+
+function normalizeOptionalString(value: unknown): string | null {
+  if (value === null || value === undefined) return null;
+  const trimmed = String(value).trim();
+  return trimmed === "" ? null : trimmed;
+}
 // ============================================================================
 // CORS Configuration
 // ============================================================================
@@ -412,9 +423,21 @@ const postHandler = withErrorHandling(async (req, { logger, requestId, startTime
     }
   }
 
+  const categoryValue = firstDefined(vehicleData.category as string | undefined, vehicleData.Category as string | undefined);
+  const brandValue = firstDefined(vehicleData.brand as string | undefined, vehicleData.Brand as string | undefined);
+  const modelValue = firstDefined(vehicleData.model as string | undefined, vehicleData.Model as string | undefined);
+  const yearValue = firstDefined(vehicleData.year as string | number | undefined, vehicleData.Year as string | number | undefined);
+  const plateValue = firstDefined(vehicleData.plate as string | undefined, vehicleData.Plate as string | undefined);
+
   // Validate required fields
-  const requiredFields = ["category", "brand", "model", "year", "plate"];
-  const missingFields = requiredFields.filter(field => !vehicleData[field]);
+  const requiredFields = [
+    ["category", categoryValue],
+    ["brand", brandValue],
+    ["model", modelValue],
+    ["year", yearValue],
+    ["plate", plateValue],
+  ] as const;
+  const missingFields = requiredFields.filter(([, value]) => !value).map(([field]) => field);
 
   if (missingFields.length > 0) {
     return createErrorResponse(
@@ -427,7 +450,7 @@ const postHandler = withErrorHandling(async (req, { logger, requestId, startTime
   }
 
   // Validate year is reasonable
-  const year = parseInt(vehicleData.year as string, 10);
+  const year = parseInt(String(yearValue), 10);
   if (isNaN(year) || year < 1900 || year > 2100) {
     return createErrorResponse(
       "Invalid year. Must be between 1900 and 2100.",
@@ -439,7 +462,11 @@ const postHandler = withErrorHandling(async (req, { logger, requestId, startTime
   }
 
   // Validate market price if provided
-  const marketPriceRaw = vehicleData.market_price || vehicleData.marketPrice;
+  const marketPriceRaw = firstDefined(
+    vehicleData.market_price,
+    vehicleData.marketPrice,
+    vehicleData.PriceNew
+  );
   let marketPrice: number = 0;
   if (marketPriceRaw !== undefined && marketPriceRaw !== null && marketPriceRaw !== "") {
     const price = parseFloat(String(marketPriceRaw));
@@ -457,9 +484,9 @@ const postHandler = withErrorHandling(async (req, { logger, requestId, startTime
 
   // Create vehicle through service layer
   logger.info("Creating new vehicle", {
-    plate: vehicleData.plate,
-    category: vehicleData.category,
-    brand: vehicleData.brand,
+    plate: plateValue,
+    category: categoryValue,
+    brand: brandValue,
   });
 
   // TODO: Implement actual image upload to Cloudinary or similar service
@@ -468,20 +495,32 @@ const postHandler = withErrorHandling(async (req, { logger, requestId, startTime
     logger.warn("Image file detected but upload logic is not implemented.", { filename: imageName, size: imageSize });
   }
 
+  const rawImageId = normalizeOptionalString(firstDefined(
+    vehicleData.image_id,
+    vehicleData.imageId,
+    vehicleData.Image
+  ));
+  const rawThumbnailUrl = normalizeOptionalString(firstDefined(
+    vehicleData.thumbnail_url,
+    vehicleData.thumbnailUrl
+  ));
+  const normalizedImageId = rawImageId ? await normalizeImageUrl(rawImageId) : null;
+  const normalizedThumbnailUrl = rawThumbnailUrl ? await normalizeImageUrl(rawThumbnailUrl) : null;
+
   // Build vehicle data with proper null handling
   const createData: Parameters<typeof vehicleService.createVehicle>[0] = {
-    category: vehicleData.category as string,
-    brand: vehicleData.brand as string,
-    model: vehicleData.model as string,
+    category: String(categoryValue),
+    brand: String(brandValue),
+    model: String(modelValue),
     year: year,
-    plate: vehicleData.plate as string,
+    plate: String(plateValue),
     market_price: marketPrice,
-    tax_type: (vehicleData.tax_type as string) || (vehicleData.taxType as string) || null,
-    condition: (vehicleData.condition as "New" | "Used" | "Other") || "Other",
-    body_type: (vehicleData.body_type as string) || (vehicleData.bodyType as string) || null,
-    color: (vehicleData.color as string) || null,
-    image_id: (vehicleData.image_id as string) || (vehicleData.imageId as string) || null,
-    thumbnail_url: (vehicleData.thumbnail_url as string) || (vehicleData.thumbnailUrl as string) || null,
+    tax_type: normalizeOptionalString(firstDefined(vehicleData.tax_type, vehicleData.taxType, vehicleData.TaxType)),
+    condition: String(firstDefined(vehicleData.condition, vehicleData.Condition) || "Other") as "New" | "Used" | "Other",
+    body_type: normalizeOptionalString(firstDefined(vehicleData.body_type, vehicleData.bodyType, vehicleData.BodyType)),
+    color: normalizeOptionalString(firstDefined(vehicleData.color, vehicleData.Color)),
+    image_id: normalizedImageId,
+    thumbnail_url: normalizedThumbnailUrl,
   };
 
   const result = await vehicleService.createVehicle(createData);

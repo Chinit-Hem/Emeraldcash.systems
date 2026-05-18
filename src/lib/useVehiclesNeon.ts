@@ -51,6 +51,8 @@ interface UseVehiclesOptions {
   brand?: string;
   /** Search term */
   search?: string;
+  /** Only fetch vehicles without images */
+  withoutImage?: boolean;
   /** Auto-refresh interval in ms (default: 30000) */
   refreshInterval?: number;
 }
@@ -67,6 +69,8 @@ interface UseVehiclesReturn {
   isValidating: boolean;
 }
 
+const VEHICLE_IMAGE_CACHE_VERSION = "6";
+
 // ============================================================================
 // Fetcher
 // ============================================================================
@@ -77,6 +81,7 @@ interface UseVehiclesReturn {
 async function fetcher(url: string): Promise<VehiclesResponse> {
   const response = await fetch(url, {
     credentials: "include",
+    cache: "no-store",
   });
 
   if (!response.ok) {
@@ -114,12 +119,19 @@ limit = 500, // Increased for dashboard pagination fix (total 1218 vehicles)
     category,
     brand,
     search,
+    withoutImage,
     refreshInterval = 0,
   } = options;
+
+  // Track if we should force refresh due to mutation
+  const [forceRefreshKey, setForceRefreshKey] = useState(0);
+  const lastMutationTimeRef = useRef<number | null>(null);
 
   // Build query string
   const queryString = useMemo(() => {
     const params = new URLSearchParams();
+    params.set("cacheVersion", VEHICLE_IMAGE_CACHE_VERSION);
+    if (forceRefreshKey > 0) params.set("refreshKey", String(forceRefreshKey));
     if (cursor) params.set("cursor", cursor);
     // Always set the limit if provided, let the API handle defaults/max
     if (limit) params.set("limit", String(limit));
@@ -127,15 +139,12 @@ limit = 500, // Increased for dashboard pagination fix (total 1218 vehicles)
     if (category && category !== "All") params.set("category", category);
     if (brand && brand !== "All") params.set("brand", brand);
     if (search) params.set("search", search);
+    if (withoutImage) params.set("withoutImage", "true");
     return params.toString();
-  }, [cursor, limit, category, brand, search]);
+  }, [cursor, forceRefreshKey, limit, category, brand, search, withoutImage]);
 
   // SWR key
   const key = `/api/vehicles/edge?${queryString}`;
-
-  // Track if we should force refresh due to mutation
-  const [, setForceRefreshKey] = useState(0);
-  const lastMutationTimeRef = useRef<number | null>(null);
 
   // Check for mutations on mount and periodically
   useEffect(() => {
@@ -214,6 +223,7 @@ limit = 500, // Increased for dashboard pagination fix (total 1218 vehicles)
 
   // Manual refresh
   const refresh = useCallback(async () => {
+    setForceRefreshKey(prev => prev + 1);
     await revalidate();
   }, [revalidate]);
 

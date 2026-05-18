@@ -347,7 +347,7 @@ export default function AddVehicleModalOptimistic({ isOpen, onClose, onSuccess }
 
   if (!isOpen) return null;
 
-  const isDisabled = isAdding || isImageProcessing;
+  const isDisabled = isAdding || isProcessing || isImageProcessing;
   const examples = getBasicInfoExamples(formData.Category);
 
   return (
@@ -473,10 +473,10 @@ export default function AddVehicleModalOptimistic({ isOpen, onClose, onSuccess }
               disabled={isDisabled}
               className="px-6 py-2 rounded-xl font-medium text-white bg-emerald-500 hover:bg-emerald-600 shadow-md hover:shadow-lg transition-all disabled:opacity-50 flex items-center gap-2"
             >
-              {isImageProcessing || isAdding ? (
+              {isImageProcessing || isAdding || isProcessing ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin" />
-                  {isImageProcessing ? "Processing image..." : "Adding..."}
+                  {isImageProcessing || isProcessing ? "Processing image..." : "Adding..."}
                 </>
               ) : (
                 <>

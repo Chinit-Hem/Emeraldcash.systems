@@ -3,7 +3,7 @@
 import { derivePrices } from "@/lib/pricing";
 import type { Vehicle } from "@/lib/types";
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { formatPrice, getVehicleThumbnailUrl } from "@/lib/vehicle-helpers";
 
 interface VehicleCardMobileProps {
@@ -32,6 +32,11 @@ export default function VehicleCardMobile({
   const [imageError, setImageError] = useState(false);
 
   const vehicleId = vehicle.VehicleId;
+
+  useEffect(() => {
+    setImageError(false);
+  }, [vehicle.Image]);
+
   const derived = derivePrices(vehicle.PriceNew);
   const price40 = vehicle.Price40 ?? derived.Price40;
   const price70 = vehicle.Price70 ?? derived.Price70;

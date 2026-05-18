@@ -83,3 +83,6 @@ build.log
 
 # Apps Script (Google integration)
 /apps-script/
+
+# Codex logs
+.codex/

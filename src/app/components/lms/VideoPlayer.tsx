@@ -102,7 +102,7 @@ type ProgressResponse = {
 
 const YOUTUBE_IFRAME_API_SRC = "https://www.youtube.com/iframe_api";
 const PROGRESS_SAVE_INTERVAL_MS = 10_000;
-const PROGRESS_POLL_INTERVAL_MS = 250;
+const PROGRESS_POLL_INTERVAL_MS = 1_000;
 const VIDEO_CONTROLS_HIDE_DELAY_MS = 2_200;
 const MAX_PLAYBACK_RATE = 1.25;
 const SEEK_GRACE_SECONDS = 2;

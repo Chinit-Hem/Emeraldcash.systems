@@ -364,6 +364,10 @@ export default function VehicleTable({
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const columnMenuRef = useRef<HTMLDivElement>(null);
 
+  useEffect(() => {
+    setImageErrors(new Set());
+  }, [vehicles]);
+
   // Handle outside click to close dropdown
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {

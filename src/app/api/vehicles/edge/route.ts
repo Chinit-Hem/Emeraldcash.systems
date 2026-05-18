@@ -44,6 +44,8 @@ const getHandler = withErrorHandling(async (req: NextRequest) => {
   if (searchParams.get("category")) filters.category = searchParams.get("category")!;
   if (searchParams.get("brand")) filters.brand = searchParams.get("brand")!;
   if (searchParams.get("search")) filters.searchTerm = searchParams.get("search")!;
+  const withoutImage = searchParams.get("withoutImage");
+  if (withoutImage === "1" || withoutImage === "true") filters.withoutImage = true;
   if (searchParams.get("cursor")) filters.offset = parseInt(searchParams.get("cursor")!) * filters.limit!;
 
   const result = await vehicleService.getVehicles(filters);

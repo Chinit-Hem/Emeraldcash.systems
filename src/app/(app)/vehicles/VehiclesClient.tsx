@@ -44,6 +44,11 @@ function IOSVehicleCard({ vehicle, isAdmin, onEdit, onDelete }: IOSVehicleCardPr
   const [imageError, setImageError] = useState(false);
 
   const vehicleId = vehicle.VehicleId;
+
+  useEffect(() => {
+    setImageError(false);
+  }, [vehicle.Image]);
+
   const derived = derivePrices(vehicle.PriceNew);
   const price40 = vehicle.Price40 ?? derived.Price40;
   const price70 = vehicle.Price70 ?? derived.Price70;

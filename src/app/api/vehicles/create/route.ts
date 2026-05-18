@@ -11,6 +11,8 @@ import { vehicleService } from "@/services/VehicleService";
 import { NextRequest, NextResponse } from "next/server";
 import type { Vehicle } from "@/lib/types";
 import type { VehicleDB } from "@/services/VehicleService";
+import { clearCachedVehicles } from "../_cache";
+import { normalizeImageUrl } from "@/lib/cloudinary";
 
 // ============================================================================
 // CORS Headers (match existing pattern)
@@ -76,6 +78,8 @@ const postHandler = withErrorHandling(async (req: NextRequest, { logger, request
     requestId
   });
 
+  const imageId = payload.Image ? await normalizeImageUrl(payload.Image) : null;
+
   // Convert to DB format for service
   const dbPayload = {
     category: payload.Category as string,
@@ -88,7 +92,8 @@ const postHandler = withErrorHandling(async (req: NextRequest, { logger, request
     condition: payload.Condition as string,
     body_type: payload.BodyType as string || null,
     color: payload.Color as string || null,
-    image_id: payload.Image as string || null,
+    image_id: imageId,
+    thumbnail_url: imageId,
   };
 
   // Create vehicle
@@ -110,6 +115,8 @@ const postHandler = withErrorHandling(async (req: NextRequest, { logger, request
     plate: result.data.Plate,
     requestId
   });
+
+  clearCachedVehicles();
 
   return createSuccessResponse(
     result.data,

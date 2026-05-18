@@ -27,9 +27,28 @@ function useConnectionWarmer() {
   }, []);
 }
 
+function useDesktopSidebar() {
+  const [isDesktop, setIsDesktop] = useState(false);
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia("(min-width: 1024px)");
+    const update = () => setIsDesktop(mediaQuery.matches);
+
+    update();
+    mediaQuery.addEventListener?.("change", update);
+
+    return () => {
+      mediaQuery.removeEventListener?.("change", update);
+    };
+  }, []);
+
+  return isDesktop;
+}
+
 function AppShellContent({ children }: AppShellProps) {
   const router = useRouter();
   const pathname = usePathname();
+  const isDesktopSidebar = useDesktopSidebar();
 
   // OPTIMIZATION: Show UI immediately with cached user, check auth in background
   const [user, setUser] = useState<User | null>(() => getCachedUser());
@@ -177,11 +196,13 @@ function AppShellContent({ children }: AppShellProps) {
     <div className="flex min-h-screen bg-transparent pb-safe lg:pb-0">
       <AuthUserProvider user={user}>
         {/* Desktop sidebar */}
-        <div className="hidden lg:block">
-          <Suspense fallback={null}>
-            <Sidebar user={user} />
-          </Suspense>
-        </div>
+        {isDesktopSidebar && (
+          <div className="hidden lg:block">
+            <Suspense fallback={null}>
+              <Sidebar user={user} />
+            </Suspense>
+          </div>
+        )}
 
         {/* Mobile drawer - Neumorphism style */}
         {isSidebarOpen && (

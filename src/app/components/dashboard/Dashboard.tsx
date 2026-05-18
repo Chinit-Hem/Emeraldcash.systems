@@ -413,7 +413,8 @@ export default function Dashboard({
     async function fetchSearchResults() {
       setIsSearching(true);
       try {
-        const url = `/api/vehicles/edge?search=${encodeURIComponent(debouncedSearch)}&limit=2000`;
+        const searchLimit = isIOSSafari ? 300 : 2000;
+        const url = `/api/vehicles/edge?search=${encodeURIComponent(debouncedSearch)}&limit=${searchLimit}`;
         const res = await fetch(url, { cache: "no-store" });
         if (!res.ok) throw new Error("Search failed");
         const data = await res.json();
@@ -431,7 +432,7 @@ export default function Dashboard({
     }
 
     fetchSearchResults();
-  }, [debouncedSearch]);
+  }, [debouncedSearch, isIOSSafari]);
 
   const aggregatedStats = useMemo(() => {
     if (!vehicles.length) return null;
