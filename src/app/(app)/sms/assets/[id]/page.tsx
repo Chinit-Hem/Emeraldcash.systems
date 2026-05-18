@@ -14,7 +14,6 @@ import {
   Layers3,
   MapPin,
   Package,
-  RotateCcw,
   Tag,
   Trash2,
   User,
@@ -197,7 +196,7 @@ export default function SmsAssetDetailPage() {
   const latestTransfer = useMemo(() => transfers[0], [transfers]);
   const historyEvents = history?.events || [];
 
-  const handleDelete = async () => {
+const handleDelete = async () => {
     if (!asset) return;
     if (!confirm(`Delete ${asset.name}? This cannot be undone.`)) return;
 
@@ -210,30 +209,6 @@ export default function SmsAssetDetailPage() {
       router.push("/sms/assets");
     } catch (err) {
       alert(err instanceof Error ? err.message : "Delete failed");
-    }
-  };
-
-  const handleReturn = async () => {
-    if (!asset) return;
-    if (!confirm(`Return ${asset.name} to stock?`)) return;
-
-    try {
-      const res = await fetch(`/api/sms/assets/${id}/return`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          location: asset.location || undefined,
-          remark: "Returned from asset details",
-        }),
-      });
-      const body = await res.json().catch(() => ({}));
-      if (!res.ok || body.success === false) {
-        throw new Error(body?.error || "Return failed");
-      }
-
-      await loadAsset();
-    } catch (err) {
-      alert(err instanceof Error ? err.message : "Return failed");
     }
   };
 
@@ -279,23 +254,13 @@ export default function SmsAssetDetailPage() {
           </Link>
 
           <div className="flex flex-wrap gap-2">
-            <Link
+<Link
               href={`/sms/assets/${asset.id}/edit`}
               className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-100"
             >
               <Edit3 className="h-4 w-4" />
               Edit
             </Link>
-            {asset.status !== "Available" && (
-              <button
-                type="button"
-                onClick={handleReturn}
-                className="inline-flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-700 shadow-sm transition hover:bg-blue-100"
-              >
-                <RotateCcw className="h-4 w-4" />
-                Return Stock
-              </button>
-            )}
             {isAdmin && (
               <button
                 type="button"

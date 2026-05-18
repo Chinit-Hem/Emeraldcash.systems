@@ -142,6 +142,37 @@ const uploadTransferImage = async (): Promise<string | null> => {
     return result.url as string;
   };
 
+// Helper to check if input is a valid UUID
+const isValidUUID = (value: string): boolean => {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
+};
+
+// Helper to create a new asset from transfer form
+const createAssetFromTransfer = async (assetName: string): Promise<{ success: boolean; assetId?: string; error?: string }> => {
+  try {
+    const response = await fetch("/api/sms/assets", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: assetName.trim(),
+        type: "Other",
+        quantity: 1,
+        status: "Available",
+      }),
+    });
+
+    const result = await response.json().catch(() => ({}));
+
+    if (!response.ok || !result.success) {
+      return { success: false, error: result.error || "Failed to create asset" };
+    }
+
+    return { success: true, assetId: result.data?.id };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : "Failed to create asset" };
+  }
+};
+
 const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setGeneralError("");
@@ -151,14 +182,48 @@ const handleSubmit = async (e: React.FormEvent) => {
     // Use selectedAssetId if available (from dropdown), otherwise resolve asset name to ID
     let finalAssetId = selectedAssetId || form.assetSearch.trim();
     
+    // Check if input is a new asset name (not UUID, not matching existing asset)
+    const assetInput = finalAssetId.trim();
+    const isNewAsset = assetInput.length >= 2 && 
+      !isValidUUID(assetInput) && 
+      !assets.some(
+        (a) => a.name.toLowerCase() === assetInput.toLowerCase() ||
+              (a.itemCode?.toLowerCase() === assetInput.toLowerCase())
+      );
+
     // If typed value doesn't look like UUID, try to find matching asset by name or itemCode
-    if (!finalAssetId.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)) {
+    if (!isValidUUID(finalAssetId) && !isNewAsset) {
       const matchedAsset = assets.find(
         (a) => a.name.toLowerCase() === finalAssetId.toLowerCase() ||
               (a.itemCode?.toLowerCase() === finalAssetId.toLowerCase())
       );
       if (matchedAsset) {
         finalAssetId = matchedAsset.id;
+      }
+    }
+
+    // If it's a new asset, create it first
+    if (isNewAsset) {
+      setLoading(true);
+      setGeneralError("");
+      try {
+        const createResult = await createAssetFromTransfer(assetInput);
+        if (!createResult.success) {
+          setGeneralError(createResult.error || "Failed to create new asset");
+          return;
+        }
+        finalAssetId = createResult.assetId!;
+        
+        // Refresh assets list for future selections
+        const assetsRes = await fetch('/api/sms/assets?pageSize=100');
+        const assetsData = await assetsRes.json().catch(() => ({}));
+        if (assetsData.success && Array.isArray(assetsData.data)) {
+          setAssets(assetsData.data.map((a: SmsAssetApiItem) => ({ id: a.id, name: a.name, itemCode: a.itemCode })));
+        }
+      } catch (err) {
+        setGeneralError(err instanceof Error ? err.message : "Failed to create new asset");
+        setLoading(false);
+        return;
       }
     }
     
@@ -200,7 +265,9 @@ const handleSubmit = async (e: React.FormEvent) => {
         throw new Error(data.error || "Failed to create transfer");
       }
 
-      setSuccess("Transfer created successfully!");
+      setSuccess(isNewAsset 
+        ? "New asset created and transfer successful!" 
+        : "Transfer created successfully!");
       setTimeout(() => router.push("/sms"), 1200);
     } catch (err) {
       setGeneralError(err instanceof Error ? err.message : "Failed to create transfer");
