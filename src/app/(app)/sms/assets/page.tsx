@@ -22,6 +22,7 @@ interface SmsAsset {
 
 interface SmsStats {
   totalAssets: number;
+  todayChange: number;
   available: number;
   inUse: number;
   borrowed: number;
@@ -263,7 +264,7 @@ const handleSaveAsset = async (data: Omit<SmsAsset, 'id'>): Promise<{ success: b
 
 {/* Stats Cards */}
         {stats && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-6 mb-12">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-7 gap-6 mb-12">
             <div className="group p-8 bg-white/70 backdrop-blur-xl rounded-3xl border border-slate-200 shadow-xl hover:shadow-2xl hover:-translate-y-2 transition-all cursor-pointer">
               <div className="text-4xl font-bold bg-gradient-to-r from-emerald-600 to-emerald-700 bg-clip-text text-transparent mb-3">
                 {stats.totalAssets}
@@ -299,6 +300,12 @@ const handleSaveAsset = async (data: Omit<SmsAsset, 'id'>): Promise<{ success: b
                 {stats.notReturned}
               </div>
               <div className="text-sm font-semibold text-slate-600 uppercase tracking-wide mb-2">Not Returned</div>
+            </div>
+            <div className="group p-8 bg-white/70 backdrop-blur-xl rounded-3xl border border-slate-200 shadow-xl hover:shadow-2xl hover:-translate-y-2 transition-all">
+              <div className="text-4xl font-bold bg-gradient-to-r from-violet-500 to-violet-600 bg-clip-text text-transparent mb-3">
+                {stats.todayChange > 0 ? `+${stats.todayChange}` : stats.todayChange}
+              </div>
+              <div className="text-sm font-semibold text-slate-600 uppercase tracking-wide mb-2">Today</div>
             </div>
           </div>
         )}
