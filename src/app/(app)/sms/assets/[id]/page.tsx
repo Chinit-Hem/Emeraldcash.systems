@@ -23,7 +23,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
-import ImageModal from "./components/ImageModal";
+import ImageModal from "../components/ImageModal";
 
 interface SmsAsset {
   id: string;
