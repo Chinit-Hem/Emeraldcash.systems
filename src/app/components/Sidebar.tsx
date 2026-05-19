@@ -86,6 +86,8 @@ function IconSettings() {
 interface SidebarProps {
   user: User;
   onNavigate?: () => void;
+  /** When true, enable expensive work (counts fetch + route prefetch). */
+  isVisible?: boolean;
 }
 
 // NavItem component with flat styling and instant navigation
@@ -236,11 +238,11 @@ function QuickFilterButton({
   }
 
 
-export default function Sidebar({ user, onNavigate }: SidebarProps) {
+export default function Sidebar({ user, onNavigate, isVisible = true }: SidebarProps) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const { stats } = useVehicleStats(300000);
+  const { stats } = useVehicleStats(isVisible ? 300000 : 0);
   const { language } = useLanguage();
   const { t } = useTranslation(language);
   const [pendingHref, setPendingHref] = useState<string | null>(null);
@@ -255,6 +257,9 @@ export default function Sidebar({ user, onNavigate }: SidebarProps) {
   const isSmsActive = pathname.startsWith("/sms");
   const isVehiclesActive = pathname === "/vehicles" && !activeCategory;
   const isCarsActive = pathname === "/vehicles" && normalizeCategory(activeCategory) === "cars";
+
+  // Some pages use category labels in different casing (Cars/Car). Treat both as active.
+  const isCarsPage = pathname === "/vehicles" && (normalizeCategory(activeCategory) === "cars" || normalizeCategory(activeCategory) === "car");
   const isMotorcyclesActive = pathname === "/vehicles" && normalizeCategory(activeCategory) === "motorcycles";
   const isTukTuksActive = pathname === "/vehicles" && (normalizeCategory(activeCategory) === "tuktuks" || isTukTukCategory(activeCategory));
   const isStockActive = pathname.startsWith("/stock");
@@ -269,27 +274,61 @@ export default function Sidebar({ user, onNavigate }: SidebarProps) {
     []
   );
 
+  // Safe prefetch with fallback for iOS Safari
+  // IMPORTANT: only run when the drawer is actually visible to avoid mobile "menu open delay".
   useEffect(() => {
+    if (!isVisible) return;
+
+    const isIOS =
+      typeof navigator !== "undefined" && /iPad|iPhone|iPod/.test(navigator.userAgent);
+
+    // iOS Safari is triggering a crash/reload loop here (observed as
+    // “A problem repeatedly occurred…” on the deployed site). To stabilize,
+    // skip aggressive prefetching entirely on iOS.
+    if (isIOS) return;
+
     const prefetchRoutes = () => {
       sidebarRoutes.forEach((href, index) => {
         globalThis.setTimeout(() => router.prefetch(href), index * 60);
       });
     };
 
-    if ("requestIdleCallback" in window) {
-      window.requestIdleCallback(prefetchRoutes, { timeout: 1500 });
-    } else {
-      globalThis.setTimeout(prefetchRoutes, 500);
-    }
-  }, [router, sidebarRoutes]);
+    // Small delay so the drawer can render instantly before prefetch work starts.
+    const t = window.setTimeout(() => {
+      if ("requestIdleCallback" in window) {
+        try {
+          window.requestIdleCallback(prefetchRoutes, { timeout: 1500 });
+        } catch {
+          globalThis.setTimeout(prefetchRoutes, 500);
+        }
+      } else {
+        globalThis.setTimeout(prefetchRoutes, 500);
+      }
+    }, 250);
+
+    return () => window.clearTimeout(t);
+  }, [router, sidebarRoutes, isVisible]);
 
   const handleNavigate = useCallback((href: string) => {
+    // Do not block navigation based on pathname/search param equality.
+    // In this app, quick-filter navigation frequently updates only query params,
+    // and blocking based on a potentially stale comparison can prevent state from clearing/setting.
     setPendingHref(href);
+
     onNavigate?.();
-    startTransition(() => {
-      router.push(href);
-    });
-  }, [onNavigate, router]);
+
+    try {
+      startTransition(() => {
+        router.push(href);
+        // Clear immediately so another Quick Filter click never gets blocked.
+        setPendingHref(null);
+      });
+    } catch (navError) {
+      console.error('[Sidebar] Navigation error:', navError);
+      setPendingHref(null);
+      window.location.href = href;
+    }
+  }, [onNavigate, router, pathname]);
 
   const handleLinkClick = useCallback((href: string) => {
     setPendingHref(href);
@@ -298,7 +337,7 @@ export default function Sidebar({ user, onNavigate }: SidebarProps) {
 
   const isPendingActive = useCallback((href: string) => pendingHref === href, [pendingHref]);
 
-  // Get counts
+  // Get counts (may be 0 while drawer isn't visible yet)
   const allVehiclesCount = stats?.total ?? 0;
   const carsCount = stats?.byCategory?.Cars ?? 0;
   const motorcyclesCount = stats?.byCategory?.Motorcycles ?? 0;
