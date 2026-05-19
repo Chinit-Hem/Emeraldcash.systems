@@ -12,6 +12,7 @@ import { ArrowLeft, CheckCircle2, Clock, Loader2, Package, RefreshCw, Users, XCi
 import Image from 'next/image';
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import ImageModal from '../assets/components/ImageModal';
 
 interface LocalUser {
   username: string;
@@ -63,7 +64,8 @@ export default function PendingPage() {
   const [actionLoading, setActionLoading] = useState<Record<string, boolean>>({});
   const [rejectRemarks, setRejectRemarks] = useState<Record<string, string>>({});
   const [rejectErrors, setRejectErrors] = useState<Record<string, string>>({});
-  const { toasts, removeToast, success: toastSuccess, error: toastError } = useToast();
+const { toasts, removeToast, success: toastSuccess, error: toastError } = useToast();
+  const [viewImage, setViewImage] = useState<{ src: string; alt: string } | null>(null);
 
 
   const fetchUsers = useCallback(async () => {
@@ -395,16 +397,21 @@ export default function PendingPage() {
                       <p className="text-sm leading-6 text-blue-900">{transfer.remark}</p>
                     </div>
                   )}
-                  {transfer.imageUrl && (
-                    <div className="relative mt-6 h-40 w-full overflow-hidden rounded-2xl border border-slate-200 bg-slate-100 sm:w-64">
+{transfer.imageUrl && (
+                    <button
+                      type="button"
+                      onClick={() => setViewImage({ src: transfer.imageUrl!, alt: `Transfer proof - Transfer #${transfer.id.slice(-8)}` })}
+                      className="relative mt-6 h-40 w-full overflow-hidden rounded-2xl border border-slate-200 bg-slate-100 sm:w-64 cursor-zoom-in focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                      aria-label="View transfer proof larger"
+                    >
                       <Image
-                        src={transfer.imageUrl}
+                        src={transfer.imageUrl!}
                         alt="Transfer proof"
                         fill
                         sizes="256px"
                         className="object-cover"
                       />
-                    </div>
+                    </button>
                   )}
                 </CardContent>
                 <div className="px-6 pb-6 relative z-10 bg-gradient-to-t from-slate-50/80 to-transparent rounded-b-3xl pt-4">
@@ -543,7 +550,15 @@ export default function PendingPage() {
         </div>
       </div>
 
-      <GlassToast toasts={toasts} onRemove={removeToast} />
+<GlassToast toasts={toasts} onRemove={removeToast} />
+
+      {/* Image lightbox modal */}
+      <ImageModal
+        src={viewImage?.src || ""}
+        alt={viewImage?.alt || ""}
+        isOpen={!!viewImage}
+        onClose={() => setViewImage(null)}
+      />
     </div>
   );
 }

@@ -6,6 +6,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import AssetFormModal from './components/AssetFormModal';
+import ImageModal from './components/ImageModal';
 
 interface SmsAsset {
   id: string;
@@ -69,6 +70,7 @@ export default function AssetsPage() {
 const [createModalOpen, setCreateModalOpen] = useState(false);
   const [editingAsset, setEditingAsset] = useState<SmsAsset | null>(null);
   const [imageErrors, setImageErrors] = useState<Set<string>>(new Set());
+  const [viewImage, setViewImage] = useState<{ src: string; alt: string } | null>(null);
 
   // Track images that failed to load - reset when assets change
   useEffect(() => {
@@ -410,7 +412,12 @@ const handleSaveAsset = async (data: Omit<SmsAsset, 'id'>): Promise<{ success: b
                         <td className="px-6 py-6 whitespace-nowrap">
                           <div className="flex items-center gap-4">
 {asset.imageUrl && !imageErrors.has(asset.id) ? (
-                              <div className="relative w-14 h-14 rounded-2xl overflow-hidden shadow-md bg-slate-100">
+                              <button
+                                type="button"
+                                onClick={() => setViewImage({ src: asset.imageUrl!, alt: asset.name })}
+                                className="relative w-14 h-14 rounded-2xl overflow-hidden shadow-md bg-slate-100 cursor-zoom-in focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                                aria-label={`View ${asset.name} larger`}
+                              >
                                 <Image
                                   src={asset.imageUrl!}
                                   alt={asset.name}
@@ -420,7 +427,7 @@ const handleSaveAsset = async (data: Omit<SmsAsset, 'id'>): Promise<{ success: b
                                   onError={() => handleImageError(asset.id)}
                                   loading="lazy"
                                 />
-                              </div>
+                              </button>
                             ) : (
                               <div className="w-14 h-14 bg-gradient-to-br from-slate-200 to-slate-300 rounded-2xl flex items-center justify-center shadow-md">
                                 <ImageIcon className="w-8 h-8 text-slate-500" />
@@ -524,8 +531,16 @@ const handleSaveAsset = async (data: Omit<SmsAsset, 'id'>): Promise<{ success: b
         }}
         onSave={handleSaveAsset}
         initialData={editingAsset || {}}
-        title={editingAsset ? `Edit ${editingAsset.name}` : 'New Asset'}
+title={editingAsset ? `Edit ${editingAsset.name}` : 'New Asset'}
         isEdit={!!editingAsset}
+      />
+
+      {/* Image lightbox modal */}
+      <ImageModal
+        src={viewImage?.src || ""}
+        alt={viewImage?.alt || ""}
+        isOpen={!!viewImage}
+        onClose={() => setViewImage(null)}
       />
     </div>
   );

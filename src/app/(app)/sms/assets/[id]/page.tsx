@@ -23,6 +23,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
+import ImageModal from "./components/ImageModal";
 
 interface SmsAsset {
   id: string;
@@ -146,9 +147,10 @@ export default function SmsAssetDetailPage() {
 const [asset, setAsset] = useState<SmsAsset | null>(null);
   const [transfers, setTransfers] = useState<SmsTransfer[]>([]);
   const [history, setHistory] = useState<AssetHistory | null>(null);
-  const [loading, setLoading] = useState(true);
+const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [imageError, setImageError] = useState(false);
+  const [viewImage, setViewImage] = useState<{ src: string; alt: string } | null>(null);
 
   const loadAsset = async () => {
     if (!id) return;
@@ -279,16 +281,21 @@ const handleDelete = async () => {
           <div className="grid gap-0 lg:grid-cols-[280px_1fr]">
 <div className="flex min-h-64 items-center justify-center border-b border-slate-200 bg-slate-100 lg:border-b-0 lg:border-r">
               {asset.imageUrl && !imageError ? (
-                <div className="relative h-full min-h-64 w-full">
+                <button
+                  type="button"
+                  onClick={() => setViewImage({ src: asset.imageUrl!, alt: asset.name })}
+                  className="relative h-full min-h-64 w-full cursor-zoom-in focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2"
+                  aria-label={`View ${asset.name} larger`}
+                >
                   <Image 
-                    src={asset.imageUrl} 
+                    src={asset.imageUrl!} 
                     alt={asset.name} 
                     fill 
                     sizes="280px" 
                     className="object-cover"
                     onError={() => setImageError(true)}
                   />
-                </div>
+                </button>
               ) : (
                 <div className="flex flex-col items-center gap-3 text-slate-400">
                   <ImageIcon className="h-12 w-12" />
@@ -373,17 +380,22 @@ const handleDelete = async () => {
                         <div className="font-semibold text-slate-900">{transfer.location || "-"}</div>
                       </div>
                     </div>
-                    {transfer.remark ? <p className="mt-3 text-sm text-slate-600">{transfer.remark}</p> : null}
+{transfer.remark ? <p className="mt-3 text-sm text-slate-600">{transfer.remark}</p> : null}
                     {transfer.imageUrl ? (
-                      <div className="relative mt-3 h-36 w-full overflow-hidden rounded-lg border border-slate-200 bg-slate-100 sm:w-56">
+                      <button
+                        type="button"
+                        onClick={() => setViewImage({ src: transfer.imageUrl!, alt: `${asset.name} - Return proof` })}
+                        className="relative mt-3 h-36 w-full cursor-zoom-in overflow-hidden rounded-lg border border-slate-200 bg-slate-100 sm:w-56 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2"
+                        aria-label="View transfer image larger"
+                      >
                         <Image
-                          src={transfer.imageUrl}
+                          src={transfer.imageUrl!}
                           alt="Return proof"
                           fill
                           sizes="224px"
                           className="object-cover"
                         />
-                      </div>
+                      </button>
                     ) : null}
                   </div>
                 ))}
@@ -424,9 +436,17 @@ const handleDelete = async () => {
                 ))}
               </div>
             )}
-          </section>
+</section>
         </div>
       </div>
+
+      {/* Image lightbox modal */}
+      <ImageModal
+        src={viewImage?.src || ""}
+        alt={viewImage?.alt || ""}
+        isOpen={!!viewImage}
+        onClose={() => setViewImage(null)}
+      />
     </div>
   );
 }
