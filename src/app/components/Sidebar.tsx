@@ -242,7 +242,12 @@ export default function Sidebar({ user, onNavigate, isVisible = true }: SidebarP
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const { stats } = useVehicleStats(isVisible ? 300000 : 0);
+  const isIOS =
+    typeof navigator !== "undefined" && /iPad|iPhone|iPod/.test(navigator.userAgent);
+
+  // On iOS Safari, opening the drawer should be stable and fast.
+  // Avoid refresh polling while the drawer mounts to prevent crashes/reload loops.
+  const { stats } = useVehicleStats(isVisible && !isIOS ? 300000 : 0);
   const { language } = useLanguage();
   const { t } = useTranslation(language);
   const [pendingHref, setPendingHref] = useState<string | null>(null);
