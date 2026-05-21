@@ -18,6 +18,7 @@ import { canAccessLMS, canManageLMS, getSession } from "@/lib/auth-helpers";
 import { dbManager } from "@/lib/db-singleton";
 import { resolveLmsStaffContext } from "@/lib/lms-auth";
 import { invalidateSequentialLessonsCache } from "@/lib/lms-cache";
+import { canAccessLessonForRole, filterLessonIdsForRole } from "@/lib/lms-lesson-access";
 
 const REQUIRED_WATCH_PERCENTAGE = 95;
 
@@ -60,9 +61,11 @@ export async function GET(request: NextRequest) {
     );
   }
 
+  const visibleLessonIds = await filterLessonIdsForRole(result.data ?? [], session.role);
+
   return NextResponse.json({
     success: true,
-    data: result.data,
+    data: visibleLessonIds,
     meta: result.meta,
   });
 }
@@ -109,6 +112,13 @@ const isAdmin = canManageLMS(session);
       return staffContext.response;
     }
     const staffId = staffContext.staffId;
+
+    if (!(await canAccessLessonForRole(lessonId, session.role))) {
+      return NextResponse.json(
+        { success: false, error: "Lesson not found" },
+        { status: 404 }
+      );
+    }
 
     // Admins without staff profile can still mark their own lessons complete
     // staffId = 0 means admin without staff profile, allow completion without checking percentage

@@ -55,7 +55,17 @@ export interface LmsDashboardStats {
     staff_name: string;
     branch: string | null;
     role: string;
+    completed_lessons_count: number;
+    total_lessons: number;
     completion_percentage: number;
+    watched_lessons_count: number;
+    in_progress_lessons_count: number;
+    average_watch_percentage: number;
+    latest_watch_percentage: number;
+    last_completed_at: string | null;
+    last_watched_at: string | null;
+    last_watched_lesson_title: string | null;
+    training_status: "not_started" | "watching" | "ready_to_complete" | "completed";
     last_activity: string | null;
   }[];
   category_completion: {
@@ -583,8 +593,8 @@ export class LmsService extends BaseService<LmsCategoryEntity, LmsCategoryDB> {
     const startTime = Date.now();
 
     try {
-      const validRoles = ["Appraiser", "Manager", "Admin", "Trainee"];
-      const role = input.role && validRoles.includes(input.role) ? input.role : "Trainee";
+      const validRoles = ["Admin", "Staff", "Accounting"];
+      const role = input.role && validRoles.includes(input.role) ? input.role : "Staff";
 
       const staff = await this.staffRepo.create({
         full_name: input.fullName,
@@ -849,17 +859,44 @@ export class LmsService extends BaseService<LmsCategoryEntity, LmsCategoryDB> {
         overall_completion_rate: totalPossibleCompletions > 0
           ? Math.round((stats.completedLessonsTotal / totalPossibleCompletions) * 100)
           : 0,
-        staff_progress: staffProgress.map(s => ({
-          staff_id: s.staff_id,
-          staff_name: s.staff_name,
-          branch: s.branch,
-          role: s.role,
-          completion_percentage: calculateCompletionPercentage(
-            s.completed_count,
+        staff_progress: staffProgress.map(s => {
+          const completedLessonsCount = Number(s.completed_count) || 0;
+          const watchedLessonsCount = Number(s.watched_lessons_count) || 0;
+          const inProgressLessonsCount = Number(s.in_progress_lessons_count) || 0;
+          const averageWatchPercentage = Math.round(Number(s.average_watch_percentage) || 0);
+          const latestWatchPercentage = Math.round(Number(s.latest_watch_percentage) || 0);
+          const completionPercentage = calculateCompletionPercentage(
+            completedLessonsCount,
             totalLessons
-          ),
-          last_activity: s.last_activity,
-        })),
+          );
+          const trainingStatus =
+            completionPercentage >= 100
+              ? "completed"
+              : latestWatchPercentage >= 95
+                ? "ready_to_complete"
+                : watchedLessonsCount > 0 || completedLessonsCount > 0
+                  ? "watching"
+                  : "not_started";
+
+          return {
+            staff_id: s.staff_id,
+            staff_name: s.staff_name,
+            branch: s.branch,
+            role: s.role,
+            completed_lessons_count: completedLessonsCount,
+            total_lessons: totalLessons,
+            completion_percentage: completionPercentage,
+            watched_lessons_count: watchedLessonsCount,
+            in_progress_lessons_count: inProgressLessonsCount,
+            average_watch_percentage: averageWatchPercentage,
+            latest_watch_percentage: latestWatchPercentage,
+            last_completed_at: s.last_completed_at,
+            last_watched_at: s.last_watched_at,
+            last_watched_lesson_title: s.last_watched_lesson_title,
+            training_status: trainingStatus,
+            last_activity: s.last_activity,
+          };
+        }),
         category_completion: categoryCompletion.map(c => ({
           category_id: c.category_id,
           category_name: c.category_name,
@@ -1126,6 +1163,7 @@ export class LmsService extends BaseService<LmsCategoryEntity, LmsCategoryDB> {
       durationMinutes: dbRecord.duration_minutes,
       orderIndex: dbRecord.order_index,
       isActive: dbRecord.is_active,
+      allowedRoles: dbRecord.allowed_roles ?? [],
     };
   }
 

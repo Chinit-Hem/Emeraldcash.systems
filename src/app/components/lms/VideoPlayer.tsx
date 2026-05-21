@@ -296,7 +296,9 @@ export function VideoPlayer({
   const durationRef = useRef(0);
   const isCompletedRef = useRef(initialCompleted);
   const playbackUnlockedRef = useRef(initialCompleted);
-  const isScrubbingRef = useRef(false);
+const isScrubbingRef = useRef(false);
+  const lastTapRef = useRef<{ x: number; y: number; time: number } | null>(null);
+  const doubleTapTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const instructionSteps = useMemo(
     () => parseInstructionSteps(stepByStepInstructions),
@@ -514,17 +516,21 @@ export function VideoPlayer({
           );
         }
 
-        playerRef.current = new yt.Player(playerMountRef.current, {
+playerRef.current = new yt.Player(playerMountRef.current, {
           videoId: youtubeVideoId,
           playerVars: {
             autoplay: 0,
             controls: 0,
             disablekb: 1,
-            fs: 0,
+            fs: 1,
             iv_load_policy: 3,
             modestbranding: 1,
             playsinline: 1,
             rel: 0,
+            // Enable proper mobile fullscreen like YouTube
+            webkitfullscreen: 1,
+            mozfullscreen: 1,
+            allowfullscreen: 1,
           },
           events: {
             onReady: (event) => {
@@ -629,7 +635,7 @@ export function VideoPlayer({
     youtubeVideoId,
   ]);
 
-  useEffect(() => {
+useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.hidden && playerRef.current) {
         playerRef.current.pauseVideo();
@@ -643,15 +649,34 @@ export function VideoPlayer({
       saveProgress();
     };
 
+    // Track fullscreen changes (works on mobile and desktop)
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+
+    // Handle orientation change on mobile - re-center video
+    const handleOrientationChange = () => {
+      // Small delay to allow orientation to complete
+      setTimeout(() => {
+        revealVideoControls();
+      }, 100);
+    };
+
     document.addEventListener("visibilitychange", handleVisibilityChange);
+    document.addEventListener("fullscreenchange", handleFullscreenChange);
     window.addEventListener("beforeunload", handleBeforeUnload);
+    window.addEventListener("orientationchange", handleOrientationChange);
+    window.addEventListener("resize", handleOrientationChange);
 
     return () => {
       document.removeEventListener("visibilitychange", handleVisibilityChange);
+      document.removeEventListener("fullscreenchange", handleFullscreenChange);
       window.removeEventListener("beforeunload", handleBeforeUnload);
+      window.removeEventListener("orientationchange", handleOrientationChange);
+      window.removeEventListener("resize", handleOrientationChange);
       clearControlsHideTimeout();
     };
-  }, [clearControlsHideTimeout, saveProgress, showWarning]);
+  }, [clearControlsHideTimeout, saveProgress, showWarning, revealVideoControls]);
 
   const togglePlay = useCallback(() => {
     if (!isReady || !playerRef.current) {
@@ -722,7 +747,7 @@ export function VideoPlayer({
     revealVideoControls();
   };
 
-  const handleSeekCommit = (event: React.PointerEvent<HTMLInputElement>) => {
+const handleSeekCommit = (event: React.PointerEvent<HTMLInputElement>) => {
     if (!isScrubbingRef.current) {
       return;
     }
@@ -730,6 +755,67 @@ export function VideoPlayer({
     isScrubbingRef.current = false;
     commitSeek(seekPreviewPercent ?? Number(event.currentTarget.value));
   };
+
+// Mobile touch gesture handler - double tap sides to seek, center to play/pause
+  const handleTouchGesture = useCallback((e: React.TouchEvent<HTMLDivElement>) => {
+    if (!isReady || !playerRef.current) return;
+    
+    // Use changedTouches for touchend event (touches is empty on touchend)
+    const touch = e.touches[0] || e.changedTouches[0];
+    if (!touch) return;
+    
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = (touch.clientX - rect.left) / rect.width;
+    const now = Date.now();
+    
+    // Check for double tap (within 300ms and close location)
+    if (
+      lastTapRef.current &&
+      now - lastTapRef.current.time < 300 &&
+      Math.abs(touch.clientX - lastTapRef.current.x) < 50 &&
+      Math.abs(touch.clientY - lastTapRef.current.y) < 50
+    ) {
+      // Double tap detected - seek left (25%) or right (75%)
+      if (x < 0.35) {
+        // Left side - seek back 10 seconds
+        const newTime = Math.max(0, currentTimeRef.current - 10);
+        playerRef.current.seekTo(newTime, true);
+        updateWatchState(newTime, Math.max(maxWatchedRef.current, newTime), durationRef.current);
+      } else if (x > 0.65) {
+        // Right side - seek forward 10 seconds
+        const newTime = Math.min(durationRef.current, currentTimeRef.current + 10);
+        playerRef.current.seekTo(newTime, true);
+        updateWatchState(newTime, Math.max(maxWatchedRef.current, newTime), durationRef.current);
+      }
+      // Clear timeout
+      if (doubleTapTimeoutRef.current) {
+        clearTimeout(doubleTapTimeoutRef.current);
+        doubleTapTimeoutRef.current = null;
+      }
+      lastTapRef.current = null;
+    } else {
+      // Single tap - store for double tap detection
+      lastTapRef.current = { x: touch.clientX, y: touch.clientY, time: now };
+      // Clear any pending timeout
+      if (doubleTapTimeoutRef.current) {
+        clearTimeout(doubleTapTimeoutRef.current);
+      }
+      // Toggle play/pause after short delay if no double tap
+      doubleTapTimeoutRef.current = setTimeout(() => {
+        if (lastTapRef.current) {
+          // Toggle play/pause on single tap
+          if (isPlaying) {
+            playerRef.current?.pauseVideo();
+          } else {
+            playerRef.current?.playVideo();
+          }
+          lastTapRef.current = null;
+        }
+      }, 200);
+    }
+    
+    revealVideoControls();
+  }, [isReady, isPlaying, commitSeek, updateWatchState]);
 
   const handlePlaybackRateChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
     revealVideoControls();
@@ -761,16 +847,37 @@ export function VideoPlayer({
     updateWatchState(0, maxWatchedRef.current, safeDuration);
   };
 
-  const toggleFullscreen = () => {
+const toggleFullscreen = useCallback(() => {
     revealVideoControls();
-    if (!document.fullscreenElement) {
-      containerRef.current?.requestFullscreen();
-      setIsFullscreen(true);
-    } else {
-      document.exitFullscreen();
+    const container = containerRef.current;
+    if (!container) return;
+
+    // Check if already in fullscreen
+    if (document.fullscreenElement) {
+      document.exitFullscreen().catch(() => {});
       setIsFullscreen(false);
+      return;
     }
-  };
+
+    // Detect iOS Safari and use webkit fullscreen (with type assertion)
+    const isIOSafari = /iPad|iPhone|iPod/.test(navigator.userAgent) && 
+      /Safari/.test(navigator.userAgent) && 
+      !/Chrome/.test(navigator.userAgent);
+    
+    // Try iOS webkit fullscreen first for iOS devices
+    if (isIOSafari && (container as unknown as { webkitRequestFullscreen?: () => Promise<void> }).webkitRequestFullscreen) {
+      (container as unknown as { webkitRequestFullscreen: () => Promise<void> }).webkitRequestFullscreen();
+      setIsFullscreen(true);
+      return;
+    }
+
+    // Standard fullscreen API for Android and desktop
+    container.requestFullscreen().catch(() => {
+      // Fallback: rely on YouTube's native fullscreen button (fs:1)
+      // which will trigger fullscreen in the iframe
+    });
+    setIsFullscreen(true);
+  }, [revealVideoControls]);
 
   const handleComplete = () => {
     if (!completionAllowed) {
@@ -836,19 +943,24 @@ export function VideoPlayer({
 
         <main className="grid grid-cols-1 gap-6 lg:grid-cols-3">
           <section className="space-y-4 lg:col-span-2">
-            <div
+<div
               ref={containerRef}
-              className={isFullscreen ? "fixed inset-0 z-50 bg-black" : ""}
+              className={isFullscreen ? "fixed inset-0 z-50 bg-black flex items-center justify-center" : ""}
             >
-              <GlassCard className="overflow-hidden rounded-2xl p-0">
+<GlassCard className={`overflow-hidden rounded-2xl p-0 ${isFullscreen ? "w-full h-full max-w-full max-h-full" : ""}`}>
                 <div
-                  className={`relative aspect-video bg-black ${
+className={`relative bg-black ${
                     shouldShowVideoControls ? "" : "cursor-none"
+                  } ${
+                    isFullscreen 
+                      ? "w-full h-full aspect-video md:aspect-video flex items-center justify-center" 
+                      : "aspect-video"
                   }`}
                   onMouseMove={revealVideoControls}
                   onTouchStart={revealVideoControls}
                   onPointerDown={revealVideoControls}
                   onFocusCapture={revealVideoControls}
+                  onTouchEnd={handleTouchGesture}
                 >
                   {thumbnailUrl && !isReady && !hasError && (
                     <img

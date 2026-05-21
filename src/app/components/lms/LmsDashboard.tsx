@@ -31,13 +31,16 @@ import {
   Lock,
   RefreshCw,
   Download,
+  Eye,
   Search,
+  Trash2,
   Award,
   TrendingUp,
   ChevronRight,
   Target,
   Zap,
-  LucideIcon
+  LucideIcon,
+  X
 } from "lucide-react";
 
 import {
@@ -148,6 +151,17 @@ class LmsApiService {
     } catch (error) {
       console.error("Last watched fetch error:", error);
       return null;
+    }
+  }
+
+  static async deleteStaff(staffId: number): Promise<void> {
+    const response = await this.fetchWithTimeout(`${this.BASE_URL}/staff?id=${staffId}`, {
+      method: "DELETE",
+    });
+
+    const data = await response.json().catch(() => ({})) as { success?: boolean; error?: string };
+    if (!response.ok || data.success === false) {
+      throw new Error(data.error || "Failed to delete LMS staff record");
     }
   }
 }
@@ -341,12 +355,27 @@ function AchievementCard({
 
 // Export to CSV
 function exportToCSV(data: StaffProgress[], filename: string) {
-  const headers = ["Staff Name", "Branch", "Completion %", "Last Activity"];
+  const headers = [
+    "Staff Name",
+    "Branch",
+    "Status",
+    "Completed Lessons",
+    "Watched Videos",
+    "Latest Watch %",
+    "Completion %",
+    "Last Activity",
+    "Last Video",
+  ];
   const rows = data.map((staff) => [
     staff.staff_name,
     staff.branch || "N/A",
+    getStaffLearningStatus(staff).label,
+    `${staff.completed_lessons_count}/${staff.total_lessons}`,
+    staff.watched_lessons_count,
+    `${staff.latest_watch_percentage}%`,
     `${staff.completion_percentage}%`,
-    staff.last_activity ? new Date(staff.last_activity).toLocaleDateString() : "Never",
+    formatLmsDate(staff.last_activity),
+    staff.last_watched_lesson_title || "",
   ]);
   const csvContent = [headers.join(","), ...rows.map((row) => row.join(","))].join("\n");
   const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
@@ -358,6 +387,120 @@ function exportToCSV(data: StaffProgress[], filename: string) {
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
+}
+
+function clampPercent(value?: number | null) {
+  const numberValue = Number(value);
+  if (!Number.isFinite(numberValue)) return 0;
+  return Math.min(100, Math.max(0, Math.round(numberValue)));
+}
+
+function formatLmsDate(value?: string | null) {
+  if (!value) return "Never";
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? "Never" : date.toLocaleDateString();
+}
+
+function getStaffLearningStatus(staff: StaffProgress) {
+  if (staff.training_status === "completed") {
+    return { label: "Completed", className: "bg-emerald-100 text-emerald-700" };
+  }
+
+  if (staff.training_status === "ready_to_complete") {
+    return { label: "Ready to complete", className: "bg-amber-100 text-amber-700" };
+  }
+
+  if (staff.training_status === "watching") {
+    return { label: "Watching", className: "bg-blue-100 text-blue-700" };
+  }
+
+  return { label: "Not started", className: "bg-slate-100 text-slate-600" };
+}
+
+type GroupedStaffProgress = StaffProgress & {
+  staff_count: number;
+  watched_staff_count: number;
+  records: StaffProgress[];
+};
+
+function normalizeStaffGroupName(name: string) {
+  return name.trim().replace(/\s+/g, " ").toLowerCase();
+}
+
+function getDateTime(value?: string | null) {
+  if (!value) return 0;
+  const time = new Date(value).getTime();
+  return Number.isNaN(time) ? 0 : time;
+}
+
+function latestStaffRecord(records: StaffProgress[]) {
+  return [...records].sort((a, b) => getDateTime(b.last_activity) - getDateTime(a.last_activity))[0];
+}
+
+function getGroupedTrainingStatus(records: StaffProgress[]): GroupedStaffProgress["training_status"] {
+  const completedCount = records.filter((record) => record.training_status === "completed").length;
+
+  if (completedCount === records.length && records.length > 0) return "completed";
+  if (records.some((record) => record.training_status === "ready_to_complete")) return "ready_to_complete";
+  if (records.some((record) =>
+    record.training_status === "watching" ||
+    record.watched_lessons_count > 0 ||
+    record.completed_lessons_count > 0
+  )) {
+    return "watching";
+  }
+
+  return "not_started";
+}
+
+function summarizeStaffProgress(data: StaffProgress[]): GroupedStaffProgress[] {
+  const grouped = new Map<string, StaffProgress[]>();
+
+  data.forEach((staff) => {
+    const key = normalizeStaffGroupName(staff.staff_name) || `staff-${staff.staff_id}`;
+    const records = grouped.get(key) ?? [];
+    records.push(staff);
+    grouped.set(key, records);
+  });
+
+  return Array.from(grouped.values())
+    .map((records) => {
+      const latest = latestStaffRecord(records);
+      const completedLessons = records.reduce((sum, record) => sum + (Number(record.completed_lessons_count) || 0), 0);
+      const totalLessons = records.reduce((sum, record) => sum + (Number(record.total_lessons) || 0), 0);
+      const watchedStaffCount = records.filter((record) =>
+        record.watched_lessons_count > 0 ||
+        record.latest_watch_percentage > 0 ||
+        record.completed_lessons_count > 0
+      ).length;
+      const branches = Array.from(new Set(records.map((record) => record.branch).filter(Boolean)));
+      const roles = Array.from(new Set(records.map((record) => record.role).filter(Boolean)));
+      const latestWatchPercentage = Math.max(...records.map((record) => clampPercent(record.latest_watch_percentage)), 0);
+
+      return {
+        ...latest,
+        branch: branches.length > 1 ? "Multiple branches" : latest.branch,
+        role: roles.length > 1 ? "Multiple roles" : latest.role,
+        completed_lessons_count: completedLessons,
+        total_lessons: totalLessons,
+        completion_percentage: totalLessons > 0 ? Math.round((completedLessons / totalLessons) * 100) : 0,
+        watched_lessons_count: records.reduce((sum, record) => sum + (Number(record.watched_lessons_count) || 0), 0),
+        in_progress_lessons_count: records.reduce((sum, record) => sum + (Number(record.in_progress_lessons_count) || 0), 0),
+        average_watch_percentage: Math.round(
+          records.reduce((sum, record) => sum + clampPercent(record.average_watch_percentage), 0) / records.length
+        ),
+        latest_watch_percentage: latestWatchPercentage,
+        last_completed_at: latest.last_completed_at,
+        last_watched_at: latest.last_watched_at,
+        last_watched_lesson_title: latest.last_watched_lesson_title,
+        training_status: getGroupedTrainingStatus(records),
+        last_activity: latest.last_activity,
+        staff_count: records.length,
+        watched_staff_count: watchedStaffCount,
+        records: [...records].sort((a, b) => getDateTime(b.last_activity) - getDateTime(a.last_activity)),
+      };
+    })
+    .sort((a, b) => getDateTime(b.last_activity) - getDateTime(a.last_activity));
 }
 
 // Main LMS Dashboard Component
@@ -378,6 +521,9 @@ function LmsDashboard({ initialData }: LmsDashboardProps) {
   const [_activeTab, _setActiveTab] = useState<TabType>("learning");
   const [isExporting, setIsExporting] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [selectedStaffGroup, setSelectedStaffGroup] = useState<GroupedStaffProgress | null>(null);
+  const [deletingStaffId, setDeletingStaffId] = useState<number | null>(null);
+  const [staffProgressError, setStaffProgressError] = useState("");
   const activeTab = _activeTab;
   const setActiveTab = _setActiveTab;
 
@@ -484,6 +630,63 @@ function LmsDashboard({ initialData }: LmsDashboardProps) {
     }, 500);
   }, [stats?.staff_progress]);
 
+  const isOwnStaffRecord = useCallback((staff: StaffProgress) => {
+    const staffName = normalizeStaffGroupName(staff.staff_name);
+    const currentUserNames = [
+      user?.username,
+      user?.full_name,
+      user?.email,
+    ]
+      .map((value) => normalizeStaffGroupName(value ?? ""))
+      .filter(Boolean);
+
+    return currentUserNames.includes(staffName);
+  }, [user?.email, user?.full_name, user?.username]);
+
+  const handleDeleteStaffRecord = useCallback(async (staff: StaffProgress) => {
+    if (!isAdmin) {
+      setStaffProgressError("Only admins can delete LMS staff records.");
+      return;
+    }
+
+    if (isOwnStaffRecord(staff)) {
+      setStaffProgressError("You cannot delete your own LMS staff record while signed in.");
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Delete LMS staff record #${staff.staff_id} for "${staff.staff_name}"? This removes it from Staff Progress.`
+    );
+    if (!confirmed) return;
+
+    setDeletingStaffId(staff.staff_id);
+    setStaffProgressError("");
+
+    try {
+      await LmsApiService.deleteStaff(staff.staff_id);
+
+      setStats((currentStats) => currentStats
+        ? {
+            ...currentStats,
+            staff_progress: currentStats.staff_progress.filter((record) => record.staff_id !== staff.staff_id),
+          }
+        : currentStats
+      );
+
+      setSelectedStaffGroup((currentGroup) => {
+        if (!currentGroup) return currentGroup;
+        const remainingRecords = currentGroup.records.filter((record) => record.staff_id !== staff.staff_id);
+        return remainingRecords.length > 0 ? summarizeStaffProgress(remainingRecords)[0] : null;
+      });
+
+      await loadData({ showSkeleton: false });
+    } catch (error) {
+      setStaffProgressError(error instanceof Error ? error.message : "Failed to delete LMS staff record");
+    } finally {
+      setDeletingStaffId(null);
+    }
+  }, [isAdmin, isOwnStaffRecord, loadData]);
+
   const handleCategoryClick = useCallback((categoryId: number) => {
     router.push(`/lms/course/${categoryId}`);
   }, [router]);
@@ -498,6 +701,10 @@ function LmsDashboard({ initialData }: LmsDashboardProps) {
   const staffAddedTrend = (stats?.staff_added_this_week ?? 0) > 0
     ? `+${stats?.staff_added_this_week} this week`
     : undefined;
+  const groupedStaffProgress = useMemo(
+    () => summarizeStaffProgress(stats?.staff_progress ?? []),
+    [stats?.staff_progress]
+  );
   const completionRateSubtitle =
     stats?.completed_lessons_total !== undefined && stats?.total_possible_completions !== undefined
       ? `${stats.completed_lessons_total} of ${stats.total_possible_completions} staff-lessons`
@@ -784,7 +991,12 @@ function LmsDashboard({ initialData }: LmsDashboardProps) {
             {isAdmin && (
               <div className="p-6 bg-white rounded-3xl shadow-sm">
                 <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-bold text-slate-800">Staff Progress</h3>
+                  <div>
+                    <h3 className="text-lg font-bold text-slate-800">Staff Progress</h3>
+                    <p className="text-sm text-slate-500">
+                      {groupedStaffProgress.length} names shown from {stats.staff_progress.length} LMS staff records
+                    </p>
+                  </div>
                   <button
                     onClick={() => router.push("/settings")}
                     className="text-sm text-emerald-600 hover:text-emerald-700 font-medium flex items-center gap-1"
@@ -793,43 +1005,121 @@ function LmsDashboard({ initialData }: LmsDashboardProps) {
                     Sync from Settings
                   </button>
                 </div>
-                {stats.staff_progress && stats.staff_progress.length > 0 ? (
+                {staffProgressError && (
+                  <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                    {staffProgressError}
+                  </div>
+                )}
+                {groupedStaffProgress.length > 0 ? (
                   <Suspense fallback={<div className="space-y-3"><div className="h-16 bg-slate-100 rounded-2xl animate-pulse" /><div className="h-16 bg-slate-100 rounded-2xl animate-pulse" /></div>}>
                     <div className="overflow-x-auto">
                       <table className="w-full">
                         <thead>
                           <tr className="border-b border-slate-200">
                             <th className="text-left py-3 px-4 text-sm font-semibold text-slate-600">Staff Name</th>
-                            <th className="text-left py-3 px-4 text-sm font-semibold text-slate-600">Branch</th>
-                            <th className="text-left py-3 px-4 text-sm font-semibold text-slate-600">Progress</th>
+                            <th className="text-left py-3 px-4 text-sm font-semibold text-slate-600">Process</th>
+                            <th className="text-left py-3 px-4 text-sm font-semibold text-slate-600">Completion</th>
                             <th className="text-left py-3 px-4 text-sm font-semibold text-slate-600">Last Activity</th>
+                            <th className="text-right py-3 px-4 text-sm font-semibold text-slate-600">Details</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
-                          {stats.staff_progress.map((staff) => (
-                            <tr key={staff.staff_id} className="hover:bg-slate-50/50">
-                              <td className="py-3 px-4">
-                                <div className="flex items-center gap-3">
-                                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-emerald-500 to-emerald-600 flex items-center justify-center text-white text-sm font-medium">
-                                    {staff.staff_name.charAt(0)}
+                          {groupedStaffProgress.map((staff) => {
+                            const completionPercentage = clampPercent(staff.completion_percentage);
+                            const latestWatchPercentage = clampPercent(staff.latest_watch_percentage);
+                            const status = getStaffLearningStatus(staff);
+                            const isOnlyOwnRecords = staff.records.every((record) => isOwnStaffRecord(record));
+                            const isDeletingGroup = staff.records.some((record) => deletingStaffId === record.staff_id);
+
+                            return (
+                              <tr key={`${normalizeStaffGroupName(staff.staff_name)}-${staff.staff_id}`} className="hover:bg-slate-50/50">
+                                <td className="py-3 px-4">
+                                  <div className="flex items-center gap-3">
+                                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-emerald-500 to-emerald-600 flex items-center justify-center text-white text-sm font-medium">
+                                      {staff.staff_name.charAt(0)}
+                                    </div>
+                                    <div>
+                                      <span className="font-medium text-slate-800">{staff.staff_name}</span>
+                                      <div className="mt-0.5 text-xs text-slate-500">
+                                        {staff.branch || "No branch"} • {staff.role}
+                                      </div>
+                                      {staff.staff_count > 1 && (
+                                        <div className="mt-0.5 text-xs font-medium text-emerald-600">
+                                          {staff.staff_count} staff records under this name
+                                        </div>
+                                      )}
+                                    </div>
                                   </div>
-                                  <span className="font-medium text-slate-800">{staff.staff_name}</span>
-                                </div>
-                              </td>
-                              <td className="py-3 px-4 text-slate-600">{staff.branch || 'N/A'}</td>
-                              <td className="py-3 px-4">
-                                <div className="flex items-center gap-2">
-                                  <div className="w-24 h-2 bg-slate-200 rounded-full overflow-hidden">
-                                    <div className="h-full bg-gradient-to-r from-emerald-500 to-emerald-600 rounded-full" style={{ width: `${staff.completion_percentage}%` }} />
+                                </td>
+                                <td className="py-3 px-4">
+                                  <div className="flex flex-col gap-1.5">
+                                    <span className={`w-fit rounded-full px-2.5 py-1 text-xs font-medium ${status.className}`}>
+                                      {status.label}
+                                    </span>
+                                    <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-500">
+                                      <span>{staff.watched_staff_count}/{staff.staff_count} staff watched</span>
+                                      <span>{staff.in_progress_lessons_count} in progress</span>
+                                      <span>{latestWatchPercentage}% latest</span>
+                                    </div>
                                   </div>
-                                  <span className="text-sm text-slate-600">{staff.completion_percentage}%</span>
-                                </div>
-                              </td>
-                              <td className="py-3 px-4 text-sm text-slate-500">
-                                {staff.last_activity ? new Date(staff.last_activity).toLocaleDateString() : 'Never'}
-                              </td>
-                            </tr>
-                          ))}
+                                </td>
+                                <td className="py-3 px-4">
+                                  <div className="flex min-w-[160px] flex-col gap-1.5">
+                                    <div className="flex items-center justify-between gap-3 text-xs text-slate-500">
+                                      <span>{staff.completed_lessons_count}/{staff.total_lessons} lessons</span>
+                                      <span className="font-semibold text-slate-700">{completionPercentage}%</span>
+                                    </div>
+                                    <div className="h-2 w-full overflow-hidden rounded-full bg-slate-200">
+                                      <div className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-emerald-600" style={{ width: `${completionPercentage}%` }} />
+                                    </div>
+                                  </div>
+                                </td>
+                                <td className="py-3 px-4 text-sm text-slate-500">
+                                  <div>{formatLmsDate(staff.last_activity)}</div>
+                                  {staff.last_watched_lesson_title && (
+                                    <div className="mt-0.5 max-w-[220px] truncate text-xs text-slate-400">
+                                      {staff.last_watched_lesson_title}
+                                    </div>
+                                  )}
+                                </td>
+                                <td className="py-3 px-4 text-right">
+                                  <div className="flex justify-end gap-2">
+                                    <button
+                                      type="button"
+                                      onClick={() => setSelectedStaffGroup(staff)}
+                                      className="inline-flex items-center gap-1.5 rounded-lg bg-slate-100 px-3 py-2 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-200"
+                                    >
+                                      <Eye className="h-3.5 w-3.5" />
+                                      View
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        if (staff.staff_count > 1) {
+                                          setSelectedStaffGroup(staff);
+                                          return;
+                                        }
+
+                                        void handleDeleteStaffRecord(staff.records[0]);
+                                      }}
+                                      disabled={isOnlyOwnRecords || isDeletingGroup}
+                                      title={
+                                        isOnlyOwnRecords
+                                          ? "You cannot delete your own LMS staff record"
+                                          : staff.staff_count > 1
+                                            ? "Open details to delete the exact staff record"
+                                            : "Delete LMS staff record"
+                                      }
+                                      className="inline-flex items-center gap-1.5 rounded-lg bg-red-50 px-3 py-2 text-xs font-medium text-red-600 transition-colors hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
+                                    >
+                                      <Trash2 className="h-3.5 w-3.5" />
+                                      {isDeletingGroup ? "Deleting" : isOnlyOwnRecords ? "Own" : "Delete"}
+                                    </button>
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          })}
                         </tbody>
                       </table>
                     </div>
@@ -990,6 +1280,128 @@ function LmsDashboard({ initialData }: LmsDashboardProps) {
                     No completed lessons yet. Start learning to see your progress!
                   </div>
                 )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {selectedStaffGroup && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-sm">
+            <div className="w-full max-w-4xl overflow-hidden rounded-2xl bg-white shadow-2xl">
+              <div className="flex items-start justify-between gap-4 border-b border-slate-100 px-6 py-5">
+                <div>
+                  <h3 className="text-lg font-bold text-slate-800">{selectedStaffGroup.staff_name}</h3>
+                  <p className="mt-1 text-sm text-slate-500">
+                    {selectedStaffGroup.watched_staff_count} of {selectedStaffGroup.staff_count} staff records watched training videos
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setSelectedStaffGroup(null)}
+                  className="rounded-lg p-2 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
+                  aria-label="Close staff details"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+              <div className="max-h-[70vh] overflow-y-auto px-6 py-5">
+                <div className="grid gap-3 sm:grid-cols-4">
+                  <div className="rounded-xl bg-slate-50 p-3">
+                    <p className="text-xs font-medium text-slate-500">Records</p>
+                    <p className="mt-1 text-xl font-bold text-slate-800">{selectedStaffGroup.staff_count}</p>
+                  </div>
+                  <div className="rounded-xl bg-blue-50 p-3">
+                    <p className="text-xs font-medium text-blue-700">Watched Staff</p>
+                    <p className="mt-1 text-xl font-bold text-blue-800">{selectedStaffGroup.watched_staff_count}</p>
+                  </div>
+                  <div className="rounded-xl bg-emerald-50 p-3">
+                    <p className="text-xs font-medium text-emerald-700">Completed Lessons</p>
+                    <p className="mt-1 text-xl font-bold text-emerald-800">
+                      {selectedStaffGroup.completed_lessons_count}/{selectedStaffGroup.total_lessons}
+                    </p>
+                  </div>
+                  <div className="rounded-xl bg-amber-50 p-3">
+                    <p className="text-xs font-medium text-amber-700">Latest Watch</p>
+                    <p className="mt-1 text-xl font-bold text-amber-800">{clampPercent(selectedStaffGroup.latest_watch_percentage)}%</p>
+                  </div>
+                </div>
+
+                {staffProgressError && (
+                  <div className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                    {staffProgressError}
+                  </div>
+                )}
+
+                <div className="mt-5 overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b border-slate-200">
+                        <th className="px-3 py-2 text-left text-xs font-semibold uppercase text-slate-500">Staff ID</th>
+                        <th className="px-3 py-2 text-left text-xs font-semibold uppercase text-slate-500">Role</th>
+                        <th className="px-3 py-2 text-left text-xs font-semibold uppercase text-slate-500">Watched</th>
+                        <th className="px-3 py-2 text-left text-xs font-semibold uppercase text-slate-500">Completion</th>
+                        <th className="px-3 py-2 text-left text-xs font-semibold uppercase text-slate-500">Last Activity</th>
+                        <th className="px-3 py-2 text-left text-xs font-semibold uppercase text-slate-500">Last Video</th>
+                        <th className="px-3 py-2 text-right text-xs font-semibold uppercase text-slate-500">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {selectedStaffGroup.records.map((record) => {
+                        const recordStatus = getStaffLearningStatus(record);
+                        const recordCompletion = clampPercent(record.completion_percentage);
+                        const recordWatch = clampPercent(record.latest_watch_percentage);
+                        const isOwnRecord = isOwnStaffRecord(record);
+
+                        return (
+                          <tr key={record.staff_id}>
+                            <td className="px-3 py-3 text-sm font-medium text-slate-800">#{record.staff_id}</td>
+                            <td className="px-3 py-3 text-sm text-slate-600">{record.role}</td>
+                            <td className="px-3 py-3">
+                              <div className="flex flex-col gap-1">
+                                <span className={`w-fit rounded-full px-2 py-0.5 text-xs font-medium ${recordStatus.className}`}>
+                                  {recordStatus.label}
+                                </span>
+                                <span className="text-xs text-slate-500">
+                                  {record.watched_lessons_count} videos • {recordWatch}% latest
+                                </span>
+                              </div>
+                            </td>
+                            <td className="px-3 py-3">
+                              <div className="min-w-[140px]">
+                                <div className="mb-1 flex items-center justify-between gap-2 text-xs text-slate-500">
+                                  <span>{record.completed_lessons_count}/{record.total_lessons}</span>
+                                  <span>{recordCompletion}%</span>
+                                </div>
+                                <div className="h-2 overflow-hidden rounded-full bg-slate-200">
+                                  <div
+                                    className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-emerald-600"
+                                    style={{ width: `${recordCompletion}%` }}
+                                  />
+                                </div>
+                              </div>
+                            </td>
+                            <td className="px-3 py-3 text-sm text-slate-600">{formatLmsDate(record.last_activity)}</td>
+                            <td className="max-w-[220px] truncate px-3 py-3 text-sm text-slate-500">
+                              {record.last_watched_lesson_title || "No video watched"}
+                            </td>
+                            <td className="px-3 py-3 text-right">
+                              <button
+                                type="button"
+                                onClick={() => void handleDeleteStaffRecord(record)}
+                                disabled={isOwnRecord || deletingStaffId === record.staff_id}
+                                title={isOwnRecord ? "You cannot delete your own LMS staff record" : "Delete LMS staff record"}
+                                className="inline-flex items-center gap-1.5 rounded-lg bg-red-50 px-3 py-2 text-xs font-medium text-red-600 transition-colors hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                                {deletingStaffId === record.staff_id ? "Deleting" : isOwnRecord ? "Own" : "Delete"}
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </div>
           </div>

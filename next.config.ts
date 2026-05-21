@@ -128,6 +128,29 @@ const nextConfig: NextConfig = {
       },
     ];
   },
+
+  async rewrites() {
+    return {
+      beforeFiles: [
+        {
+          source: "/api/vehicles/edge",
+          destination: "/api/vehicles",
+        },
+        {
+          source: "/api/vehicles/stats",
+          destination: "/api/dashboard/stats",
+        },
+        {
+          source: "/api/vehicles/create",
+          destination: "/api/vehicles",
+        },
+        {
+          source: "/api/vehicles/clear-cache",
+          destination: "/api/vehicles-cache",
+        },
+      ],
+    };
+  },
 };
 
 export default nextConfig;

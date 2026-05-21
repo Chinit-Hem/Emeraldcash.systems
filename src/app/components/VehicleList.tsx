@@ -215,9 +215,9 @@ export default function VehicleList({ category }: VehicleListProps) {
       try {
         // Build URL with search parameter if present
         // INCREASED: limit from 500 to 2000 to show all vehicles including test data
-        let url = "/api/vehicles/edge?limit=2000";
+        let url = "/api/vehicles?limit=2000";
         if (debouncedSearch.trim()) {
-          url += `&search=${encodeURIComponent(debouncedSearch)}`;
+          url += `&searchTerm=${encodeURIComponent(debouncedSearch)}`;
         }
         
         const res = await fetch(url, { cache: "no-store" });

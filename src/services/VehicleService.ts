@@ -31,7 +31,8 @@ import type { VehicleFilters } from "@/types/vehicle";
 // Re-export VehicleFilters for backwards compatibility
 export type { VehicleFilters };
 import { BaseService, ServiceResult } from "./BaseService";
-import { isCloudinaryPublicId } from "@/lib/cloudinary";
+import { deleteImage, extractCloudinaryPublicId, isCloudinaryPublicId } from "@/lib/cloudinary";
+import { getVehicleThumbnailUrl, mergeVehicleImages } from "@/lib/vehicle-helpers";
 
 
 
@@ -83,6 +84,7 @@ export interface VehicleEntity {
   BodyType: string;
   Color: string;
   Image: string;
+  Images?: string[];
   Time: string;
 }
 
@@ -101,6 +103,13 @@ export interface VehicleStats {
   byCondition: Record<string, number>;
   avgPrice: number;
   noImageCount: number;
+}
+
+interface VehicleImageCleanupResult {
+  deleted: number;
+  failed: number;
+  skipped: number;
+  errors: string[];
 }
 
 /**
@@ -168,24 +177,15 @@ export class VehicleService extends BaseService<VehicleEntity, VehicleDB> {
     // Normalize category with plural/singular handling
     const normalizedCategory = VehicleService.normalizeCategory(dbVehicle.category);
 
-    // Prefer a display-ready thumbnail, but do not discard raw IDs/public IDs.
-    // Some imports/uploads store the only usable image value in thumbnail_url.
+    // Prefer the canonical image_id first. Uploads update image_id, while
+    // older imported rows may still have the only usable value in thumbnail_url.
     const thumbnailUrl = dbVehicle.thumbnail_url?.trim();
-    const hasValidThumbnail = thumbnailUrl && (
-      thumbnailUrl.startsWith("http://") ||
-      thumbnailUrl.startsWith("https://") ||
-      thumbnailUrl.startsWith("data:")
-    );
-
-    // Synchronous normalization - just check if image_id is already a URL
     const imageId = dbVehicle.image_id?.trim() || "";
-    const isImageIdUrl = imageId && (
-      imageId.startsWith("http://") ||
-      imageId.startsWith("https://") ||
-      imageId.startsWith("data:")
+    const imageCandidates = mergeVehicleImages(imageId, thumbnailUrl || "");
+    const normalizedImages = imageCandidates.filter((image) =>
+      Boolean(getVehicleThumbnailUrl(image, "w400-h300"))
     );
-    const rawThumbnail = thumbnailUrl || "";
-    const normalizedImage = hasValidThumbnail ? thumbnailUrl : (imageId || rawThumbnail);
+    const normalizedImage = normalizedImages[0] || "";
 
     // Create entity with both BaseEntity and Vehicle properties
     const vehicle: VehicleEntity = {
@@ -209,6 +209,7 @@ export class VehicleService extends BaseService<VehicleEntity, VehicleDB> {
       BodyType: dbVehicle.body_type || "",
       Color: dbVehicle.color || "",
       Image: normalizedImage,
+      Images: normalizedImages,
       Time: dbVehicle.created_at || new Date().toISOString(),
     };
 
@@ -1002,6 +1003,214 @@ conditions.push(`(NULLIF(TRIM(COALESCE(image_id, '')), '') IS NULL AND NULLIF(TR
   // VEHICLE-SPECIFIC METHODS
   // ============================================================================
 
+  private async ensureVehicleImagesTable(): Promise<void> {
+    await dbManager.executeUnsafe(`
+      CREATE TABLE IF NOT EXISTS vehicle_images (
+        id SERIAL PRIMARY KEY,
+        vehicle_id INTEGER NOT NULL REFERENCES vehicles(id) ON DELETE CASCADE,
+        image_url TEXT NOT NULL,
+        sort_order INTEGER NOT NULL DEFAULT 0,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+    await dbManager.executeUnsafe(`
+      CREATE INDEX IF NOT EXISTS idx_vehicle_images_vehicle_id_sort
+      ON vehicle_images(vehicle_id, sort_order, id)
+    `);
+  }
+
+  public async getVehicleImageReferences(vehicleId: number): Promise<ServiceResult<string[]>> {
+    const startTime = Date.now();
+
+    try {
+      await this.ensureVehicleImagesTable();
+
+      const [vehicleRows, galleryRows] = await Promise.all([
+        dbManager.executeUnsafe<Pick<VehicleDB, "image_id" | "thumbnail_url">>(
+          `
+            SELECT image_id, thumbnail_url
+            FROM vehicles
+            WHERE id = $1
+          `,
+          [vehicleId]
+        ),
+        dbManager.executeUnsafe<{ image_url: string }>(
+          `
+            SELECT image_url
+            FROM vehicle_images
+            WHERE vehicle_id = $1
+            ORDER BY sort_order ASC, id ASC
+          `,
+          [vehicleId]
+        ),
+      ]);
+
+      const vehicleRow = vehicleRows[0];
+      const imageReferences = mergeVehicleImages(
+        vehicleRow?.image_id,
+        vehicleRow?.thumbnail_url,
+        galleryRows.map((row) => row.image_url)
+      );
+
+      return {
+        success: true,
+        data: imageReferences,
+        meta: { durationMs: Date.now() - startTime, queryCount: 2 },
+      };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Failed to fetch vehicle image references";
+      console.error("[VehicleService.getVehicleImageReferences] Error:", errorMessage);
+      return {
+        success: false,
+        error: errorMessage,
+        data: [],
+        meta: { durationMs: Date.now() - startTime, queryCount: 1 },
+      };
+    }
+  }
+
+  private async deleteRemovedVehicleCloudinaryImages(
+    previousImages: unknown[],
+    nextImages: unknown[],
+    context: string
+  ): Promise<VehicleImageCleanupResult> {
+    const nextPublicIds = new Set(
+      mergeVehicleImages(nextImages)
+        .map((image) => extractCloudinaryPublicId(image))
+        .filter((publicId): publicId is string => Boolean(publicId))
+    );
+    const removedPublicIds = Array.from(new Set(
+      mergeVehicleImages(previousImages)
+        .map((image) => extractCloudinaryPublicId(image))
+        .filter((publicId): publicId is string => Boolean(publicId))
+        .filter((publicId) => !nextPublicIds.has(publicId))
+    ));
+
+    if (removedPublicIds.length === 0) {
+      return { deleted: 0, failed: 0, skipped: 0, errors: [] };
+    }
+
+    const results = await Promise.all(
+      removedPublicIds.map(async (publicId) => {
+        const result = await deleteImage(publicId);
+        return { publicId, ...result };
+      })
+    );
+
+    const failed = results.filter((result) => !result.success);
+    if (failed.length > 0) {
+      console.warn("[VehicleService.deleteRemovedVehicleCloudinaryImages] Cleanup incomplete:", {
+        context,
+        failed: failed.map((result) => ({
+          publicId: result.publicId,
+          error: result.error,
+        })),
+      });
+    }
+
+    return {
+      deleted: results.length - failed.length,
+      failed: failed.length,
+      skipped: 0,
+      errors: failed.map((result) => `${result.publicId}: ${result.error || "Delete failed"}`),
+    };
+  }
+
+  public async getVehicleImages(vehicleId: number): Promise<ServiceResult<string[]>> {
+    const startTime = Date.now();
+
+    try {
+      await this.ensureVehicleImagesTable();
+      const rows = await dbManager.executeUnsafe<{ image_url: string }>(
+        `
+          SELECT image_url
+          FROM vehicle_images
+          WHERE vehicle_id = $1
+          ORDER BY sort_order ASC, id ASC
+        `,
+        [vehicleId]
+      );
+
+      return {
+        success: true,
+        data: mergeVehicleImages(rows.map((row) => row.image_url)),
+        meta: { durationMs: Date.now() - startTime, queryCount: 1 },
+      };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Failed to fetch vehicle images";
+      console.error("[VehicleService.getVehicleImages] Error:", errorMessage);
+      return {
+        success: false,
+        error: errorMessage,
+        data: [],
+        meta: { durationMs: Date.now() - startTime, queryCount: 1 },
+      };
+    }
+  }
+
+  public async replaceVehicleImages(
+    vehicleId: number,
+    images: string[],
+    options: {
+      previousImages?: string[];
+      deleteRemovedFromCloudinary?: boolean;
+    } = {}
+  ): Promise<ServiceResult<string[]>> {
+    const startTime = Date.now();
+    const normalizedImages = mergeVehicleImages(images);
+    const shouldDeleteRemovedFromCloudinary = options.deleteRemovedFromCloudinary !== false;
+    let previousImages = mergeVehicleImages(options.previousImages);
+
+    try {
+      await this.ensureVehicleImagesTable();
+
+      if (shouldDeleteRemovedFromCloudinary && options.previousImages === undefined) {
+        const previousResult = await this.getVehicleImageReferences(vehicleId);
+        previousImages = previousResult.success ? previousResult.data ?? [] : [];
+      }
+
+      await dbManager.executeUnsafe(
+        `DELETE FROM vehicle_images WHERE vehicle_id = $1`,
+        [vehicleId]
+      );
+
+      for (let index = 0; index < normalizedImages.length; index++) {
+        await dbManager.executeUnsafe(
+          `
+            INSERT INTO vehicle_images (vehicle_id, image_url, sort_order)
+            VALUES ($1, $2, $3)
+          `,
+          [vehicleId, normalizedImages[index], index]
+        );
+      }
+
+      await this.invalidateCache(`${this.serviceName}:${vehicleId}`);
+
+      if (shouldDeleteRemovedFromCloudinary) {
+        await this.deleteRemovedVehicleCloudinaryImages(
+          previousImages,
+          normalizedImages,
+          `vehicle:${vehicleId}:replace-images`
+        );
+      }
+
+      return {
+        success: true,
+        data: normalizedImages,
+        meta: { durationMs: Date.now() - startTime, queryCount: normalizedImages.length + 1 },
+      };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Failed to replace vehicle images";
+      console.error("[VehicleService.replaceVehicleImages] Error:", errorMessage);
+      return {
+        success: false,
+        error: errorMessage,
+        meta: { durationMs: Date.now() - startTime, queryCount: 1 },
+      };
+    }
+  }
+
 
   /**
    * Convert VehicleEntity to legacy Vehicle format
@@ -1022,6 +1231,7 @@ conditions.push(`(NULLIF(TRIM(COALESCE(image_id, '')), '') IS NULL AND NULLIF(TR
       BodyType: entity.BodyType,
       Color: entity.Color,
       Image: entity.Image,
+      Images: entity.Images,
       Time: entity.Time,
     };
   }
@@ -1055,9 +1265,17 @@ conditions.push(`(NULLIF(TRIM(COALESCE(image_id, '')), '') IS NULL AND NULLIF(TR
       console.info(`[VehicleService] Vehicle ID ${id} FOUND: ${result.data.Plate || 'N/A'}`);
     }
     if (result.success && result.data) {
+      const vehicle = this.toVehicle(result.data);
+      const galleryResult = await this.getVehicleImages(id);
+      const galleryImages = galleryResult.success && galleryResult.data?.length
+        ? galleryResult.data
+        : mergeVehicleImages(vehicle.Images, vehicle.Image);
+      vehicle.Images = galleryImages;
+      vehicle.Image = galleryImages[0] || vehicle.Image;
+
       return {
         ...result,
-        data: this.toVehicle(result.data),
+        data: vehicle,
       };
     }
     return result as ServiceResult<Vehicle>;
@@ -1213,7 +1431,19 @@ conditions.push(`(NULLIF(TRIM(COALESCE(image_id, '')), '') IS NULL AND NULLIF(TR
    * Overrides base delete to provide vehicle-specific return type
    */
   public async deleteVehicle(id: number): Promise<ServiceResult<boolean>> {
-    return this.delete(id);
+    const imageReferencesResult = await this.getVehicleImageReferences(id);
+    const imageReferences = imageReferencesResult.success ? imageReferencesResult.data ?? [] : [];
+    const result = await this.delete(id);
+
+    if (result.success && result.data) {
+      await this.deleteRemovedVehicleCloudinaryImages(
+        imageReferences,
+        [],
+        `vehicle:${id}:delete`
+      );
+    }
+
+    return result;
   }
 
   /**

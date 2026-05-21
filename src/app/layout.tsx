@@ -54,6 +54,17 @@ const iosSafariGuardScript = `
   })();
 `;
 
+const languageInitScript = `
+  (function () {
+    try {
+      var lang = localStorage.getItem("vms.language");
+      if (lang !== "km" && lang !== "en") lang = "en";
+      document.documentElement.lang = lang;
+      document.documentElement.dir = "ltr";
+    } catch (_) {}
+  })();
+`;
+
 export const metadata: Metadata = {
   title: "Emerald Cash VMS",
   description: "Vehicle Management System by Emerald Cash",
@@ -99,6 +110,7 @@ export default async function RootLayout({
           <link href="https://fonts.googleapis.com/css2?family=Kantumruy+Pro:wght@300;400;700&display=swap" rel="stylesheet" />
         </noscript>
         <script id="ios-safari-guard" dangerouslySetInnerHTML={{ __html: iosSafariGuardScript }} />
+        <script id="language-init" dangerouslySetInnerHTML={{ __html: languageInitScript }} />
         <script id="theme-init" dangerouslySetInnerHTML={{ __html: themeInitScript }} />
       </head>
       <body className="antialiased" suppressHydrationWarning>

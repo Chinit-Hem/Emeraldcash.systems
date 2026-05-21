@@ -50,6 +50,7 @@ export interface LessonFormData {
   stepByStepInstructions: string;
   durationMinutes: number | null;
   orderIndex: number;
+  allowedRoles: string[];
 }
 
 // ============================================================================
@@ -86,6 +87,8 @@ const validateYoutubeUrl = (url: string): boolean => {
   return patterns.some((pattern) => pattern.test(url));
 };
 
+const LESSON_AUDIENCE_ROLES = ["Staff", "Accounting"] as const;
+
 // ============================================================================
 // Main Component
 // ============================================================================
@@ -104,6 +107,7 @@ export function AddLessonForm({
     stepByStepInstructions: "",
     durationMinutes: null,
     orderIndex: 0,
+    allowedRoles: [...LESSON_AUDIENCE_ROLES],
   });
 
   const [errors, setErrors] = useState<Partial<Record<keyof LessonFormData, string>> & { submit?: string }>({});
@@ -125,6 +129,7 @@ export function AddLessonForm({
       stepByStepInstructions: "",
       durationMinutes: null,
       orderIndex: 0,
+      allowedRoles: [...LESSON_AUDIENCE_ROLES],
     });
     setYoutubePreview(null);
     setErrors({});
@@ -202,6 +207,10 @@ export function AddLessonForm({
       newErrors.categoryId = "Please select a category";
     }
 
+    if (formData.allowedRoles.length === 0) {
+      newErrors.allowedRoles = "Select at least one role";
+    }
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   }, [formData]);
@@ -211,7 +220,7 @@ export function AddLessonForm({
     e.preventDefault();
 
     // Mark all fields as touched
-    setTouched({ title: true, categoryId: true, youtubeUrl: true, description: true, stepByStepInstructions: true, durationMinutes: true, orderIndex: true });
+    setTouched({ title: true, categoryId: true, youtubeUrl: true, description: true, stepByStepInstructions: true, durationMinutes: true, orderIndex: true, allowedRoles: true });
 
     if (!validateForm()) {
       // Scroll to first error
@@ -415,6 +424,49 @@ export function AddLessonForm({
                       </div>
                     </div>
                   </div>
+                )}
+              </div>
+
+              {/* Lesson Audience */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Visible to
+                </label>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {LESSON_AUDIENCE_ROLES.map((role) => (
+                    <label
+                      key={role}
+                      className={`flex items-center gap-3 rounded-lg border px-4 py-3 transition-colors ${
+                        formData.allowedRoles.includes(role)
+                          ? "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-900/20 dark:text-emerald-300"
+                          : "border-gray-200 bg-gray-50 text-gray-600 dark:border-gray-700 dark:bg-gray-800/50 dark:text-gray-300"
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={formData.allowedRoles.includes(role)}
+                        onChange={() =>
+                          setFormData((prev) => ({
+                            ...prev,
+                            allowedRoles: prev.allowedRoles.includes(role)
+                              ? prev.allowedRoles.filter((item) => item !== role)
+                              : [...prev.allowedRoles, role],
+                          }))
+                        }
+                        className="w-4 h-4 text-emerald-600 border-gray-300 rounded focus:ring-emerald-500"
+                      />
+                      <span className="text-sm font-medium">{role}</span>
+                    </label>
+                  ))}
+                </div>
+                <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                  Admin can always view every lesson.
+                </p>
+                {errors.allowedRoles && (
+                  <p className="mt-1 text-sm text-red-600 dark:text-red-400 flex items-center gap-1">
+                    <AlertCircle className="w-4 h-4" />
+                    {errors.allowedRoles}
+                  </p>
                 )}
               </div>
 

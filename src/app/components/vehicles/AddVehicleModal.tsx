@@ -362,7 +362,7 @@ export default function AddVehicleModal({ isOpen, onClose, onSuccess }: AddVehic
       }
 
       // Create vehicle
-      const res = await fetch('/api/vehicles/create', {
+      const res = await fetch('/api/vehicles', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),

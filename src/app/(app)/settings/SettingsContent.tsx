@@ -124,6 +124,11 @@ export default function SettingsContent() {
   const { t } = useTranslation(language);
   
   const isAdmin = user.role === "Admin";
+  const formatRoleLabel = useCallback((role: Role) => {
+    if (role === "Admin") return t.admin;
+    if (role === "Accounting") return "Accounting";
+    return t.staff;
+  }, [t.admin, t.staff]);
   
   const [activeTab, setActiveTab] = useState<TabType>("profile");
   const [users, setUsers] = useState<ManagedUser[]>([]);
@@ -427,7 +432,7 @@ export default function SettingsContent() {
                     </h2>
                     <div className="flex items-center gap-3 mt-2">
                       <span className="px-3 py-1 rounded-full bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 text-sm font-medium">
-                        {user.role === "Admin" ? t.admin : t.staff}
+                        {formatRoleLabel(user.role)}
                       </span>
                       <span className="text-slate-500 dark:text-slate-400 text-sm">
                         {t.memberSince} {new Date().toLocaleDateString(language === "km" ? "km-KH" : "en-US")}
@@ -496,6 +501,7 @@ export default function SettingsContent() {
                       className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 shadow-sm hover:shadow-md dark:shadow-slate-900/20 dark:hover:shadow-slate-900/40 transition-all"
                     >
                       <option value="Staff">{t.staff}</option>
+                      <option value="Accounting">Accounting</option>
                       <option value="Admin">{t.admin}</option>
                     </select>
                   </div>
@@ -660,11 +666,13 @@ export default function SettingsContent() {
                               {managedUser.full_name || managedUser.username}
                             </h4>
                             <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                              managedUser.role === "Admin" 
+                              managedUser.role === "Admin"
                                 ? "bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300"
+                                : managedUser.role === "Accounting"
+                                ? "bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300"
                                 : "bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300"
                             }`}>
-                              {managedUser.role === "Admin" ? t.admin : t.staff}
+                              {formatRoleLabel(managedUser.role)}
                             </span>
                           </div>
                           <p className="text-sm text-slate-500 dark:text-slate-400 truncate">

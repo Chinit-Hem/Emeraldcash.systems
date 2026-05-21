@@ -1,4 +1,5 @@
 import { requirePermission } from "@/lib/auth-helpers";
+import { deleteImage, extractCloudinaryPublicId } from "@/lib/cloudinary";
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 
@@ -14,20 +15,41 @@ export async function POST(req: NextRequest) {
   const auth = requirePermission(req, "vehicles:edit");
   if (auth.response) return auth.response;
 
-  const baseUrl = process.env.NEXT_PUBLIC_API_URL;
-  if (!baseUrl) {
-    return NextResponse.json(
-      { ok: false, error: "Missing NEXT_PUBLIC_API_URL" },
-      { status: 500 }
-    );
-  }
-
   try {
     const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
+    const cloudinaryValue = sanitizeString(
+      body.publicId ?? body.imageUrl ?? body.imageFileId,
+      1000
+    );
+    const cloudinaryPublicId = extractCloudinaryPublicId(cloudinaryValue);
+
+    if (cloudinaryPublicId) {
+      const result = await deleteImage(cloudinaryPublicId);
+      if (!result.success) {
+        return NextResponse.json(
+          { ok: false, error: result.error || "Cloudinary image delete failed" },
+          { status: 502 }
+        );
+      }
+
+      return NextResponse.json({
+        ok: true,
+        data: { publicId: cloudinaryPublicId },
+      });
+    }
+
     const imageFileId = sanitizeString(body.imageFileId, 500);
 
     if (!imageFileId) {
       return NextResponse.json({ ok: false, error: "Missing or invalid imageFileId" }, { status: 400 });
+    }
+
+    const baseUrl = process.env.NEXT_PUBLIC_API_URL;
+    if (!baseUrl) {
+      return NextResponse.json(
+        { ok: false, error: "Missing NEXT_PUBLIC_API_URL" },
+        { status: 500 }
+      );
     }
 
     // Validate token

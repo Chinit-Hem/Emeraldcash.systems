@@ -69,7 +69,7 @@ interface UseVehiclesReturn {
   isValidating: boolean;
 }
 
-const VEHICLE_IMAGE_CACHE_VERSION = "6";
+const VEHICLE_IMAGE_CACHE_VERSION = "7";
 
 // ============================================================================
 // Fetcher
@@ -138,13 +138,14 @@ limit = 500, // Increased for dashboard pagination fix (total 1218 vehicles)
 
     if (category && category !== "All") params.set("category", category);
     if (brand && brand !== "All") params.set("brand", brand);
-    if (search) params.set("search", search);
+    if (search) params.set("searchTerm", search);
     if (withoutImage) params.set("withoutImage", "true");
     return params.toString();
   }, [cursor, forceRefreshKey, limit, category, brand, search, withoutImage]);
 
-  // SWR key
-  const key = `/api/vehicles/edge?${queryString}`;
+  // SWR key. Use the canonical vehicles endpoint; nested static vehicle routes
+  // are not reliably served in the current Next dev runtime.
+  const key = `/api/vehicles?${queryString}`;
 
   // Check for mutations on mount and periodically
   useEffect(() => {
@@ -377,6 +378,22 @@ interface StatsResponse {
   };
 }
 
+interface DashboardStatsResponse {
+  success?: boolean;
+  data?: {
+    total?: number;
+    countsByCategory?: Partial<VehicleStats["byCategory"]>;
+    countsByCondition?: Partial<VehicleStats["byCondition"]>;
+    noImageCount?: number;
+    avgPrice?: number;
+  };
+  error?: string;
+  meta?: {
+    durationMs?: number;
+    requestId?: string;
+  };
+}
+
 /**
  * Fetcher for stats endpoint
  */
@@ -390,13 +407,33 @@ async function statsFetcher(url: string): Promise<StatsResponse> {
     throw new Error(error.error || `HTTP ${response.status}`);
   }
 
-  const data = await response.json();
+  const data: DashboardStatsResponse = await response.json();
 
-  if (!data.success) {
+  if (data.success === false) {
     throw new Error(data.error || "API returned unsuccessful response");
   }
 
-  return data;
+  return {
+    success: true,
+    data: {
+      total: data.data?.total || 0,
+      byCategory: {
+        Cars: data.data?.countsByCategory?.Cars || 0,
+        Motorcycles: data.data?.countsByCategory?.Motorcycles || 0,
+        TukTuks: data.data?.countsByCategory?.TukTuks || 0,
+      },
+      byCondition: {
+        New: data.data?.countsByCondition?.New || 0,
+        Used: data.data?.countsByCondition?.Used || 0,
+      },
+      noImageCount: data.data?.noImageCount || 0,
+      avgPrice: data.data?.avgPrice || 0,
+    },
+    meta: {
+      durationMs: data.meta?.durationMs || 0,
+      requestId: data.meta?.requestId || "dashboard-stats",
+    },
+  };
 }
 
 /**
@@ -408,7 +445,7 @@ export function useVehicleStats(refreshInterval = 120000): {
   error: string | null;
 } {
   const { data, error, isLoading, mutate: revalidate } = useSWR<StatsResponse>(
-    "/api/vehicles/stats",
+    "/api/dashboard/stats",
     statsFetcher,
     {
       refreshInterval,

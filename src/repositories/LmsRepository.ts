@@ -387,24 +387,105 @@ export class LmsDashboardRepository {
     branch: string | null;
     role: string;
     completed_count: number;
+    watched_lessons_count: number;
+    in_progress_lessons_count: number;
+    average_watch_percentage: number;
+    latest_watch_percentage: number;
+    last_completed_at: string | null;
+    last_watched_at: string | null;
+    last_watched_lesson_title: string | null;
     last_activity: string | null;
   }[]> {
+    await this.ensureProgressTables();
+
     const query = `
+      WITH completion AS (
+        SELECT
+          staff_id,
+          COUNT(*) as completed_count,
+          MAX(completed_at) as last_completed_at
+        FROM lms_lesson_completions
+        GROUP BY staff_id
+      ),
+      watch_summary AS (
+        SELECT
+          staff_id,
+          COUNT(*) FILTER (WHERE watch_percentage > 0) as watched_lessons_count,
+          COUNT(*) FILTER (WHERE watch_percentage > 0 AND watch_percentage < 95) as in_progress_lessons_count,
+          ROUND(AVG(NULLIF(watch_percentage, 0))) as average_watch_percentage,
+          MAX(last_watched_at) as last_watched_at
+        FROM lms_lesson_progress
+        GROUP BY staff_id
+      ),
+      latest_watch AS (
+        SELECT DISTINCT ON (lp.staff_id)
+          lp.staff_id,
+          l.title as last_watched_lesson_title,
+          lp.watch_percentage as latest_watch_percentage,
+          lp.last_watched_at
+        FROM lms_lesson_progress lp
+        LEFT JOIN lms_lessons l ON l.id = lp.lesson_id
+        WHERE lp.watch_percentage > 0
+        ORDER BY lp.staff_id, lp.last_watched_at DESC NULLS LAST, lp.updated_at DESC NULLS LAST
+      )
       SELECT
         s.id as staff_id,
         s.full_name as staff_name,
         s.branch_location as branch,
         s.role,
-        COUNT(lc.lesson_id) as completed_count,
-        MAX(lc.completed_at) as last_activity
+        COALESCE(c.completed_count, 0) as completed_count,
+        COALESCE(ws.watched_lessons_count, 0) as watched_lessons_count,
+        COALESCE(ws.in_progress_lessons_count, 0) as in_progress_lessons_count,
+        COALESCE(ws.average_watch_percentage, 0) as average_watch_percentage,
+        COALESCE(lw.latest_watch_percentage, 0) as latest_watch_percentage,
+        c.last_completed_at,
+        ws.last_watched_at,
+        lw.last_watched_lesson_title,
+        CASE
+          WHEN c.last_completed_at IS NULL THEN ws.last_watched_at
+          WHEN ws.last_watched_at IS NULL THEN c.last_completed_at
+          WHEN c.last_completed_at >= ws.last_watched_at THEN c.last_completed_at
+          ELSE ws.last_watched_at
+        END as last_activity
       FROM lms_staff s
-      LEFT JOIN lms_lesson_completions lc ON lc.staff_id = s.id
+      LEFT JOIN completion c ON c.staff_id = s.id
+      LEFT JOIN watch_summary ws ON ws.staff_id = s.id
+      LEFT JOIN latest_watch lw ON lw.staff_id = s.id
       WHERE s.is_active = true
-      GROUP BY s.id, s.full_name, s.branch_location, s.role
-      ORDER BY completed_count DESC
+      ORDER BY completed_count DESC, last_activity DESC NULLS LAST, s.full_name ASC
     `;
 
     return await this.executeQuery(query);
+  }
+
+  private async ensureProgressTables(): Promise<void> {
+    await this.executeQuery(`
+      CREATE TABLE IF NOT EXISTS lms_lesson_progress (
+        id SERIAL PRIMARY KEY,
+        staff_id INTEGER NOT NULL REFERENCES lms_staff(id) ON DELETE CASCADE,
+        lesson_id INTEGER NOT NULL REFERENCES lms_lessons(id) ON DELETE CASCADE,
+        current_time_seconds INTEGER DEFAULT 0,
+        max_watched_seconds INTEGER DEFAULT 0,
+        duration_seconds INTEGER DEFAULT 0,
+        watch_percentage NUMERIC(5,2) DEFAULT 0,
+        playback_rate_violations INTEGER DEFAULT 0,
+        tab_hidden_count INTEGER DEFAULT 0,
+        last_watched_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(staff_id, lesson_id)
+      )
+    `);
+
+    await this.executeQuery(`
+      CREATE INDEX IF NOT EXISTS idx_lms_progress_staff_lesson
+      ON lms_lesson_progress(staff_id, lesson_id)
+    `);
+
+    await this.executeQuery(`
+      CREATE INDEX IF NOT EXISTS idx_lms_progress_last_watched
+      ON lms_lesson_progress(last_watched_at)
+    `);
   }
 
   /**

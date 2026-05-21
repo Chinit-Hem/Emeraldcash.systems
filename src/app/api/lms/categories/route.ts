@@ -10,6 +10,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { lmsService } from "@/services/LmsService";
 import { canAccessLMS, canManageLMS, getSession } from "@/lib/auth-helpers";
+import { getVisibleLessonCountsByCategory } from "@/lib/lms-lesson-access";
 
 type CategoryEntityLike = {
   id: string | number;
@@ -70,9 +71,17 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const legacyCategories = (result.data ?? []).map((category) =>
-    toLegacyCategory(category as CategoryEntityLike)
-  );
+  const isAdmin = canManageLMS(session);
+  const visibleCountsByCategory = await getVisibleLessonCountsByCategory(session.role);
+  const legacyCategories = (result.data ?? [])
+    .map((category) => {
+      const legacyCategory = toLegacyCategory(category as CategoryEntityLike);
+      return {
+        ...legacyCategory,
+        lesson_count: visibleCountsByCategory.get(legacyCategory.id) ?? 0,
+      };
+    })
+    .filter((category) => isAdmin || category.lesson_count > 0);
 
   return NextResponse.json({
     success: true,

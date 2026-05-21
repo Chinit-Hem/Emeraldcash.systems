@@ -6,13 +6,16 @@ import {
   ArrowLeft,
   Building2,
   CheckCircle2,
+  Clock,
   Edit2,
   Loader2,
   Mail,
+  PlayCircle,
   Plus,
   RefreshCw,
   Search,
   Shield,
+  TrendingUp,
   Trash2,
   Users
 } from "lucide-react";
@@ -31,15 +34,84 @@ type ManagedUser = {
   profile_picture?: string | null;
 };
 
+type TrainingStatus = "not_started" | "watching" | "ready_to_complete" | "completed";
+
 interface StaffMember {
+  id: number;
   staff_id: number;
+  full_name: string;
   staff_name: string;
+  email: string | null;
+  branch_location: string | null;
   branch: string | null;
+  role: string;
+  phone: string | null;
+  is_active: boolean;
+  completed_lessons_count: number;
+  total_lessons: number;
   completion_percentage: number;
+  watched_lessons_count: number;
+  in_progress_lessons_count: number;
+  average_watch_percentage: number;
+  latest_watch_percentage: number;
+  last_completed_at: string | null;
+  last_watched_at: string | null;
+  last_watched_lesson_title: string | null;
+  training_status: TrainingStatus;
   last_activity: string | null;
-  email?: string;
-  role?: string;
-  is_active?: boolean;
+}
+
+function normalizeText(value?: string | null) {
+  return value?.trim().toLowerCase() || "";
+}
+
+function clampPercentage(value?: number | null) {
+  const numberValue = Number(value);
+  if (!Number.isFinite(numberValue)) return 0;
+  return Math.min(100, Math.max(0, Math.round(numberValue)));
+}
+
+function formatDate(value?: string | null) {
+  if (!value) return "Never";
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? "Never" : date.toLocaleDateString();
+}
+
+function getTrainingStatus(progress: StaffMember | null) {
+  const status = progress?.training_status ?? "not_started";
+
+  if (!progress) {
+    return {
+      label: "Not synced",
+      className: "bg-slate-100 text-slate-600",
+    };
+  }
+
+  if (status === "completed") {
+    return {
+      label: "Completed",
+      className: "bg-emerald-100 text-emerald-700",
+    };
+  }
+
+  if (status === "ready_to_complete") {
+    return {
+      label: "Ready to complete",
+      className: "bg-amber-100 text-amber-700",
+    };
+  }
+
+  if (status === "watching") {
+    return {
+      label: "Watching",
+      className: "bg-blue-100 text-blue-700",
+    };
+  }
+
+  return {
+    label: "Not started",
+    className: "bg-slate-100 text-slate-600",
+  };
 }
 
 export default function StaffAdminPage() {
@@ -407,10 +479,36 @@ export default function StaffAdminPage() {
   };
 
   // Get LMS progress for a user - MEMOIZED for performance
-  const getLMSProgress = useCallback((email: string | null) => {
-    if (!email) return null;
-    return lmsStaff.find(s => s.email?.toLowerCase() === email.toLowerCase());
+  const getLMSProgress = useCallback((managedUser: ManagedUser) => {
+    const email = normalizeText(managedUser.email);
+    const fullName = normalizeText(managedUser.full_name);
+    const username = normalizeText(managedUser.username);
+
+    return lmsStaff.find((staff) => {
+      const staffEmail = normalizeText(staff.email);
+      const staffName = normalizeText(staff.full_name || staff.staff_name);
+      return (
+        (email && staffEmail === email) ||
+        (fullName && staffName === fullName) ||
+        (username && staffName === username)
+      );
+    }) ?? null;
   }, [lmsStaff]);
+
+  const staffSummary = useMemo(() => {
+    const progressRows = users
+      .map((managedUser) => getLMSProgress(managedUser))
+      .filter((progress): progress is StaffMember => Boolean(progress));
+
+    return {
+      totalUsers: users.length,
+      syncedUsers: progressRows.length,
+      startedUsers: progressRows.filter((progress) =>
+        progress.watched_lessons_count > 0 || progress.completed_lessons_count > 0
+      ).length,
+      completedUsers: progressRows.filter((progress) => progress.training_status === "completed").length,
+    };
+  }, [getLMSProgress, users]);
 
   // Filter users based on search - MEMOIZED to avoid recomputation on every render
   const filteredUsers = useMemo(() => {
@@ -469,6 +567,41 @@ export default function StaffAdminPage() {
             {userActionSuccess}
           </div>
         )}
+
+        <div className="grid gap-4 mb-8 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="rounded-2xl bg-white p-4 shadow-[4px_4px_12px_#e2e8f0,-4px_-4px_12px_#ffffff]">
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-medium text-slate-500">Users</p>
+              <Users className="h-4 w-4 text-slate-400" />
+            </div>
+            <p className="mt-2 text-2xl font-bold text-slate-800">{staffSummary.totalUsers}</p>
+            <p className="mt-1 text-xs text-slate-500">Settings accounts</p>
+          </div>
+          <div className="rounded-2xl bg-white p-4 shadow-[4px_4px_12px_#e2e8f0,-4px_-4px_12px_#ffffff]">
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-medium text-slate-500">LMS Synced</p>
+              <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+            </div>
+            <p className="mt-2 text-2xl font-bold text-slate-800">{staffSummary.syncedUsers}</p>
+            <p className="mt-1 text-xs text-slate-500">Ready for training</p>
+          </div>
+          <div className="rounded-2xl bg-white p-4 shadow-[4px_4px_12px_#e2e8f0,-4px_-4px_12px_#ffffff]">
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-medium text-slate-500">Watching</p>
+              <PlayCircle className="h-4 w-4 text-blue-500" />
+            </div>
+            <p className="mt-2 text-2xl font-bold text-slate-800">{staffSummary.startedUsers}</p>
+            <p className="mt-1 text-xs text-slate-500">Opened at least one video</p>
+          </div>
+          <div className="rounded-2xl bg-white p-4 shadow-[4px_4px_12px_#e2e8f0,-4px_-4px_12px_#ffffff]">
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-medium text-slate-500">Completed</p>
+              <TrendingUp className="h-4 w-4 text-purple-500" />
+            </div>
+            <p className="mt-2 text-2xl font-bold text-slate-800">{staffSummary.completedUsers}</p>
+            <p className="mt-1 text-xs text-slate-500">Finished all lessons</p>
+          </div>
+        </div>
 
         {/* Create User Form */}
         <div className="mb-8 p-6 bg-white rounded-3xl shadow-[8px_8px_24px_#e2e8f0,-8px_-8px_24px_#ffffff]">
@@ -593,19 +726,22 @@ export default function StaffAdminPage() {
             </div>
           ) : (
             filteredUsers.map((managedUser) => {
-const lmsProgress = getLMSProgress(managedUser.email ?? null);
+              const lmsProgress = getLMSProgress(managedUser);
               const isSynced = !!lmsProgress;
-              
+              const completionPercentage = clampPercentage(lmsProgress?.completion_percentage);
+              const latestWatchPercentage = clampPercentage(lmsProgress?.latest_watch_percentage);
+              const status = getTrainingStatus(lmsProgress);
+
               return (
                 <div
                   key={managedUser.username}
-                  className="flex items-center justify-between p-6 bg-white rounded-3xl shadow-[8px_8px_24px_#e2e8f0,-8px_-8px_24px_#ffffff] hover:shadow-[12px_12px_32px_#e2e8f0,-12px_-12px_32px_#ffffff] transition-all"
+                  className="flex flex-col gap-4 p-6 bg-white rounded-3xl shadow-[8px_8px_24px_#e2e8f0,-8px_-8px_24px_#ffffff] hover:shadow-[12px_12px_32px_#e2e8f0,-12px_-12px_32px_#ffffff] transition-all lg:flex-row lg:items-center lg:justify-between"
                 >
-                  <div className="flex items-center gap-4">
+                  <div className="flex min-w-0 flex-1 items-start gap-4">
                     {/* Avatar */}
                     <div className="relative shrink-0">
                       {managedUser.profile_picture ? (
-                         
+
                         <img
                           src={managedUser.profile_picture}
                           alt={managedUser.username}
@@ -622,10 +758,10 @@ const lmsProgress = getLMSProgress(managedUser.email ?? null);
                         </div>
                       )}
                     </div>
-                    
-                    <div>
-                    <div className="flex items-center gap-2">
-                      <h3 className="text-lg font-bold text-slate-800">
+
+                    <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h3 className="truncate text-lg font-bold text-slate-800">
                         {managedUser.full_name || managedUser.username}
                       </h3>
                       {managedUser.username.toLowerCase() === (user?.username || "").toLowerCase() && (
@@ -646,6 +782,9 @@ const lmsProgress = getLMSProgress(managedUser.email ?? null);
                           Synced to LMS
                         </span>
                       )}
+                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${status.className}`}>
+                        {status.label}
+                      </span>
                     </div>
                       
                       <div className="flex flex-wrap items-center gap-3 text-sm text-slate-500 mt-1">
@@ -668,25 +807,47 @@ const lmsProgress = getLMSProgress(managedUser.email ?? null);
 
                       {/* LMS Progress */}
                       {lmsProgress && (
-                        <div className="flex items-center gap-2 mt-2">
-                          <div className="w-24 h-2 bg-slate-200 rounded-full overflow-hidden">
-                            <div 
-                              className="h-full bg-gradient-to-r from-emerald-500 to-emerald-600 rounded-full"
-                              style={{ width: `${lmsProgress.completion_percentage}%` }}
-                            />
+                        <div className="mt-3 rounded-2xl border border-slate-100 bg-slate-50/80 p-3">
+                          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center justify-between gap-3 text-xs font-medium text-slate-600">
+                                <span>LMS completion</span>
+                                <span>{completionPercentage}%</span>
+                              </div>
+                              <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-slate-200">
+                                <div
+                                  className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-emerald-600"
+                                  style={{ width: `${completionPercentage}%` }}
+                                />
+                              </div>
+                            </div>
+                            <div className="flex flex-wrap gap-2 text-xs text-slate-600">
+                              <span className="inline-flex items-center gap-1 rounded-full bg-white px-2.5 py-1">
+                                <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
+                                {lmsProgress.completed_lessons_count}/{lmsProgress.total_lessons} complete
+                              </span>
+                              <span className="inline-flex items-center gap-1 rounded-full bg-white px-2.5 py-1">
+                                <PlayCircle className="h-3.5 w-3.5 text-blue-500" />
+                                {lmsProgress.watched_lessons_count} watched
+                              </span>
+                              <span className="inline-flex items-center gap-1 rounded-full bg-white px-2.5 py-1">
+                                <Clock className="h-3.5 w-3.5 text-amber-500" />
+                                {latestWatchPercentage}% latest
+                              </span>
+                            </div>
                           </div>
-                          <span className="text-xs text-slate-500">{lmsProgress.completion_percentage}% complete</span>
-                          {lmsProgress.last_activity && (
-                            <span className="text-xs text-slate-400">
-                              • Last active: {new Date(lmsProgress.last_activity).toLocaleDateString()}
-                            </span>
-                          )}
+                          <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500">
+                            <span>Last active: {formatDate(lmsProgress.last_activity)}</span>
+                            {lmsProgress.last_watched_lesson_title && (
+                              <span className="truncate">Last video: {lmsProgress.last_watched_lesson_title}</span>
+                            )}
+                          </div>
                         </div>
                       )}
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2">
+                  <div className="flex shrink-0 items-center gap-2 self-end lg:self-center">
                     <button
                       onClick={() => startEditUser(managedUser)}
                       disabled={editingUser !== null}

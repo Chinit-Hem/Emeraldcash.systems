@@ -682,7 +682,7 @@ export const vehicleApi = {
 
   // Clear cache
   async clearCache(): Promise<void> {
-    return apiRequest<void>("/api/vehicles/clear-cache", {
+    return apiRequest<void>("/api/vehicles-cache", {
       method: "POST",
     });
   },

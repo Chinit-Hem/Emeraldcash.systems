@@ -83,11 +83,21 @@ function IconSettings() {
   );
 }
 
+type SidebarMode = "desktop" | "drawer";
+
 interface SidebarProps {
   user: User;
   onNavigate?: () => void;
-  /** When true, enable expensive work (counts fetch + route prefetch). */
+  /**
+   * When true, enable expensive work (counts fetch + route prefetch).
+   * NOTE: mobile drawer should use mode="drawer" for maximum speed.
+   */
   isVisible?: boolean;
+  /**
+   * Used to distinguish desktop sidebar vs mobile drawer (hamburger).
+   * Drawer mode should be extremely fast: minimal/zero prefetch and no stats polling.
+   */
+  mode?: SidebarMode;
 }
 
 // NavItem component with flat styling and instant navigation
@@ -238,16 +248,23 @@ function QuickFilterButton({
   }
 
 
-export default function Sidebar({ user, onNavigate, isVisible = true }: SidebarProps) {
+export default function Sidebar({
+  user,
+  onNavigate,
+  isVisible = true,
+  mode = "desktop",
+}: SidebarProps) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const isIOS =
     typeof navigator !== "undefined" && /iPad|iPhone|iPod/.test(navigator.userAgent);
 
-  // On iOS Safari, opening the drawer should be stable and fast.
-  // Avoid refresh polling while the drawer mounts to prevent crashes/reload loops.
-  const { stats } = useVehicleStats(isVisible && !isIOS ? 300000 : 0);
+  // Drawer mode must be extremely fast: no polling/network work on open.
+  // Desktop keeps the previous behavior.
+  const isDrawer = mode === "drawer";
+  const { stats } = useVehicleStats(isVisible && !isDrawer && !isIOS ? 300000 : 0);
+
   const { language } = useLanguage();
   const { t } = useTranslation(language);
   const [pendingHref, setPendingHref] = useState<string | null>(null);
@@ -280,16 +297,15 @@ export default function Sidebar({ user, onNavigate, isVisible = true }: SidebarP
   );
 
   // Safe prefetch with fallback for iOS Safari
-  // IMPORTANT: only run when the drawer is actually visible to avoid mobile "menu open delay".
+  // Drawer mode must be fast: disable any prefetch work when mode="drawer".
   useEffect(() => {
     if (!isVisible) return;
+    if (mode === "drawer") return;
 
     const isIOS =
       typeof navigator !== "undefined" && /iPad|iPhone|iPod/.test(navigator.userAgent);
 
-    // iOS Safari is triggering a crash/reload loop here (observed as
-    // “A problem repeatedly occurred…” on the deployed site). To stabilize,
-    // skip aggressive prefetching entirely on iOS.
+    // iOS Safari crash/reload loop observed with aggressive prefetching.
     if (isIOS) return;
 
     const prefetchRoutes = () => {
@@ -298,7 +314,6 @@ export default function Sidebar({ user, onNavigate, isVisible = true }: SidebarP
       });
     };
 
-    // Small delay so the drawer can render instantly before prefetch work starts.
     const t = window.setTimeout(() => {
       if ("requestIdleCallback" in window) {
         try {
@@ -312,7 +327,7 @@ export default function Sidebar({ user, onNavigate, isVisible = true }: SidebarP
     }, 250);
 
     return () => window.clearTimeout(t);
-  }, [router, sidebarRoutes, isVisible]);
+  }, [router, sidebarRoutes, isVisible, mode]);
 
   const handleNavigate = useCallback((href: string) => {
     // Do not block navigation based on pathname/search param equality.

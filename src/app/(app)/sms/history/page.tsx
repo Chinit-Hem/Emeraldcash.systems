@@ -33,6 +33,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { formatDistanceToNow } from "date-fns";
+import { normalizeCambodiaTimeString } from "@/lib/cambodiaTime";
 
 // ============================================================================
 // Types
@@ -336,6 +337,14 @@ export default function HistoryPage() {
       setClearingHistory(false);
     }
   };
+
+  // -- Real-time relative time ticker --
+  const [nowTick, setNowTick] = useState(0);
+  useEffect(() => {
+    const id = window.setInterval(() => setNowTick((x) => x + 1), 1000);
+    return () => window.clearInterval(id);
+  }, []);
+  void nowTick;
 
   // -- Render --
   return (
@@ -762,7 +771,9 @@ export default function HistoryPage() {
                                       <span className="text-xs text-slate-400 ml-auto flex items-center gap-1">
                                         <CalendarDays className="w-3 h-3" />
                                         {new Date(
-                                          event.timestamp
+                                          normalizeCambodiaTimeString(
+                                            event.timestamp
+                                          )
                                         ).toLocaleString(language, {
                                           year: "numeric",
                                           month: "short",
@@ -841,7 +852,11 @@ export default function HistoryPage() {
                                     <div className="flex items-center gap-1.5 text-xs text-slate-400 mb-3">
                                       <Clock className="w-3 h-3" />
                                       {formatDistanceToNow(
-                                        new Date(event.timestamp),
+                                        new Date(
+                                          normalizeCambodiaTimeString(
+                                            event.timestamp
+                                          )
+                                        ),
                                         { addSuffix: true }
                                       )}
                                     </div>

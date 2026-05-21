@@ -4,12 +4,12 @@ import React, { useEffect, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useAuthUser } from "@/app/components/AuthContext";
 import { formatVehicleId, formatVehicleTime, formatCurrency } from "@/lib/format";
-import { driveThumbnailUrl, extractDriveFileId } from "@/lib/drive";
 import { onVehicleCacheUpdate } from "@/lib/vehicleCache";
 import { derivePrices } from "@/lib/pricing";
 import type { Vehicle } from "@/lib/types";
 import { TAX_TYPE_METADATA } from "@/lib/types";
 import { useMounted } from "@/lib/useMounted";
+import { getVehicleImageUrls, getVehiclePrimaryImageUrl } from "@/lib/vehicle-helpers";
 import { 
   ArrowLeft, 
   Car,
@@ -39,35 +39,7 @@ import { ImageInput } from "@/components/ui/ImageInput";
 
 // Helper to get proper image URL
 const getImageUrl = (imageUrl: unknown): string | null => {
-  if (imageUrl === null || imageUrl === undefined) return null;
-  
-  let url: string;
-  if (Array.isArray(imageUrl)) {
-    if (imageUrl.length === 0) return null;
-    const firstElement = imageUrl[0];
-    if (typeof firstElement !== 'string') return null;
-    url = firstElement;
-  } else if (typeof imageUrl === 'string') {
-    url = imageUrl;
-  } else {
-    try {
-      url = String(imageUrl);
-      if (url === '[object Object]' || url === 'undefined' || url === 'null') return null;
-    } catch {
-      return null;
-    }
-  }
-  
-  if (!url || typeof url !== 'string' || !url.trim() || url === 'undefined' || url === 'null') return null;
-  
-  if (url.includes('res.cloudinary.com')) return url;
-  
-  const fileId = extractDriveFileId(url);
-  if (fileId) {
-    return driveThumbnailUrl(fileId, "w800-h600");
-  }
-  
-  return url;
+  return getVehiclePrimaryImageUrl(imageUrl, "w800-h600");
 };
 
 // Category options
@@ -389,7 +361,8 @@ function ViewVehicleInner() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [formData, setFormData] = useState<Partial<Vehicle>>({});
-const [imagePreview, setImagePreview] = useState<string | undefined>(undefined);
+  const [imageValues, setImageValues] = useState<string[]>([]);
+  const [activeImageIndex, setActiveImageIndex] = useState(0);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   // Redirect to vehicles list if ID is a reserved word
@@ -546,7 +519,7 @@ const [imagePreview, setImagePreview] = useState<string | undefined>(undefined);
         Price70: vehicle.Price70 || 0,
         Description: vehicle.Description || "",
       });
-setImagePreview(getImageUrl(vehicle.Image) ?? undefined);
+      setImageValues(getVehicleImageUrls(vehicle.Images?.length ? vehicle.Images : vehicle.Image, "w800-h600"));
     }
   }, [vehicle, isEditMode]);
 
@@ -573,8 +546,8 @@ setImagePreview(getImageUrl(vehicle.Image) ?? undefined);
     }
   };
 
-const handleImageChange = (value: string | null) => {
-    setImagePreview(value ?? undefined);
+  const handleImagesChange = (values: string[]) => {
+    setImageValues(values);
   };
 
   const validateForm = (): boolean => {
@@ -597,40 +570,46 @@ const handleImageChange = (value: string | null) => {
     setSubmitError(null);
     
     try {
-      let finalImageUrl = vehicle.Image;
-      
-      if (imagePreview && imagePreview !== getImageUrl(vehicle.Image)) {
-        if (imagePreview.startsWith('data:')) {
-          const uploadRes = await fetch("/api/upload", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ 
-              file: imagePreview, 
-              folder: "vehicle_images",
-              filename: `${vehicle.VehicleId}_${Date.now()}`
-            }),
-          });
-          
-          if (!uploadRes.ok) {
-            const uploadError = await uploadRes.json().catch(() => ({}));
-            throw new Error(uploadError.error || "Failed to upload image");
+      const finalImageUrls = await Promise.all(
+        imageValues.map(async (imageValue, index) => {
+          if (imageValue.startsWith('http://') || imageValue.startsWith('https://')) {
+            return imageValue;
           }
-          const uploadData = await uploadRes.json();
-          finalImageUrl = uploadData?.data?.url || uploadData?.url;
-          if (!finalImageUrl) {
-            throw new Error("Upload response missing image URL");
+
+          if (imageValue.startsWith('data:')) {
+            const uploadRes = await fetch("/api/upload", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                file: imageValue,
+                folder: "vehicle_images",
+                filename: `${vehicle.VehicleId}_${Date.now()}_${index}`
+              }),
+            });
+
+            if (!uploadRes.ok) {
+              const uploadError = await uploadRes.json().catch(() => ({}));
+              throw new Error(uploadError.error || "Failed to upload image");
+            }
+            const uploadData = await uploadRes.json();
+            const uploadedUrl = uploadData?.data?.url || uploadData?.url;
+            if (!uploadedUrl) {
+              throw new Error("Upload response missing image URL");
+            }
+            return uploadedUrl;
           }
-        } else if (imagePreview.startsWith('http')) {
-          finalImageUrl = imagePreview;
-        }
-      }
+
+          return imageValue;
+        })
+      );
       
       const updateRes = await fetch(`/api/vehicles/${vehicle.VehicleId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...formData,
-          Image: finalImageUrl,
+          Image: finalImageUrls[0] || "",
+          Images: finalImageUrls,
         }),
       });
       
@@ -650,7 +629,7 @@ const handleImageChange = (value: string | null) => {
   const handleCancelEdit = () => {
     setIsEditMode(false);
     setFormData({});
-setImagePreview(undefined);
+    setImageValues([]);
     setErrors({});
     setSubmitError(null);
   };
@@ -732,7 +711,10 @@ setImagePreview(undefined);
   }
 
   const currentVehicle = vehicle;
-  const displayImageUrl = getImageUrl(currentVehicle.Image);
+  const vehicleImageSource = currentVehicle.Images?.length ? currentVehicle.Images : currentVehicle.Image;
+  const displayImageUrls = getVehicleImageUrls(vehicleImageSource, "w800-h600");
+  const galleryImageUrls = getVehicleImageUrls(vehicleImageSource, "w1200-h900");
+  const displayImageUrl = displayImageUrls[0] ?? getImageUrl(currentVehicle.Image);
   const taxTypeMeta = TAX_TYPE_METADATA.find((tt) => tt.value === currentVehicle.TaxType);
   const isTukTuk = currentVehicle.Category?.toLowerCase().includes("tuk");
 
@@ -845,7 +827,10 @@ setImagePreview(undefined);
               {displayImageUrl ? (
                 <div
                   className="relative h-64 lg:h-80 cursor-pointer group"
-                  onClick={() => setIsImageModalOpen(true)}
+                  onClick={() => {
+                    setActiveImageIndex(0);
+                    setIsImageModalOpen(true);
+                  }}
                 >
                   { }
                   <img
@@ -859,8 +844,15 @@ setImagePreview(undefined);
                       ID: {formatVehicleId(currentVehicle.VehicleId)}
                     </span>
                   </div>
-                  {isTukTuk && (
+                  {galleryImageUrls.length > 1 && (
                     <div className="absolute top-4 right-4">
+                      <span className="rounded-lg bg-black/60 px-3 py-1.5 text-xs font-semibold text-white shadow-lg backdrop-blur-sm">
+                        1 / {galleryImageUrls.length}
+                      </span>
+                    </div>
+                  )}
+                  {isTukTuk && (
+                    <div className={cn("absolute", galleryImageUrls.length > 1 ? "right-4 top-14" : "right-4 top-4")}>
                       <div className="bg-orange-500 text-white p-2 rounded-lg shadow-lg">
                         <TukTukIcon className="w-5 h-5" />
                       </div>
@@ -948,8 +940,13 @@ setImagePreview(undefined);
                   <FormSection title="Vehicle Image" icon={ImageIcon}>
                     <div className="max-w-md">
                       <ImageInput
-                        value={imagePreview}
-                        onChange={handleImageChange}
+                        value={imageValues[0] || ""}
+                        values={imageValues}
+                        onChange={(value) => handleImagesChange(value ? [value] : [])}
+                        onChangeMany={handleImagesChange}
+                        multiple
+                        maxImages={12}
+                        maxSizeMB={10}
                         disabled={isSubmitting}
                       />
                     </div>
@@ -1186,6 +1183,8 @@ setImagePreview(undefined);
         isOpen={isImageModalOpen}
         onClose={() => setIsImageModalOpen(false)}
         imageUrl={displayImageUrl || ""}
+        images={galleryImageUrls}
+        initialIndex={activeImageIndex}
         alt={`${currentVehicle.Brand} ${currentVehicle.Model}`}
       />
 

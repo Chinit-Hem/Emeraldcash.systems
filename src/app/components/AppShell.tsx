@@ -2,7 +2,7 @@
 
 import type { User } from "@/lib/types";
 import Image from "next/image";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Suspense, type ReactNode, useEffect, useRef, useState } from "react";
 
 import Sidebar from "@/app/components/Sidebar";
@@ -48,6 +48,7 @@ function useDesktopSidebar() {
 function AppShellContent({ children }: AppShellProps) {
   const router = useRouter();
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const isDesktopSidebar = useDesktopSidebar();
 
   // OPTIMIZATION: Show UI immediately with cached user, check auth in background
@@ -137,6 +138,13 @@ function AppShellContent({ children }: AppShellProps) {
     };
   }, [router]);
 
+  const mainRef = useRef<HTMLElement | null>(null);
+
+  const getScrollKey = (path: string) => {
+    const sp = searchParams?.toString?.() || "";
+    return `vms_scroll:${path}:${sp}`;
+  };
+
   // Close sidebar when pathname changes - use flushSync for immediate effect
   const prevPathnameRef = useRef(pathname);
   useEffect(() => {
@@ -146,6 +154,41 @@ function AppShellContent({ children }: AppShellProps) {
       const timeoutId = setTimeout(() => setIsSidebarOpen(false), 0);
       return () => clearTimeout(timeoutId);
     }
+  }, [pathname]);
+
+  // Persist/restore scroll position for the nested scroll container (<main />)
+  useEffect(() => {
+    const el = mainRef.current;
+    if (!el) return;
+
+    const key = getScrollKey(pathname);
+
+    const onScroll = () => {
+      try {
+        sessionStorage.setItem(key, String(el.scrollTop));
+      } catch {
+        // ignore quota/session errors
+      }
+    };
+
+    el.addEventListener("scroll", onScroll, { passive: true });
+
+    // Restore when we mount on this pathname (or return back)
+    // Do it after paint so layout has settled.
+    const restoreTimer = window.setTimeout(() => {
+      try {
+        const saved = sessionStorage.getItem(key);
+        if (saved != null) el.scrollTop = Number(saved) || 0;
+      } catch {
+        // ignore
+      }
+    }, 0);
+
+    return () => {
+      window.clearTimeout(restoreTimer);
+      el.removeEventListener("scroll", onScroll);
+    };
+     
   }, [pathname]);
 
   // Neumorphism loading card
@@ -198,8 +241,8 @@ function AppShellContent({ children }: AppShellProps) {
         {/* Desktop sidebar */}
         {isDesktopSidebar && (
           <div className="hidden lg:block">
-            <Suspense fallback={null}>
-              <Sidebar user={user} />
+              <Suspense fallback={null}>
+              <Sidebar user={user} mode="desktop" />
             </Suspense>
           </div>
         )}
@@ -224,7 +267,12 @@ function AppShellContent({ children }: AppShellProps) {
               aria-label="Navigation menu"
             >
               <Suspense fallback={null}>
-                <Sidebar user={user} onNavigate={() => setIsSidebarOpen(false)} />
+                <Sidebar
+                  user={user}
+                  onNavigate={() => setIsSidebarOpen(false)}
+                  isVisible={true}
+                  mode="drawer"
+                />
               </Suspense>
             </div>
           </div>
@@ -235,9 +283,13 @@ function AppShellContent({ children }: AppShellProps) {
           <header className={mobileHeaderClass}>
             <div className="h-14 px-4 flex items-center justify-between max-w-[100vw]">
               <button
-                onClick={() => setIsSidebarOpen(true)}
+                onClick={() => {
+                  // iOS Safari: avoid touch default handling delays/double events
+                  requestAnimationFrame(() => setIsSidebarOpen(true));
+                }}
                 className="neu-icon-btn touch-target"
                 aria-label="Open navigation menu"
+                type="button"
               >
                 <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 6h16M4 12h16M4 18h16" />
@@ -265,7 +317,7 @@ function AppShellContent({ children }: AppShellProps) {
           </header>
 
           {/* Main content - Add padding-top to account for fixed header on mobile */}
-          <main className="flex-1 overflow-auto pt-4 lg:pt-0">
+          <main ref={mainRef} className="flex-1 overflow-auto pt-4 lg:pt-0">
             {children}
           </main>
         </div>

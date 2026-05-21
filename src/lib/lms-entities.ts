@@ -42,6 +42,7 @@ export interface LmsLessonDB extends BaseDBRecord {
   duration_minutes: number | null;
   order_index: number;
   is_active: boolean;
+  allowed_roles?: string[];
 }
 
 /**
@@ -99,6 +100,7 @@ export interface LmsLessonEntity extends BaseEntity {
   durationMinutes: number | null;
   orderIndex: number;
   isActive: boolean;
+  allowedRoles?: string[];
   // Completion status (computed)
   isCompleted?: boolean;
   completedAt?: string | null;
@@ -175,7 +177,17 @@ export interface LmsDashboardStatsEntity {
     staffName: string;
     branch: string | null;
     role: string;
+    completedLessonsCount: number;
+    totalLessons: number;
     completionPercentage: number;
+    watchedLessonsCount: number;
+    inProgressLessonsCount: number;
+    averageWatchPercentage: number;
+    latestWatchPercentage: number;
+    lastCompletedAt: string | null;
+    lastWatchedAt: string | null;
+    lastWatchedLessonTitle: string | null;
+    trainingStatus: "not_started" | "watching" | "ready_to_complete" | "completed";
     lastActivity: string | null;
   }[];
   categoryCompletion: {
@@ -243,6 +255,7 @@ export interface CreateLmsCategoryInput {
   icon?: string | null;
   color?: string | null;
   orderIndex?: number;
+  allowedRoles?: string[];
 }
 
 /**
@@ -255,6 +268,7 @@ export interface UpdateLmsCategoryInput {
   color?: string | null;
   orderIndex?: number;
   isActive?: boolean;
+  allowedRoles?: string[];
 }
 
 /**
@@ -357,6 +371,7 @@ export function toLessonEntity(db: LmsLessonDB): LmsLessonEntity {
     durationMinutes: db.duration_minutes,
     orderIndex: db.order_index,
     isActive: db.is_active,
+    allowedRoles: db.allowed_roles ?? [],
   };
 }
 

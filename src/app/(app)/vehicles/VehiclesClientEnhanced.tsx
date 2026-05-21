@@ -177,6 +177,25 @@ function vehicleHasDisplayableImage(imageValue: unknown): boolean {
   return /^[a-zA-Z0-9\-_/\\.]+$/.test(normalizedValue);
 }
 
+function categoryFilterToApiCategory(value: string | null | undefined): string | undefined {
+  const normalized = value?.toLowerCase().trim();
+  if (!normalized || normalized === "all") return undefined;
+  if (normalized.includes("motor") || normalized.includes("bike")) return "Motorcycles";
+  if (normalized.includes("tuk") || normalized.includes("rickshaw")) return "TukTuks";
+  if (normalized.includes("car")) return "Cars";
+  return undefined;
+}
+
+function categoryMatchesFilter(category: string | undefined, filter: string): boolean {
+  const targetCategory = categoryFilterToApiCategory(filter);
+  if (!targetCategory) return true;
+  return categoryFilterToApiCategory(category) === targetCategory;
+}
+
+function formatCategoryFilterValue(value: string): string {
+  return categoryFilterToApiCategory(value) || value;
+}
+
 // ============================================================================
 // TukTuk Icon Component - From Sidebar Menu (IconTukTuk)
 // ============================================================================
@@ -810,6 +829,128 @@ return (
   );
 }
 
+function MobileVehicleListCard({
+  vehicle,
+  isAdmin,
+  onView,
+  onEdit,
+  onDelete,
+  getImageUrl,
+}: {
+  vehicle: Vehicle;
+  isAdmin: boolean;
+  onView: (id: string) => void;
+  onEdit: (id: string) => void;
+  onDelete: (vehicle: Vehicle) => void;
+  getImageUrl: (imageValue: unknown) => string | null;
+}) {
+  const imageUrl = getImageUrl(vehicle.Image);
+
+  const getMobileCategoryClass = (category: string) => {
+    const cat = category?.toLowerCase() || "";
+    if (cat.includes("car")) return "bg-blue-50 text-blue-700 ring-blue-100";
+    if (cat.includes("motor") || cat.includes("bike")) return "bg-purple-50 text-purple-700 ring-purple-100";
+    if (cat.includes("tuk") || cat.includes("rickshaw")) return "bg-orange-50 text-orange-700 ring-orange-100";
+    return "bg-slate-50 text-slate-700 ring-slate-100";
+  };
+
+  return (
+    <article
+      onClick={() => onView(vehicle.VehicleId)}
+      className="rounded-2xl border border-slate-100 bg-white p-4 shadow-[0_4px_16px_rgba(15,23,42,0.07)] active:scale-[0.99] transition-transform"
+    >
+      <div className="flex items-start gap-3">
+        <div className="relative h-16 w-16 flex-shrink-0 overflow-hidden rounded-xl bg-slate-100 shadow-sm">
+          <Car className="absolute inset-0 m-auto h-6 w-6 text-slate-300" aria-hidden="true" />
+          {imageUrl && (
+            <img
+              src={imageUrl}
+              alt={vehicle.Model || "Vehicle"}
+              className="relative h-full w-full object-cover"
+              loading="lazy"
+              decoding="async"
+              onError={(e) => {
+                e.currentTarget.style.display = "none";
+              }}
+            />
+          )}
+        </div>
+
+        <div className="min-w-0 flex-1">
+          <div className="mb-2 flex items-start justify-between gap-2">
+            <div className="min-w-0">
+              <h3 className="truncate text-base font-bold text-slate-900">
+                {vehicle.Brand || "-"} {vehicle.Model || "-"}
+              </h3>
+              <p className="truncate text-sm text-slate-500">
+                {vehicle.Year || "-"} {vehicle.Plate ? `- ${vehicle.Plate}` : ""}
+              </p>
+            </div>
+            <span className={cn(
+              "flex-shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold ring-1",
+              getMobileCategoryClass(vehicle.Category)
+            )}>
+              {vehicle.Category || "-"}
+            </span>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2 text-sm">
+            <div className="rounded-xl bg-slate-50 px-3 py-2">
+              <div className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Brand</div>
+              <div className="truncate font-semibold text-slate-800">{vehicle.Brand || "-"}</div>
+            </div>
+            <div className="rounded-xl bg-slate-50 px-3 py-2">
+              <div className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Model</div>
+              <div className="truncate font-semibold text-slate-800">{vehicle.Model || "-"}</div>
+            </div>
+            <div className="rounded-xl bg-slate-50 px-3 py-2">
+              <div className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Price</div>
+              <div className="truncate font-bold text-emerald-600">
+                {vehicle.PriceNew == null ? "-" : `$${vehicle.PriceNew.toLocaleString()}`}
+              </div>
+            </div>
+            <div className="rounded-xl bg-slate-50 px-3 py-2">
+              <div className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Condition</div>
+              <div className="truncate font-semibold text-slate-800">{vehicle.Condition || "-"}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-4 flex gap-2" onClick={(event) => event.stopPropagation()}>
+        <button
+          type="button"
+          onClick={() => onView(vehicle.VehicleId)}
+          className="flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl bg-slate-100 px-3 text-sm font-bold text-slate-700 transition-colors active:bg-slate-200"
+        >
+          <Eye className="h-4 w-4" />
+          View
+        </button>
+        {isAdmin && (
+          <>
+            <button
+              type="button"
+              onClick={() => onEdit(vehicle.VehicleId)}
+              className="flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl bg-emerald-50 px-3 text-sm font-bold text-emerald-700 transition-colors active:bg-emerald-100"
+            >
+              <Pen className="h-4 w-4" />
+              Edit
+            </button>
+            <button
+              type="button"
+              onClick={() => onDelete(vehicle)}
+              className="flex min-h-11 w-11 items-center justify-center rounded-xl bg-red-50 text-red-600 transition-colors active:bg-red-100"
+              aria-label={`Delete ${vehicle.Brand || "vehicle"} ${vehicle.Model || ""}`.trim()}
+            >
+              <Trash2 className="h-4 w-4" />
+            </button>
+          </>
+        )}
+      </div>
+    </article>
+  );
+}
+
 // ============================================================================
 // Loading Skeleton Component
 // ============================================================================
@@ -978,8 +1119,16 @@ export default function VehiclesClientEnhanced() {
 
   // Desktop can keep the full local dataset. Mobile Safari needs a smaller
   // payload to avoid tab reloads on memory-constrained devices.
+  const apiCategoryFilter = useMemo(
+    () => categoryFilterToApiCategory(
+      quickFilter ?? (filters.category !== "all" ? filters.category : null)
+    ),
+    [quickFilter, filters.category]
+  );
+
   const { vehicles, meta, loading, error, refresh, isValidating } = useVehiclesNeon({
     limit: isMobileSafeMode ? MOBILE_VEHICLE_FETCH_LIMIT : DESKTOP_VEHICLE_FETCH_LIMIT,
+    category: apiCategoryFilter,
     withoutImage: filters.hasImage === "no",
     refreshInterval: 0,
   });
@@ -1183,13 +1332,13 @@ const isTukTukCategory = useCallback((cat: string | undefined): boolean => {
     if (deferredQuickFilter) {
       switch (deferredQuickFilter) {
         case "cars":
-          result = result.filter(v => isCarCategory(v.Category));
+          result = result.filter(v => categoryMatchesFilter(v.Category, "cars"));
           break;
         case "motorcycles":
-          result = result.filter(v => isMotorcycleCategory(v.Category));
+          result = result.filter(v => categoryMatchesFilter(v.Category, "motorcycles"));
           break;
         case "tuktuks":
-          result = result.filter(v => isTukTukCategory(v.Category));
+          result = result.filter(v => categoryMatchesFilter(v.Category, "tuktuks"));
           break;
       }
     }
@@ -1220,7 +1369,7 @@ const isTukTukCategory = useCallback((cat: string | undefined): boolean => {
     }
 
     if (deferredFilters.category && deferredFilters.category !== "all") {
-      result = result.filter(v => v.Category?.toLowerCase() === deferredFilters.category.toLowerCase());
+      result = result.filter(v => categoryMatchesFilter(v.Category, deferredFilters.category));
     }
 
     if (deferredFilters.condition && deferredFilters.condition !== "all") {
@@ -1569,7 +1718,6 @@ const getVehicleImageUrl = useCallback((imageValue: unknown): string | null => {
           <QuickFilterCard
             active={quickFilter === null}
             onClick={() => {
-              setQuickFilter(null);
               router.push("/vehicles", { scroll: false });
             }}
             icon={Car}
@@ -1582,7 +1730,6 @@ const getVehicleImageUrl = useCallback((imageValue: unknown): string | null => {
             active={quickFilter === "cars"}
             onClick={() => {
               const newFilter = quickFilter === "cars" ? null : "cars";
-              setQuickFilter(newFilter);
               if (newFilter) {
                 router.push("/vehicles?category=cars", { scroll: false });
               } else {
@@ -1599,7 +1746,6 @@ const getVehicleImageUrl = useCallback((imageValue: unknown): string | null => {
             active={quickFilter === "motorcycles"}
             onClick={() => {
               const newFilter = quickFilter === "motorcycles" ? null : "motorcycles";
-              setQuickFilter(newFilter);
               if (newFilter) {
                 router.push("/vehicles?category=motorcycles", { scroll: false });
               } else {
@@ -1616,9 +1762,8 @@ const getVehicleImageUrl = useCallback((imageValue: unknown): string | null => {
             active={quickFilter === "tuktuks"}
             onClick={() => {
               const newFilter = quickFilter === "tuktuks" ? null : "tuktuks";
-              setQuickFilter(newFilter);
               if (newFilter) {
-                router.push("/vehicles?category=TukTuks", { scroll: false });
+                router.push("/vehicles?category=tuktuks", { scroll: false });
               } else {
                 router.push("/vehicles", { scroll: false });
               }
@@ -1639,7 +1784,7 @@ const getVehicleImageUrl = useCallback((imageValue: unknown): string | null => {
                 <NeuInput
                   value={filters.search}
                   onChange={(val) => setFilters(prev => ({ ...prev, search: val }))}
-                  placeholder="t.searchByBrandModel"
+                  placeholder={t.searchByBrandModel}
                   icon={Search}
                 />
               </div>
@@ -1658,7 +1803,7 @@ const getVehicleImageUrl = useCallback((imageValue: unknown): string | null => {
                         router.push("/vehicles", { scroll: false });
                       } else {
                         setQuickFilter(value);
-                        setFilters(prev => ({ ...prev, category: value }));
+                        setFilters(prev => ({ ...prev, category: "all" }));
                         router.push(`/vehicles?category=${value}`, { scroll: false });
                       }
                     }}
@@ -1956,15 +2101,18 @@ const getVehicleImageUrl = useCallback((imageValue: unknown): string | null => {
               {quickFilter && (
                 <FilterTag
                   label="Category"
-                  value={quickFilter.charAt(0).toUpperCase() + quickFilter.slice(1)}
-                  onRemove={() => setQuickFilter(null)}
+                  value={formatCategoryFilterValue(quickFilter)}
+                  onRemove={() => {
+                    setQuickFilter(null);
+                    router.push("/vehicles", { scroll: false });
+                  }}
                 />
               )}
 
               {filters.category !== "all" && (
                 <FilterTag
                   label="Category"
-                  value={filters.category}
+                  value={formatCategoryFilterValue(filters.category)}
                   onRemove={() => setFilters(prev => ({ ...prev, category: "all" }))}
                 />
               )}
@@ -2124,8 +2272,22 @@ const getVehicleImageUrl = useCallback((imageValue: unknown): string | null => {
                     Avg Price: <span className="font-bold text-emerald-600">${Math.round(group.avgPrice).toLocaleString()}</span>
                   </div>
                 </div>
-                {/* Group Vehicles Table */}
-                <div className="bg-white rounded-2xl shadow-[0_4px_20px_rgba(0,0,0,0.08)] overflow-hidden border border-slate-100">
+                {/* Group Vehicles List */}
+                <div className="space-y-3 md:hidden">
+                  {group.vehicles.map((vehicle) => (
+                    <MobileVehicleListCard
+                      key={vehicle.VehicleId}
+                      vehicle={vehicle}
+                      isAdmin={isAdmin}
+                      onView={handleView}
+                      onEdit={handleEdit}
+                      onDelete={handleDelete}
+                      getImageUrl={getVehicleImageUrl}
+                    />
+                  ))}
+                </div>
+
+                <div className="hidden overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-[0_4px_20px_rgba(0,0,0,0.08)] md:block">
                   <div className="overflow-x-auto">
                     <table className="w-full">
                       <thead className="sticky top-0 z-10">
@@ -2342,17 +2504,18 @@ const getVehicleImageUrl = useCallback((imageValue: unknown): string | null => {
 
         {/* Pagination - only show when not grouping and not searching */}
         {totalPages > 1 && groupBy === "none" && !filters.search && (
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className="text-sm text-slate-500">
+          <div className="rounded-2xl border border-slate-100 bg-white/80 p-3 shadow-[0_4px_16px_rgba(15,23,42,0.07)] sm:p-4">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex flex-wrap items-center gap-3">
+                <div className="text-sm text-slate-500">
                 Page {currentPage} of {totalPages}
-              </div>
+                </div>
 
-              {/* Items Per Page Dropdown */}
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-slate-500">Show:</span>
-                <div className="relative">
-<select
+                {/* Items Per Page Dropdown */}
+                <div className="flex min-w-0 items-center gap-2">
+                  <span className="text-sm text-slate-500">Show:</span>
+                  <div className="relative">
+                    <select
                     title="Items per page"
                     value={itemsPerPage}
                     onChange={(e) => {
@@ -2360,7 +2523,7 @@ const getVehicleImageUrl = useCallback((imageValue: unknown): string | null => {
                       setItemsPerPage(newValue);
                       setCurrentPage(1); // Reset to first page when changing items per page
                     }}
-                    className="px-3 py-1.5 rounded-lg bg-white shadow-[2px_2px_4px_#e2e8f0,-2px_-2px_4px_#ffffff] text-sm text-slate-700 font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500/30 appearance-none cursor-pointer pr-8"
+                    className="h-11 rounded-lg bg-white px-3 pr-8 text-sm font-medium text-slate-700 shadow-[2px_2px_4px_#e2e8f0,-2px_-2px_4px_#ffffff] appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
                   >
                     {ITEMS_PER_PAGE_OPTIONS.map((option) => (
                       <option key={option} value={option}>
@@ -2368,61 +2531,64 @@ const getVehicleImageUrl = useCallback((imageValue: unknown): string | null => {
                       </option>
                     ))}
                   </select>
-                  <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400 pointer-events-none" />
+                    <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400 pointer-events-none" />
+                  </div>
+                  <span className="text-sm text-slate-500">{t.perPage}</span>
                 </div>
-                <span className="text-sm text-slate-500">{t.perPage}</span>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <NeuButton
-                variant="default"
-                size="sm"
-                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                disabled={currentPage <= 1}
-              >
-                Previous
-              </NeuButton>
-
-              <div className="flex items-center gap-1">
-                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                  // Show pages around current page
-                  let pageNum;
-                  if (totalPages <= 5) {
-                    pageNum = i + 1;
-                  } else if (currentPage <= 3) {
-                    pageNum = i + 1;
-                  } else if (currentPage >= totalPages - 2) {
-                    pageNum = totalPages - 4 + i;
-                  } else {
-                    pageNum = currentPage - 2 + i;
-                  }
-
-                  return (
-                    <button
-                      key={pageNum}
-                      onClick={() => setCurrentPage(pageNum)}
-                      className={cn(
-                        "w-9 h-9 rounded-lg text-sm font-medium transition-all duration-200",
-                        currentPage === pageNum
-                          ? "bg-emerald-500 text-white shadow-md"
-                          : "bg-white text-slate-600 hover:bg-slate-50 shadow-sm"
-                      )}
-                    >
-                      {pageNum}
-                    </button>
-                  );
-                })}
               </div>
 
-              <NeuButton
-                variant="default"
-                size="sm"
-                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                disabled={currentPage >= totalPages}
-              >
-                Next
-              </NeuButton>
+              <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+                <NeuButton
+                  variant="default"
+                  size="sm"
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  disabled={currentPage <= 1}
+                  className="min-h-11 flex-1 sm:flex-none"
+                >
+                  Previous
+                </NeuButton>
+
+                <div className="order-first flex w-full items-center justify-center gap-1 sm:order-none sm:w-auto">
+                  {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                    // Show pages around current page
+                    let pageNum;
+                    if (totalPages <= 5) {
+                      pageNum = i + 1;
+                    } else if (currentPage <= 3) {
+                      pageNum = i + 1;
+                    } else if (currentPage >= totalPages - 2) {
+                      pageNum = totalPages - 4 + i;
+                    } else {
+                      pageNum = currentPage - 2 + i;
+                    }
+
+                    return (
+                      <button
+                        key={pageNum}
+                        onClick={() => setCurrentPage(pageNum)}
+                        className={cn(
+                          "h-10 w-10 rounded-lg text-sm font-medium transition-colors",
+                          currentPage === pageNum
+                            ? "bg-emerald-500 text-white shadow-md"
+                            : "bg-white text-slate-600 hover:bg-slate-50 shadow-sm"
+                        )}
+                      >
+                        {pageNum}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <NeuButton
+                  variant="default"
+                  size="sm"
+                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                  disabled={currentPage >= totalPages}
+                  className="min-h-11 flex-1 sm:flex-none"
+                >
+                  Next
+                </NeuButton>
+              </div>
             </div>
           </div>
         )}

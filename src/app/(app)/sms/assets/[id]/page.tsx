@@ -24,6 +24,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import ImageModal from "../components/ImageModal";
+import { CAMBODIA_TIMEZONE } from "@/lib/cambodiaTime";
 
 interface SmsAsset {
   id: string;
@@ -69,11 +70,13 @@ interface AssetHistory {
 
 function formatDate(value: string): string {
   return new Intl.DateTimeFormat("en-US", {
+    timeZone: CAMBODIA_TIMEZONE,
     year: "numeric",
     month: "short",
     day: "numeric",
     hour: "2-digit",
     minute: "2-digit",
+    hour12: true,
   }).format(new Date(value));
 }
 

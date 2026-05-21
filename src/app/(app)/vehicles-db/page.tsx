@@ -1,6 +1,9 @@
 import { sql } from "@/lib/db";
 import { formatPrice, getVehicleThumbnailUrl } from "@/lib/vehicle-helpers";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 // Vehicle type definition based on the vehicles table schema
 interface Vehicle {
   id: number;
@@ -56,7 +59,7 @@ export default async function VehiclesDbPage() {
         created_at,
         updated_at
       FROM vehicles
-      ORDER BY id ASC
+      ORDER BY COALESCE(updated_at, created_at) DESC NULLS LAST, id DESC
     `;
 
 
@@ -174,7 +177,9 @@ export default async function VehiclesDbPage() {
                   </td>
                   <td className="px-4 py-3 whitespace-nowrap">
                     {(() => {
-                      const imageUrl = getVehicleThumbnailUrl(vehicle.thumbnail_url || vehicle.image_id, "w96-h96");
+                      const imageUrl =
+                        getVehicleThumbnailUrl(vehicle.image_id, "w96-h96") ||
+                        getVehicleThumbnailUrl(vehicle.thumbnail_url, "w96-h96");
                       return imageUrl ? (
                         <img
                           src={imageUrl}

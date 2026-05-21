@@ -61,11 +61,19 @@ export function OptimizedLink({
     }
   }, []);
 
-  // Preload high priority routes on mount
+// Preload high priority routes on mount with iOS safe fallback
   useEffect(() => {
+    const isIOS = typeof navigator !== 'undefined' && /iPad|iPhone|iPod/.test(navigator.userAgent);
+    
     if (priority === "high" && prefetch && !hasPrefetched.current) {
       if (href === pathname || href === "#") return;
-      router.prefetch(href);
+      
+      // Safe prefetch with fallback for iOS Safari
+      if (isIOS) {
+        globalThis.setTimeout(() => router.prefetch(href), 100);
+      } else {
+        router.prefetch(href);
+      }
       hasPrefetched.current = true;
     }
   }, [href, pathname, prefetch, priority, router]);
@@ -135,23 +143,31 @@ export function PrefetchProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const hasPrefetched = useRef(false);
 
-  useEffect(() => {
+useEffect(() => {
     if (hasPrefetched.current) return;
     hasPrefetched.current = true;
+    
+    const isIOS = typeof navigator !== 'undefined' && /iPad|iPhone|iPod/.test(navigator.userAgent);
 
-    // Prefetch critical routes after initial render
+    // Prefetch critical routes after initial render - iOS safe
     const prefetchCritical = () => {
       CRITICAL_ROUTES.forEach((route, index) => {
-        // Stagger prefetches to avoid network congestion
+        // Stagger prefetches to avoid network congestion - longer delay for iOS
         setTimeout(() => {
           router.prefetch(route);
-        }, index * 100);
+        }, index * (isIOS ? 150 : 100));
       });
     };
 
-    // Use requestIdleCallback if available, otherwise setTimeout
-    if ("requestIdleCallback" in window) {
-      window.requestIdleCallback(prefetchCritical, { timeout: 2000 });
+    // Use setTimeout for iOS to avoid potential issues with requestIdleCallback
+    if (isIOS) {
+      setTimeout(prefetchCritical, 500);
+    } else if ("requestIdleCallback" in window) {
+      try {
+        window.requestIdleCallback(prefetchCritical, { timeout: 2000 });
+      } catch {
+        setTimeout(prefetchCritical, 1000);
+      }
     } else {
       setTimeout(prefetchCritical, 1000);
     }

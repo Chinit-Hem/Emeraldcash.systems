@@ -436,7 +436,8 @@ export default function EnhancedDashboard({
   useEffect(() => {
     setVehicles(initialVehicles);
     setMeta(initialMeta);
-  }, [initialVehicles, initialMeta]);
+    setError(initialError);
+  }, [initialVehicles, initialMeta, initialError]);
 
   // Real data search: query API across 100% of database when user types
   useEffect(() => {
@@ -450,7 +451,7 @@ export default function EnhancedDashboard({
       setIsSearching(true);
       try {
         const searchLimit = isIOSSafari ? 300 : 2000;
-        const url = `/api/vehicles/edge?search=${encodeURIComponent(debouncedSearch)}&limit=${searchLimit}`;
+        const url = `/api/vehicles?searchTerm=${encodeURIComponent(debouncedSearch)}&limit=${searchLimit}`;
         const res = await fetch(url, { cache: "no-store" });
         if (!res.ok) throw new Error("Search failed");
         const data = await res.json();

@@ -9,6 +9,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSession, canAccessLMS } from "@/lib/auth-helpers";
 import { dbManager } from "@/lib/db-singleton";
 import { getRequestedStaffId, resolveLmsStaffContext } from "@/lib/lms-auth";
+import { canAccessLessonForRole } from "@/lib/lms-lesson-access";
 
 const COMPLETE_THRESHOLD_PERCENT = 95;
 const COMPLETE_END_TOLERANCE_SECONDS = 5;
@@ -175,16 +176,24 @@ export async function GET(request: NextRequest) {
           ON lp.staff_id = $1
           AND lp.lesson_id = recent_lessons.lesson_id
         ORDER BY recent_lessons.watched_at DESC NULLS LAST
-        LIMIT 1
+        LIMIT 10
       `,
       [staffContext.staffId]
     );
 
-    if (!lastWatchedRows[0]) {
+    const visibleLastWatched = [];
+    for (const row of lastWatchedRows) {
+      if (await canAccessLessonForRole(Number(row.lesson_id), session.role)) {
+        visibleLastWatched.push(row);
+        break;
+      }
+    }
+
+    if (!visibleLastWatched[0]) {
       return lastWatchedResponse(null);
     }
 
-    const row = lastWatchedRows[0];
+    const row = visibleLastWatched[0];
     return lastWatchedResponse({
       lessonId: row.lesson_id,
       title: row.title,
@@ -200,6 +209,13 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(
       { success: false, error: "lessonId is required" },
       { status: 400 }
+    );
+  }
+
+  if (!(await canAccessLessonForRole(lessonId, session.role))) {
+    return NextResponse.json(
+      { success: false, error: "Lesson not found" },
+      { status: 404 }
     );
   }
 
@@ -287,6 +303,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       { success: false, error: "lessonId is required" },
       { status: 400 }
+    );
+  }
+
+  if (!(await canAccessLessonForRole(lessonId, session.role))) {
+    return NextResponse.json(
+      { success: false, error: "Lesson not found" },
+      { status: 404 }
     );
   }
 

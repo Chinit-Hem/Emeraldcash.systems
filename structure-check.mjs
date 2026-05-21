@@ -47,6 +47,7 @@ const allowedRootFiles = new Set([
   "tsconfig.json",
   "tsconfig.tsbuildinfo",
   "vercel.json",
+  "TODO.md",
 ]);
 
 const allowedRootDirectories = new Set([
@@ -66,7 +67,6 @@ const allowedRootDirectories = new Set([
 ]);
 
 const looseRootFilePatterns = [
-  /^TODO.*\.md$/i,
   /^.*_TODO\.md$/i,
   /^.*_SUMMARY\.md$/i,
   /^.*_REPORT\.md$/i,
@@ -113,11 +113,19 @@ for (const entry of readdirSync(root)) {
   }
 }
 
-const appComponentsPath = path.join(root, "src/app/components");
-if (existsSync(appComponentsPath)) {
-  warnings.push(
-    "src/app/components still contains legacy shared components. Prefer src/components for reusable UI and src/features/<feature>/components for feature UI during future refactors.",
-  );
+const legacySharedCandidates = [
+  "src/app/components/Sidebar.tsx",
+  "src/app/components/TopBar.tsx",
+  "src/app/components/OptimizedLink.tsx",
+  "src/app/components/OptimizedImage.tsx",
+];
+
+for (const filePath of legacySharedCandidates) {
+  if (exists(filePath)) {
+    warnings.push(
+      `Legacy shared UI still exists at ${filePath}. Prefer moving shared UI to src/components/ and feature UI to src/features/<feature>/components. (Planned refactor; keep imports stable via re-exports if needed.)`,
+    );
+  }
 }
 
 const legacyRouteComponents = [

@@ -37,6 +37,7 @@ export interface LmsLesson {
   duration_minutes: number | null;
   order_index: number;
   is_active: boolean;
+  allowed_roles?: string[];
 }
 
 export interface LmsStaff {
@@ -67,6 +68,7 @@ export interface LessonWithStatus {
   completed_at: string | null;
   category_name?: string;
   category_color?: string;
+  allowed_roles?: string[];
 }
 
 export interface StaffProgress {
@@ -74,7 +76,17 @@ export interface StaffProgress {
   staff_name: string;
   branch: string | null;
   role: string;
+  completed_lessons_count: number;
+  total_lessons: number;
   completion_percentage: number;
+  watched_lessons_count: number;
+  in_progress_lessons_count: number;
+  average_watch_percentage: number;
+  latest_watch_percentage: number;
+  last_completed_at: string | null;
+  last_watched_at: string | null;
+  last_watched_lesson_title: string | null;
+  training_status: "not_started" | "watching" | "ready_to_complete" | "completed";
   last_activity: string | null;
 }
 
@@ -129,6 +141,7 @@ export interface LessonFormData {
   durationMinutes: number;
   orderIndex: number;
   isActive?: boolean;
+  allowedRoles?: string[];
 }
 
 export interface StaffFormData {

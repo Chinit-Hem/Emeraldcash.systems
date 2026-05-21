@@ -29,7 +29,7 @@ async function ensureKv() {
 // Cache Keys & TTLs
 // ============================================================================
 
-const CACHE_PREFIX = 'lms:';
+const CACHE_PREFIX = 'lms:v2:';
 const LESSONS_CACHE_TTL = 60 * 5; // 5 minutes
 const _STATS_CACHE_TTL = 60 * 10;  // 10 minutes
 
@@ -49,9 +49,10 @@ export interface LmsCacheResult<T> {
  * Get cached lessons by category (regular list)
  */
 export async function getCachedLessonsByCategory(
-  categoryId: number
+  categoryId: number,
+  viewerRole = "all"
 ): Promise<LmsCacheResult<LmsLesson[]>> {
-  const cacheKey = `${CACHE_PREFIX}lessons:${categoryId}`;
+  const cacheKey = `${CACHE_PREFIX}lessons:${categoryId}:${viewerRole}`;
   await ensureKv();
 
   if (process.env.NODE_ENV === 'development' || !kv) {
@@ -84,9 +85,10 @@ export async function getCachedLessonsByCategory(
  */
 export async function setCachedLessonsByCategory(
   categoryId: number,
-  lessons: LmsLesson[]
+  lessons: LmsLesson[],
+  viewerRole = "all"
 ): Promise<boolean> {
-  const cacheKey = `${CACHE_PREFIX}lessons:${categoryId}`;
+  const cacheKey = `${CACHE_PREFIX}lessons:${categoryId}:${viewerRole}`;
   await ensureKv();
 
   if (!kv) return false;
@@ -105,9 +107,10 @@ export async function setCachedLessonsByCategory(
  */
 export async function getCachedSequentialLessons(
   categoryId: number,
-  staffId: number
+  staffId: number,
+  viewerRole = "all"
 ): Promise<LmsCacheResult<LmsLesson[]>> {
-  const cacheKey = `${CACHE_PREFIX}lessons-seq:${categoryId}:${staffId}`;
+  const cacheKey = `${CACHE_PREFIX}lessons-seq:${categoryId}:${staffId}:${viewerRole}`;
   await ensureKv();
 
   if (!kv) return { success: false };
@@ -139,9 +142,10 @@ export async function getCachedSequentialLessons(
 export async function setCachedSequentialLessons(
   categoryId: number,
   staffId: number,
-  lessons: LmsLesson[]
+  lessons: LmsLesson[],
+  viewerRole = "all"
 ): Promise<boolean> {
-  const cacheKey = `${CACHE_PREFIX}lessons-seq:${categoryId}:${staffId}`;
+  const cacheKey = `${CACHE_PREFIX}lessons-seq:${categoryId}:${staffId}:${viewerRole}`;
   await ensureKv();
 
   if (!kv) return false;
@@ -168,7 +172,10 @@ export async function invalidateCategoryCache(categoryId: number): Promise<void>
   const client = kv;
 
   const keys = [
-    `${CACHE_PREFIX}lessons:${categoryId}`,
+    `${CACHE_PREFIX}lessons:${categoryId}:all`,
+    `${CACHE_PREFIX}lessons:${categoryId}:Admin`,
+    `${CACHE_PREFIX}lessons:${categoryId}:Staff`,
+    `${CACHE_PREFIX}lessons:${categoryId}:Accounting`,
   ];
 
   try {
@@ -192,7 +199,12 @@ export async function invalidateSequentialLessonsCache(
   if (!kv) return;
 
   try {
-    await kv.del(`${CACHE_PREFIX}lessons-seq:${categoryId}:${staffId}`);
+    await Promise.all([
+      kv.del(`${CACHE_PREFIX}lessons-seq:${categoryId}:${staffId}:all`),
+      kv.del(`${CACHE_PREFIX}lessons-seq:${categoryId}:${staffId}:Admin`),
+      kv.del(`${CACHE_PREFIX}lessons-seq:${categoryId}:${staffId}:Staff`),
+      kv.del(`${CACHE_PREFIX}lessons-seq:${categoryId}:${staffId}:Accounting`),
+    ]);
   } catch (error) {
     console.error('[LmsCache] Invalidate sequential lessons error:', error);
   }

@@ -21,6 +21,7 @@
 
 import { processImageForUpload } from "@/lib/clientImageCompression";
 import { fileToDataUrl } from "@/lib/fileToDataUrl";
+import { parseVehicleImages } from "@/lib/vehicle-helpers";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 
 // ============================================================================
@@ -30,8 +31,16 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 export interface ImageInputProps {
   /** Current image value (URL or base64) */
   value?: string;
+  /** Current image values for gallery mode */
+  values?: string[];
   /** Callback when image changes (URL, base64, or null) */
   onChange: (value: string | null) => void;
+  /** Callback when gallery images change */
+  onChangeMany?: (values: string[]) => void;
+  /** Allow more than one image */
+  multiple?: boolean;
+  /** Maximum number of images in gallery mode */
+  maxImages?: number;
   /** Optional label text */
   label?: string;
   /** Optional helper text */
@@ -63,7 +72,11 @@ interface ImagePreview {
 
 export function ImageInput({
   value,
+  values,
   onChange,
+  onChangeMany,
+  multiple = false,
+  maxImages = 12,
   label = "Vehicle Image",
   helperText = "Drag & drop, click to upload, paste image URL, or Ctrl+V to paste image",
   maxSizeMB = 5,
@@ -81,6 +94,7 @@ export function ImageInput({
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [preview, setPreview] = useState<ImagePreview | null>(null);
+  const [previews, setPreviews] = useState<ImagePreview[]>([]);
   const [urlInput, setUrlInput] = useState("");
   const [isMounted, setIsMounted] = useState(false);
   const [isUsingFallback, setIsUsingFallback] = useState(false);
@@ -91,8 +105,10 @@ export function ImageInput({
   const objectUrlRef = useRef<string | null>(null);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const replaceInputRef = useRef<HTMLInputElement>(null);
   const urlInputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const replaceIndexRef = useRef<number | null>(null);
 
   // ============================================================================
   // Effects
@@ -109,6 +125,21 @@ export function ImageInput({
 
   // Update preview when value changes
   useEffect(() => {
+    if (multiple) {
+      const galleryValues = parseVehicleImages(values?.length ? values : value);
+      setPreviews(
+        galleryValues.map((image, index) => ({
+          url: image,
+          name: index === 0 ? "Primary image" : `Image ${index + 1}`,
+          isUrl: image.startsWith("http://") || image.startsWith("https://"),
+        }))
+      );
+      setPreview(null);
+      setIsUsingFallback(false);
+      setFailedUrl(null);
+      return;
+    }
+
     if (!value) {
       setPreview(null);
       setIsUsingFallback(false);
@@ -192,7 +223,7 @@ export function ImageInput({
         isUrl: false,
       });
     }
-  }, [value, maxSizeMB, failedUrl]);
+  }, [value, values, multiple, maxSizeMB, failedUrl]);
 
   // ============================================================================
   // Helpers
@@ -323,16 +354,99 @@ export function ImageInput({
     return fileToDataUrl(file);
   };
 
+  const buildPreview = useCallback((url: string, index: number, name?: string, size?: number): ImagePreview => ({
+    url,
+    name: name || (index === 0 ? "Primary image" : `Image ${index + 1}`),
+    size,
+    isUrl: url.startsWith("http://") || url.startsWith("https://"),
+  }), []);
+
+  const emitMultipleImages = useCallback((nextValues: string[]) => {
+    const uniqueValues = parseVehicleImages(nextValues).slice(0, maxImages);
+    setPreviews(uniqueValues.map((image, index) => buildPreview(image, index)));
+    setPreview(null);
+    setCacheKey((prev) => prev + 1);
+    if (onChangeMany) {
+      onChangeMany(uniqueValues);
+    } else {
+      onChange(uniqueValues[0] ?? null);
+    }
+  }, [buildPreview, maxImages, onChange, onChangeMany]);
+
+  const appendMultipleImages = useCallback((newValues: string[]) => {
+    const currentValues = parseVehicleImages(previews.map((item) => item.url));
+    emitMultipleImages([...currentValues, ...newValues]);
+  }, [emitMultipleImages, previews]);
+
+  const replaceMultipleImage = useCallback((index: number, nextValue: string) => {
+    const currentValues = parseVehicleImages(previews.map((item) => item.url));
+    if (index < 0 || index >= currentValues.length) return;
+    currentValues[index] = nextValue;
+    emitMultipleImages(currentValues);
+  }, [emitMultipleImages, previews]);
+
+  const removeMultipleImage = useCallback((index: number) => {
+    const currentValues = parseVehicleImages(previews.map((item) => item.url));
+    currentValues.splice(index, 1);
+    emitMultipleImages(currentValues);
+  }, [emitMultipleImages, previews]);
+
+  const clearMultipleImages = useCallback(() => {
+    emitMultipleImages([]);
+    setUrlInput("");
+    setError(null);
+  }, [emitMultipleImages]);
+
   // ============================================================================
   // Event Handlers
   // ============================================================================
 
   const handleFileSelect = useCallback(async (file: File) => {
     setError(null);
-    
+
     const validationError = validateFile(file);
     if (validationError) {
       setError(validationError);
+      return;
+    }
+
+    if (multiple) {
+      const replacingIndex = replaceIndexRef.current;
+      replaceIndexRef.current = null;
+
+      if (replacingIndex === null && previews.length >= maxImages) {
+        setError(`You can upload up to ${maxImages} images.`);
+        return;
+      }
+
+      setIsLoading(true);
+      try {
+        const processedFile = await processImageForUpload(file, {
+          maxWidth: 1200,
+          quality: 0.7,
+          autoCompress: true,
+          maxSizeMB: 1,
+        });
+        const dataUrl = await readFileAsDataUrl(processedFile);
+        const cleanedDataUrl = cleanDataUrl(dataUrl);
+
+        if (replacingIndex !== null) {
+          replaceMultipleImage(replacingIndex, cleanedDataUrl);
+        } else {
+          appendMultipleImages([cleanedDataUrl]);
+        }
+      } catch (err) {
+        console.warn("[ImageInput] Multi-image processing failed, using original file:", err);
+        const dataUrl = await readFileAsDataUrl(file);
+        const cleanedDataUrl = cleanDataUrl(dataUrl);
+        if (replacingIndex !== null) {
+          replaceMultipleImage(replacingIndex, cleanedDataUrl);
+        } else {
+          appendMultipleImages([cleanedDataUrl]);
+        }
+      } finally {
+        setIsLoading(false);
+      }
       return;
     }
 
@@ -410,7 +524,7 @@ export function ImageInput({
     } finally {
       setIsLoading(false);
     }
-  }, [onChange, validateFile]);
+  }, [appendMultipleImages, maxImages, multiple, onChange, previews.length, replaceMultipleImage, validateFile]);
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -435,11 +549,51 @@ export function ImageInput({
   const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (files && files.length > 0) {
-      handleFileSelect(files[0]);
+      if (multiple && replaceIndexRef.current === null) {
+        const remainingSlots = Math.max(maxImages - previews.length, 0);
+        const selectedFiles = Array.from(files).slice(0, remainingSlots);
+
+        if (selectedFiles.length === 0) {
+          setError(`You can upload up to ${maxImages} images.`);
+        } else {
+          void (async () => {
+            setError(null);
+            setIsLoading(true);
+            const processedValues: string[] = [];
+
+            try {
+              for (const file of selectedFiles) {
+                const validationError = validateFile(file);
+                if (validationError) {
+                  setError(validationError);
+                  continue;
+                }
+
+                const processedFile = await processImageForUpload(file, {
+                  maxWidth: 1200,
+                  quality: 0.7,
+                  autoCompress: true,
+                  maxSizeMB: 1,
+                }).catch(() => file);
+                const dataUrl = await readFileAsDataUrl(processedFile);
+                processedValues.push(cleanDataUrl(dataUrl));
+              }
+
+              if (processedValues.length > 0) {
+                appendMultipleImages(processedValues);
+              }
+            } finally {
+              setIsLoading(false);
+            }
+          })();
+        }
+      } else {
+        void handleFileSelect(files[0]);
+      }
     }
     // Reset input so the same file can be selected again
     e.target.value = "";
-  }, [handleFileSelect]);
+  }, [appendMultipleImages, handleFileSelect, maxImages, multiple, previews.length, validateFile]);
 
   const handleUrlSubmit = useCallback(async (url: string) => {
     const trimmedUrl = url.trim();
@@ -503,6 +657,15 @@ export function ImageInput({
 
       await imageLoadPromise;
 
+      if (multiple) {
+        if (previews.length >= maxImages) {
+          throw new Error(`You can upload up to ${maxImages} images.`);
+        }
+        appendMultipleImages([trimmedUrl]);
+        setUrlInput("");
+        return;
+      }
+
       // Only update parent and show preview after successful validation
       onChange(trimmedUrl);
       setPreview({
@@ -521,7 +684,7 @@ export function ImageInput({
     } finally {
       setIsLoading(false);
     }
-  }, [onChange]);
+  }, [appendMultipleImages, maxImages, multiple, onChange, previews.length]);
 
   const handleDrop = useCallback(async (e: React.DragEvent) => {
     e.preventDefault();
@@ -532,7 +695,42 @@ export function ImageInput({
 
     const files = e.dataTransfer.files;
     if (files.length > 0) {
-      await handleFileSelect(files[0]);
+      if (multiple) {
+        const remainingSlots = Math.max(maxImages - previews.length, 0);
+        const selectedFiles = Array.from(files).slice(0, remainingSlots);
+
+        if (selectedFiles.length === 0) {
+          setError(`You can upload up to ${maxImages} images.`);
+          return;
+        }
+
+        setIsLoading(true);
+        const processedValues: string[] = [];
+        try {
+          for (const file of selectedFiles) {
+            const validationError = validateFile(file);
+            if (validationError) {
+              setError(validationError);
+              continue;
+            }
+            const processedFile = await processImageForUpload(file, {
+              maxWidth: 1200,
+              quality: 0.7,
+              autoCompress: true,
+              maxSizeMB: 1,
+            }).catch(() => file);
+            const dataUrl = await readFileAsDataUrl(processedFile);
+            processedValues.push(cleanDataUrl(dataUrl));
+          }
+          if (processedValues.length > 0) {
+            appendMultipleImages(processedValues);
+          }
+        } finally {
+          setIsLoading(false);
+        }
+      } else {
+        await handleFileSelect(files[0]);
+      }
       return;
     }
 
@@ -543,7 +741,7 @@ export function ImageInput({
     }
 
     setError("Drop an image file or a direct image URL.");
-  }, [handleFileSelect, handleUrlSubmit, disabled]);
+  }, [appendMultipleImages, disabled, handleFileSelect, handleUrlSubmit, maxImages, multiple, previews.length, validateFile]);
 
   const handleUrlInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     setUrlInput(e.target.value);
@@ -558,6 +756,11 @@ export function ImageInput({
   }, [urlInput, handleUrlSubmit]);
 
   const handleRemove = useCallback(() => {
+    if (multiple) {
+      clearMultipleImages();
+      return;
+    }
+
     // Clean up object URL if exists
     if (objectUrlRef.current) {
       URL.revokeObjectURL(objectUrlRef.current);
@@ -570,7 +773,7 @@ export function ImageInput({
     setIsUsingFallback(false);
     setFailedUrl(null);
     setCacheKey(prev => prev + 1); // Force re-render
-  }, [onChange]);
+  }, [clearMultipleImages, multiple, onChange]);
 
   const handleRetry = useCallback(() => {
     if (failedUrl) {
@@ -675,15 +878,104 @@ export function ImageInput({
           ref={fileInputRef}
           type="file"
           accept={accept}
+          multiple={multiple}
           onChange={handleInputChange}
           disabled={disabled}
           className="hidden"
         />
+        {multiple && (
+          <input
+            ref={replaceInputRef}
+            type="file"
+            accept={accept}
+            onChange={handleInputChange}
+            disabled={disabled}
+            className="hidden"
+          />
+        )}
 
         {isLoading ? (
           <div className="flex flex-col items-center justify-center space-y-2">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600" />
             <p className="text-sm text-gray-500 dark:text-gray-400">Processing...</p>
+          </div>
+        ) : multiple && previews.length > 0 ? (
+          <div className="space-y-4" onClick={(e) => e.stopPropagation()}>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+              {previews.map((item, index) => (
+                <div
+                  key={`${item.url}-${index}-${cacheKey}`}
+                  className="group relative overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800"
+                >
+                  <img
+                    src={item.url}
+                    alt={index === 0 ? "Primary vehicle image" : `Vehicle image ${index + 1}`}
+                    className="h-28 w-full object-cover"
+                    onError={() => {
+                      setError("One image could not be loaded. Replace it or remove it.");
+                    }}
+                  />
+                  <div className="absolute left-2 top-2 rounded-full bg-black/60 px-2 py-0.5 text-[11px] font-semibold text-white">
+                    {index === 0 ? "Primary" : index + 1}
+                  </div>
+                  <div className="absolute inset-x-2 bottom-2 flex gap-1 opacity-100 sm:opacity-0 sm:transition sm:group-hover:opacity-100">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        replaceIndexRef.current = index;
+                        replaceInputRef.current?.click();
+                      }}
+                      disabled={disabled}
+                      className="flex-1 rounded-lg bg-white/95 px-2 py-1 text-xs font-semibold text-slate-800 shadow hover:bg-white disabled:opacity-50"
+                    >
+                      Replace
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        removeMultipleImage(index);
+                      }}
+                      disabled={disabled}
+                      className="rounded-lg bg-red-500 px-2 py-1 text-xs font-semibold text-white shadow hover:bg-red-600 disabled:opacity-50"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                </div>
+              ))}
+              {previews.length < maxImages && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    fileInputRef.current?.click();
+                  }}
+                  disabled={disabled}
+                  className="flex h-28 flex-col items-center justify-center rounded-xl border border-dashed border-gray-300 bg-gray-50 text-xs font-medium text-gray-500 transition hover:border-emerald-400 hover:bg-emerald-50 hover:text-emerald-700 disabled:opacity-50 dark:border-gray-700 dark:bg-gray-800"
+                >
+                  <svg className="mb-1 h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.7} d="M12 5v14m7-7H5" />
+                  </svg>
+                  Add photo
+                </button>
+              )}
+            </div>
+            <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-gray-500 dark:text-gray-400">
+              <span>{previews.length} / {maxImages} photos</span>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  clearMultipleImages();
+                }}
+                disabled={disabled}
+                className="font-semibold text-red-500 hover:text-red-600 disabled:opacity-50"
+              >
+                Replace all
+              </button>
+            </div>
           </div>
         ) : preview ? (
           <div className="relative">
@@ -770,7 +1062,7 @@ export function ImageInput({
       </div>
 
       {/* URL Input Section */}
-      {!preview && (
+      {(!preview || multiple) && (
         <div className="space-y-2">
           <div className="relative">
             <input

@@ -74,8 +74,12 @@ function normalizeUsername(username: string): string {
   return username.trim().toLowerCase();
 }
 
-function sanitizeRole(role: unknown): DBRole {
-  return role === "Admin" ? "Admin" : "Staff";
+function sanitizeRole(role: unknown): DBRole | null {
+  if (role === "Admin" || role === "Staff" || role === "Accounting") {
+    return role;
+  }
+
+  return null;
 }
 
 function publicUserFromDB(user: UserDB): PublicUser {
@@ -302,7 +306,7 @@ export async function createUser(params: {
 
     // Validate role
     const role = sanitizeRole(params.role);
-    if (role !== "Admin" && role !== "Staff") {
+    if (!role) {
       log("INFO", "createUser() - invalid role", { role: params.role });
       return { ok: false, error: "Invalid role", code: "invalid_role" };
     }

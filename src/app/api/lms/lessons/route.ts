@@ -10,7 +10,15 @@
 import { canAccessLMS, canManageLMS, getSession } from "@/lib/auth-helpers";
 import { getRequestedStaffId, resolveLmsStaffContext } from "@/lib/lms-auth";
 import { getCachedLessonsByCategory, getCachedSequentialLessons, invalidateCategoryCache, setCachedLessonsByCategory, setCachedSequentialLessons } from "@/lib/lms-cache";
+import {
+  attachAllowedRolesToLessons,
+  canRoleAccessLesson,
+  normalizeLessonAudienceRoles,
+  recomputeSequentialUnlocks,
+  setLessonAllowedRoles,
+} from "@/lib/lms-lesson-access";
 import { type LmsLesson, type SequentialLesson } from "@/lib/lms-schema";
+import type { Role } from "@/lib/types";
 import { lmsService } from "@/services/LmsService";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -32,9 +40,13 @@ type LessonEntityLike = {
   completedAt?: string | null;
   createdAt?: string;
   updatedAt?: string;
+  allowedRoles?: string[];
+  allowed_roles?: string[];
 };
 
 function toLegacyLesson(lesson: LessonEntityLike): LmsLesson & Partial<SequentialLesson> {
+  const allowedRoles = normalizeLessonAudienceRoles(lesson.allowedRoles ?? lesson.allowed_roles);
+
   return {
     id: Number(lesson.id),
     category_id: lesson.categoryId,
@@ -48,12 +60,45 @@ function toLegacyLesson(lesson: LessonEntityLike): LmsLesson & Partial<Sequentia
     duration_minutes: lesson.durationMinutes,
     order_index: lesson.orderIndex,
     is_active: lesson.isActive,
+    allowed_roles: allowedRoles,
     created_at: lesson.createdAt ?? "",
     updated_at: lesson.updatedAt ?? "",
     ...(lesson.isCompleted !== undefined ? { is_completed: lesson.isCompleted } : {}),
     ...(lesson.isUnlocked !== undefined ? { is_unlocked: lesson.isUnlocked } : {}),
     ...(lesson.completedAt !== undefined ? { completed_at: lesson.completedAt } : {}),
   };
+}
+
+async function prepareLessonsForRole<T extends LmsLesson & Partial<SequentialLesson>>(
+  lessons: T[],
+  role: Role
+) {
+  const lessonsWithRoles = await attachAllowedRolesToLessons(lessons);
+
+  if (role === "Admin") {
+    return lessonsWithRoles;
+  }
+
+  return lessonsWithRoles.filter((lesson) =>
+    canRoleAccessLesson(role, lesson.allowed_roles)
+  );
+}
+
+function hasLessonAudienceInput(body: Record<string, unknown>) {
+  return (
+    body.allowedRoles !== undefined ||
+    body.allowed_roles !== undefined ||
+    body.accountingOnly !== undefined ||
+    body.accounting_only !== undefined
+  );
+}
+
+function getLessonAudienceFromBody(body: Record<string, unknown>) {
+  if (body.accountingOnly === true || body.accounting_only === true) {
+    return ["Accounting"];
+  }
+
+  return normalizeLessonAudienceRoles(body.allowedRoles ?? body.allowed_roles);
 }
 
 // ============================================================================
@@ -83,6 +128,8 @@ export async function GET(request: NextRequest) {
   const id = searchParams.get("id");
   const sequential = searchParams.get("sequential") === "true";
   const all = searchParams.get("all") === "true";
+  const isAdmin = canManageLMS(session);
+  const viewerRole = session.role;
 
   // If id is provided, fetch single lesson
   if (id) {
@@ -95,15 +142,34 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    const legacyLesson = result.data ? toLegacyLesson(result.data as LessonEntityLike) : null;
+    const visibleLessons = legacyLesson
+      ? await prepareLessonsForRole([legacyLesson], viewerRole)
+      : [];
+
+    if (legacyLesson && visibleLessons.length === 0) {
+      return NextResponse.json(
+        { success: false, error: "Lesson not found" },
+        { status: 404 }
+      );
+    }
+
     return NextResponse.json({
       success: true,
-      data: result.data ? toLegacyLesson(result.data as LessonEntityLike) : null,
+      data: visibleLessons[0] ?? null,
       meta: result.meta,
     });
   }
 
   // If all=true, fetch all lessons (for admin)
   if (all) {
+    if (!isAdmin) {
+      return NextResponse.json(
+        { success: false, error: "Admin access required to view all lessons" },
+        { status: 403 }
+      );
+    }
+
     const result = await lmsService.getAllLessons();
 
     if (!result.success) {
@@ -116,10 +182,11 @@ export async function GET(request: NextRequest) {
     const legacyLessons = (result.data ?? []).map((lesson) =>
       toLegacyLesson(lesson as LessonEntityLike)
     );
+    const lessonsWithRoles = await prepareLessonsForRole(legacyLessons, viewerRole);
 
     return NextResponse.json({
       success: true,
-      data: legacyLessons,
+      data: lessonsWithRoles,
       meta: result.meta,
     });
   }
@@ -150,9 +217,9 @@ export async function GET(request: NextRequest) {
     // Admins can access all lessons regardless of completion status
     if (staffId === 0) {
       console.log('[LESSONS API] Admin without staff profile - all lessons unlocked');
-      const cacheResult = await getCachedLessonsByCategory(categoryIdNum);
+      const cacheResult = await getCachedLessonsByCategory(categoryIdNum, viewerRole);
       let lessons: LmsLesson[];
-      
+
       if (cacheResult.success) {
         lessons = cacheResult.data as LmsLesson[];
       } else {
@@ -163,10 +230,11 @@ export async function GET(request: NextRequest) {
             { status: 500 }
           );
         }
-lessons = (result.data ?? []).map(l => toLegacyLesson(l)) as LmsLesson[];
-        await setCachedLessonsByCategory(categoryIdNum, lessons);
+        const legacyLessons = (result.data ?? []).map(l => toLegacyLesson(l)) as LmsLesson[];
+        lessons = await prepareLessonsForRole(legacyLessons, viewerRole);
+        await setCachedLessonsByCategory(categoryIdNum, lessons, viewerRole);
       }
-      
+
       // Add is_unlocked=true and is_completed=false for all lessons for admins
       const lessonsWithStatus = lessons.map((lesson) => ({
         ...lesson,
@@ -183,7 +251,7 @@ lessons = (result.data ?? []).map(l => toLegacyLesson(l)) as LmsLesson[];
     }
     
     // TRY CACHE FIRST (99% hit rate expected)
-    const cacheResult = await getCachedSequentialLessons(categoryIdNum, staffId);
+    const cacheResult = await getCachedSequentialLessons(categoryIdNum, staffId, viewerRole);
     if (cacheResult.success) {
       return NextResponse.json({
         success: true,
@@ -205,7 +273,10 @@ lessons = (result.data ?? []).map(l => toLegacyLesson(l)) as LmsLesson[];
       const legacySequentialLessons = (result.data ?? []).map((lesson) =>
         toLegacyLesson(lesson as LessonEntityLike)
       ) as SequentialLesson[];
-      await setCachedSequentialLessons(categoryIdNum, staffId, legacySequentialLessons);
+      const visibleSequentialLessons = recomputeSequentialUnlocks(
+        await prepareLessonsForRole(legacySequentialLessons, viewerRole)
+      ) as SequentialLesson[];
+      await setCachedSequentialLessons(categoryIdNum, staffId, visibleSequentialLessons, viewerRole);
     }
     
     if (!result.success) {
@@ -218,17 +289,20 @@ lessons = (result.data ?? []).map(l => toLegacyLesson(l)) as LmsLesson[];
 const legacySequentialLessons = (result.data ?? []).map((lesson) =>
       toLegacyLesson(lesson as LessonEntityLike)
     ) as SequentialLesson[];
+    const visibleSequentialLessons = recomputeSequentialUnlocks(
+      await prepareLessonsForRole(legacySequentialLessons, viewerRole)
+    ) as SequentialLesson[];
 
     return NextResponse.json({
       success: true,
-      data: legacySequentialLessons,
+      data: visibleSequentialLessons,
       meta: result.meta,
     });
   }
 
   // Regular lessons list - CACHED
   // TRY CACHE FIRST (ultra-fast response)
-  const cacheResult = await getCachedLessonsByCategory(categoryIdNum);
+  const cacheResult = await getCachedLessonsByCategory(categoryIdNum, viewerRole);
   if (cacheResult.success) {
     return NextResponse.json({
       success: true,
@@ -250,7 +324,8 @@ const legacySequentialLessons = (result.data ?? []).map((lesson) =>
     const legacyLessons = (result.data ?? []).map((lesson) =>
       toLegacyLesson(lesson as LessonEntityLike)
     ) as LmsLesson[];
-    await setCachedLessonsByCategory(categoryIdNum, legacyLessons);
+    const visibleLessons = await prepareLessonsForRole(legacyLessons, viewerRole);
+    await setCachedLessonsByCategory(categoryIdNum, visibleLessons, viewerRole);
   }
   
   if (!result.success) {
@@ -263,10 +338,11 @@ const legacySequentialLessons = (result.data ?? []).map((lesson) =>
   const legacyLessons = (result.data ?? []).map((lesson) =>
     toLegacyLesson(lesson as LessonEntityLike)
   );
+  const visibleLessons = await prepareLessonsForRole(legacyLessons, viewerRole);
 
   return NextResponse.json({
     success: true,
-    data: legacyLessons,
+    data: visibleLessons,
     meta: result.meta,
   });
 
@@ -301,6 +377,7 @@ export async function POST(request: NextRequest) {
     const stepByStepInstructions = body.stepByStepInstructions ?? body.step_by_step_instructions;
     const durationMinutes = body.durationMinutes ?? body.duration_minutes;
     const orderIndex = body.orderIndex ?? body.order_index;
+    const allowedRoles = getLessonAudienceFromBody(body);
 
     // Validate required fields
     if (!categoryId || typeof categoryId !== "number") {
@@ -335,6 +412,10 @@ export async function POST(request: NextRequest) {
     });
 
     // INVALIDATE CACHE for this category
+    if (result.success && result.data) {
+      await setLessonAllowedRoles(Number(result.data.id), allowedRoles);
+    }
+
     if (result.success && categoryId) {
       await invalidateCategoryCache(categoryId);
     }
@@ -346,11 +427,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const responseLesson = result.data
+      ? (await prepareLessonsForRole([toLegacyLesson(result.data as LessonEntityLike)], session.role))[0] ?? null
+      : null;
+
     return NextResponse.json({
       success: true,
-      data: result.data ? toLegacyLesson(result.data as LessonEntityLike) : null,
+      data: responseLesson,
       meta: result.meta,
-    }, { 
+    }, {
       status: 201,
       headers: { 'X-Cache': 'INVALIDATED' }
     });
@@ -402,6 +487,8 @@ export async function PUT(request: NextRequest) {
     const durationMinutes = body.durationMinutes ?? body.duration_minutes;
     const orderIndex = body.orderIndex ?? body.order_index;
     const isActive = body.isActive ?? body.is_active;
+    const shouldUpdateAudience = hasLessonAudienceInput(body);
+    const allowedRoles = getLessonAudienceFromBody(body);
 
     const result = await lmsService.updateLesson(parseInt(id), {
       categoryId: typeof categoryId === "number" ? categoryId : undefined,
@@ -414,9 +501,15 @@ export async function PUT(request: NextRequest) {
       isActive: typeof isActive === "boolean" ? isActive : undefined,
     });
 
+    if (result.success && shouldUpdateAudience) {
+      await setLessonAllowedRoles(parseInt(id), allowedRoles);
+    }
+
     // INVALIDATE CACHE
     if (result.success && typeof categoryId === "number") {
       await invalidateCategoryCache(categoryId);
+    } else if (result.success && result.data?.categoryId) {
+      await invalidateCategoryCache(result.data.categoryId);
     }
 
     if (!result.success) {
@@ -426,9 +519,13 @@ export async function PUT(request: NextRequest) {
       );
     }
 
+    const responseLesson = result.data
+      ? (await prepareLessonsForRole([toLegacyLesson(result.data as LessonEntityLike)], session.role))[0] ?? null
+      : null;
+
     return NextResponse.json({
       success: true,
-      data: result.data ? toLegacyLesson(result.data as LessonEntityLike) : null,
+      data: responseLesson,
       meta: result.meta,
     }, {
       headers: { 'X-Cache': 'INVALIDATED' }
@@ -474,16 +571,12 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
+    const existingLesson = await lmsService.getLessonById(parseInt(id));
     const result = await lmsService.deleteLesson(parseInt(id));
 
     // INVALIDATE CACHE for lesson's category
-    if (result.success) {
-      try {
-        const lessonQuery = await lmsService.getLessonById(parseInt(id));
-        if (lessonQuery.success && lessonQuery.data?.categoryId) {
-          await invalidateCategoryCache(lessonQuery.data.categoryId);
-        }
-      } catch {}
+    if (result.success && existingLesson.success && existingLesson.data?.categoryId) {
+      await invalidateCategoryCache(existingLesson.data.categoryId);
     }
 
     if (!result.success) {

@@ -6,7 +6,7 @@ const META_KEY = "vms-vehicles-meta";
 const CACHE_VERSION_KEY = "vms-vehicles-version";
 const CACHE_TIMESTAMP_KEY = "vms-vehicles-timestamp";
 const LAST_MUTATION_KEY = "vms-vehicles-last-mutation";
-const CURRENT_CACHE_VERSION = "6"; // Increment when cache format changes
+const CURRENT_CACHE_VERSION = "7"; // Increment when cache format changes
 const UPDATE_EVENT = "vms-vehicles-updated";
 const CACHE_STALE_MS = 5 * 60 * 1000; // 5 minutes stale time - prevents cache-invalidation-storm
 const MAX_CACHE_AGE_MS = 10 * 60 * 1000; // 10 minutes max cache age - allows longer cache lifetime
@@ -117,6 +117,7 @@ export function recordMutation(): void {
   try {
     const now = Date.now();
     localStorage.setItem(LAST_MUTATION_KEY, now.toString());
+    window.dispatchEvent(new CustomEvent(UPDATE_EVENT, { detail: [] }));
     // Mutation logging removed for production
   } catch {
     // ignore errors

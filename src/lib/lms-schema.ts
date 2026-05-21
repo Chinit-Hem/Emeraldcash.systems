@@ -17,7 +17,7 @@
 import type { Role } from "@/lib/types";
 
 // Unified role system - same as settings/users
-export const LMS_ROLES: Role[] = ["Admin", "Staff", "Transfer"];
+export const LMS_ROLES: Role[] = ["Admin", "Staff", "Accounting"];
 
 export type LmsRole = Role;
 
@@ -66,6 +66,7 @@ export interface LmsLesson {
   duration_minutes: number | null; // Estimated duration
   order_index: number;
   is_active: boolean;
+  allowed_roles?: string[];
   created_at: string;
   updated_at: string;
 }
@@ -162,7 +163,18 @@ export interface LmsDashboardStats {
     staff_id: number;
     staff_name: string;
     branch: string | null;
+    role: string;
+    completed_lessons_count: number;
+    total_lessons: number;
     completion_percentage: number;
+    watched_lessons_count: number;
+    in_progress_lessons_count: number;
+    average_watch_percentage: number;
+    latest_watch_percentage: number;
+    last_completed_at: string | null;
+    last_watched_at: string | null;
+    last_watched_lesson_title: string | null;
+    training_status: "not_started" | "watching" | "ready_to_complete" | "completed";
     last_activity: string | null;
   }[];
   category_completion: {
@@ -201,6 +213,8 @@ export interface CreateLmsLessonInput {
   step_by_step_instructions?: string;
   duration_minutes?: number;
   order_index?: number;
+  allowedRoles?: string[];
+  allowed_roles?: string[];
 }
 
 export interface UpdateLmsLessonInput {
@@ -212,6 +226,8 @@ export interface UpdateLmsLessonInput {
   duration_minutes?: number | null;
   order_index?: number;
   is_active?: boolean;
+  allowedRoles?: string[];
+  allowed_roles?: string[];
 }
 
 export interface CreateLmsStaffInput {
@@ -402,9 +418,20 @@ CREATE TABLE IF NOT EXISTS lms_lesson_completions (
   UNIQUE(staff_id, lesson_id)
 );
 
+-- LMS Lesson Role Access Table
+-- No row for a lesson means visible to all LMS staff roles.
+-- A row with role='Accounting' restricts the lesson to Accounting users and Admins.
+CREATE TABLE IF NOT EXISTS lms_lesson_role_access (
+  lesson_id INTEGER NOT NULL REFERENCES lms_lessons(id) ON DELETE CASCADE,
+  role VARCHAR(50) NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (lesson_id, role)
+);
+
 -- Indexes for performance
 CREATE INDEX IF NOT EXISTS idx_lms_lessons_category ON lms_lessons(category_id);
 CREATE INDEX IF NOT EXISTS idx_lms_lessons_order ON lms_lessons(order_index);
+CREATE INDEX IF NOT EXISTS idx_lms_lesson_role_access_role ON lms_lesson_role_access(role);
 CREATE INDEX IF NOT EXISTS idx_lms_completions_staff ON lms_lesson_completions(staff_id);
 CREATE INDEX IF NOT EXISTS idx_lms_completions_lesson ON lms_lesson_completions(lesson_id);
 CREATE INDEX IF NOT EXISTS idx_lms_staff_branch ON lms_staff(branch_location);

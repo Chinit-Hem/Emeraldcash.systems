@@ -5,6 +5,103 @@
 
 import { driveThumbnailUrl, extractDriveFileId } from "./drive";
 
+function isBlankImageValue(value: string): boolean {
+  const normalized = value.trim().toLowerCase();
+  return (
+    !normalized ||
+    normalized === "undefined" ||
+    normalized === "null" ||
+    normalized === "base64" ||
+    normalized.startsWith("base64,") ||
+    /^data:image\/[^,;]+$/i.test(normalized)
+  );
+}
+
+function stripOuterQuotes(value: string): string {
+  return value.trim().replace(/^["']|["']$/g, "");
+}
+
+function collectVehicleImages(value: unknown, output: string[]): void {
+  if (value === null || value === undefined) return;
+
+  if (Array.isArray(value)) {
+    value.forEach((item) => collectVehicleImages(item, output));
+    return;
+  }
+
+  if (typeof value === "object") {
+    const record = value as Record<string, unknown>;
+    collectVehicleImages(
+      record.url ?? record.src ?? record.image ?? record.Image ?? record.thumbnail ?? record.imageUrl,
+      output
+    );
+    return;
+  }
+
+  const raw = stripOuterQuotes(String(value));
+  if (isBlankImageValue(raw)) return;
+
+  if (raw.startsWith("data:image/")) {
+    if (raw.includes(",")) output.push(raw);
+    return;
+  }
+
+  if (
+    raw.startsWith("blob:") ||
+    raw.startsWith("http://") ||
+    raw.startsWith("https://")
+  ) {
+    output.push(raw);
+    return;
+  }
+
+  if (
+    (raw.startsWith("[") && raw.endsWith("]")) ||
+    (raw.startsWith("{") && raw.endsWith("}"))
+  ) {
+    try {
+      collectVehicleImages(JSON.parse(raw), output);
+      return;
+    } catch {
+      // Fall through to delimiter handling for malformed imported values.
+    }
+  }
+
+  raw
+    .split(/[\n;|]/)
+    .map(stripOuterQuotes)
+    .filter((item) => !isBlankImageValue(item))
+    .forEach((item) => output.push(item));
+}
+
+/**
+ * Parse any supported vehicle image shape into an ordered, de-duplicated list.
+ * Supports old single strings, imported arrays, JSON strings, and new galleries.
+ */
+export function parseVehicleImages(value: unknown): string[] {
+  const collected: string[] = [];
+  collectVehicleImages(value, collected);
+
+  const seen = new Set<string>();
+  return collected.filter((image) => {
+    const key = image.trim();
+    if (!key || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+export function mergeVehicleImages(...values: unknown[]): string[] {
+  return parseVehicleImages(values);
+}
+
+export function serializeVehicleImages(images: unknown): string {
+  const parsed = parseVehicleImages(images);
+  if (parsed.length === 0) return "";
+  if (parsed.length === 1) return parsed[0];
+  return JSON.stringify(parsed);
+}
+
 /**
  * Format price for display
  */
@@ -67,6 +164,16 @@ export function getVehicleThumbnailUrl(imageId: string | null, size: string = "w
   if (!fileId) return null;
 
   return driveThumbnailUrl(fileId, size);
+}
+
+export function getVehicleImageUrls(imageValue: unknown, size: string = "w400-h300"): string[] {
+  return parseVehicleImages(imageValue)
+    .map((image) => getVehicleThumbnailUrl(image, size))
+    .filter((image): image is string => Boolean(image));
+}
+
+export function getVehiclePrimaryImageUrl(imageValue: unknown, size: string = "w400-h300"): string | null {
+  return getVehicleImageUrls(imageValue, size)[0] ?? null;
 }
 
 /**

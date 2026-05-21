@@ -46,6 +46,7 @@ interface Lesson {
   duration_minutes: number | null;
   order_index: number;
   is_active: boolean;
+  allowed_roles?: string[];
 }
 
 interface EditLessonFormProps {
@@ -66,6 +67,7 @@ export interface LessonFormData {
   durationMinutes: number | null;
   orderIndex: number;
   isActive: boolean;
+  allowedRoles: string[];
 }
 
 // ============================================================================
@@ -81,6 +83,13 @@ const validateYoutubeUrl = (url: string): boolean => {
   ];
   return patterns.some((pattern) => pattern.test(url));
 };
+
+const LESSON_AUDIENCE_ROLES = ["Staff", "Accounting"] as const;
+
+function normalizeLessonAudience(allowedRoles?: string[]) {
+  const roles = allowedRoles?.filter((role) => LESSON_AUDIENCE_ROLES.includes(role as typeof LESSON_AUDIENCE_ROLES[number]));
+  return roles && roles.length > 0 ? roles : [...LESSON_AUDIENCE_ROLES];
+}
 
 // ============================================================================
 // Main Component
@@ -107,6 +116,7 @@ export function EditLessonForm({
     durationMinutes: lesson.duration_minutes,
     orderIndex: lesson.order_index,
     isActive: lesson.is_active,
+    allowedRoles: normalizeLessonAudience(lesson.allowed_roles),
   });
 
   const [errors, setErrors] = useState<Partial<Record<keyof LessonFormData, string>> & { submit?: string }>({});
@@ -128,6 +138,7 @@ export function EditLessonForm({
       durationMinutes: lesson.duration_minutes,
       orderIndex: lesson.order_index,
       isActive: lesson.is_active,
+      allowedRoles: normalizeLessonAudience(lesson.allowed_roles),
     });
     setYoutubePreview(lesson.youtube_video_id);
   }, [lesson]);
@@ -179,6 +190,10 @@ export function EditLessonForm({
 
     if (formData.categoryId === 0) {
       newErrors.categoryId = "Please select a category";
+    }
+
+    if (formData.allowedRoles.length === 0) {
+      newErrors.allowedRoles = "Select at least one role";
     }
 
     setErrors(newErrors);
@@ -386,6 +401,49 @@ export function EditLessonForm({
                       </div>
                     </div>
                   </div>
+                )}
+              </div>
+
+              {/* Lesson Audience */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Visible to
+                </label>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {LESSON_AUDIENCE_ROLES.map((role) => (
+                    <label
+                      key={role}
+                      className={`flex items-center gap-3 rounded-lg border px-4 py-3 transition-colors ${
+                        formData.allowedRoles.includes(role)
+                          ? "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-800 dark:bg-blue-900/20 dark:text-blue-300"
+                          : "border-gray-200 bg-gray-50 text-gray-600 dark:border-gray-700 dark:bg-gray-800/50 dark:text-gray-300"
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={formData.allowedRoles.includes(role)}
+                        onChange={() =>
+                          setFormData((prev) => ({
+                            ...prev,
+                            allowedRoles: prev.allowedRoles.includes(role)
+                              ? prev.allowedRoles.filter((item) => item !== role)
+                              : [...prev.allowedRoles, role],
+                          }))
+                        }
+                        className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                      />
+                      <span className="text-sm font-medium">{role}</span>
+                    </label>
+                  ))}
+                </div>
+                <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                  Admin can always view every lesson.
+                </p>
+                {errors.allowedRoles && (
+                  <p className="mt-1 text-sm text-red-600 dark:text-red-400 flex items-center gap-1">
+                    <AlertCircle className="w-4 h-4" />
+                    {errors.allowedRoles}
+                  </p>
                 )}
               </div>
 

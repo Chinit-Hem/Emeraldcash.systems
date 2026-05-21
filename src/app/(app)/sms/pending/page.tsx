@@ -8,6 +8,7 @@ import { GlassToast, useToast } from '@/components/ui/glass/GlassToast';
 import { useAuthUser } from '@/app/components/AuthContext';
 import type { SmsTransfer as PendingTransfer } from '@/lib/sms-types';
 import { formatDistanceToNow } from 'date-fns';
+import { normalizeCambodiaTimeString } from '@/lib/cambodiaTime';
 import { ArrowLeft, CheckCircle2, Clock, Loader2, Package, RefreshCw, Users, XCircle } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -64,7 +65,7 @@ export default function PendingPage() {
   const [actionLoading, setActionLoading] = useState<Record<string, boolean>>({});
   const [rejectRemarks, setRejectRemarks] = useState<Record<string, string>>({});
   const [rejectErrors, setRejectErrors] = useState<Record<string, string>>({});
-const { toasts, removeToast, success: toastSuccess, error: toastError } = useToast();
+  const { toasts, removeToast, success: toastSuccess, error: toastError } = useToast();
   const [viewImage, setViewImage] = useState<{ src: string; alt: string } | null>(null);
 
 
@@ -176,7 +177,7 @@ const { toasts, removeToast, success: toastSuccess, error: toastError } = useToa
 
   const stats = useMemo(() => ({
     total: pending.length,
-    avgWait: pending.length > 0 
+    avgWait: pending.length > 0
       ? formatDistanceToNow(new Date(pending[0].createdAt), { addSuffix: true })
       : null,
   }), [pending]);
@@ -397,10 +398,16 @@ const { toasts, removeToast, success: toastSuccess, error: toastError } = useToa
                       <p className="text-sm leading-6 text-blue-900">{transfer.remark}</p>
                     </div>
                   )}
-{transfer.imageUrl && (
+
+                  {transfer.imageUrl && (
                     <button
                       type="button"
-                      onClick={() => setViewImage({ src: transfer.imageUrl!, alt: `Transfer proof - Transfer #${transfer.id.slice(-8)}` })}
+                      onClick={() =>
+                        setViewImage({
+                          src: transfer.imageUrl!,
+                          alt: `Transfer proof - Transfer #${transfer.id.slice(-8)}`,
+                        })
+                      }
                       className="relative mt-6 h-40 w-full overflow-hidden rounded-2xl border border-slate-200 bg-slate-100 sm:w-64 cursor-zoom-in focus:outline-none focus:ring-2 focus:ring-emerald-500"
                       aria-label="View transfer proof larger"
                     >

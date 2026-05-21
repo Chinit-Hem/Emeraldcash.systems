@@ -21,6 +21,7 @@ import { getCachedVehicles, setCachedVehicles } from "./_cache";
 import { buildCorsHeaders } from "@/lib/cors"; // Import shared CORS utility
 import type { Vehicle } from "@/lib/types";
 import { normalizeImageUrl } from "@/lib/cloudinary";
+import { mergeVehicleImages } from "@/lib/vehicle-helpers";
 
 type VehiclesMeta = {
   total?: number;
@@ -51,6 +52,14 @@ function normalizeOptionalString(value: unknown): string | null {
   if (value === null || value === undefined) return null;
   const trimmed = String(value).trim();
   return trimmed === "" ? null : trimmed;
+}
+
+async function normalizeVehicleImages(...values: unknown[]): Promise<string[]> {
+  const rawImages = mergeVehicleImages(...values);
+  const normalizedImages = await Promise.all(
+    rawImages.map((image) => normalizeImageUrl(image))
+  );
+  return mergeVehicleImages(normalizedImages);
 }
 // ============================================================================
 // CORS Configuration
@@ -117,10 +126,15 @@ const getHandler = withErrorHandling(async (req, { logger, requestId, startTime 
   // Parse query parameters with validation
   const { searchParams } = new URL(req.url);
   const hasExplicitLimit = searchParams.has("limit");
+  const requestedLimit = parseInt(searchParams.get("limit") || "50", 10);
+  const maxLimit = 2000;
+  const limit = Number.isFinite(requestedLimit)
+    ? Math.min(Math.max(requestedLimit, 1), maxLimit)
+    : 50;
 
   // OPTIMIZED: Reduced default limit from 100 to 50 for better performance
   const filters: VehicleFilters = {
-    limit: Math.min(parseInt(searchParams.get("limit") || "50", 10), 200), // Max 200, default 50
+    limit,
     offset: Math.max(parseInt(searchParams.get("offset") || "0", 10), 0), // Min 0
     orderBy: searchParams.get("orderBy") || "id",
     orderDirection: (searchParams.get("orderDirection") as "ASC" | "DESC") || "DESC",
@@ -495,17 +509,20 @@ const postHandler = withErrorHandling(async (req, { logger, requestId, startTime
     logger.warn("Image file detected but upload logic is not implemented.", { filename: imageName, size: imageSize });
   }
 
-  const rawImageId = normalizeOptionalString(firstDefined(
-    vehicleData.image_id,
-    vehicleData.imageId,
-    vehicleData.Image
-  ));
   const rawThumbnailUrl = normalizeOptionalString(firstDefined(
     vehicleData.thumbnail_url,
     vehicleData.thumbnailUrl
   ));
-  const normalizedImageId = rawImageId ? await normalizeImageUrl(rawImageId) : null;
-  const normalizedThumbnailUrl = rawThumbnailUrl ? await normalizeImageUrl(rawThumbnailUrl) : null;
+  const normalizedImages = await normalizeVehicleImages(
+    vehicleData.Images,
+    vehicleData.images,
+    vehicleData.image_id,
+    vehicleData.imageId,
+    vehicleData.Image,
+    rawThumbnailUrl
+  );
+  const normalizedImageId = normalizedImages[0] || null;
+  const normalizedThumbnailUrl = normalizedImageId;
 
   // Build vehicle data with proper null handling
   const createData: Parameters<typeof vehicleService.createVehicle>[0] = {
@@ -543,6 +560,24 @@ const postHandler = withErrorHandling(async (req, { logger, requestId, startTime
     vehicleId: result.data?.VehicleId,
     plate: result.data?.Plate,
   });
+
+  if (result.data?.VehicleId) {
+    const galleryResult = await vehicleService.replaceVehicleImages(
+      Number(result.data.VehicleId),
+      normalizedImages
+    );
+    if (!galleryResult.success) {
+      return createErrorResponse(
+        galleryResult.error || "Failed to save vehicle images.",
+        requestId,
+        Date.now() - startTime,
+        500,
+        buildCorsHeaders(req)
+      );
+    }
+    result.data.Images = normalizedImages;
+    result.data.Image = normalizedImages[0] || result.data.Image;
+  }
 
   // Invalidate LRU cache on create
   import('./_cache').then(({ clearCachedVehicles }) => {

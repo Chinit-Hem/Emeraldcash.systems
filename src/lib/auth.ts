@@ -292,6 +292,8 @@ export type Permission = "read" | "create" | "update" | "delete" | "admin";
 const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
   Admin: ["read", "create", "update", "delete", "admin"],
   Staff: ["read", "create", "update"],
+  Accounting: ["read", "create", "update"],
+  Transfer: ["read", "create", "update"],
 };
 
 export function hasPermission(role: Role, permission: Permission): boolean {

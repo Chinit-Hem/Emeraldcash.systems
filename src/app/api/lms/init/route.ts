@@ -75,6 +75,17 @@ export async function POST(request: NextRequest) {
       `ALTER TABLE lms_lessons ADD COLUMN IF NOT EXISTS thumbnail_cloudinary_public_id VARCHAR(255)`
     );
 
+    // Create LMS Lesson Role Access Table
+    const createLessonRoleAccessTable = `
+      CREATE TABLE IF NOT EXISTS lms_lesson_role_access (
+        lesson_id INTEGER NOT NULL REFERENCES lms_lessons(id) ON DELETE CASCADE,
+        role VARCHAR(50) NOT NULL,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (lesson_id, role)
+      )
+    `;
+    await dbManager.executeUnsafe(createLessonRoleAccessTable);
+
     // Create LMS Staff Table
     const createStaffTable = `
       CREATE TABLE IF NOT EXISTS lms_staff (
@@ -131,6 +142,7 @@ export async function POST(request: NextRequest) {
     const createIndexes = [
       `CREATE INDEX IF NOT EXISTS idx_lms_lessons_category ON lms_lessons(category_id)`,
       `CREATE INDEX IF NOT EXISTS idx_lms_lessons_order ON lms_lessons(order_index)`,
+      `CREATE INDEX IF NOT EXISTS idx_lms_lesson_role_access_role ON lms_lesson_role_access(role)`,
       `CREATE INDEX IF NOT EXISTS idx_lms_completions_staff ON lms_lesson_completions(staff_id)`,
       `CREATE INDEX IF NOT EXISTS idx_lms_completions_lesson ON lms_lesson_completions(lesson_id)`,
       `CREATE INDEX IF NOT EXISTS idx_lms_progress_staff_lesson ON lms_lesson_progress(staff_id, lesson_id)`,

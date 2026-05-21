@@ -2,17 +2,17 @@
 
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import Image from 'next/image';
-import { useState, useCallback, useRef, type LabelHTMLAttributes } from 'react';
+import { useState, useCallback, type LabelHTMLAttributes } from 'react';
 import { Button } from '@/components/ui/button';
 import { GlassInput as Input } from '@/components/ui/glass/GlassInput';
+import { ImageInput } from '@/components/ui/ImageInput';
 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
-import { Car, DollarSign, FileText, ImagePlus, Loader2, ShieldCheck, X } from 'lucide-react';
-import { compressImage } from '@/lib/compressImage';
+import { Car, DollarSign, FileText, ImagePlus, Loader2, ShieldCheck } from 'lucide-react';
 import { TAX_TYPE_OPTIONS, COLOR_OPTIONS } from '@/lib/types';
 import type { Vehicle } from '@/lib/types';
+import { getVehicleImageUrls } from '@/lib/vehicle-helpers';
 import { vehicleSchema, type VehicleFormData } from './vehicleSchema';
 import type { SubmitHandler } from 'react-hook-form';
 import { useEffect } from 'react';
@@ -76,10 +76,10 @@ export default function BasicVehicleForm({
   onClearError,
   modalTitle = 'Vehicle Form'
 }: BasicVehicleFormProps) {
-  const [imagePreview, setImagePreview] = useState<string | null>(vehicle.Image || null);
-  const [imageFile, setImageFile] = useState<File | null>(null);
-  const [imageLoading, setImageLoading] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [imageValues, setImageValues] = useState<string[]>(() =>
+    getVehicleImageUrls(vehicle.Images?.length ? vehicle.Images : vehicle.Image, "w800-h600")
+  );
+  const [imagesDirty, setImagesDirty] = useState(false);
 
   const form = useForm<VehicleFormData>({
     resolver: zodResolver(vehicleSchema),
@@ -130,46 +130,27 @@ export default function BasicVehicleForm({
       : "Auto calculated"
   );
 
-  const handleImageChange = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  useEffect(() => {
+    const nextImages = getVehicleImageUrls(vehicle.Images?.length ? vehicle.Images : vehicle.Image, "w800-h600");
+    setImageValues(nextImages);
+    setImagesDirty(false);
+    setValue('Image', nextImages[0] || '', { shouldDirty: false, shouldValidate: true });
+  }, [setValue, vehicle.Image, vehicle.Images, vehicle.VehicleId]);
 
-    setImageLoading(true);
-    try {
-      // Compress if >1MB
-      let processedFile = file;
-      if (file.size > 1024 * 1024) {
-        const compressed = await compressImage(file, { maxWidth: 800, quality: 0.8 });
-        processedFile = compressed.file;
-      }
-      const preview = URL.createObjectURL(processedFile);
-      setImagePreview(preview);
-      setImageFile(processedFile);
-      setValue('Image', preview, { shouldDirty: true, shouldValidate: true });
-    } catch (err) {
-      console.error('Image processing failed:', err);
-    } finally {
-      setImageLoading(false);
-    }
-  }, [setValue]);
-
-  const handleRemoveImage = useCallback(() => {
-    setImagePreview(null);
-    setImageFile(null);
-    setValue('Image', '', { shouldDirty: true, shouldValidate: true });
-  if (fileInputRef.current) fileInputRef.current.value = '';
-
-
+  const handleImagesChange = useCallback((values: string[]) => {
+    setImageValues(values);
+    setImagesDirty(true);
+    setValue('Image', values[0] || '', { shouldDirty: true, shouldValidate: true });
   }, [setValue]);
 
   const onFormSubmit: SubmitHandler<VehicleFormData> = useCallback(async (data: VehicleFormData) => {
 
     try {
-      await onSubmit(data, imageFile);
-    } catch (err) {
-      console.error('Form submit failed:', err);
+      await onSubmit({ ...data, Image: imageValues[0] || '', Images: imageValues }, null);
+    } catch {
+      // Parent update hooks already surface submit errors in the form.
     }
-  }, [onSubmit, imageFile]);
+  }, [imageValues, onSubmit]);
 
   return (
     <form onSubmit={handleSubmit(onFormSubmit)} className="space-y-5">
@@ -274,57 +255,19 @@ export default function BasicVehicleForm({
 
       <FormSection
         title="Image"
-        description="Upload a clear vehicle image. Large files are compressed before saving."
+        description="Upload one or more clear vehicle photos. The first photo is used in lists."
         icon={<ImagePlus className="h-5 w-5" />}
       >
-        <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_280px] md:items-start">
-          <div className="space-y-2">
-            <Label htmlFor="Image">Vehicle image</Label>
-            <input
-              id="Image"
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              onChange={handleImageChange}
-              className="w-full rounded-xl border border-slate-200 bg-white p-3 text-sm text-slate-700 file:mr-4 file:rounded-lg file:border-0 file:bg-emerald-50 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-emerald-700 hover:file:bg-emerald-100 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-200"
-            />
-            <p className="text-xs text-slate-500 dark:text-slate-400">
-              JPG, PNG, or WebP. Keep the vehicle centered and readable.
-            </p>
-            {imageLoading && (
-              <p className="inline-flex items-center gap-2 text-sm text-slate-500">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Compressing image...
-              </p>
-            )}
-          </div>
-          <div className="relative min-h-40 overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-900">
-            {imagePreview ? (
-              <>
-                <Image
-                  src={imagePreview}
-                  alt="Vehicle preview"
-                  width={560}
-                  height={360}
-                  className="h-44 w-full object-cover"
-                />
-                <button
-                  type="button"
-                  onClick={handleRemoveImage}
-                  className="absolute right-3 top-3 flex h-9 w-9 items-center justify-center rounded-full bg-red-600 text-white shadow-lg transition hover:bg-red-700"
-                  aria-label="Remove image"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              </>
-            ) : (
-              <div className="flex h-44 flex-col items-center justify-center gap-2 text-slate-400">
-                <ImagePlus className="h-8 w-8" />
-                <span className="text-sm">No image selected</span>
-              </div>
-            )}
-          </div>
-        </div>
+        <ImageInput
+          values={imageValues}
+          value={imageValues[0] || ''}
+          onChange={(value) => handleImagesChange(value ? [value] : [])}
+          onChangeMany={handleImagesChange}
+          multiple
+          maxImages={12}
+          maxSizeMB={10}
+          helperText="Drag & drop, click to upload, paste image URL, or Ctrl+V to paste image"
+        />
       </FormSection>
 
       <FormSection
@@ -398,7 +341,7 @@ export default function BasicVehicleForm({
       <div className="sticky bottom-0 z-10 -mx-4 border-t border-slate-200 bg-white/90 p-4 backdrop-blur-xl dark:border-slate-800 dark:bg-slate-950/90 md:-mx-6">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <p className="min-h-5 text-sm text-slate-500 dark:text-slate-400">
-            {isDirty ? "Unsaved changes detected" : "No unsaved changes"}
+            {isDirty || imagesDirty ? "Unsaved changes detected" : "No unsaved changes"}
           </p>
           <div className="flex flex-col gap-3 sm:flex-row">
             <Button
@@ -412,7 +355,7 @@ export default function BasicVehicleForm({
             </Button>
             <Button
               type="submit"
-              disabled={!isDirty || isSubmitting}
+              disabled={(!isDirty && !imagesDirty) || isSubmitting}
               className="min-w-40"
             >
               {isSubmitting ? (

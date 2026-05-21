@@ -5,6 +5,7 @@ import { compressImage } from "@/lib/clientImageCompression";
 import { recordMutation } from "@/lib/vehicleCache";
 import { safeBase64ToFile } from "@/lib/fileToDataUrl";
 import type { Vehicle } from "@/lib/types";
+import { parseVehicleImages } from "@/lib/vehicle-helpers";
 
 /**
  * Clean base64 data URL to remove problematic characters
@@ -170,8 +171,10 @@ async function uploadImageToCloudinary(
   return result.data.url;
 }
 
+type VehicleCreateData = Partial<Vehicle> & { Images?: string[] };
+
 async function prepareImageForUpload(
-  data: Partial<Vehicle>,
+  data: VehicleCreateData,
   imageFile: File | null | undefined,
   tempId: string
 ): Promise<File | string | null> {
@@ -218,6 +221,19 @@ async function prepareImageForUpload(
   return null;
 }
 
+async function resolveImageForSave(
+  source: File | string,
+  category: string,
+  tempId: string,
+  index: number
+): Promise<string> {
+  if (typeof source === "string" && (source.startsWith("http://") || source.startsWith("https://"))) {
+    return source;
+  }
+
+  return uploadImageToCloudinary(source, category, `${tempId}_${index}`);
+}
+
 export function useAddVehicleOptimistic(
   options: UseAddVehicleOptimisticOptions = {}
 ): UseAddVehicleOptimisticReturn {
@@ -227,7 +243,7 @@ export function useAddVehicleOptimistic(
 
   const addVehicle = useCallback(
     async (
-      data: Partial<Vehicle>,
+      data: VehicleCreateData,
       imageFile?: File | null
     ): Promise<Vehicle> => {
       setIsAdding(true);
@@ -249,14 +265,18 @@ export function useAddVehicleOptimistic(
         Price40: data.Price40 || null,
         Price70: data.Price70 || null,
         Image: "", // Will be updated after upload
+        Images: [],
         Time: new Date().toISOString(),
       };
 
       console.log(`[addVehicle] Starting optimistic add with temp ID: ${tempId}`);
 
       let pendingImage: File | string | null = null;
+      const galleryImages = Array.isArray(data.Images) ? parseVehicleImages(data.Images) : [];
       try {
-        pendingImage = await prepareImageForUpload(data, imageFile, tempId);
+        pendingImage = galleryImages.length > 0
+          ? null
+          : await prepareImageForUpload(data, imageFile, tempId);
       } catch (err) {
         setIsAdding(false);
         const error = err instanceof Error ? err : new Error("Failed to prepare image");
@@ -286,26 +306,36 @@ export function useAddVehicleOptimistic(
         }
       });
 
-      if (pendingImage) {
+      const pendingImages: Array<File | string> = galleryImages.length > 0
+        ? galleryImages
+        : pendingImage
+          ? [pendingImage]
+          : [];
+
+      if (pendingImages.length > 0) {
         setIsProcessing(true);
         try {
-          const imageUrl = await uploadImageToCloudinary(
-            pendingImage,
-            data.Category || "Cars",
-            tempId
+          const imageUrls = await Promise.all(
+            pendingImages.map((source, index) =>
+              resolveImageForSave(source, data.Category || "Cars", tempId, index)
+            )
+          );
+          const validImageUrls = parseVehicleImages(imageUrls).filter(
+            (imageUrl) =>
+              imageUrl &&
+              imageUrl !== "undefined" &&
+              imageUrl !== "null" &&
+              !imageUrl.includes("/undefined")
           );
 
-          if (
-            !imageUrl ||
-            imageUrl === "undefined" ||
-            imageUrl === "null" ||
-            imageUrl.includes("/undefined")
-          ) {
+          if (validImageUrls.length !== imageUrls.length) {
             throw new Error("Image upload returned an invalid URL");
           }
 
-          payload.image_id = imageUrl;
-          optimisticVehicle.Image = imageUrl;
+          payload.image_id = validImageUrls[0];
+          payload.Images = validImageUrls;
+          optimisticVehicle.Image = validImageUrls[0] || "";
+          optimisticVehicle.Images = validImageUrls;
         } catch (uploadError) {
           const error = uploadError instanceof Error
             ? uploadError

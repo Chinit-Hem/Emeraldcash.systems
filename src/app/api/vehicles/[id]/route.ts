@@ -8,6 +8,7 @@ import { createErrorResponse, createSuccessResponse, withErrorHandling } from "@
 import { requirePermission } from "@/lib/auth-helpers";
 import { vehicleService } from "@/services/VehicleService";
 import { normalizeImageUrl } from "@/lib/cloudinary";
+import { mergeVehicleImages } from "@/lib/vehicle-helpers";
 import { NextRequest, NextResponse } from "next/server";
 import type { VehicleDB } from "@/services/VehicleService";
 import { clearCachedVehicles } from "../_cache";
@@ -34,6 +35,8 @@ type VehicleUpdatePayload = {
   Color?: string;
   color?: string;
   Image?: string | null;
+  Images?: string[] | null;
+  images?: string[] | null;
   image_id?: string | null;
   thumbnail_url?: string | null;
 };
@@ -56,6 +59,8 @@ function normalizeOptionalString(value: string | null | undefined): string | nul
 }
 
 function normalizeUpdatePayload(payload: VehicleUpdatePayload) {
+  const imageValue = firstDefined(payload.Image, payload.image_id);
+  const thumbnailValue = firstDefined(payload.thumbnail_url);
   const normalized = {
     category: firstDefined(payload.Category, payload.category)?.trim(),
     brand: firstDefined(payload.Brand, payload.brand)?.trim(),
@@ -67,12 +72,21 @@ function normalizeUpdatePayload(payload: VehicleUpdatePayload) {
     condition: firstDefined(payload.Condition, payload.condition)?.trim(),
     body_type: firstDefined(payload.BodyType, payload.body_type)?.trim(),
     color: firstDefined(payload.Color, payload.color)?.trim(),
-    image_id: normalizeOptionalString(firstDefined(payload.Image, payload.image_id)),
+    image_id: normalizeOptionalString(imageValue),
+    thumbnail_url: normalizeOptionalString(thumbnailValue),
   };
 
   return Object.fromEntries(
     Object.entries(normalized).filter(([, value]) => value !== undefined)
   ) as Partial<VehicleDB>;
+}
+
+async function normalizeVehicleImages(...values: unknown[]): Promise<string[]> {
+  const rawImages = mergeVehicleImages(...values);
+  const normalizedImages = await Promise.all(
+    rawImages.map((image) => normalizeImageUrl(image))
+  );
+  return mergeVehicleImages(normalizedImages);
 }
 
 // ============================================================================
@@ -185,24 +199,60 @@ const putHandler = withErrorHandling(async (req: NextRequest, { logger, requestI
   }
 
   const dbPayload = normalizeUpdatePayload(payload);
+  const hasGalleryUpdate =
+    Object.prototype.hasOwnProperty.call(payload, "Images") ||
+    Object.prototype.hasOwnProperty.call(payload, "images");
+  const hasSingleImageUpdate =
+    Object.prototype.hasOwnProperty.call(payload, "Image") ||
+    Object.prototype.hasOwnProperty.call(payload, "image_id");
+  const normalizedImages = hasGalleryUpdate || hasSingleImageUpdate
+    ? await normalizeVehicleImages(
+        payload.Images,
+        payload.images,
+        payload.Image,
+        payload.image_id,
+        payload.thumbnail_url
+      )
+    : null;
+
+  if (normalizedImages) {
+    dbPayload.image_id = normalizedImages[0] || null;
+    dbPayload.thumbnail_url = normalizedImages[0] || null;
+  }
 
   // Log incoming payload for debugging image update issues
-  console.log('[🚀 API UPDATE FULL PAYLOAD]:', JSON.stringify({ 
+  console.log('[🚀 API UPDATE FULL PAYLOAD]:', JSON.stringify({
     vehicleId: id, 
     dbPayload,
     payloadKeys: Object.keys(payload)
   }, null, 2));
 
-  // 🚀 IMAGE SAVE FIX: Normalize image_id (public_id → URL)
-  if (dbPayload.image_id) {
+  const hasImageUpdate = Object.prototype.hasOwnProperty.call(dbPayload, "image_id");
+  const hasThumbnailUpdate = Object.prototype.hasOwnProperty.call(dbPayload, "thumbnail_url");
+
+  // Image save fix: normalize image_id (public_id/Drive ID -> URL) and keep
+  // thumbnail_url in sync so server-rendered DB lists show the latest upload.
+  if (!normalizedImages && dbPayload.image_id) {
     const normalizedImageId = await normalizeImageUrl(dbPayload.image_id);
     console.log(`[API UPDATE ${id}] Image normalized: "${dbPayload.image_id.substring(0,30)}..." → "${normalizedImageId.substring(0,50)}..."`);
     dbPayload.image_id = normalizedImageId;
+
+    dbPayload.thumbnail_url = hasThumbnailUpdate && dbPayload.thumbnail_url
+      ? await normalizeImageUrl(dbPayload.thumbnail_url)
+      : normalizedImageId;
+  } else if (!normalizedImages && hasImageUpdate) {
+    dbPayload.thumbnail_url = null;
+  } else if (!normalizedImages && hasThumbnailUpdate && dbPayload.thumbnail_url) {
+    dbPayload.thumbnail_url = await normalizeImageUrl(dbPayload.thumbnail_url);
   }
 
   if (Object.keys(dbPayload).length === 0) {
     return createErrorResponse("No valid fields to update", requestId, Date.now() - startTime, 400, buildCorsHeaders(req));
   }
+
+  const previousImagesResult = normalizedImages
+    ? await vehicleService.getVehicleImageReferences(id)
+    : null;
 
   // Required fields cannot be blank when they are included in a partial update.
   const requiredFields = [
@@ -247,6 +297,25 @@ const putHandler = withErrorHandling(async (req: NextRequest, { logger, requestI
   }
 
   logger.info("[UPDATE OK]", { vehicleId: id });
+
+  if (normalizedImages) {
+    const galleryResult = await vehicleService.replaceVehicleImages(id, normalizedImages, {
+      previousImages: previousImagesResult?.success ? previousImagesResult.data ?? [] : undefined,
+    });
+    if (!galleryResult.success) {
+      return createErrorResponse(
+        galleryResult.error || "Failed to save vehicle images",
+        requestId,
+        Date.now() - startTime,
+        500,
+        buildCorsHeaders(req)
+      );
+    }
+    if (result.data) {
+      result.data.Images = normalizedImages;
+      result.data.Image = normalizedImages[0] || "";
+    }
+  }
 
   clearCachedVehicles();
 

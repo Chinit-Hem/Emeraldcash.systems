@@ -6,6 +6,7 @@ import { getCloudinaryFolder } from "@/lib/cloudinary-folders";
 import { recordMutation } from "@/lib/vehicleCache";
 import { safeBase64ToFile } from "@/lib/fileToDataUrl";
 import type { Vehicle } from "@/lib/types";
+import { parseVehicleImages } from "@/lib/vehicle-helpers";
 
 function cleanBase64DataUrl(dataUrl: string): string {
   if (!dataUrl || typeof dataUrl !== 'string') return dataUrl;
@@ -49,6 +50,8 @@ interface UseUpdateVehicleOptimisticReturn {
   ) => Promise<void>;
   isUpdating: boolean;
 }
+
+type VehicleUpdateData = Partial<Vehicle> & { Images?: string[] };
 
 const MAX_RETRY_ATTEMPTS = 1;
 const RETRY_DELAY_MS = 100;
@@ -294,6 +297,46 @@ async function uploadImageToCloudinary(
   }
 }
 
+async function resolveGalleryImageForSave(
+  image: string,
+  category: string,
+  vehicleId: string,
+  index: number
+): Promise<string | null> {
+  if (image.startsWith("http://") || image.startsWith("https://")) {
+    return image;
+  }
+
+  if (!image.startsWith("data:image/")) {
+    return null;
+  }
+
+  let fileFromBase64: File | null = null;
+  const filename = `vehicle_${vehicleId}_${Date.now()}_${index}.jpg`;
+
+  try {
+    const response = await fetch(image);
+    const blob = await response.blob();
+    if (blob.size > 0 && blob.type.startsWith("image/")) {
+      fileFromBase64 = new File([blob], filename, { type: blob.type });
+    }
+  } catch {
+    const cleanedImage = cleanBase64DataUrl(image);
+    const { file } = safeBase64ToFile(cleanedImage, filename);
+    fileFromBase64 = file;
+  }
+
+  if (!fileFromBase64) {
+    return null;
+  }
+
+  return uploadImageToCloudinaryWithRetry(
+    fileFromBase64,
+    category,
+    `${vehicleId}_${index}`
+  );
+}
+
 export function useUpdateVehicleOptimistic(
   options: UseUpdateVehicleOptimisticOptions = {}
 ): UseUpdateVehicleOptimisticReturn {
@@ -303,7 +346,7 @@ export function useUpdateVehicleOptimistic(
   const updateVehicle = useCallback(
     async (
       vehicleId: string,
-      data: Partial<Vehicle>,
+      data: VehicleUpdateData,
       originalVehicle: Vehicle,
       imageFile?: File | null
     ): Promise<void> => {
@@ -312,6 +355,8 @@ export function useUpdateVehicleOptimistic(
       let lastError: Error | null = null;
       let attempts = 0;
       let cloudinaryImageUrl: string | null = null;
+      const hasGalleryUpdate = Array.isArray(data.Images);
+      let cloudinaryImageUrls: string[] | null = hasGalleryUpdate ? [] : null;
 
       const reportProgress = (stage: 'compressing' | 'uploading' | 'processing' | 'saving', progress: number) => {
         onProgress?.(stage, progress);
@@ -319,7 +364,35 @@ export function useUpdateVehicleOptimistic(
 
       // Image upload
       try {
-        if (imageFile) {
+        if (hasGalleryUpdate) {
+          const galleryImages = parseVehicleImages(data.Images);
+          reportProgress('compressing', 100);
+          reportProgress('uploading', galleryImages.length > 0 ? 0 : 100);
+
+          const galleryResults = await Promise.allSettled(
+            galleryImages.map((image, index) =>
+              resolveGalleryImageForSave(
+                image,
+                data.Category || originalVehicle.Category || "Cars",
+                vehicleId,
+                index
+              )
+            )
+          );
+          cloudinaryImageUrls = parseVehicleImages(
+            galleryResults
+              .filter((result): result is PromiseFulfilledResult<string | null> => result.status === "fulfilled")
+              .map((result) => result.value)
+              .filter((imageUrl): imageUrl is string => Boolean(imageUrl))
+          );
+
+          if (galleryImages.length > 0 && cloudinaryImageUrls.length === 0) {
+            throw new Error("The selected photos are invalid. Replace the broken photos or remove them before saving.");
+          }
+          reportProgress('uploading', 100);
+          cloudinaryImageUrl = cloudinaryImageUrls[0] || null;
+        }
+        else if (imageFile) {
           const fileSizeKB = imageFile.size / 1024;
           
           let fileToUpload: File;
@@ -398,13 +471,21 @@ export function useUpdateVehicleOptimistic(
       }
 
       // Validate image result
-      const imageWasProvided = !!imageFile || (data.Image && data.Image.startsWith("data:image/"));
+      const imageWasProvided = !hasGalleryUpdate && (!!imageFile || (data.Image && data.Image.startsWith("data:image/")));
       const imageUploadFailed = imageWasProvided && !cloudinaryImageUrl;
       const imageUrlIsInvalid = cloudinaryImageUrl === "undefined" || 
                                 cloudinaryImageUrl === "null" || 
                                 (cloudinaryImageUrl && cloudinaryImageUrl.includes("/undefined"));
+      const galleryHasInvalidUrl = cloudinaryImageUrls?.some(
+        (imageUrl) =>
+          !imageUrl ||
+          imageUrl === "undefined" ||
+          imageUrl === "null" ||
+          imageUrl.includes("/undefined") ||
+          imageUrl.startsWith("data:image/")
+      );
 
-      if (imageUploadFailed || imageUrlIsInvalid) {
+      if (imageUploadFailed || imageUrlIsInvalid || galleryHasInvalidUrl) {
         setIsUpdating(false);
         const error = new Error(
           imageUrlIsInvalid 
@@ -430,7 +511,10 @@ export function useUpdateVehicleOptimistic(
         market_price: data.PriceNew || originalVehicle.PriceNew,
       };
 
-      if (cloudinaryImageUrl &&
+      if (cloudinaryImageUrls) {
+        payload.image_id = cloudinaryImageUrls[0] || null;
+        payload.Images = cloudinaryImageUrls;
+      } else if (cloudinaryImageUrl &&
           (cloudinaryImageUrl.startsWith('http://') ||
            cloudinaryImageUrl.startsWith('https://'))) {
         if (cloudinaryImageUrl.startsWith('data:image/')) {
@@ -515,7 +599,12 @@ export function useUpdateVehicleOptimistic(
           }
 
           reportProgress('saving', 100);
-          const updatedVehicle = result.data || { ...originalVehicle, ...data, Image: cloudinaryImageUrl };
+          const updatedVehicle = result.data || {
+            ...originalVehicle,
+            ...data,
+            Image: cloudinaryImageUrls ? (cloudinaryImageUrls[0] || "") : (cloudinaryImageUrl || originalVehicle.Image),
+            Images: cloudinaryImageUrls ?? originalVehicle.Images,
+          };
 
           setTimeout(() => {
             recordMutation();

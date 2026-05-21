@@ -23,17 +23,57 @@ type StaffEntityLike = {
   updatedAt?: string;
 };
 
-function toLegacyStaff(staff: StaffEntityLike) {
+type StaffProgressLike = {
+  staff_id: number;
+  staff_name: string;
+  branch: string | null;
+  role: string;
+  completed_lessons_count: number;
+  total_lessons: number;
+  completion_percentage: number;
+  watched_lessons_count: number;
+  in_progress_lessons_count: number;
+  average_watch_percentage: number;
+  latest_watch_percentage: number;
+  last_completed_at: string | null;
+  last_watched_at: string | null;
+  last_watched_lesson_title: string | null;
+  training_status: "not_started" | "watching" | "ready_to_complete" | "completed";
+  last_activity: string | null;
+};
+
+function normalizeText(value?: string | null) {
+  return value?.trim().toLowerCase() || "";
+}
+
+function toLegacyStaff(staff: StaffEntityLike, progress?: StaffProgressLike) {
+  const staffId = Number(staff.id);
+
   return {
-    id: Number(staff.id),
+    id: staffId,
+    staff_id: staffId,
     full_name: staff.fullName,
+    staff_name: staff.fullName,
     email: staff.email,
     branch_location: staff.branchLocation,
+    branch: staff.branchLocation,
     role: staff.role,
     phone: staff.phone,
     is_active: staff.isActive,
     created_at: staff.createdAt ?? null,
     updated_at: staff.updatedAt ?? null,
+    completed_lessons_count: progress?.completed_lessons_count ?? 0,
+    total_lessons: progress?.total_lessons ?? 0,
+    completion_percentage: progress?.completion_percentage ?? 0,
+    watched_lessons_count: progress?.watched_lessons_count ?? 0,
+    in_progress_lessons_count: progress?.in_progress_lessons_count ?? 0,
+    average_watch_percentage: progress?.average_watch_percentage ?? 0,
+    latest_watch_percentage: progress?.latest_watch_percentage ?? 0,
+    last_completed_at: progress?.last_completed_at ?? null,
+    last_watched_at: progress?.last_watched_at ?? null,
+    last_watched_lesson_title: progress?.last_watched_lesson_title ?? null,
+    training_status: progress?.training_status ?? "not_started",
+    last_activity: progress?.last_activity ?? null,
   };
 }
 
@@ -59,7 +99,10 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const result = await lmsService.getStaff();
+  const [result, dashboardResult] = await Promise.all([
+    lmsService.getStaff(),
+    lmsService.getDashboardStats(),
+  ]);
 
   if (!result.success) {
     return NextResponse.json(
@@ -68,9 +111,19 @@ export async function GET(request: NextRequest) {
     );
   }
 
+  const progressByStaffId = new Map(
+    (dashboardResult.success ? dashboardResult.data?.staff_progress ?? [] : []).map((progress) => [
+      progress.staff_id,
+      progress,
+    ])
+  );
+
   return NextResponse.json({
     success: true,
-    data: (result.data ?? []).map((staff) => toLegacyStaff(staff as StaffEntityLike)),
+    data: (result.data ?? []).map((staff) => {
+      const staffRecord = staff as StaffEntityLike;
+      return toLegacyStaff(staffRecord, progressByStaffId.get(Number(staffRecord.id)));
+    }),
     meta: result.meta,
   });
 }
@@ -238,7 +291,40 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    const result = await lmsService.deleteStaff(parseInt(id));
+    const staffId = Number.parseInt(id, 10);
+    if (!Number.isInteger(staffId) || staffId <= 0) {
+      return NextResponse.json(
+        { success: false, error: "id must be a positive number" },
+        { status: 400 }
+      );
+    }
+
+    if (session.staffId && Number(session.staffId) === staffId) {
+      return NextResponse.json(
+        { success: false, error: "You cannot delete your own LMS staff record" },
+        { status: 403 }
+      );
+    }
+
+    const staffListResult = await lmsService.getStaff();
+    const targetStaff = staffListResult.success
+      ? staffListResult.data?.find((staff) => Number(staff.id) === staffId)
+      : null;
+    const currentUsername = normalizeText(session.username);
+
+    if (
+      targetStaff &&
+      currentUsername &&
+      (normalizeText(targetStaff.fullName) === currentUsername ||
+        normalizeText(targetStaff.email) === currentUsername)
+    ) {
+      return NextResponse.json(
+        { success: false, error: "You cannot delete your own LMS staff record" },
+        { status: 403 }
+      );
+    }
+
+    const result = await lmsService.deleteStaff(staffId);
 
     if (!result.success) {
       return NextResponse.json(

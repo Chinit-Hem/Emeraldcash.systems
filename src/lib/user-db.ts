@@ -11,7 +11,7 @@ import {
 } from "./errors";
 import { log } from "./logger";
 
-export type Role = "Admin" | "Staff" | "Transfer";
+export type Role = "Admin" | "Staff" | "Accounting" | "Transfer";
 
 export interface UserDB {
   username: string;
@@ -30,7 +30,7 @@ export interface UserDB {
 // Validation constants
 const USERNAME_REGEX = /^[a-z0-9._-]{3,32}$/;
 const MAX_PASSWORD_HASH_LENGTH = 255;
-const VALID_ROLES: Role[] = ["Admin", "Staff", "Transfer"];
+const VALID_ROLES: Role[] = ["Admin", "Staff", "Accounting", "Transfer"];
 
 // Input validation functions
 function validateUsername(username: string): void {
@@ -108,7 +108,7 @@ export async function ensureUsersTable(): Promise<void> {
       async () => sql`
         CREATE TABLE IF NOT EXISTS users (
           username VARCHAR(32) PRIMARY KEY,
-          role VARCHAR(10) NOT NULL CHECK (role IN ('Admin', 'Staff')),
+          role VARCHAR(20) NOT NULL CHECK (role IN ('Admin', 'Staff', 'Accounting', 'Transfer')),
           password_hash VARCHAR(255) NOT NULL,
           created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
           updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
@@ -116,6 +116,28 @@ export async function ensureUsersTable(): Promise<void> {
         )
       `,
       "ensureUsersTable"
+    );
+    await queryWithRetry(
+      async () => sql`
+        DO $$
+        BEGIN
+          ALTER TABLE users ALTER COLUMN role TYPE VARCHAR(20);
+
+          IF EXISTS (
+            SELECT 1
+            FROM pg_constraint
+            WHERE conname = 'users_role_check'
+              AND conrelid = 'users'::regclass
+          ) THEN
+            ALTER TABLE users DROP CONSTRAINT users_role_check;
+          END IF;
+
+          ALTER TABLE users
+          ADD CONSTRAINT users_role_check
+          CHECK (role IN ('Admin', 'Staff', 'Accounting', 'Transfer'));
+        END $$;
+      `,
+      "ensureUsersTable-role-constraint"
     );
     log("INFO", "Users table verified/created successfully");
   } catch (error) {

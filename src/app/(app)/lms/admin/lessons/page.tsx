@@ -27,6 +27,25 @@ interface LessonFormData {
   duration_minutes: number;
   order_index: number;
   is_active: boolean;
+  allowed_roles: string[];
+}
+
+const LESSON_AUDIENCE_ROLES = ["Staff", "Accounting"] as const;
+const DEFAULT_LESSON_AUDIENCE = [...LESSON_AUDIENCE_ROLES];
+
+function normalizeLessonAudience(allowedRoles?: string[]) {
+  const roles = new Set(allowedRoles?.filter((role) => LESSON_AUDIENCE_ROLES.includes(role as typeof LESSON_AUDIENCE_ROLES[number])));
+  return roles.size > 0 ? [...roles] : [...DEFAULT_LESSON_AUDIENCE];
+}
+
+function getAudienceLabel(allowedRoles?: string[]) {
+  const roles = normalizeLessonAudience(allowedRoles);
+  const staffEnabled = roles.includes("Staff");
+  const accountingEnabled = roles.includes("Accounting");
+
+  if (staffEnabled && accountingEnabled) return "All staff";
+  if (accountingEnabled) return "Accounting only";
+  return "Staff only";
 }
 
 export default function LessonsAdminPage() {
@@ -53,6 +72,7 @@ export default function LessonsAdminPage() {
     duration_minutes: 10,
     order_index: 0,
     is_active: true,
+    allowed_roles: [...DEFAULT_LESSON_AUDIENCE],
   });
 
   const fetchData = useCallback(async () => {
@@ -99,6 +119,10 @@ export default function LessonsAdminPage() {
       setError("Please select a category");
       return;
     }
+    if (formData.allowed_roles.length === 0) {
+      setError("Select at least one role for lesson visibility");
+      return;
+    }
 
     setSaving(true);
     setError("");
@@ -118,6 +142,7 @@ export default function LessonsAdminPage() {
       completed_at: null,
       category_name: categories.find(c => c.id === formData.category_id)?.name || "",
       category_color: categories.find(c => c.id === formData.category_id)?.color || "emerald",
+      allowed_roles: formData.allowed_roles,
     };
 
     // Update local state immediately (optimistic)
@@ -205,6 +230,7 @@ export default function LessonsAdminPage() {
       duration_minutes: lesson.duration_minutes || 10,
       order_index: lesson.order_index,
       is_active: true, // Default to active, API doesn't return this
+      allowed_roles: normalizeLessonAudience(lesson.allowed_roles),
     });
     setShowAddForm(true);
   };
@@ -219,6 +245,7 @@ export default function LessonsAdminPage() {
       duration_minutes: 10,
       order_index: lessons.filter(l => l.category_id === categories[0]?.id).length,
       is_active: true,
+      allowed_roles: [...DEFAULT_LESSON_AUDIENCE],
     });
     setShowAddForm(false);
     setError("");
@@ -233,6 +260,19 @@ export default function LessonsAdminPage() {
         newSet.add(catId);
       }
       return newSet;
+    });
+  };
+
+  const toggleAudienceRole = (role: typeof LESSON_AUDIENCE_ROLES[number]) => {
+    setFormData((prev) => {
+      const nextRoles = prev.allowed_roles.includes(role)
+        ? prev.allowed_roles.filter((item) => item !== role)
+        : [...prev.allowed_roles, role];
+
+      return {
+        ...prev,
+        allowed_roles: nextRoles,
+      };
     });
   };
 
@@ -369,7 +409,34 @@ export default function LessonsAdminPage() {
                   />
                 </div>
               </div>
-              
+
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">Visible to</label>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {LESSON_AUDIENCE_ROLES.map((role) => (
+                    <label
+                      key={role}
+                      className={`flex items-center gap-3 rounded-xl border px-4 py-3 transition-colors ${
+                        formData.allowed_roles.includes(role)
+                          ? "border-blue-200 bg-blue-50 text-blue-700"
+                          : "border-slate-200 bg-slate-50 text-slate-600"
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={formData.allowed_roles.includes(role)}
+                        onChange={() => toggleAudienceRole(role)}
+                        className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                      />
+                      <span className="text-sm font-medium">{role}</span>
+                    </label>
+                  ))}
+                </div>
+                <p className="mt-2 text-xs text-slate-500">
+                  Admin can always view every lesson. Accounting can also view normal Staff lessons.
+                </p>
+              </div>
+
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">YouTube URL</label>
                 <input
@@ -494,6 +561,8 @@ export default function LessonsAdminPage() {
                                   <span>Video</span>
                                   <span>•</span>
                                   <span>{lesson.duration_minutes || 0} min</span>
+                                  <span>•</span>
+                                  <span>{getAudienceLabel(lesson.allowed_roles)}</span>
                                 </div>
                               </div>
                             </div>

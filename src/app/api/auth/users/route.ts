@@ -13,7 +13,7 @@ import { NextRequest, NextResponse } from "next/server";
 const USERNAME_REGEX = /^[a-z0-9._-]{3,32}$/;
 const MIN_PASSWORD_LENGTH = 4;
 const MAX_PASSWORD_LENGTH = 72;
-const VALID_ROLES: Role[] = ["Admin", "Staff"];
+const VALID_ROLES: Role[] = ["Admin", "Staff", "Accounting"];
 
 // Security headers for all responses
 const securityHeaders = {
@@ -79,13 +79,11 @@ function validateRole(role: unknown): ValidationResult<Role> {
     return { valid: false, error: "Role is required and must be a string" };
   }
   
-  const normalizedRole = role === "Admin" ? "Admin" : "Staff";
-  
-  if (!VALID_ROLES.includes(normalizedRole)) {
+  if (!VALID_ROLES.includes(role)) {
     return { valid: false, error: `Role must be one of: ${VALID_ROLES.join(", ")}` };
   }
   
-  return { valid: true, value: normalizedRole };
+  return { valid: true, value: role };
 }
 
 // Helper to create error response

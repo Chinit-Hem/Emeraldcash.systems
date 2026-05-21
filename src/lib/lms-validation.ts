@@ -22,6 +22,7 @@ export const lessonSchema = z.object({
   durationMinutes: z.number().min(1).max(300).nullable(),
   orderIndex: z.number().min(0),
   isActive: z.boolean(),
+  allowedRoles: z.array(z.enum(["Staff", "Accounting"])).optional(),
 });
 
 export const staffSchema = z.object({
@@ -29,7 +30,7 @@ export const staffSchema = z.object({
   fullName: z.string().min(2, "Full name required").max(50),
   email: z.string().email("Valid email").or(z.literal("")).optional(),
   branchLocation: z.string().max(100).optional(),
-  role: z.enum(["Appraiser", "Manager", "Admin", "Trainee"]),
+  role: z.enum(["Admin", "Staff", "Accounting"]),
   phone: z.string().max(20).optional(),
   isActive: z.boolean(),
 });
@@ -37,4 +38,3 @@ export const staffSchema = z.object({
 export type CategoryFormData = z.infer<typeof categorySchema>;
 export type LessonFormData = z.infer<typeof lessonSchema>;
 export type StaffFormData = z.infer<typeof staffSchema>;
-

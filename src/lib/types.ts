@@ -1,5 +1,5 @@
 
-export type Role = "Admin" | "Staff" | "Transfer" | string;
+export type Role = "Admin" | "Staff" | "Accounting" | "Transfer" | string;
 
 // Role definition for custom roles
 export interface RoleDefinition {
@@ -51,10 +51,20 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<string, Permission[]> = {
     "vehicles:view",           // Can view vehicles (read-only)
     "sms:view",                // Can view stock/assets
     "sms:transfer",            // Can participate in stock transfers
+    "sms:create",              // Can upload images / create stock as part of transfer flow
     "users:view",              // Can view users
     "lms:view",                // Can access LMS
     "reports:view"             // Can view reports
     // Note: Staff CANNOT create/edit/delete vehicles or access settings
+  ],
+  Accounting: [
+    "vehicles:view",           // Same app permissions as Staff
+    "sms:view",
+    "sms:transfer",
+    "sms:create",
+    "users:view",
+    "lms:view",
+    "reports:view"
   ],
   Transfer: [
     "lms:view",                // Can access LMS
@@ -121,6 +131,45 @@ export const TAX_TYPE_OPTIONS = [
 ] as const;
 
 export type TaxType = (typeof TAX_TYPE_OPTIONS)[number];
+
+export const CAR_BRAND_OPTIONS = [
+  "Toyota",
+  "Lexus",
+  "Honda",
+  "Nissan",
+  "Mazda",
+  "Mitsubishi",
+  "Suzuki",
+  "Hyundai",
+  "Kia",
+  "Ford",
+  "Chevrolet",
+  "Mercedes-Benz",
+  "BMW",
+  "Audi",
+  "Isuzu",
+] as const;
+
+export const MOTORCYCLE_BRAND_OPTIONS = [
+  "Honda",
+  "Yamaha",
+  "Suzuki",
+  "Kawasaki",
+  "Sym",
+] as const;
+
+export const TUK_TUK_BRAND_OPTIONS = [
+  "Bajaj",
+  "Piaggio",
+  "Onion",
+] as const;
+
+export const VEHICLE_BRAND_OPTIONS_BY_CATEGORY = {
+  Cars: CAR_BRAND_OPTIONS,
+  Motorcycles: MOTORCYCLE_BRAND_OPTIONS,
+  "Tuk Tuk": TUK_TUK_BRAND_OPTIONS,
+  TukTuks: TUK_TUK_BRAND_OPTIONS,
+} as const;
 
 // Tax Type metadata with descriptions for static data
 export interface TaxTypeMetadata {
@@ -209,8 +258,11 @@ export type Vehicle = {
   BodyType: string;
   Color: string;
   ShadowBox?: string | null; // Shadow box/trim color
-  // Image is always normalized to a string (Google Sheets arrays are converted)
+  // Primary image used by list/card views.
   Image: string;
+  // Optional full gallery. Detail/edit screens can use this while older single-image
+  // records continue to work through Image.
+  Images?: string[];
   Time: string;
   _deleted?: boolean;
   Description?: string | null; // Additional notes/description about the vehicle

@@ -507,7 +507,8 @@ export class SmsAssetService extends BaseService<SmsAssetEntity, SmsAssetDB> {
           st.id, st.asset_id as "assetId", st.sender_id as "senderId",
           st.receiver_id as "receiverId", st.location, st.status, st.remark,
           transfer_image.image_url as "imageUrl",
-          st.created_at as "createdAt", st.accepted_at as "acceptedAt"
+          st.created_at AT TIME ZONE 'Asia/Phnom_Penh' as "createdAt",
+          st.accepted_at AT TIME ZONE 'Asia/Phnom_Penh' as "acceptedAt"
         FROM sms_transfers st
         LEFT JOIN LATERAL (
           SELECT image_url
@@ -578,13 +579,17 @@ export class SmsAssetService extends BaseService<SmsAssetEntity, SmsAssetDB> {
         await this.ensureTransferImagesTable();
       }
 
-      const now = new Date().toISOString();
-
       const result = await dbManager.executeUnsafe(
         `INSERT INTO sms_transfers (id, asset_id, sender_id, receiver_id, location, status, remark, created_at)
-         VALUES (gen_random_uuid(), $1, $2, $3, $4, 'pending', $5, $6)
+         VALUES (
+           gen_random_uuid(),
+           $1, $2, $3, $4,
+           'pending',
+           $5,
+           (NOW() AT TIME ZONE 'Asia/Phnom_Penh')
+         )
          RETURNING *`,
-        [transferData.assetId, transferData.senderId, transferData.receiverId, transferData.location, transferData.remark || null, now],
+        [transferData.assetId, transferData.senderId, transferData.receiverId, transferData.location, transferData.remark || null],
         8000 // 8s timeout — safely under Vercel's 10s limit
       ) as Array<Record<string, unknown>>;
 
@@ -1026,7 +1031,6 @@ if (status === 'accepted') {
         await this.ensureTransferImagesTable();
       }
 
-      const now = new Date().toISOString();
       // Create a pending transfer request for admin approval
       // sender = whoever currently has the asset (assigned_to)
       // receiver = 'stock' indicates this is a return-to-stock request
@@ -1036,9 +1040,16 @@ if (status === 'accepted') {
 
       const result = await dbManager.executeUnsafe(
         `INSERT INTO sms_transfers (id, asset_id, sender_id, receiver_id, location, status, remark, created_at)
-         VALUES (gen_random_uuid(), $1, $2, 'stock', $3, 'pending', $4, $5)
+         VALUES (
+           gen_random_uuid(),
+           $1, $2, 'stock',
+           $3,
+           'pending',
+           $4,
+           (NOW() AT TIME ZONE 'Asia/Phnom_Penh')
+         )
          RETURNING *`,
-        [assetId, senderId, returnLocation, returnRemark, now],
+        [assetId, senderId, returnLocation, returnRemark],
         8000
       ) as Array<Record<string, unknown>>;
 
@@ -1191,7 +1202,8 @@ const stats: Record<string, number> = {
           receiver_id as "receiverId", location, status,
           COALESCE(NULLIF(remark, ''), 'Transfer ' || status) as description,
           transfer_image.image_url as "imageUrl",
-          created_at as timestamp, accepted_at as "acceptedAt"
+          created_at AT TIME ZONE 'Asia/Phnom_Penh' as timestamp,
+          accepted_at AT TIME ZONE 'Asia/Phnom_Penh' as "acceptedAt"
         FROM sms_transfers
         LEFT JOIN LATERAL (
           SELECT image_url

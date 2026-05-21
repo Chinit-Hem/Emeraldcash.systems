@@ -4,15 +4,14 @@ import React, { useState, useEffect, useCallback } from "react";
 import { useToast } from "@/components/ui/glass/GlassToast";
 import { cn } from "@/lib/ui";
 import type { Vehicle } from "@/lib/types";
+import { VEHICLE_BRAND_OPTIONS_BY_CATEGORY } from "@/lib/types";
 import { derivePrices } from "@/lib/pricing";
-import { base64ToBlob } from "@/lib/base64ToBlob";
-import { formatFileSize } from "@/lib/compressImage";
 import ImageInput from "@/components/ui/ImageInput";
 import { useAddVehicleOptimistic } from "./useAddVehicleOptimistic";
 
 // Icons
 import {
-  Car, Bike, Tag, Calendar, DollarSign, CheckCircle2,
+  Car, Bike, Tag, Calendar, DollarSign,
   FileText, ImageIcon as ImageIconComp, Loader2, Save,
   Sparkles, X, AlertCircle
 } from "lucide-react";
@@ -119,6 +118,12 @@ const BASIC_INFO_EXAMPLES: Record<CategoryOption, {
 
 function getBasicInfoExamples(category?: string) {
   return BASIC_INFO_EXAMPLES[category as CategoryOption] ?? BASIC_INFO_EXAMPLES.Cars;
+}
+
+function getBrandOptions(category?: string) {
+  return VEHICLE_BRAND_OPTIONS_BY_CATEGORY[
+    category as keyof typeof VEHICLE_BRAND_OPTIONS_BY_CATEGORY
+  ] ?? VEHICLE_BRAND_OPTIONS_BY_CATEGORY.Cars;
 }
 
 // UI Components
@@ -263,8 +268,7 @@ export default function AddVehicleModalOptimistic({ isOpen, onClose, onSuccess }
   // Form state
   const [formData, setFormData] = useState(INITIAL_FORM_DATA);
   const [errors, setErrors] = useState<FormErrors>({});
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
-  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imageValues, setImageValues] = useState<string[]>([]);
   const [isImageProcessing, setIsImageProcessing] = useState(false);
 
   // Reset on open
@@ -272,8 +276,7 @@ export default function AddVehicleModalOptimistic({ isOpen, onClose, onSuccess }
     if (isOpen) {
       setFormData(INITIAL_FORM_DATA);
       setErrors({});
-      setImagePreview(null);
-      setImageFile(null);
+      setImageValues([]);
       setIsImageProcessing(false);
     }
   }, [isOpen]);
@@ -314,24 +317,9 @@ export default function AddVehicleModalOptimistic({ isOpen, onClose, onSuccess }
     });
   }, []);
 
-  const handleImageChange = useCallback((value: string | null) => {
-    setImagePreview(value);
-    if (value?.startsWith('data:')) {
-      try {
-        const blob = base64ToBlob(value);
-        setImageFile(new File([blob], 'vehicle.jpg', { type: blob.type }));
-        setFormData(prev => ({ ...prev, Image: "" }));
-      } catch {
-        setImageFile(null);
-        setFormData(prev => ({ ...prev, Image: "" }));
-      }
-    } else if (typeof value === "string" && (value.startsWith("http://") || value.startsWith("https://"))) {
-      setImageFile(null);
-      setFormData(prev => ({ ...prev, Image: value }));
-    } else {
-      setImageFile(null);
-      setFormData(prev => ({ ...prev, Image: "" }));
-    }
+  const handleImagesChange = useCallback((values: string[]) => {
+    setImageValues(values);
+    setFormData(prev => ({ ...prev, Image: values[0] || "", Images: values }));
   }, []);
 
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
@@ -339,16 +327,17 @@ export default function AddVehicleModalOptimistic({ isOpen, onClose, onSuccess }
     if (!validateForm()) return;
 
     try {
-      await addVehicle(formData, imageFile || undefined);
+      await addVehicle({ ...formData, Image: imageValues[0] || "", Images: imageValues }, undefined);
     } catch (err) {
       // Error handled by useAddVehicleOptimistic onError
     }
-  }, [formData, imageFile, validateForm, addVehicle]);
+  }, [addVehicle, formData, imageValues, validateForm]);
 
   if (!isOpen) return null;
 
   const isDisabled = isAdding || isProcessing || isImageProcessing;
   const examples = getBasicInfoExamples(formData.Category);
+  const brandOptions = getBrandOptions(formData.Category);
 
   return (
     <ModalBackdrop onClose={onClose}>
@@ -376,7 +365,13 @@ export default function AddVehicleModalOptimistic({ isOpen, onClose, onSuccess }
                   error={errors.Brand}
                   icon={Tag}
                   disabled={isDisabled}
+                  list="vehicle-brand-options"
                 />
+                <datalist id="vehicle-brand-options">
+                  {brandOptions.map((brand) => (
+                    <option key={brand} value={brand} />
+                  ))}
+                </datalist>
                 <FormInput
                   label="Model *"
                   placeholder={examples.model}
@@ -430,19 +425,17 @@ export default function AddVehicleModalOptimistic({ isOpen, onClose, onSuccess }
             {/* Image */}
             <FormSection title="Vehicle Image" icon={ImageIconComp}>
               <ImageInput
-                value={imagePreview || ""}
-                onChange={handleImageChange}
+                value={imageValues[0] || ""}
+                values={imageValues}
+                onChange={(value) => handleImagesChange(value ? [value] : [])}
+                onChangeMany={handleImagesChange}
                 className="w-full"
                 maxSizeMB={10}
+                multiple
+                maxImages={12}
                 disabled={isDisabled}
                 onProcessingChange={setIsImageProcessing}
               />
-              {imageFile && (
-                <p className="text-xs text-emerald-500 mt-2 flex items-center gap-1">
-                  <CheckCircle2 className="w-3 h-3" />
-                  Ready: {formatFileSize(imageFile.size)}
-                </p>
-              )}
             </FormSection>
 
             {/* Description */}

@@ -483,6 +483,62 @@ Original error: ${detailedError}`,
 }
 
 
+function isCloudinaryTransformationSegment(segment: string): boolean {
+  if (!segment) return false;
+  if (segment.includes(",")) {
+    return segment.split(",").every(isCloudinaryTransformationSegment);
+  }
+
+  return /^(?:a|ar|b|bo|br|c|co|cs|d|dl|dn|dpr|e|eo|f|fl|fn|g|h|ki|l|o|pg|q|r|so|sp|t|u|vc|vs|w|x|y|z)_/i.test(segment);
+}
+
+function stripImageExtension(publicId: string): string {
+  return publicId.replace(/\.(?:avif|bmp|gif|jpe?g|png|svg|tiff?|webp)$/i, "");
+}
+
+/**
+ * Extract a Cloudinary public_id from either a stored public_id or a delivery URL.
+ * Returns null for Google Drive, data/blob URLs, and non-Cloudinary images.
+ */
+export function extractCloudinaryPublicId(imageValue: string | null | undefined): string | null {
+  if (!imageValue || typeof imageValue !== "string") return null;
+
+  const trimmed = imageValue.trim();
+  if (!trimmed || trimmed.startsWith("data:") || trimmed.startsWith("blob:")) return null;
+
+  if (isCloudinaryPublicId(trimmed)) {
+    return stripImageExtension(trimmed);
+  }
+
+  if (!trimmed.startsWith("http://") && !trimmed.startsWith("https://")) {
+    return null;
+  }
+
+  try {
+    const url = new URL(trimmed);
+    if (url.hostname !== "res.cloudinary.com") return null;
+
+    const parts = url.pathname.split("/").filter(Boolean);
+    const uploadIndex = parts.findIndex((part) => part === "upload");
+    if (uploadIndex === -1) return null;
+
+    const publicIdParts = parts.slice(uploadIndex + 1);
+    while (
+      publicIdParts.length > 0 &&
+      (/^v\d+$/i.test(publicIdParts[0]) || isCloudinaryTransformationSegment(publicIdParts[0]))
+    ) {
+      publicIdParts.shift();
+    }
+
+    if (publicIdParts.length === 0) return null;
+
+    const decodedPublicId = decodeURIComponent(publicIdParts.join("/"));
+    return stripImageExtension(decodedPublicId);
+  } catch {
+    return null;
+  }
+}
+
 // Delete image from Cloudinary
 export async function deleteImage(publicId: string): Promise<{
   success: boolean;
@@ -499,7 +555,7 @@ export async function deleteImage(publicId: string): Promise<{
     const cloudinary = await getCloudinary();
     const result = await cloudinary.uploader.destroy(publicId);
 
-    if (result.result === "ok") {
+    if (result.result === "ok" || result.result === "not found") {
       return { success: true };
     } else {
       return {

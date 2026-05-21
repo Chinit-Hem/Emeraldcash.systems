@@ -33,8 +33,12 @@ export default function TopBar({
   };
 
   // Translated role names
-  const roleLabel = language === 'km' 
-    ? (user.role === 'Admin' ? 'អ្នកគ្រប់គ្រង' : 'បុគ្គលិក')
+  const roleLabel = language === 'km'
+    ? user.role === 'Admin'
+      ? 'អ្នកគ្រប់គ្រង'
+      : user.role === 'Accounting'
+      ? 'គណនេយ្យ'
+      : 'បុគ្គលិក'
     : user.role;
 
   return (
