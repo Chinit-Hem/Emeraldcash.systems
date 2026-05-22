@@ -11,6 +11,7 @@
 "use client";
 
 import React from "react";
+import { TukTukIcon as TukTukVehicleIcon } from "@/components/icons/TukTukIcon";
 import { cn } from "@/lib/ui";
 
 // ============================================================================
@@ -77,16 +78,7 @@ const MotorcycleIcon = ({ className, style }: IconProps) => (
 );
 
 const TukTukIcon = ({ className, style }: IconProps) => (
-  <svg className={className} style={style} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M4 16v-2a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v2" />
-    <circle cx="6.5" cy="18.5" r="2.5" />
-    <circle cx="17.5" cy="18.5" r="2.5" />
-    <path d="M4 14h2a2 2 0 0 1 2 2v2" />
-    <path d="M16 14h2a2 2 0 0 1 2 2v2" />
-    <path d="M12 14v-4" />
-    <path d="M8 10h8" />
-    <path d="M12 6v4" />
-  </svg>
+  <TukTukVehicleIcon className={className} style={style} />
 );
 
 const PriceIcon = ({ className, style }: IconProps) => (

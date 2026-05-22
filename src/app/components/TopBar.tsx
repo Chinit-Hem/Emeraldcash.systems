@@ -100,7 +100,7 @@ export default function TopBar({
         {/* Center Section - Logo & Brand */}
         {!title && (
           <div className="flex items-center gap-3 absolute left-1/2 transform -translate-x-1/2">
-            <div className="relative h-10 w-10 flex items-center justify-center bg-emerald-100 dark:bg-emerald-900/30 rounded-xl">
+            <div className="relative h-10 w-10 flex items-center justify-center rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-white">
               <Image
                 src="/logo.png"
                 alt="Emerald Cash"
@@ -112,7 +112,7 @@ export default function TopBar({
             </div>
             <div className="hidden sm:block text-center">
               <div className="text-base font-bold text-gray-900 dark:text-white tracking-tight">
-                {language === 'km' ? 'អេមរ៉ាល់ខាស' : 'Emerald Cash'}
+                {language === 'km' ? 'អេមើរ៉ល ឃែស' : 'Emerald Cash'}
               </div>
               <div className="text-xs font-medium text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">
                 {language === 'km' ? 'ប្រព័ន្ធគ្រប់គ្រងយានយន្ត' : 'Vehicle Management'}

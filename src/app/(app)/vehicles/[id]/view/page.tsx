@@ -36,6 +36,7 @@ import { ConfirmDeleteModal } from "@/app/components/vehicles/ConfirmDeleteModal
 import { useDeleteVehicle } from "@/app/components/vehicles/useDeleteVehicle";
 import { useToast } from "@/components/ui/glass/GlassToast";
 import { ImageInput } from "@/components/ui/ImageInput";
+import { TukTukIcon } from "@/components/icons/TukTukIcon";
 
 // Helper to get proper image URL
 const getImageUrl = (imageUrl: unknown): string | null => {
@@ -61,35 +62,10 @@ const CATEGORY_OPTIONS: { value: CategoryOption; label: string; icon: React.Reac
   {
     value: "Tuk Tuk",
     label: "TukTuks",
-    icon: (
-      <svg viewBox="0 0 24 24" className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <circle cx="6" cy="18" r="3" />
-        <circle cx="18" cy="18" r="3" />
-        <path d="M6 18h12" />
-        <path d="M3 12h18v6H3z" />
-        <path d="M12 12V8" />
-        <path d="M8 8h8" />
-        <path d="M10 8V4h4v4" />
-      </svg>
-    ),
+    icon: <TukTukIcon className="w-6 h-6" />,
     color: "#f97316",
   },
 ];
-
-// TukTuk Icon Component
-function TukTukIcon({ className = "w-6 h-6" }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="6" cy="18" r="3" />
-      <circle cx="18" cy="18" r="3" />
-      <path d="M6 18h12" />
-      <path d="M3 12h18v6H3z" />
-      <path d="M12 12V8" />
-      <path d="M8 8h8" />
-      <path d="M10 8V4h4v4" />
-    </svg>
-  );
-}
 
 // Color mapping
 const getColorHex = (colorName: string): string => {

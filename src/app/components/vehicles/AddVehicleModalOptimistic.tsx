@@ -7,6 +7,7 @@ import type { Vehicle } from "@/lib/types";
 import { VEHICLE_BRAND_OPTIONS_BY_CATEGORY } from "@/lib/types";
 import { derivePrices } from "@/lib/pricing";
 import ImageInput from "@/components/ui/ImageInput";
+import { TukTukIcon } from "@/components/icons/TukTukIcon";
 import { useAddVehicleOptimistic } from "./useAddVehicleOptimistic";
 
 // Icons
@@ -57,14 +58,7 @@ const CATEGORY_OPTIONS: { value: CategoryOption; label: string; icon: React.Reac
   {
     value: "Tuk Tuk" as const,
     label: "TukTuks",
-    icon: (
-      <svg viewBox="0 0 24 24" className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="2">
-        <circle cx="6" cy="18" r="3" />
-        <circle cx="18" cy="18" r="3" />
-        <path d="M6 18h12" />
-        <path d="M3 12h18v6H3z" />
-      </svg>
-    ),
+    icon: <TukTukIcon className="w-6 h-6" />,
     color: "#f97316",
   },
 ];

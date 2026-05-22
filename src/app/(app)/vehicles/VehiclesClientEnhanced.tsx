@@ -15,6 +15,7 @@ import { cn } from "@/lib/ui";
 import { useVehiclesNeon, useVehicleStats } from "@/lib/useVehiclesNeon";
 import { getFuzzySuggestions } from "@/lib/fuzzySearch";
 import SearchSuggestions from "@/components/SearchSuggestions";
+import { TukTukIcon } from "@/components/icons/TukTukIcon";
 import {
   AlertCircle,
   ArrowDown,
@@ -32,6 +33,7 @@ import {
   List,
   Pen,
   Plus,
+  Package,
   RefreshCw,
   RotateCcw,
   Search,
@@ -99,6 +101,9 @@ const ITEMS_PER_PAGE_OPTIONS = [10, 20, 30, 50, 100, 500, 2000];
 const DEFAULT_ITEMS_PER_PAGE = 10;
 const MOBILE_VEHICLE_FETCH_LIMIT = 200;
 const DESKTOP_VEHICLE_FETCH_LIMIT = 2000;
+const FILTER_LABEL_CLASS = "mb-1.5 block text-xs font-medium text-slate-600 dark:text-slate-400";
+const FILTER_FIELD_CLASS =
+  "w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 transition-all placeholder-slate-400 focus:border-emerald-500/30 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 dark:border-slate-700 dark:bg-slate-800/80 dark:text-slate-100 dark:placeholder-slate-500";
 
 function detectMobileSafariLike(): boolean {
   if (typeof navigator === "undefined") return false;
@@ -197,32 +202,6 @@ function formatCategoryFilterValue(value: string): string {
 }
 
 // ============================================================================
-// TukTuk Icon Component - From Sidebar Menu (IconTukTuk)
-// ============================================================================
-
-function TukTukIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className={className}
-    >
-      <path d="M4 16v-3a2 2 0 0 1 2-2h8l3 3v3" />
-      <path d="M14 13V9a2 2 0 0 1 2-2h2" />
-      <circle cx="7" cy="17" r="2" />
-      <circle cx="17" cy="17" r="2" />
-    </svg>
-  );
-}
-
-// ============================================================================
 // UI Components
 // ============================================================================
 
@@ -243,11 +222,11 @@ function NeuCard({
     <div
       onClick={onClick}
       className={cn(
-"bg-gradient-to-br from-[#f8fafc] to-[#f1f5f9] rounded-2xl transition-all duration-150",
+        "rounded-2xl border border-slate-200/70 bg-gradient-to-br from-[#f8fafc] to-[#f1f5f9] transition-all duration-150 dark:border-slate-700/70 dark:from-slate-900 dark:to-slate-800",
         active
-          ? "shadow-[inset_4px_4px_8px_#cbd5e1,inset_-4px_-4px_8px_#ffffff]"
-          : "shadow-[6px_6px_12px_#cbd5e1,-6px_-6px_12px_#ffffff]",
-        hover && !active && "hover:shadow-[8px_8px_16px_#cbd5e1,-8px_-8px_16px_#ffffff] hover:-translate-y-0.5",
+          ? "shadow-[inset_4px_4px_8px_#cbd5e1,inset_-4px_-4px_8px_#ffffff] dark:shadow-[inset_4px_4px_10px_rgba(2,6,23,0.72),inset_-4px_-4px_10px_rgba(51,65,85,0.22)]"
+          : "shadow-[6px_6px_12px_#cbd5e1,-6px_-6px_12px_#ffffff] dark:shadow-[0_14px_30px_rgba(2,6,23,0.45)]",
+        hover && !active && "hover:-translate-y-0.5 hover:shadow-[8px_8px_16px_#cbd5e1,-8px_-8px_16px_#ffffff] dark:hover:shadow-[0_18px_38px_rgba(2,6,23,0.6)]",
         className
       )}
     >
@@ -283,16 +262,21 @@ function NeuButton({
 
   const variantClasses = {
     default: cn(
-      "bg-gradient-to-br from-[#f8fafc] to-[#f1f5f9] text-slate-600",
+      "bg-gradient-to-br from-[#f8fafc] to-[#f1f5f9] text-slate-600 dark:from-slate-900 dark:to-slate-800 dark:text-slate-200",
       "shadow-[4px_4px_8px_#cbd5e1,-4px_-4px_8px_#ffffff]",
+      "dark:shadow-[0_10px_24px_rgba(2,6,23,0.45)]",
       "hover:shadow-[6px_6px_12px_#cbd5e1,-6px_-6px_12px_#ffffff]",
+      "dark:hover:shadow-[0_14px_30px_rgba(2,6,23,0.58)]",
       "active:shadow-[inset_3px_3px_6px_#cbd5e1,inset_-3px_-3px_6px_#ffffff]",
+      "dark:active:shadow-[inset_3px_3px_8px_rgba(2,6,23,0.7),inset_-3px_-3px_8px_rgba(51,65,85,0.22)]",
       "transition-all duration-200"
     ),
     primary: cn(
       "bg-gradient-to-r from-emerald-500 to-emerald-600 text-white",
       "shadow-[4px_4px_8px_#cbd5e1,-4px_-4px_8px_#ffffff,0_4px_15px_rgba(16,185,129,0.3)]",
+      "dark:shadow-[0_10px_24px_rgba(16,185,129,0.18)]",
       "hover:shadow-[6px_6px_12px_#cbd5e1,-6px_-6px_12px_#ffffff,0_6px_20px_rgba(16,185,129,0.4)]",
+      "dark:hover:shadow-[0_14px_30px_rgba(16,185,129,0.26)]",
       "hover:from-emerald-600 hover:to-emerald-700",
       "active:scale-[0.98]",
       "transition-all duration-200"
@@ -300,7 +284,9 @@ function NeuButton({
     secondary: cn(
       "bg-gradient-to-r from-blue-500 to-blue-600 text-white",
       "shadow-[4px_4px_8px_#cbd5e1,-4px_-4px_8px_#ffffff,0_4px_15px_rgba(59,130,246,0.3)]",
+      "dark:shadow-[0_10px_24px_rgba(59,130,246,0.18)]",
       "hover:shadow-[6px_6px_12px_#cbd5e1,-6px_-6px_12px_#ffffff,0_6px_20px_rgba(59,130,246,0.4)]",
+      "dark:hover:shadow-[0_14px_30px_rgba(59,130,246,0.26)]",
       "hover:from-blue-600 hover:to-blue-700",
       "active:scale-[0.98]",
       "transition-all duration-200"
@@ -308,13 +294,15 @@ function NeuButton({
     danger: cn(
       "bg-gradient-to-r from-red-500 to-red-600 text-white",
       "shadow-[4px_4px_8px_#cbd5e1,-4px_-4px_8px_#ffffff,0_4px_15px_rgba(239,68,68,0.3)]",
+      "dark:shadow-[0_10px_24px_rgba(239,68,68,0.18)]",
       "hover:shadow-[6px_6px_12px_#cbd5e1,-6px_-6px_12px_#ffffff,0_6px_20px_rgba(239,68,68,0.4)]",
+      "dark:hover:shadow-[0_14px_30px_rgba(239,68,68,0.26)]",
       "hover:from-red-600 hover:to-red-700",
       "active:scale-[0.98]",
       "transition-all duration-200"
     ),
     ghost: cn(
-      "text-slate-500 hover:text-slate-700 hover:bg-slate-100/50",
+      "text-slate-500 hover:bg-slate-100/50 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-800/70 dark:hover:text-slate-100",
       "transition-all duration-200"
     )
   };
@@ -356,18 +344,20 @@ function NeuInput({
 }) {
   return (
     <div className={cn("relative", className)}>
-      {Icon && <Icon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />}
+      {Icon && <Icon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 dark:text-slate-500" />}
       <input
         type={type}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
         className={cn(
-          "w-full bg-white rounded-2xl transition-all duration-200",
+          "w-full rounded-2xl border border-slate-200/70 bg-white transition-all duration-200 dark:border-slate-700/70 dark:bg-slate-900",
           "shadow-[4px_4px_8px_#e2e8f0,-4px_-4px_8px_#ffffff]",
+          "dark:shadow-[0_10px_24px_rgba(2,6,23,0.45)]",
           "focus:shadow-[6px_6px_12px_#e2e8f0,-6px_-6px_12px_#ffffff]",
+          "dark:focus:shadow-[0_14px_30px_rgba(2,6,23,0.58)]",
           "focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500/40",
-          "text-slate-700 placeholder-slate-400 outline-none",
+          "text-slate-700 placeholder-slate-400 outline-none dark:text-slate-100 dark:placeholder-slate-500",
           Icon ? "pl-12 pr-4 py-3" : "px-4 py-3"
         )}
       />
@@ -425,7 +415,7 @@ function QuickFilterCard({
     emerald: {
       gradient: "from-emerald-500 via-emerald-600 to-emerald-700",
       bg: "bg-emerald-500",
-      light: "bg-emerald-100",
+      light: "bg-emerald-100 dark:bg-emerald-500/15",
       text: "text-emerald-700",
       shadow: "shadow-emerald-500/30",
       glow: "shadow-emerald-500/50",
@@ -434,7 +424,7 @@ function QuickFilterCard({
     blue: {
       gradient: "from-blue-500 via-blue-600 to-blue-700",
       bg: "bg-blue-500",
-      light: "bg-blue-100",
+      light: "bg-blue-100 dark:bg-blue-500/15",
       text: "text-blue-700",
       shadow: "shadow-blue-500/30",
       glow: "shadow-blue-500/50",
@@ -443,7 +433,7 @@ function QuickFilterCard({
     purple: {
       gradient: "from-purple-500 via-purple-600 to-purple-700",
       bg: "bg-purple-500",
-      light: "bg-purple-100",
+      light: "bg-purple-100 dark:bg-purple-500/15",
       text: "text-purple-700",
       shadow: "shadow-purple-500/30",
       glow: "shadow-purple-500/50",
@@ -452,7 +442,7 @@ function QuickFilterCard({
     orange: {
       gradient: "from-orange-500 via-orange-600 to-orange-700",
       bg: "bg-orange-500",
-      light: "bg-orange-100",
+      light: "bg-orange-100 dark:bg-orange-500/15",
       text: "text-orange-700",
       shadow: "shadow-orange-500/30",
       glow: "shadow-orange-500/50",
@@ -461,7 +451,7 @@ function QuickFilterCard({
     slate: {
       gradient: "from-slate-500 via-slate-600 to-slate-700",
       bg: "bg-slate-500",
-      light: "bg-slate-100",
+      light: "bg-slate-100 dark:bg-slate-700/70",
       text: "text-slate-700",
       shadow: "shadow-slate-500/30",
       glow: "shadow-slate-500/50",
@@ -482,7 +472,7 @@ function QuickFilterCard({
         "group relative flex flex-col items-start gap-3 p-5 rounded-2xl transition-all duration-500 w-full overflow-hidden border backdrop-blur-xl",
         active
           ? cn("bg-gradient-to-br text-white border-white/20", colors.gradient, colors.shadow, "shadow-lg scale-[1.02]")
-          : cn("bg-white/80 border-white/60 hover:bg-white/95 hover:shadow-xl hover:shadow-slate-200/50 hover:scale-[1.02] hover:-translate-y-1 shadow-[0_4px_20px_rgba(0,0,0,0.05)]"),
+          : cn("border-white/60 bg-white/80 shadow-[0_4px_20px_rgba(0,0,0,0.05)] hover:-translate-y-1 hover:scale-[1.02] hover:bg-white/95 hover:shadow-xl hover:shadow-slate-200/50 dark:border-slate-700/70 dark:bg-slate-900/80 dark:shadow-[0_14px_30px_rgba(2,6,23,0.4)] dark:hover:bg-slate-800/90 dark:hover:shadow-black/30"),
         isPressed && "scale-[0.98] transition-transform duration-150"
       )}
       style={{ animationDelay: `${index * 100}ms` }}
@@ -508,13 +498,13 @@ function QuickFilterCard({
       <div className="relative w-full text-left">
         <div className={cn(
 "text-3xl font-bold tracking-tight transition-all duration-150",
-          active ? "text-white" : "text-slate-800"
+          active ? "text-white" : "text-slate-800 dark:text-slate-100"
         )}>
           <AnimatedCounter value={count} duration={800 + index * 100} />
         </div>
         <div className={cn(
 "text-sm font-medium transition-all duration-150",
-          active ? "text-white/80" : "text-slate-500"
+          active ? "text-white/80" : "text-slate-500 dark:text-slate-400"
         )}>
           {label}
         </div>
@@ -543,14 +533,14 @@ function ViewToggle({
   t: ReturnType<typeof useTranslation>["t"];
 }) {
   return (
-    <div className="flex items-center gap-1 p-1 bg-slate-100/80 rounded-xl shadow-[inset_2px_2px_4px_#cbd5e1,inset_-2px_-2px_4px_#ffffff]">
+    <div className="flex items-center gap-1 rounded-xl bg-slate-100/80 p-1 shadow-[inset_2px_2px_4px_#cbd5e1,inset_-2px_-2px_4px_#ffffff] dark:bg-slate-800/80 dark:shadow-[inset_2px_2px_6px_rgba(2,6,23,0.65),inset_-2px_-2px_6px_rgba(51,65,85,0.22)]">
       <button
         onClick={() => onChange("grid")}
         className={cn(
           "flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200",
           view === "grid"
-            ? "bg-white text-emerald-600 shadow-[2px_2px_4px_#cbd5e1,-2px_-2px_4px_#ffffff]"
-            : "text-slate-500 hover:text-slate-700"
+            ? "bg-white text-emerald-600 shadow-[2px_2px_4px_#cbd5e1,-2px_-2px_4px_#ffffff] dark:bg-slate-900 dark:text-emerald-300 dark:shadow-[0_6px_14px_rgba(2,6,23,0.4)]"
+            : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-100"
         )}
       >
         <Grid3X3 className="w-4 h-4" />
@@ -561,8 +551,8 @@ function ViewToggle({
         className={cn(
           "flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200",
           view === "list"
-            ? "bg-white text-emerald-600 shadow-[2px_2px_4px_#cbd5e1,-2px_-2px_4px_#ffffff]"
-            : "text-slate-500 hover:text-slate-700"
+            ? "bg-white text-emerald-600 shadow-[2px_2px_4px_#cbd5e1,-2px_-2px_4px_#ffffff] dark:bg-slate-900 dark:text-emerald-300 dark:shadow-[0_6px_14px_rgba(2,6,23,0.4)]"
+            : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-100"
         )}
       >
         <List className="w-4 h-4" />
@@ -585,24 +575,24 @@ function TotalsToggle({
 }) {
   return (
     <div className="flex items-center gap-2 text-sm">
-      <span className={cn("font-medium transition-colors", mode === "all" ? "text-slate-800" : "text-slate-500")}>
+      <span className={cn("font-medium transition-colors", mode === "all" ? "text-slate-800 dark:text-slate-100" : "text-slate-500 dark:text-slate-400")}>
         All-time
       </span>
       <button
         onClick={() => onChange(mode === "all" ? "filtered" : "all")}
         className={cn(
 "relative w-12 h-6 rounded-full transition-colors duration-150 shadow-[inset_2px_2px_4px_#cbd5e1,inset_-2px_-2px_4px_#ffffff]",
-          mode === "filtered" ? "bg-emerald-500" : "bg-slate-200"
+          mode === "filtered" ? "bg-emerald-500" : "bg-slate-200 dark:bg-slate-800"
         )}
       >
         <span
           className={cn(
-"absolute top-1 left-1 w-4 h-4 bg-white rounded-full shadow-md transition-transform duration-150",
+"absolute top-1 left-1 w-4 h-4 rounded-full bg-white shadow-md transition-transform duration-150 dark:bg-slate-200",
             mode === "filtered" ? "translate-x-6" : "translate-x-0"
           )}
         />
       </button>
-      <span className={cn("font-medium transition-colors", mode === "filtered" ? "text-slate-800" : "text-slate-500")}>
+      <span className={cn("font-medium transition-colors", mode === "filtered" ? "text-slate-800 dark:text-slate-100" : "text-slate-500 dark:text-slate-400")}>
         Filtered
       </span>
     </div>
@@ -623,12 +613,12 @@ function FilterTag({
   onRemove: () => void;
 }) {
   return (
-    <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-50 text-emerald-700 text-xs font-medium border border-emerald-100 shadow-sm">
-      <span className="text-emerald-500">{label}:</span>
+    <span className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-100 bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-700 shadow-sm dark:border-emerald-500/30 dark:bg-emerald-500/15 dark:text-emerald-300">
+      <span className="text-emerald-500 dark:text-emerald-300">{label}:</span>
       <span className="font-semibold">{value}</span>
       <button
         onClick={onRemove}
-        className="ml-1 p-0.5 rounded-full hover:bg-emerald-200 text-emerald-600 hover:text-emerald-800 transition-colors"
+        className="ml-1 rounded-full p-0.5 text-emerald-600 transition-colors hover:bg-emerald-200 hover:text-emerald-800 dark:text-emerald-300 dark:hover:bg-emerald-500/20 dark:hover:text-emerald-100"
       >
         <X className="w-3 h-3" />
       </button>
@@ -652,9 +642,9 @@ function ActionButton({
   variant?: "default" | "edit" | "delete";
 }) {
   const variantClasses = {
-    default: "text-slate-500 hover:text-emerald-600 hover:ring-emerald-200",
-    edit: "text-slate-500 hover:text-blue-600 hover:ring-blue-200",
-    delete: "text-slate-500 hover:text-red-600 hover:ring-red-200"
+    default: "text-slate-500 hover:text-emerald-600 hover:ring-emerald-200 dark:text-slate-400 dark:hover:text-emerald-300 dark:hover:ring-emerald-500/30",
+    edit: "text-slate-500 hover:text-blue-600 hover:ring-blue-200 dark:text-slate-400 dark:hover:text-blue-300 dark:hover:ring-blue-500/30",
+    delete: "text-slate-500 hover:text-red-600 hover:ring-red-200 dark:text-slate-400 dark:hover:text-red-300 dark:hover:ring-red-500/30"
   };
 
 return (
@@ -665,10 +655,10 @@ return (
         onClick(e);
       }}
       className={cn(
-        "group relative flex items-center justify-center w-9 h-9 rounded-xl bg-white",
-        "shadow-[0_2px_8px_rgba(0,0,0,0.08)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.12)]",
+        "group relative flex h-9 w-9 items-center justify-center rounded-xl bg-white dark:bg-slate-800",
+        "shadow-[0_2px_8px_rgba(0,0,0,0.08)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.12)] dark:shadow-[0_8px_18px_rgba(2,6,23,0.45)] dark:hover:shadow-[0_10px_24px_rgba(2,6,23,0.6)]",
         "hover:scale-105 active:scale-95 transition-all duration-200",
-        "ring-1 ring-slate-100",
+        "ring-1 ring-slate-100 dark:ring-slate-700",
         variantClasses[variant]
       )}
     >
@@ -703,24 +693,24 @@ function VehicleCard({
 }) {
   const getCategoryColor = (category: string) => {
     const cat = category?.toLowerCase() || "";
-    if (cat.includes("car")) return "bg-blue-50 text-blue-700 ring-blue-100";
-    if (cat.includes("motor") || cat.includes("bike")) return "bg-purple-50 text-purple-700 ring-purple-100";
-    if (cat.includes("tuk") || cat.includes("rickshaw")) return "bg-orange-50 text-orange-700 ring-orange-100";
-    return "bg-slate-50 text-slate-700 ring-slate-100";
+    if (cat.includes("car")) return "bg-blue-50 text-blue-700 ring-blue-100 dark:bg-blue-500/15 dark:text-blue-300 dark:ring-blue-500/30";
+    if (cat.includes("motor") || cat.includes("bike")) return "bg-purple-50 text-purple-700 ring-purple-100 dark:bg-purple-500/15 dark:text-purple-300 dark:ring-purple-500/30";
+    if (cat.includes("tuk") || cat.includes("rickshaw")) return "bg-orange-50 text-orange-700 ring-orange-100 dark:bg-orange-500/15 dark:text-orange-300 dark:ring-orange-500/30";
+    return "bg-slate-50 text-slate-700 ring-slate-100 dark:bg-slate-800 dark:text-slate-300 dark:ring-slate-700";
   };
 
   const getConditionColor = (condition: string) => {
     return condition?.toLowerCase() === "new"
-      ? "bg-emerald-50 text-emerald-700 ring-emerald-200"
-      : "bg-amber-50 text-amber-700 ring-amber-200";
+      ? "bg-emerald-50 text-emerald-700 ring-emerald-200 dark:bg-emerald-500/15 dark:text-emerald-300 dark:ring-emerald-500/30"
+      : "bg-amber-50 text-amber-700 ring-amber-200 dark:bg-amber-500/15 dark:text-amber-300 dark:ring-amber-500/30";
   };
 
   const imageUrl = getImageUrl(vehicle.Image);
 
 return (
-    <div className="group bg-white rounded-2xl shadow-[0_4px_20px_rgba(0,0,0,0.08)] hover:shadow-[0_8px_30px_rgba(0,0,0,0.12)] transition-all duration-150 overflow-hidden border border-slate-100 hover:border-emerald-200">
+    <div className="group overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-[0_4px_20px_rgba(0,0,0,0.08)] transition-all duration-150 hover:border-emerald-200 hover:shadow-[0_8px_30px_rgba(0,0,0,0.12)] dark:border-slate-700/80 dark:bg-slate-900 dark:shadow-[0_16px_32px_rgba(2,6,23,0.45)] dark:hover:border-emerald-500/35 dark:hover:shadow-[0_20px_42px_rgba(2,6,23,0.62)]">
       {/* Image */}
-      <div className="relative aspect-[4/3] overflow-hidden bg-slate-100">
+      <div className="relative aspect-[4/3] overflow-hidden bg-slate-100 dark:bg-slate-800">
         {imageUrl ? (
             <img
               src={imageUrl}
@@ -732,8 +722,8 @@ return (
               }}
             />
           ) : (
-            <div className="flex h-full w-full items-center justify-center bg-slate-100">
-              <Car className="h-10 w-10 text-slate-300" aria-hidden="true" />
+            <div className="flex h-full w-full items-center justify-center bg-slate-100 dark:bg-slate-800">
+              <Car className="h-10 w-10 text-slate-300 dark:text-slate-600" aria-hidden="true" />
             </div>
           )}
         <div className="absolute top-3 left-3">
@@ -762,46 +752,46 @@ return (
       <div className="p-4">
         <div className="flex items-start justify-between mb-2">
           <div>
-            <h3 className="font-bold text-slate-800 text-lg">{vehicle.Brand}</h3>
-            <p className="text-slate-500 text-sm">{vehicle.Model}</p>
+            <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100">{vehicle.Brand}</h3>
+            <p className="text-sm text-slate-500 dark:text-slate-400">{vehicle.Model}</p>
           </div>
           <div className="text-right">
             <p className="font-bold text-emerald-600 text-lg">
               ${vehicle.PriceNew?.toLocaleString() || "-"}
             </p>
-            <p className="text-slate-400 text-xs">{t.marketPrice}</p>
+            <p className="text-xs text-slate-400 dark:text-slate-500">{t.marketPrice}</p>
           </div>
         </div>
 
         <div className="grid grid-cols-2 gap-2 mb-4 text-sm">
-          <div className="flex items-center gap-2 text-slate-600">
-            <span className="text-slate-400">{t.year}:</span>
+          <div className="flex items-center gap-2 text-slate-600 dark:text-slate-300">
+            <span className="text-slate-400 dark:text-slate-500">{t.year}:</span>
             <span className="font-medium">{vehicle.Year || "-"}</span>
           </div>
-          <div className="flex items-center gap-2 text-slate-600">
-            <span className="text-slate-400">{t.plate}:</span>
+          <div className="flex items-center gap-2 text-slate-600 dark:text-slate-300">
+            <span className="text-slate-400 dark:text-slate-500">{t.plate}:</span>
             <span className="font-medium font-mono">{vehicle.Plate || "-"}</span>
           </div>
           {vehicle.Color && (
-            <div className="flex items-center gap-2 text-slate-600">
-              <span className="text-slate-400">{t.color}:</span>
+            <div className="flex items-center gap-2 text-slate-600 dark:text-slate-300">
+              <span className="text-slate-400 dark:text-slate-500">{t.color}:</span>
               <span
-                className="w-4 h-4 rounded-full border border-slate-200"
+                className="h-4 w-4 rounded-full border border-slate-200 dark:border-slate-600"
                 style={{ backgroundColor: vehicle.Color.toLowerCase() }}
               />
               <span className="font-medium">{vehicle.Color}</span>
             </div>
           )}
           {vehicle.TaxType && (
-            <div className="flex items-center gap-2 text-slate-600">
-              <span className="text-slate-400">{t.taxType}:</span>
+            <div className="flex items-center gap-2 text-slate-600 dark:text-slate-300">
+              <span className="text-slate-400 dark:text-slate-500">{t.taxType}:</span>
               <span className="font-medium">{vehicle.TaxType}</span>
             </div>
           )}
         </div>
 
         {/* Actions */}
-        <div className="flex items-center gap-2 pt-3 border-t border-slate-100">
+        <div className="flex items-center gap-2 border-t border-slate-100 pt-3 dark:border-slate-800">
           <ActionButton
             onClick={() => onView(vehicle.VehicleId)}
             icon={Eye}
@@ -848,20 +838,20 @@ function MobileVehicleListCard({
 
   const getMobileCategoryClass = (category: string) => {
     const cat = category?.toLowerCase() || "";
-    if (cat.includes("car")) return "bg-blue-50 text-blue-700 ring-blue-100";
-    if (cat.includes("motor") || cat.includes("bike")) return "bg-purple-50 text-purple-700 ring-purple-100";
-    if (cat.includes("tuk") || cat.includes("rickshaw")) return "bg-orange-50 text-orange-700 ring-orange-100";
-    return "bg-slate-50 text-slate-700 ring-slate-100";
+    if (cat.includes("car")) return "bg-blue-50 text-blue-700 ring-blue-100 dark:bg-blue-500/15 dark:text-blue-300 dark:ring-blue-500/30";
+    if (cat.includes("motor") || cat.includes("bike")) return "bg-purple-50 text-purple-700 ring-purple-100 dark:bg-purple-500/15 dark:text-purple-300 dark:ring-purple-500/30";
+    if (cat.includes("tuk") || cat.includes("rickshaw")) return "bg-orange-50 text-orange-700 ring-orange-100 dark:bg-orange-500/15 dark:text-orange-300 dark:ring-orange-500/30";
+    return "bg-slate-50 text-slate-700 ring-slate-100 dark:bg-slate-800 dark:text-slate-300 dark:ring-slate-700";
   };
 
   return (
     <article
       onClick={() => onView(vehicle.VehicleId)}
-      className="rounded-2xl border border-slate-100 bg-white p-4 shadow-[0_4px_16px_rgba(15,23,42,0.07)] active:scale-[0.99] transition-transform"
+      className="rounded-2xl border border-slate-100 bg-white p-4 shadow-[0_4px_16px_rgba(15,23,42,0.07)] transition-transform active:scale-[0.99] dark:border-slate-700/80 dark:bg-slate-900 dark:shadow-[0_14px_30px_rgba(2,6,23,0.45)]"
     >
       <div className="flex items-start gap-3">
-        <div className="relative h-16 w-16 flex-shrink-0 overflow-hidden rounded-xl bg-slate-100 shadow-sm">
-          <Car className="absolute inset-0 m-auto h-6 w-6 text-slate-300" aria-hidden="true" />
+        <div className="relative h-16 w-16 flex-shrink-0 overflow-hidden rounded-xl bg-slate-100 shadow-sm dark:bg-slate-800">
+          <Car className="absolute inset-0 m-auto h-6 w-6 text-slate-300 dark:text-slate-600" aria-hidden="true" />
           {imageUrl && (
             <img
               src={imageUrl}
@@ -879,10 +869,10 @@ function MobileVehicleListCard({
         <div className="min-w-0 flex-1">
           <div className="mb-2 flex items-start justify-between gap-2">
             <div className="min-w-0">
-              <h3 className="truncate text-base font-bold text-slate-900">
+              <h3 className="truncate text-base font-bold text-slate-900 dark:text-slate-100">
                 {vehicle.Brand || "-"} {vehicle.Model || "-"}
               </h3>
-              <p className="truncate text-sm text-slate-500">
+              <p className="truncate text-sm text-slate-500 dark:text-slate-400">
                 {vehicle.Year || "-"} {vehicle.Plate ? `- ${vehicle.Plate}` : ""}
               </p>
             </div>
@@ -895,23 +885,23 @@ function MobileVehicleListCard({
           </div>
 
           <div className="grid grid-cols-2 gap-2 text-sm">
-            <div className="rounded-xl bg-slate-50 px-3 py-2">
-              <div className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Brand</div>
-              <div className="truncate font-semibold text-slate-800">{vehicle.Brand || "-"}</div>
+            <div className="rounded-xl bg-slate-50 px-3 py-2 dark:bg-slate-800/80">
+              <div className="text-[11px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">Brand</div>
+              <div className="truncate font-semibold text-slate-800 dark:text-slate-100">{vehicle.Brand || "-"}</div>
             </div>
-            <div className="rounded-xl bg-slate-50 px-3 py-2">
-              <div className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Model</div>
-              <div className="truncate font-semibold text-slate-800">{vehicle.Model || "-"}</div>
+            <div className="rounded-xl bg-slate-50 px-3 py-2 dark:bg-slate-800/80">
+              <div className="text-[11px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">Model</div>
+              <div className="truncate font-semibold text-slate-800 dark:text-slate-100">{vehicle.Model || "-"}</div>
             </div>
-            <div className="rounded-xl bg-slate-50 px-3 py-2">
-              <div className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Price</div>
+            <div className="rounded-xl bg-slate-50 px-3 py-2 dark:bg-slate-800/80">
+              <div className="text-[11px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">Price</div>
               <div className="truncate font-bold text-emerald-600">
                 {vehicle.PriceNew == null ? "-" : `$${vehicle.PriceNew.toLocaleString()}`}
               </div>
             </div>
-            <div className="rounded-xl bg-slate-50 px-3 py-2">
-              <div className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Condition</div>
-              <div className="truncate font-semibold text-slate-800">{vehicle.Condition || "-"}</div>
+            <div className="rounded-xl bg-slate-50 px-3 py-2 dark:bg-slate-800/80">
+              <div className="text-[11px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">Condition</div>
+              <div className="truncate font-semibold text-slate-800 dark:text-slate-100">{vehicle.Condition || "-"}</div>
             </div>
           </div>
         </div>
@@ -921,7 +911,7 @@ function MobileVehicleListCard({
         <button
           type="button"
           onClick={() => onView(vehicle.VehicleId)}
-          className="flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl bg-slate-100 px-3 text-sm font-bold text-slate-700 transition-colors active:bg-slate-200"
+          className="flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl bg-slate-100 px-3 text-sm font-bold text-slate-700 transition-colors active:bg-slate-200 dark:bg-slate-800 dark:text-slate-200 dark:active:bg-slate-700"
         >
           <Eye className="h-4 w-4" />
           View
@@ -931,7 +921,7 @@ function MobileVehicleListCard({
             <button
               type="button"
               onClick={() => onEdit(vehicle.VehicleId)}
-              className="flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl bg-emerald-50 px-3 text-sm font-bold text-emerald-700 transition-colors active:bg-emerald-100"
+              className="flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl bg-emerald-50 px-3 text-sm font-bold text-emerald-700 transition-colors active:bg-emerald-100 dark:bg-emerald-500/15 dark:text-emerald-300 dark:active:bg-emerald-500/25"
             >
               <Pen className="h-4 w-4" />
               Edit
@@ -939,7 +929,7 @@ function MobileVehicleListCard({
             <button
               type="button"
               onClick={() => onDelete(vehicle)}
-              className="flex min-h-11 w-11 items-center justify-center rounded-xl bg-red-50 text-red-600 transition-colors active:bg-red-100"
+              className="flex min-h-11 w-11 items-center justify-center rounded-xl bg-red-50 text-red-600 transition-colors active:bg-red-100 dark:bg-red-500/15 dark:text-red-300 dark:active:bg-red-500/25"
               aria-label={`Delete ${vehicle.Brand || "vehicle"} ${vehicle.Model || ""}`.trim()}
             >
               <Trash2 className="h-4 w-4" />
@@ -948,49 +938,6 @@ function MobileVehicleListCard({
         )}
       </div>
     </article>
-  );
-}
-
-// ============================================================================
-// Loading Skeleton Component
-// ============================================================================
-
-function LoadingSkeleton({ view }: { view: ViewMode }) {
-  if (view === "grid") {
-    return (
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-        {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
-          <div
-            key={i}
-            className="bg-white rounded-2xl shadow-[0_4px_20px_rgba(0,0,0,0.08)] overflow-hidden border border-slate-100"
-          >
-            <div className="aspect-[4/3] bg-slate-200 animate-pulse" />
-            <div className="p-4 space-y-3">
-              <div className="h-5 bg-slate-200 rounded animate-pulse w-2/3" />
-              <div className="h-4 bg-slate-200 rounded animate-pulse w-1/2" />
-              <div className="grid grid-cols-2 gap-2 pt-2">
-                <div className="h-4 bg-slate-200 rounded animate-pulse" />
-                <div className="h-4 bg-slate-200 rounded animate-pulse" />
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
-    );
-  }
-
-  return (
-    <div className="bg-white rounded-2xl shadow-[0_4px_20px_rgba(0,0,0,0.08)] overflow-hidden border border-slate-100">
-      <div className="h-14 bg-slate-50 border-b border-slate-100" />
-      {[1, 2, 3, 4, 5].map((i) => (
-        <div key={i} className="h-16 border-b border-slate-100 last:border-0 flex items-center px-6 gap-4">
-          <div className="w-12 h-12 bg-slate-200 rounded-xl animate-pulse" />
-          <div className="flex-1 h-4 bg-slate-200 rounded animate-pulse" />
-          <div className="w-24 h-4 bg-slate-200 rounded animate-pulse" />
-          <div className="w-24 h-4 bg-slate-200 rounded animate-pulse" />
-        </div>
-      ))}
-    </div>
   );
 }
 
@@ -1132,6 +1079,7 @@ export default function VehiclesClientEnhanced() {
     withoutImage: filters.hasImage === "no",
     refreshInterval: 0,
   });
+  const isInitialVehiclesLoad = loading && vehicles.length === 0;
 
   const { stats } = useVehicleStats(120000); // Keep stats warm without frequent background refetching.
 
@@ -1623,36 +1571,26 @@ const getVehicleImageUrl = useCallback((imageValue: unknown): string | null => {
 
   const getCategoryBadgeClass = (category: string) => {
     const cat = category?.toLowerCase() || "";
-    if (cat.includes("car")) return "bg-blue-50 text-blue-700 ring-1 ring-blue-100";
-    if (cat.includes("motor") || cat.includes("bike")) return "bg-purple-50 text-purple-700 ring-1 ring-purple-100";
-    if (cat.includes("tuk") || cat.includes("rickshaw")) return "bg-orange-50 text-orange-700 ring-1 ring-orange-100";
-    return "bg-slate-50 text-slate-700 ring-1 ring-slate-100";
+    if (cat.includes("car")) return "bg-blue-50 text-blue-700 ring-1 ring-blue-100 dark:bg-blue-500/15 dark:text-blue-300 dark:ring-blue-500/30";
+    if (cat.includes("motor") || cat.includes("bike")) return "bg-purple-50 text-purple-700 ring-1 ring-purple-100 dark:bg-purple-500/15 dark:text-purple-300 dark:ring-purple-500/30";
+    if (cat.includes("tuk") || cat.includes("rickshaw")) return "bg-orange-50 text-orange-700 ring-1 ring-orange-100 dark:bg-orange-500/15 dark:text-orange-300 dark:ring-orange-500/30";
+    return "bg-slate-50 text-slate-700 ring-1 ring-slate-100 dark:bg-slate-800 dark:text-slate-300 dark:ring-slate-700";
   };
 
   // ==========================================================================
   // Render
   // ==========================================================================
 
-  if (loading) {
+  if (error && vehicles.length === 0) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-slate-100 to-slate-200 p-4 sm:p-6 lg:p-8">
-        <div className="max-w-[1600px] mx-auto">
-          <LoadingSkeleton view={viewMode} />
-        </div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-slate-100 to-slate-200 p-4 sm:p-6 lg:p-8">
+      <div className="ec-dark-scope min-h-screen bg-gradient-to-br from-slate-50 via-slate-100 to-slate-200 p-4 dark:from-slate-950 dark:via-slate-950 dark:to-slate-900 sm:p-6 lg:p-8">
         <div className="max-w-3xl mx-auto">
           <NeuCard className="p-8 text-center" hover={false}>
-            <div className="w-20 h-20 mx-auto mb-6 rounded-2xl bg-gradient-to-br from-red-100 to-red-50 shadow-[6px_6px_12px_#cbd5e1,-6px_-6px_12px_#ffffff] flex items-center justify-center">
+            <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-2xl bg-gradient-to-br from-red-100 to-red-50 shadow-[6px_6px_12px_#cbd5e1,-6px_-6px_12px_#ffffff] dark:from-red-500/15 dark:to-red-500/5 dark:shadow-[0_14px_30px_rgba(127,29,29,0.25)]">
               <AlertCircle className="w-10 h-10 text-red-500" />
             </div>
-            <h2 className="text-2xl font-bold text-slate-800 mb-3">{t.errorLoadingVehicles}</h2>
-            <p className="text-slate-500 mb-8">{error}</p>
+            <h2 className="mb-3 text-2xl font-bold text-slate-800 dark:text-slate-100">{t.errorLoadingVehicles}</h2>
+            <p className="mb-8 text-slate-500 dark:text-slate-400">{error}</p>
             <NeuButton onClick={handleRefresh} variant="primary">{t.retry}</NeuButton>
           </NeuCard>
         </div>
@@ -1661,26 +1599,33 @@ const getVehicleImageUrl = useCallback((imageValue: unknown): string | null => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-slate-100 to-slate-200 p-4 sm:p-6 lg:p-8">
+    <div className="ec-dark-scope min-h-screen bg-gradient-to-br from-slate-50 via-slate-100 to-slate-200 p-4 dark:from-slate-950 dark:via-slate-950 dark:to-slate-900 sm:p-6 lg:p-8">
       <div className="max-w-[1600px] mx-auto space-y-6">
 
         {/* Header Section */}
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-slate-800 flex items-center gap-3">
+            <h1 className="flex items-center gap-3 text-3xl font-bold text-slate-800 dark:text-slate-100">
               <span className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-600 flex items-center justify-center shadow-lg shadow-emerald-500/30">
                 <Car className="w-6 h-6 text-white" />
               </span>
               Vehicle Inventory
             </h1>
-            <p className="text-slate-500 mt-2 ml-13">{t.manageTrackVehicles}</p>
+            <p className="ml-13 mt-2 text-slate-500 dark:text-slate-400">{t.manageTrackVehicles}</p>
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
+            {isInitialVehiclesLoad && (
+              <span className="inline-flex items-center gap-2 rounded-xl border border-slate-100 bg-white/80 px-3 py-2 text-xs font-medium text-slate-500 shadow-[0_2px_8px_rgba(0,0,0,0.05)] dark:border-slate-700 dark:bg-slate-900/80 dark:text-slate-400 dark:shadow-[0_10px_24px_rgba(2,6,23,0.4)]">
+                <RefreshCw className="h-4 w-4 animate-spin text-emerald-500" />
+                Loading
+              </span>
+            )}
+
             {/* Last Sync */}
-            <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-white/80 shadow-[0_2px_8px_rgba(0,0,0,0.05)] border border-slate-100">
-              <Clock className="w-4 h-4 text-slate-400" />
-              <span className="text-xs text-slate-500">
+            <div className="flex items-center gap-2 rounded-xl border border-slate-100 bg-white/80 px-3 py-2 shadow-[0_2px_8px_rgba(0,0,0,0.05)] dark:border-slate-700 dark:bg-slate-900/80 dark:shadow-[0_10px_24px_rgba(2,6,23,0.4)]">
+              <Clock className="w-4 h-4 text-slate-400 dark:text-slate-500" />
+              <span className="text-xs text-slate-500 dark:text-slate-400">
                 Last sync: {lastSync.toLocaleTimeString()}
               </span>
             </div>
@@ -1720,7 +1665,7 @@ const getVehicleImageUrl = useCallback((imageValue: unknown): string | null => {
             onClick={() => {
               router.push("/vehicles", { scroll: false });
             }}
-            icon={Car}
+            icon={Package}
             label={t.totalVehicles}
             count={displayStats.total}
             color="emerald"
@@ -1807,14 +1752,14 @@ const getVehicleImageUrl = useCallback((imageValue: unknown): string | null => {
                         router.push(`/vehicles?category=${value}`, { scroll: false });
                       }
                     }}
-                    className="w-full px-4 py-3 rounded-xl bg-white shadow-[4px_4px_8px_#e2e8f0,-4px_-4px_8px_#ffffff] text-slate-700 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500/30 appearance-none cursor-pointer"
+                    className="w-full cursor-pointer appearance-none rounded-xl border border-slate-200/70 bg-white px-4 py-3 text-sm font-medium text-slate-700 shadow-[4px_4px_8px_#e2e8f0,-4px_-4px_8px_#ffffff] focus:outline-none focus:ring-2 focus:ring-emerald-500/30 dark:border-slate-700/70 dark:bg-slate-900 dark:text-slate-100 dark:shadow-[0_10px_24px_rgba(2,6,23,0.45)]"
                   >
                     <option value="all">{t.allCategories}</option>
                     <option value="cars">🚗 Cars</option>
                     <option value="motorcycles">🏍️ Motorcycles</option>
                     <option value="tuktuks">🛺 TukTuks</option>
                   </select>
-                  <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                  <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 dark:text-slate-500" />
                 </div>
               </div>
 
@@ -1846,7 +1791,7 @@ const getVehicleImageUrl = useCallback((imageValue: unknown): string | null => {
                   title="Group vehicles by"
                   value={groupBy}
                   onChange={(e) => setGroupBy(e.target.value as GroupByOption)}
-                  className="w-full px-4 py-2.5 rounded-xl bg-white shadow-[4px_4px_8px_#e2e8f0,-4px_-4px_8px_#ffffff] text-slate-700 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500/30 appearance-none cursor-pointer pr-10"
+                  className="w-full cursor-pointer appearance-none rounded-xl border border-slate-200/70 bg-white px-4 py-2.5 pr-10 text-sm font-medium text-slate-700 shadow-[4px_4px_8px_#e2e8f0,-4px_-4px_8px_#ffffff] focus:outline-none focus:ring-2 focus:ring-emerald-500/30 dark:border-slate-700/70 dark:bg-slate-900 dark:text-slate-100 dark:shadow-[0_10px_24px_rgba(2,6,23,0.45)]"
                 >
                   <option value="none">Group: None</option>
                   <option value="category">Group: Category</option>
@@ -1855,7 +1800,7 @@ const getVehicleImageUrl = useCallback((imageValue: unknown): string | null => {
                   <option value="condition">Group: Condition</option>
                   <option value="color">Group: Color</option>
                 </select>
-                <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 dark:text-slate-500" />
               </div>
 
               <ViewToggle view={viewMode} onChange={setViewMode} t={t} />
@@ -1867,10 +1812,13 @@ const getVehicleImageUrl = useCallback((imageValue: unknown): string | null => {
                   onClick={() => setShowColumnMenu(!showColumnMenu)}
                   className={cn(
                     "flex items-center gap-2 px-4 py-2.5 rounded-xl font-medium text-sm",
-                    "bg-gradient-to-br from-[#f8fafc] to-[#f1f5f9] text-slate-600",
+                    "bg-gradient-to-br from-[#f8fafc] to-[#f1f5f9] text-slate-600 dark:from-slate-900 dark:to-slate-800 dark:text-slate-200",
                     "shadow-[4px_4px_8px_#cbd5e1,-4px_-4px_8px_#ffffff]",
+                    "dark:shadow-[0_10px_24px_rgba(2,6,23,0.45)]",
                     "hover:shadow-[6px_6px_12px_#cbd5e1,-6px_-6px_12px_#ffffff]",
+                    "dark:hover:shadow-[0_14px_30px_rgba(2,6,23,0.58)]",
                     "active:shadow-[inset_3px_3px_6px_#cbd5e1,inset_-3px_-3px_6px_#ffffff]",
+                    "dark:active:shadow-[inset_3px_3px_8px_rgba(2,6,23,0.7),inset_-3px_-3px_8px_rgba(51,65,85,0.22)]",
                     "transition-all duration-200"
                   )}
                 >
@@ -1881,11 +1829,11 @@ const getVehicleImageUrl = useCallback((imageValue: unknown): string | null => {
                 {showColumnMenu && (
                   <NeuCard className="absolute right-0 top-full mt-2 p-4 w-64 z-50" hover={false}>
                     <div className="space-y-3">
-                      <div className="flex items-center justify-between pb-2 border-b border-slate-200">
-                        <span className="font-semibold text-slate-700">{t.visibleColumns}</span>
+                      <div className="flex items-center justify-between border-b border-slate-200 pb-2 dark:border-slate-700">
+                        <span className="font-semibold text-slate-700 dark:text-slate-100">{t.visibleColumns}</span>
                         <button
                           onClick={() => setShowColumnMenu(false)}
-                          className="text-slate-500 hover:text-slate-700"
+                          className="text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-100"
                         >
                           <X className="w-4 h-4" />
                         </button>
@@ -1895,29 +1843,29 @@ const getVehicleImageUrl = useCallback((imageValue: unknown): string | null => {
                         {COLUMNS.filter(col => col.key !== "actions").map((col) => (
                           <label
                             key={col.key}
-                            className="flex items-center gap-3 cursor-pointer hover:bg-slate-50 p-2 rounded-lg transition-colors"
+                            className="flex cursor-pointer items-center gap-3 rounded-lg p-2 transition-colors hover:bg-slate-50 dark:hover:bg-slate-800"
                           >
                             <input
                               type="checkbox"
                               checked={visibleColumns.includes(col.key)}
                               onChange={() => toggleColumn(col.key)}
-                              className="rounded border-slate-300 text-emerald-500 focus:ring-emerald-500 w-4 h-4"
+                              className="h-4 w-4 rounded border-slate-300 text-emerald-500 focus:ring-emerald-500 dark:border-slate-600"
                             />
-                            <span className="text-sm text-slate-600">{col.label}</span>
+                            <span className="text-sm text-slate-600 dark:text-slate-300">{col.label}</span>
                           </label>
                         ))}
                       </div>
 
-                      <div className="flex gap-2 pt-2 border-t border-slate-200">
+                      <div className="flex gap-2 border-t border-slate-200 pt-2 dark:border-slate-700">
                         <button
                           onClick={() => setVisibleColumns(COLUMNS.map(c => c.key))}
-                          className="flex-1 px-3 py-1.5 text-xs font-medium text-emerald-600 bg-emerald-50 hover:bg-emerald-100 rounded-lg transition-colors"
+                          className="flex-1 rounded-lg bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-600 transition-colors hover:bg-emerald-100 dark:bg-emerald-500/15 dark:text-emerald-300 dark:hover:bg-emerald-500/25"
                         >
                           Select All
                         </button>
                         <button
                           onClick={() => setVisibleColumns(["image", "brand", "model", "actions"])}
-                          className="flex-1 px-3 py-1.5 text-xs font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors"
+                          className="flex-1 rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
                         >
                           Minimal
                         </button>
@@ -1931,15 +1879,15 @@ const getVehicleImageUrl = useCallback((imageValue: unknown): string | null => {
 
           {/* Advanced Filters Panel */}
 {showFilters && (
-            <div className="bg-white/90 backdrop-blur-xl rounded-2xl border border-slate-200 shadow-lg p-5 animate-in slide-in-from-top-2 duration-300">
+            <div className="animate-in slide-in-from-top-2 rounded-2xl border border-slate-200 bg-white/90 p-5 shadow-lg backdrop-blur-xl duration-300 dark:border-slate-700/80 dark:bg-slate-900/90 dark:shadow-[0_18px_40px_rgba(2,6,23,0.5)]">
               <div className="flex items-center justify-between mb-4">
-                <h4 className="text-sm font-semibold text-slate-700 flex items-center gap-2">
+                <h4 className="flex items-center gap-2 text-sm font-semibold text-slate-700 dark:text-slate-100">
                   <Filter className="w-4 h-4 text-emerald-500" />
                   Advanced Filters
                 </h4>
                 <button
                   onClick={() => setShowFilters(false)}
-                  className="text-slate-400 hover:text-slate-600"
+                  className="text-slate-400 hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-200"
                 >
                   <X className="w-4 h-4" />
                 </button>
@@ -1947,12 +1895,12 @@ const getVehicleImageUrl = useCallback((imageValue: unknown): string | null => {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6 gap-4">
                 <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1.5">{t.category}</label>
+                  <label className={FILTER_LABEL_CLASS}>{t.category}</label>
 <select
                     title="Filter by category"
                     value={filters.category}
                     onChange={(e) => setFilters(prev => ({ ...prev, category: e.target.value }))}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500/30 transition-all"
+                    className={FILTER_FIELD_CLASS}
                   >
                     <option value="all">All Categories</option>
                     <option value="cars">Cars</option>
@@ -1962,12 +1910,12 @@ const getVehicleImageUrl = useCallback((imageValue: unknown): string | null => {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1.5">{t.condition}</label>
+                  <label className={FILTER_LABEL_CLASS}>{t.condition}</label>
 <select
                     title="Filter by condition"
                     value={filters.condition}
                     onChange={(e) => setFilters(prev => ({ ...prev, condition: e.target.value }))}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500/30 transition-all"
+                    className={FILTER_FIELD_CLASS}
                   >
                     <option value="all">All Conditions</option>
                     <option value="new">New</option>
@@ -1978,78 +1926,78 @@ const getVehicleImageUrl = useCallback((imageValue: unknown): string | null => {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1.5">{t.brand}</label>
+                  <label className={FILTER_LABEL_CLASS}>{t.brand}</label>
                   <input
                     type="text"
                     value={filters.brand}
                     onChange={(e) => setFilters(prev => ({ ...prev, brand: e.target.value }))}
                     placeholder="e.g. Toyota"
-                    className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-sm text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500/30 transition-all"
+                    className={FILTER_FIELD_CLASS}
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1.5">{t.model}</label>
+                  <label className={FILTER_LABEL_CLASS}>{t.model}</label>
                   <input
                     type="text"
                     value={filters.model}
                     onChange={(e) => setFilters(prev => ({ ...prev, model: e.target.value }))}
                     placeholder="e.g. Camry"
-                    className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-sm text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500/30 transition-all"
+                    className={FILTER_FIELD_CLASS}
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1.5">{t.year}</label>
+                  <label className={FILTER_LABEL_CLASS}>{t.year}</label>
                   <input
                     type="text"
                     value={filters.year}
                     onChange={(e) => setFilters(prev => ({ ...prev, year: e.target.value }))}
                     placeholder="e.g. 2022"
-                    className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-sm text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500/30 transition-all"
+                    className={FILTER_FIELD_CLASS}
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1.5">{t.plate}</label>
+                  <label className={FILTER_LABEL_CLASS}>{t.plate}</label>
                   <input
                     type="text"
                     value={filters.plate}
                     onChange={(e) => setFilters(prev => ({ ...prev, plate: e.target.value }))}
                     placeholder="e.g. PP-1234"
-                    className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-sm text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500/30 transition-all"
+                    className={FILTER_FIELD_CLASS}
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1.5">{t.minPrice}</label>
+                  <label className={FILTER_LABEL_CLASS}>{t.minPrice}</label>
                   <input
                     type="number"
                     value={filters.minPrice}
                     onChange={(e) => setFilters(prev => ({ ...prev, minPrice: e.target.value }))}
                     placeholder="0"
-                    className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-sm text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500/30 transition-all"
+                    className={FILTER_FIELD_CLASS}
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1.5">{t.maxPrice}</label>
+                  <label className={FILTER_LABEL_CLASS}>{t.maxPrice}</label>
                   <input
                     type="number"
                     value={filters.maxPrice}
                     onChange={(e) => setFilters(prev => ({ ...prev, maxPrice: e.target.value }))}
                     placeholder="999999"
-                    className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-sm text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500/30 transition-all"
+                    className={FILTER_FIELD_CLASS}
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1.5">{t.taxType}</label>
+                  <label className={FILTER_LABEL_CLASS}>{t.taxType}</label>
 <select
                     title="Filter by tax type"
                     value={filters.taxType}
                     onChange={(e) => setFilters(prev => ({ ...prev, taxType: e.target.value }))}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500/30 transition-all"
+                    className={FILTER_FIELD_CLASS}
                   >
                     <option value="">All Tax Types</option>
                     <option value="vat">VAT</option>
@@ -2060,7 +2008,7 @@ const getVehicleImageUrl = useCallback((imageValue: unknown): string | null => {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1.5">{t.imageStatus}</label>
+                  <label className={FILTER_LABEL_CLASS}>{t.imageStatus}</label>
                   <button
                     onClick={() => {
                       const nextHasImage = filters.hasImage === 'no' ? '' : 'no';
@@ -2070,8 +2018,8 @@ const getVehicleImageUrl = useCallback((imageValue: unknown): string | null => {
                     className={cn(
                       "w-full px-3 py-2 rounded-xl text-sm font-medium transition-all duration-200 flex items-center justify-center gap-2",
                       filters.hasImage === 'no'
-                        ? "bg-amber-100 text-amber-700 border-2 border-amber-300"
-                        : "bg-slate-50 border border-slate-200 text-slate-600 hover:bg-slate-100"
+                        ? "border-2 border-amber-300 bg-amber-100 text-amber-700 dark:border-amber-500/40 dark:bg-amber-500/15 dark:text-amber-300"
+                        : "border border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800/80 dark:text-slate-300 dark:hover:bg-slate-700"
                     )}
                   >
                     <span className={cn(
@@ -2088,7 +2036,7 @@ const getVehicleImageUrl = useCallback((imageValue: unknown): string | null => {
           {/* Active Filter Tags */}
           {hasActiveFilters() && (
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-xs text-slate-500 font-medium">{t.activeFilters}:</span>
+              <span className="text-xs font-medium text-slate-500 dark:text-slate-400">{t.activeFilters}:</span>
 
               {filters.search && (
                 <FilterTag
@@ -2190,30 +2138,34 @@ const getVehicleImageUrl = useCallback((imageValue: unknown): string | null => {
         {/* Results Count */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <span className="text-sm text-slate-600">
-              {groupBy !== "none" ? (
+            <span className="text-sm text-slate-600 dark:text-slate-300">
+              {isInitialVehiclesLoad ? (
                 <>
-                  Showing all <span className="font-semibold text-slate-800">{filteredVehicles.length}</span> vehicles
-                  <span className="text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded-lg ml-2">
+                  Loading <span className="font-semibold text-slate-800 dark:text-slate-100">vehicles</span>...
+                </>
+              ) : groupBy !== "none" ? (
+                <>
+                  Showing all <span className="font-semibold text-slate-800 dark:text-slate-100">{filteredVehicles.length}</span> vehicles
+                  <span className="ml-2 rounded-lg bg-blue-50 px-2 py-1 text-xs text-blue-600 dark:bg-blue-500/15 dark:text-blue-300">
                     Grouped by {groupBy}
                   </span>
                 </>
               ) : (
                 <>
-                  Showing <span className="font-semibold text-slate-800">{paginatedVehicles.length}</span> of{" "}
-                  <span className="font-semibold text-slate-800">{meta?.total || filteredVehicles.length}</span> vehicles
+                  Showing <span className="font-semibold text-slate-800 dark:text-slate-100">{paginatedVehicles.length}</span> of{" "}
+                  <span className="font-semibold text-slate-800 dark:text-slate-100">{meta?.total || filteredVehicles.length}</span> vehicles
                 </>
               )}
             </span>
             {totalsMode === "filtered" && groupBy === "none" && (
-              <span className="text-xs text-emerald-600 bg-emerald-50 px-2 py-1 rounded-lg">
+              <span className="rounded-lg bg-emerald-50 px-2 py-1 text-xs text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-300">
                 Filtered view
               </span>
             )}
           </div>
 
           {viewMode === "list" && groupBy === "none" && (
-            <div className="text-sm text-slate-500">
+            <div className="text-sm text-slate-500 dark:text-slate-400">
               Sorted by {sortField} ({sortDirection})
             </div>
           )}
@@ -2223,17 +2175,17 @@ const getVehicleImageUrl = useCallback((imageValue: unknown): string | null => {
         {viewMode === "grid" ? (
           // Grid View with Grouping
           <div className="space-y-8">
-            {visibleVehicleGroups.map((group) => (
+            {filteredVehicles.length > 0 && visibleVehicleGroups.map((group) => (
               <div key={group.key} className="space-y-4">
                 {/* Group Header */}
-                <div className="flex items-center justify-between px-4 py-3 bg-gradient-to-r from-slate-50 to-slate-100/80 rounded-xl border border-slate-200/60 shadow-sm">
+                <div className="flex items-center justify-between rounded-xl border border-slate-200/60 bg-gradient-to-r from-slate-50 to-slate-100/80 px-4 py-3 shadow-sm dark:border-slate-700/70 dark:from-slate-900 dark:to-slate-800/80">
                   <div className="flex items-center gap-3">
-                    <h3 className="text-lg font-bold text-slate-800">{group.label}</h3>
-                    <span className="px-3 py-1 bg-emerald-100 text-emerald-700 text-sm font-semibold rounded-full shadow-sm">
+                    <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100">{group.label}</h3>
+                    <span className="rounded-full bg-emerald-100 px-3 py-1 text-sm font-semibold text-emerald-700 shadow-sm dark:bg-emerald-500/15 dark:text-emerald-300">
                       {group.count} vehicles
                     </span>
                   </div>
-                  <div className="text-sm text-slate-600">
+                  <div className="text-sm text-slate-600 dark:text-slate-300">
                     Avg Price: <span className="font-bold text-emerald-600">${Math.round(group.avgPrice).toLocaleString()}</span>
                   </div>
                 </div>
@@ -2258,17 +2210,17 @@ const getVehicleImageUrl = useCallback((imageValue: unknown): string | null => {
         ) : (
           // List View (Table) with Grouping
           <div className="space-y-6">
-            {visibleVehicleGroups.map((group) => (
+            {filteredVehicles.length > 0 && visibleVehicleGroups.map((group) => (
               <div key={group.key} className="space-y-3">
                 {/* Group Header */}
-                <div className="flex items-center justify-between px-4 py-3 bg-gradient-to-r from-slate-50 to-slate-100/80 rounded-xl border border-slate-200/60 shadow-sm">
+                <div className="flex items-center justify-between rounded-xl border border-slate-200/60 bg-gradient-to-r from-slate-50 to-slate-100/80 px-4 py-3 shadow-sm dark:border-slate-700/70 dark:from-slate-900 dark:to-slate-800/80">
                   <div className="flex items-center gap-3">
-                    <h3 className="text-lg font-bold text-slate-800">{group.label}</h3>
-                    <span className="px-3 py-1 bg-emerald-100 text-emerald-700 text-sm font-semibold rounded-full shadow-sm">
+                    <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100">{group.label}</h3>
+                    <span className="rounded-full bg-emerald-100 px-3 py-1 text-sm font-semibold text-emerald-700 shadow-sm dark:bg-emerald-500/15 dark:text-emerald-300">
                       {group.count} vehicles
                     </span>
                   </div>
-                  <div className="text-sm text-slate-600">
+                  <div className="text-sm text-slate-600 dark:text-slate-300">
                     Avg Price: <span className="font-bold text-emerald-600">${Math.round(group.avgPrice).toLocaleString()}</span>
                   </div>
                 </div>
@@ -2287,17 +2239,17 @@ const getVehicleImageUrl = useCallback((imageValue: unknown): string | null => {
                   ))}
                 </div>
 
-                <div className="hidden overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-[0_4px_20px_rgba(0,0,0,0.08)] md:block">
+                <div className="hidden overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-[0_4px_20px_rgba(0,0,0,0.08)] dark:border-slate-700/80 dark:bg-slate-900 dark:shadow-[0_18px_40px_rgba(2,6,23,0.5)] md:block">
                   <div className="overflow-x-auto">
                     <table className="w-full">
                       <thead className="sticky top-0 z-10">
-                        <tr className="bg-slate-50/95 backdrop-blur-sm border-b border-slate-200">
+                        <tr className="border-b border-slate-200 bg-slate-50/95 backdrop-blur-sm dark:border-slate-700 dark:bg-slate-800/95">
                           {COLUMNS.filter(col => visibleColumns.includes(col.key)).map((col) => (
                             <th
                               key={col.key}
                               className={cn(
-                                "px-4 py-3.5 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider",
-                                col.sortable && "cursor-pointer select-none hover:text-slate-900 hover:bg-slate-100/50 transition-colors"
+                                "px-4 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-300",
+                                col.sortable && "cursor-pointer select-none transition-colors hover:bg-slate-100/50 hover:text-slate-900 dark:hover:bg-slate-700/60 dark:hover:text-slate-100"
                               )}
                               style={{ width: col.width }}
                               onClick={() => col.sortable && handleSort(col.key as keyof Vehicle)}
@@ -2310,16 +2262,16 @@ const getVehicleImageUrl = useCallback((imageValue: unknown): string | null => {
                           ))}
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-slate-100">
+                      <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                         {group.vehicles.map((vehicle, index) => (
                           <tr
                             key={vehicle.VehicleId}
                             onClick={() => handleView(vehicle.VehicleId)}
-                            className="group hover:bg-slate-50/80 transition-all duration-200 cursor-pointer"
+                            className="group cursor-pointer transition-all duration-200 hover:bg-slate-50/80 dark:hover:bg-slate-800/70"
                             style={{ animationDelay: `${index * 50}ms` }}
                           >
                             {visibleColumns.includes("id") && (
-                              <td className="px-4 py-3.5 text-sm font-medium text-slate-500">#{vehicle.VehicleId}</td>
+                              <td className="px-4 py-3.5 text-sm font-medium text-slate-500 dark:text-slate-400">#{vehicle.VehicleId}</td>
                             )}
 
                             {visibleColumns.includes("image") && (
@@ -2327,8 +2279,8 @@ const getVehicleImageUrl = useCallback((imageValue: unknown): string | null => {
                                 {(() => {
                                   const imageUrl = getVehicleImageUrl(vehicle.Image);
                                   return imageUrl ? (
-                                    <div className="relative h-12 w-12 overflow-hidden rounded-xl bg-slate-100 shadow-sm ring-2 ring-white">
-                                      <Car className="absolute inset-0 m-auto h-5 w-5 text-slate-300" aria-hidden="true" />
+                                    <div className="relative h-12 w-12 overflow-hidden rounded-xl bg-slate-100 shadow-sm ring-2 ring-white dark:bg-slate-800 dark:ring-slate-700">
+                                      <Car className="absolute inset-0 m-auto h-5 w-5 text-slate-300 dark:text-slate-600" aria-hidden="true" />
                                       <img
                                         src={imageUrl}
                                         alt={vehicle.Model || "Vehicle"}
@@ -2339,8 +2291,8 @@ const getVehicleImageUrl = useCallback((imageValue: unknown): string | null => {
                                       />
                                     </div>
                                   ) : (
-                                    <div className="w-12 h-12 rounded-xl bg-slate-100 flex items-center justify-center">
-                                      <Car className="w-5 h-5 text-slate-400" />
+                                    <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-slate-100 dark:bg-slate-800">
+                                      <Car className="h-5 w-5 text-slate-400 dark:text-slate-600" />
                                     </div>
                                   );
                                 })()}
@@ -2359,20 +2311,20 @@ const getVehicleImageUrl = useCallback((imageValue: unknown): string | null => {
                             )}
 
                             {visibleColumns.includes("brand") && (
-                              <td className="px-4 py-3.5 text-sm font-semibold text-slate-800">{vehicle.Brand}</td>
+                              <td className="px-4 py-3.5 text-sm font-semibold text-slate-800 dark:text-slate-100">{vehicle.Brand}</td>
                             )}
 
                             {visibleColumns.includes("model") && (
-                              <td className="px-4 py-3.5 text-sm text-slate-700">{vehicle.Model}</td>
+                              <td className="px-4 py-3.5 text-sm text-slate-700 dark:text-slate-300">{vehicle.Model}</td>
                             )}
 
                             {visibleColumns.includes("year") && (
-                              <td className="px-4 py-3.5 text-sm text-slate-600 font-medium">{vehicle.Year || "-"}</td>
+                              <td className="px-4 py-3.5 text-sm font-medium text-slate-600 dark:text-slate-300">{vehicle.Year || "-"}</td>
                             )}
 
                             {visibleColumns.includes("plate") && (
                               <td className="px-4 py-3.5">
-                                <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-mono font-medium bg-slate-100 text-slate-700 ring-1 ring-slate-200">
+                                <span className="inline-flex items-center rounded-lg bg-slate-100 px-2.5 py-1 font-mono text-xs font-medium text-slate-700 ring-1 ring-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:ring-slate-700">
                                   {vehicle.Plate || "-"}
                                 </span>
                               </td>
@@ -2398,14 +2350,14 @@ const getVehicleImageUrl = useCallback((imageValue: unknown): string | null => {
 
                             {visibleColumns.includes("taxType") && (
                               <td className="px-4 py-3.5">
-                                <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium bg-slate-100 text-slate-700 ring-1 ring-slate-200">
+                                <span className="inline-flex items-center rounded-lg bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700 ring-1 ring-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:ring-slate-700">
                                   {vehicle.TaxType || "-"}
                                 </span>
                               </td>
                             )}
 
                             {visibleColumns.includes("bodyType") && (
-                              <td className="px-4 py-3.5 text-sm text-slate-700">{vehicle.BodyType || "-"}</td>
+                              <td className="px-4 py-3.5 text-sm text-slate-700 dark:text-slate-300">{vehicle.BodyType || "-"}</td>
                             )}
 
                             {visibleColumns.includes("color") && (
@@ -2413,11 +2365,11 @@ const getVehicleImageUrl = useCallback((imageValue: unknown): string | null => {
                                 <div className="flex items-center gap-2">
                                   {vehicle.Color && (
                                     <span
-                                      className="w-4 h-4 rounded-full border border-slate-200 shadow-sm"
+                                      className="h-4 w-4 rounded-full border border-slate-200 shadow-sm dark:border-slate-600"
                                       style={{ backgroundColor: vehicle.Color.toLowerCase() }}
                                     />
                                   )}
-                                  <span className="text-sm text-slate-700">{vehicle.Color || "-"}</span>
+                                  <span className="text-sm text-slate-700 dark:text-slate-300">{vehicle.Color || "-"}</span>
                                 </div>
                               </td>
                             )}
@@ -2427,8 +2379,8 @@ const getVehicleImageUrl = useCallback((imageValue: unknown): string | null => {
                                 <span className={cn(
                                   "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold",
                                   vehicle.Condition?.toLowerCase() === "new"
-                                    ? "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200"
-                                    : "bg-amber-50 text-amber-700 ring-1 ring-amber-200"
+                                    ? "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200 dark:bg-emerald-500/15 dark:text-emerald-300 dark:ring-emerald-500/30"
+                                    : "bg-amber-50 text-amber-700 ring-1 ring-amber-200 dark:bg-amber-500/15 dark:text-amber-300 dark:ring-amber-500/30"
                                 )}>
                                   <span className={cn(
                                     "w-1.5 h-1.5 rounded-full",
@@ -2490,12 +2442,22 @@ const getVehicleImageUrl = useCallback((imageValue: unknown): string | null => {
                   />
                 )}
 
-                <div className="px-6 py-12 text-center bg-white rounded-2xl shadow-[0_4px_20px_rgba(0,0,0,0.08)] border border-slate-100">
-                  <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-slate-50 flex items-center justify-center">
-                    <Search className="w-8 h-8 text-slate-300" />
+                <div className="rounded-2xl border border-slate-100 bg-white px-6 py-12 text-center shadow-[0_4px_20px_rgba(0,0,0,0.08)] dark:border-slate-700/80 dark:bg-slate-900 dark:shadow-[0_18px_40px_rgba(2,6,23,0.5)]">
+                  <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-slate-50 dark:bg-slate-800">
+                    {isInitialVehiclesLoad ? (
+                      <RefreshCw className="w-8 h-8 animate-spin text-emerald-500" />
+                    ) : (
+                      <Search className="w-8 h-8 text-slate-300 dark:text-slate-600" />
+                    )}
                   </div>
-                  <h3 className="text-lg font-semibold text-slate-700 mb-1">{t.noVehiclesFound}</h3>
-                  <p className="text-sm text-slate-500">{t.tryAdjustingFilters}</p>
+                  <h3 className="mb-1 text-lg font-semibold text-slate-700 dark:text-slate-100">
+                    {isInitialVehiclesLoad ? "Loading Vehicles" : t.noVehiclesFound}
+                  </h3>
+                  <p className="text-sm text-slate-500 dark:text-slate-400">
+                    {isInitialVehiclesLoad
+                      ? "Your VMS data will appear here as soon as it finishes loading."
+                      : t.tryAdjustingFilters}
+                  </p>
                 </div>
               </div>
             )}
@@ -2504,16 +2466,16 @@ const getVehicleImageUrl = useCallback((imageValue: unknown): string | null => {
 
         {/* Pagination - only show when not grouping and not searching */}
         {totalPages > 1 && groupBy === "none" && !filters.search && (
-          <div className="rounded-2xl border border-slate-100 bg-white/80 p-3 shadow-[0_4px_16px_rgba(15,23,42,0.07)] sm:p-4">
+          <div className="rounded-2xl border border-slate-100 bg-white/80 p-3 shadow-[0_4px_16px_rgba(15,23,42,0.07)] dark:border-slate-700/80 dark:bg-slate-900/80 dark:shadow-[0_18px_40px_rgba(2,6,23,0.5)] sm:p-4">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex flex-wrap items-center gap-3">
-                <div className="text-sm text-slate-500">
+                <div className="text-sm text-slate-500 dark:text-slate-400">
                 Page {currentPage} of {totalPages}
                 </div>
 
                 {/* Items Per Page Dropdown */}
                 <div className="flex min-w-0 items-center gap-2">
-                  <span className="text-sm text-slate-500">Show:</span>
+                  <span className="text-sm text-slate-500 dark:text-slate-400">Show:</span>
                   <div className="relative">
                     <select
                     title="Items per page"
@@ -2523,7 +2485,7 @@ const getVehicleImageUrl = useCallback((imageValue: unknown): string | null => {
                       setItemsPerPage(newValue);
                       setCurrentPage(1); // Reset to first page when changing items per page
                     }}
-                    className="h-11 rounded-lg bg-white px-3 pr-8 text-sm font-medium text-slate-700 shadow-[2px_2px_4px_#e2e8f0,-2px_-2px_4px_#ffffff] appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
+                    className="h-11 cursor-pointer appearance-none rounded-lg border border-slate-200/70 bg-white px-3 pr-8 text-sm font-medium text-slate-700 shadow-[2px_2px_4px_#e2e8f0,-2px_-2px_4px_#ffffff] focus:outline-none focus:ring-2 focus:ring-emerald-500/30 dark:border-slate-700/70 dark:bg-slate-800 dark:text-slate-100 dark:shadow-[0_8px_18px_rgba(2,6,23,0.45)]"
                   >
                     {ITEMS_PER_PAGE_OPTIONS.map((option) => (
                       <option key={option} value={option}>
@@ -2531,9 +2493,9 @@ const getVehicleImageUrl = useCallback((imageValue: unknown): string | null => {
                       </option>
                     ))}
                   </select>
-                    <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400 pointer-events-none" />
+                    <ChevronDown className="pointer-events-none absolute right-2 top-1/2 h-3 w-3 -translate-y-1/2 text-slate-400 dark:text-slate-500" />
                   </div>
-                  <span className="text-sm text-slate-500">{t.perPage}</span>
+                  <span className="text-sm text-slate-500 dark:text-slate-400">{t.perPage}</span>
                 </div>
               </div>
 
@@ -2570,7 +2532,7 @@ const getVehicleImageUrl = useCallback((imageValue: unknown): string | null => {
                           "h-10 w-10 rounded-lg text-sm font-medium transition-colors",
                           currentPage === pageNum
                             ? "bg-emerald-500 text-white shadow-md"
-                            : "bg-white text-slate-600 hover:bg-slate-50 shadow-sm"
+                            : "bg-white text-slate-600 shadow-sm hover:bg-slate-50 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
                         )}
                       >
                         {pageNum}

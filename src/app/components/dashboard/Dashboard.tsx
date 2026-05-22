@@ -20,6 +20,7 @@ import type { Vehicle } from "@/lib/types";
 import { useDebouncedValue } from "@/lib/useDebouncedValue";
 import { CATEGORY_COLORS } from "@/lib/categoryColors";
 import { safeGetMonthKey } from "@/lib/safeDate";
+import { TukTukIcon } from "@/components/icons/TukTukIcon";
 
 // ============================================================================
 // Dynamic Chart Imports (ssr: false prevents hydration errors)
@@ -111,24 +112,24 @@ type ChartDatum = {
 
 const ColorPalette = {
   emerald: {
-    bg: "bg-emerald-100",
-    text: "text-emerald-600",
+    bg: "bg-emerald-100 dark:bg-emerald-500/15",
+    text: "text-emerald-600 dark:text-emerald-300",
   },
   blue: {
-    bg: "bg-blue-100",
-    text: "text-blue-600",
+    bg: "bg-blue-100 dark:bg-blue-500/15",
+    text: "text-blue-600 dark:text-blue-300",
   },
   purple: {
-    bg: "bg-purple-100",
-    text: "text-purple-600",
+    bg: "bg-purple-100 dark:bg-purple-500/15",
+    text: "text-purple-600 dark:text-purple-300",
   },
   orange: {
-    bg: "bg-orange-100",
-    text: "text-orange-600",
+    bg: "bg-orange-100 dark:bg-orange-500/15",
+    text: "text-orange-600 dark:text-orange-300",
   },
   red: {
-    bg: "bg-red-100",
-    text: "text-red-600",
+    bg: "bg-red-100 dark:bg-red-500/15",
+    text: "text-red-600 dark:text-red-300",
   },
 };
 
@@ -142,14 +143,14 @@ const ColorPalette = {
 function ChartSkeleton({ height = 300 }: ChartSkeletonProps) {
   return (
     <div 
-      className="w-full flex items-center justify-center bg-slate-100 rounded-[20px]"
+      className="w-full flex items-center justify-center bg-slate-100 rounded-[20px] dark:bg-slate-900"
       style={{ height: `${height}px` }}
     >
       <div className="flex flex-col items-center gap-3">
-        <div className="w-10 h-10 rounded-full bg-slate-100 shadow-sm flex items-center justify-center">
+        <div className="w-10 h-10 rounded-full bg-slate-100 shadow-sm flex items-center justify-center dark:bg-slate-800">
           <div className="w-6 h-6 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
         </div>
-        <span className="text-sm text-[#4a4a5a]">Loading chart...</span>
+        <span className="text-sm text-[#4a4a5a] dark:text-slate-400">Loading chart...</span>
       </div>
     </div>
   );
@@ -167,24 +168,24 @@ function MobileSafeChartSummary({
 
   if (visibleData.length === 0) {
     return (
-      <div className="h-full min-h-[220px] rounded-[20px] bg-slate-50 p-5 flex items-center justify-center text-sm text-[#4a4a5a]">
+      <div className="h-full min-h-[220px] rounded-[20px] bg-slate-50 p-5 flex items-center justify-center text-sm text-[#4a4a5a] dark:bg-slate-900 dark:text-slate-400">
         {emptyLabel}
       </div>
     );
   }
 
   return (
-    <div className="h-full min-h-[220px] rounded-[20px] bg-slate-50 p-5 flex flex-col justify-center gap-4">
+    <div className="h-full min-h-[220px] rounded-[20px] bg-slate-50 p-5 flex flex-col justify-center gap-4 dark:bg-slate-900">
       {visibleData.map((item) => {
         const width = Math.max((item.value / maxValue) * 100, 6);
 
         return (
           <div key={item.name} className="space-y-2">
             <div className="flex items-center justify-between gap-3 text-sm">
-              <span className="font-medium text-[#1a1a2e] truncate">{item.name}</span>
-              <span className="font-semibold text-[#1a1a2e] tabular-nums">{item.value.toLocaleString()}</span>
+              <span className="font-medium text-[#1a1a2e] truncate dark:text-slate-200">{item.name}</span>
+              <span className="font-semibold text-[#1a1a2e] tabular-nums dark:text-slate-100">{item.value.toLocaleString()}</span>
             </div>
-            <div className="h-2.5 rounded-full bg-slate-200 overflow-hidden">
+            <div className="h-2.5 rounded-full bg-slate-200 overflow-hidden dark:bg-slate-800">
               <div
                 className="h-full rounded-full bg-emerald-500"
                 style={{
@@ -231,14 +232,14 @@ function DashboardStatCard({
       {subtitle}
     </a>
   ) : subtitle ? (
-    <p className="text-xs text-[#4a4a5a] mt-1 truncate">{subtitle}</p>
+    <p className="text-xs text-[#4a4a5a] mt-1 truncate dark:text-slate-400">{subtitle}</p>
   ) : null;
 
   const innerContent = (
     <div className="flex items-center justify-between">
       <div className="min-w-0 flex-1">
-        <p className="text-sm font-medium text-[#4a4a5a] truncate">{title}</p>
-        <p className="text-xl sm:text-2xl font-bold text-[#1a1a2e] mt-1">
+        <p className="text-sm font-medium text-[#4a4a5a] truncate dark:text-slate-400">{title}</p>
+        <p className="text-xl sm:text-2xl font-bold text-[#1a1a2e] mt-1 dark:text-slate-100">
           {value}
         </p>
         {subtitleContent}
@@ -251,11 +252,11 @@ function DashboardStatCard({
 
   if (isLoading) {
     return (
-      <div className="bg-slate-100 rounded-[24px] shadow-sm p-6 animate-pulse">
+      <div className="bg-slate-100 rounded-[24px] shadow-sm p-6 animate-pulse dark:bg-slate-900 dark:ring-1 dark:ring-slate-800">
         <div className="flex items-center justify-between">
           <div className="space-y-2">
-            <div className="h-4 w-24 bg-slate-200 rounded" />
-            <div className="h-8 w-16 bg-slate-200 rounded" />
+            <div className="h-4 w-24 bg-slate-200 rounded dark:bg-slate-800" />
+            <div className="h-8 w-16 bg-slate-200 rounded dark:bg-slate-800" />
           </div>
           <div className={`p-3 rounded-xl ${colors.bg} opacity-50`}>
             {icon}
@@ -265,7 +266,7 @@ function DashboardStatCard({
     );
   }
 
-  const cardClasses = `bg-slate-100 rounded-[24px] shadow-sm p-6 ${clickableClasses}`;
+  const cardClasses = `bg-slate-100 rounded-[24px] shadow-sm p-6 dark:bg-slate-900 dark:ring-1 dark:ring-slate-800 ${clickableClasses}`;
 
   if (href && subtitleHref) {
     return (
@@ -323,12 +324,7 @@ const Icons = {
     </svg>
   ),
   tuk: (
-    <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16v-3a2 2 0 0 1 2-2h8l3 3v3" />
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M14 13V9a2 2 0 0 1 2-2h2" />
-      <circle cx="7" cy="17" r="2" strokeWidth={1.5} />
-      <circle cx="17" cy="17" r="2" strokeWidth={1.5} />
-    </svg>
+    <TukTukIcon className="w-5 h-5 sm:w-6 sm:h-6" />
   ),
   search: (
     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -364,12 +360,7 @@ const Icons = {
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M14 11l2 6" />
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M10 11l2-3h3" />
       </svg>
-      <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16v-3a2 2 0 0 1 2-2h8l3 3v3" />
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M14 13V9a2 2 0 0 1 2-2h2" />
-        <circle cx="7" cy="17" r="2" strokeWidth={1.5} />
-        <circle cx="17" cy="17" r="2" strokeWidth={1.5} />
-      </svg>
+      <TukTukIcon className="w-4 h-4 sm:w-5 sm:h-5" />
     </div>
   ),
 };
@@ -542,12 +533,12 @@ export default function Dashboard({
 
   if (error) {
     return (
-      <div className="p-4 sm:p-6">
-        <div className="bg-slate-100 rounded-[24px] shadow-sm p-6">
+      <div className="p-4 sm:p-6 dark:bg-slate-950">
+        <div className="bg-slate-100 rounded-[24px] shadow-sm p-6 dark:bg-slate-900 dark:ring-1 dark:ring-slate-800">
           <p className="text-red-600">{error}</p>
           <button
             onClick={handleRefresh}
-            className="mt-4 px-6 py-3 bg-[#e74c3c] text-white rounded-[16px] shadow-sm active:bg-slate-100 font-semibold transition-all"
+            className="mt-4 px-6 py-3 bg-[#e74c3c] text-white rounded-[16px] shadow-sm active:bg-slate-100 font-semibold transition-all dark:active:bg-slate-800"
           >
             Retry
           </button>
@@ -566,17 +557,17 @@ export default function Dashboard({
   const useMobileSafeCharts = isIOSSafari;
 
   return (
-    <div className="p-4 sm:p-6 space-y-6 max-w-[1600px] mx-auto bg-slate-100 min-h-screen">
+    <div className="p-4 sm:p-6 space-y-6 max-w-[1600px] mx-auto bg-slate-100 min-h-screen dark:bg-slate-950">
       {/* Header Section */}
-      <div className="bg-slate-100 rounded-[30px] shadow-sm p-6 sm:p-8">
+      <div className="bg-slate-100 rounded-[30px] shadow-sm p-6 sm:p-8 dark:bg-slate-900 dark:ring-1 dark:ring-slate-800">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-[#1a1a2e]">
+            <h1 className="text-2xl sm:text-3xl font-bold text-[#1a1a2e] dark:text-slate-100">
               Dashboard
             </h1>
-            <p className="text-sm text-[#4a4a5a] mt-2">
+            <p className="text-sm text-[#4a4a5a] mt-2 dark:text-slate-400">
               {isLoading ? (
-                <span className="inline-block w-24 h-4 bg-slate-200 rounded animate-pulse" />
+                <span className="inline-block w-24 h-4 bg-slate-200 rounded animate-pulse dark:bg-slate-800" />
               ) : (
                 <span className="flex items-center gap-2">
                   <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
@@ -588,7 +579,7 @@ export default function Dashboard({
           <button
             onClick={handleRefresh}
             disabled={isRefreshing}
-            className="px-6 py-3 bg-[#2ecc71] text-white font-semibold rounded-[16px] shadow-sm active:bg-slate-100 transition-all flex items-center gap-2 disabled:opacity-50"
+            className="px-6 py-3 bg-[#2ecc71] text-white font-semibold rounded-[16px] shadow-sm active:bg-slate-100 transition-all flex items-center gap-2 disabled:opacity-50 dark:active:bg-slate-800"
           >
             <span className={isRefreshing ? "animate-spin" : ""}>{Icons.refresh}</span>
             {isRefreshing ? "Refreshing..." : "Refresh Data"}
@@ -648,7 +639,7 @@ export default function Dashboard({
 
       {/* Search Bar */}
       <div className="relative">
-        <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-[#4a4a5a]">
+        <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-[#4a4a5a] dark:text-slate-400">
           {Icons.search}
         </div>
         <input
@@ -656,7 +647,7 @@ export default function Dashboard({
           placeholder="Search vehicles (Brand, Model, Category, Plate...)..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          className="w-full pl-12 pr-4 py-4 rounded-[20px] bg-slate-100 shadow-sm text-[#1a1a2e] placeholder-[#4a4a5a] focus:outline-none focus:ring-2 focus:ring-emerald-500/20 text-sm sm:text-base"
+          className="w-full pl-12 pr-4 py-4 rounded-[20px] bg-slate-100 shadow-sm text-[#1a1a2e] placeholder-[#4a4a5a] focus:outline-none focus:ring-2 focus:ring-emerald-500/20 text-sm sm:text-base dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-500 dark:ring-1 dark:ring-slate-800"
         />
         {debouncedSearch !== searchQuery && (
           <div className="absolute inset-y-0 right-0 pr-4 flex items-center">
@@ -666,17 +657,17 @@ export default function Dashboard({
       </div>
 
       {/* Search Results Count */}
-      <div className="flex flex-wrap items-center gap-2 text-sm text-[#4a4a5a]">
-        <span className="font-medium text-[#1a1a2e]">
+      <div className="flex flex-wrap items-center gap-2 text-sm text-[#4a4a5a] dark:text-slate-400">
+        <span className="font-medium text-[#1a1a2e] dark:text-slate-100">
           {filteredVehicles.length.toLocaleString()}
         </span>
         <span>of</span>
-        <span className="font-medium text-[#1a1a2e]">
+        <span className="font-medium text-[#1a1a2e] dark:text-slate-100">
           {meta.total.toLocaleString()}
         </span>
         <span>vehicles</span>
         {debouncedSearch && (
-          <span className="text-[#4a4a5a]">
+          <span className="text-[#4a4a5a] dark:text-slate-400">
             matching &quot;{debouncedSearch}&quot;
           </span>
         )}
@@ -690,8 +681,8 @@ export default function Dashboard({
       {/* Charts Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Vehicles by Category */}
-        <div className="bg-slate-100 rounded-[30px] shadow-sm p-6 sm:p-8">
-          <h3 className="text-base sm:text-lg font-semibold text-[#1a1a2e] mb-6">
+        <div className="bg-slate-100 rounded-[30px] shadow-sm p-6 sm:p-8 dark:bg-slate-900 dark:ring-1 dark:ring-slate-800">
+          <h3 className="text-base sm:text-lg font-semibold text-[#1a1a2e] mb-6 dark:text-slate-100">
             Vehicles by Category
           </h3>
           <div className="w-full h-[250px] sm:h-[300px]">
@@ -706,8 +697,8 @@ export default function Dashboard({
         </div>
 
         {/* New vs Used */}
-        <div className="bg-slate-100 rounded-[30px] shadow-sm p-6 sm:p-8">
-          <h3 className="text-base sm:text-lg font-semibold text-[#1a1a2e] mb-6">
+        <div className="bg-slate-100 rounded-[30px] shadow-sm p-6 sm:p-8 dark:bg-slate-900 dark:ring-1 dark:ring-slate-800">
+          <h3 className="text-base sm:text-lg font-semibold text-[#1a1a2e] mb-6 dark:text-slate-100">
             New vs Used
           </h3>
           <div className="w-full h-[250px] sm:h-[300px]">
@@ -722,8 +713,8 @@ export default function Dashboard({
         </div>
 
         {/* Top Brands */}
-        <div className="bg-slate-100 rounded-[30px] shadow-sm p-6 sm:p-8">
-          <h3 className="text-base sm:text-lg font-semibold text-[#1a1a2e] mb-6">
+        <div className="bg-slate-100 rounded-[30px] shadow-sm p-6 sm:p-8 dark:bg-slate-900 dark:ring-1 dark:ring-slate-800">
+          <h3 className="text-base sm:text-lg font-semibold text-[#1a1a2e] mb-6 dark:text-slate-100">
             Top Brands
           </h3>
           <div className="w-full h-[250px] sm:h-[300px]">
@@ -738,8 +729,8 @@ export default function Dashboard({
         </div>
 
         {/* Monthly Added */}
-        <div className="bg-slate-100 rounded-[30px] shadow-sm p-6 sm:p-8">
-          <h3 className="text-base sm:text-lg font-semibold text-[#1a1a2e] mb-6">
+        <div className="bg-slate-100 rounded-[30px] shadow-sm p-6 sm:p-8 dark:bg-slate-900 dark:ring-1 dark:ring-slate-800">
+          <h3 className="text-base sm:text-lg font-semibold text-[#1a1a2e] mb-6 dark:text-slate-100">
             Monthly Added
           </h3>
           <div className="w-full h-[250px] sm:h-[300px]">
@@ -756,29 +747,29 @@ export default function Dashboard({
 
       {/* Quick Stats Footer */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 sm:gap-6 pt-6">
-        <div className="bg-slate-100 rounded-[24px] shadow-sm p-6 text-center">
+        <div className="bg-slate-100 rounded-[24px] shadow-sm p-6 text-center dark:bg-slate-900 dark:ring-1 dark:ring-slate-800">
           <p className="text-2xl sm:text-3xl font-bold text-emerald-600">
             {(meta.total - meta.noImageCount).toLocaleString()}
           </p>
-          <p className="text-xs sm:text-sm text-[#4a4a5a]">With Images</p>
+          <p className="text-xs sm:text-sm text-[#4a4a5a] dark:text-slate-400">With Images</p>
         </div>
-        <div className="bg-slate-100 rounded-[24px] shadow-sm p-6 text-center">
+        <div className="bg-slate-100 rounded-[24px] shadow-sm p-6 text-center dark:bg-slate-900 dark:ring-1 dark:ring-slate-800">
           <p className="text-2xl sm:text-3xl font-bold text-red-600">
             {meta.noImageCount.toLocaleString()}
           </p>
-          <p className="text-xs sm:text-sm text-[#4a4a5a]">Without Images</p>
+          <p className="text-xs sm:text-sm text-[#4a4a5a] dark:text-slate-400">Without Images</p>
         </div>
-        <div className="bg-slate-100 rounded-[24px] shadow-sm p-6 text-center">
+        <div className="bg-slate-100 rounded-[24px] shadow-sm p-6 text-center dark:bg-slate-900 dark:ring-1 dark:ring-slate-800">
           <p className="text-2xl sm:text-3xl font-bold text-blue-600">
             ${Math.round(meta.avgPrice).toLocaleString()}
           </p>
-          <p className="text-xs sm:text-sm text-[#4a4a5a]">Avg Price</p>
+          <p className="text-xs sm:text-sm text-[#4a4a5a] dark:text-slate-400">Avg Price</p>
         </div>
-        <div className="bg-slate-100 rounded-[24px] shadow-sm p-6 text-center">
+        <div className="bg-slate-100 rounded-[24px] shadow-sm p-6 text-center dark:bg-slate-900 dark:ring-1 dark:ring-slate-800">
           <p className="text-2xl sm:text-3xl font-bold text-purple-600">
             {aggregatedStats ? Object.keys(aggregatedStats.byBrand).length : '-'}
           </p>
-          <p className="text-xs sm:text-sm text-[#4a4a5a]">Unique Brands (sample)</p>
+          <p className="text-xs sm:text-sm text-[#4a4a5a] dark:text-slate-400">Unique Brands (sample)</p>
         </div>
       </div>
     </div>

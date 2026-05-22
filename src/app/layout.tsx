@@ -11,9 +11,10 @@ const themeInitScript = `
     try {
       var modeKey = "vms.theme-mode";
       var legacyKeys = ["theme", "vms.theme"];
+      var colors = { light: "#ecfdf5", dark: "#020617" };
       var mode = localStorage.getItem(modeKey);
 
-      if (mode !== "light" && mode !== "dark" && mode !== "system") {
+      if (mode !== "light" && mode !== "dark") {
         for (var i = 0; i < legacyKeys.length; i++) {
           var legacy = localStorage.getItem(legacyKeys[i]);
           if (legacy === "light" || legacy === "dark") {
@@ -23,14 +24,21 @@ const themeInitScript = `
         }
       }
 
-      if (!mode) mode = "system";
-      var isDark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
-      var resolved = mode === "system" ? (isDark ? "dark" : "light") : mode;
+      if (mode !== "light" && mode !== "dark") mode = "light";
       var root = document.documentElement;
       root.classList.remove("light", "dark");
-      root.classList.add(resolved);
-      root.dataset.theme = resolved;
+      root.classList.add(mode);
+      root.dataset.theme = mode;
       root.dataset.themeMode = mode;
+
+      root.style.colorScheme = mode;
+      var meta = document.querySelector('meta[name="theme-color"]');
+      if (!meta) {
+        meta = document.createElement("meta");
+        meta.setAttribute("name", "theme-color");
+        document.head.appendChild(meta);
+      }
+      meta.setAttribute("content", colors[mode]);
     } catch (_) {}
   })();
 `;
@@ -66,7 +74,7 @@ const languageInitScript = `
 `;
 
 export const metadata: Metadata = {
-  title: "Emerald Cash VMS",
+  title: "Emerald Cash Systems",
   description: "Vehicle Management System by Emerald Cash",
   icons: {
     icon: "/favicon.ico",
@@ -80,10 +88,7 @@ export const viewport: Viewport = {
   maximumScale: 1,
   userScalable: false,
   viewportFit: "cover",
-  themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#ecfdf5" },
-    { media: "(prefers-color-scheme: dark)", color: "#0f172a" },
-  ],
+  themeColor: "#ecfdf5",
 };
 
 export default async function RootLayout({

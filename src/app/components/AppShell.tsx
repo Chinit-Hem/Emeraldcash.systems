@@ -3,12 +3,13 @@
 import type { User } from "@/lib/types";
 import Image from "next/image";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Suspense, type ReactNode, useEffect, useRef, useState } from "react";
+import { Suspense, type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 
 import Sidebar from "@/app/components/Sidebar";
 import { AuthUserProvider } from "@/app/components/AuthContext";
 import { UIProvider } from "@/app/components/UIContext";
 import { clearCachedUser, getCachedUser, setCachedUser } from "@/app/components/authCache";
+import { useLanguage } from "@/lib/LanguageContext";
 
 type AppShellProps = {
   children: ReactNode;
@@ -50,6 +51,8 @@ function AppShellContent({ children }: AppShellProps) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const isDesktopSidebar = useDesktopSidebar();
+  const { language } = useLanguage();
+  const systemsLabel = language === "km" ? "ប្រព័ន្ធ" : "Systems";
 
   // OPTIMIZATION: Show UI immediately with cached user, check auth in background
   const [user, setUser] = useState<User | null>(() => getCachedUser());
@@ -58,6 +61,8 @@ function AppShellContent({ children }: AppShellProps) {
   const [error, setError] = useState<string | null>(null);
   const hasRedirected = useRef(false);
   const authChecked = useRef(false);
+  const openSidebar = useCallback(() => setIsSidebarOpen(true), []);
+  const closeSidebar = useCallback(() => setIsSidebarOpen(false), []);
 
   // Warm up DB connection on mount
   useConnectionWarmer();
@@ -150,11 +155,9 @@ function AppShellContent({ children }: AppShellProps) {
   useEffect(() => {
     if (prevPathnameRef.current !== pathname) {
       prevPathnameRef.current = pathname;
-      // Schedule state update to avoid synchronous setState warning
-      const timeoutId = setTimeout(() => setIsSidebarOpen(false), 0);
-      return () => clearTimeout(timeoutId);
+      closeSidebar();
     }
-  }, [pathname]);
+  }, [closeSidebar, pathname]);
 
   // Persist/restore scroll position for the nested scroll container (<main />)
   useEffect(() => {
@@ -247,46 +250,43 @@ function AppShellContent({ children }: AppShellProps) {
           </div>
         )}
 
-        {/* Mobile drawer - Neumorphism style */}
-        {isSidebarOpen && (
+        {/* Mobile drawer - mounted ahead of time so opening feels instant */}
+        <div
+          className={`fixed inset-0 z-[60] lg:hidden ${isSidebarOpen ? "visible pointer-events-auto" : "invisible pointer-events-none"}`}
+          onKeyDown={(e) => {
+            if (e.key === "Escape") closeSidebar();
+          }}
+          aria-hidden={!isSidebarOpen}
+        >
           <div
-            className="fixed inset-0 z-[60] lg:hidden"
-            onKeyDown={(e) => {
-              if (e.key === 'Escape') setIsSidebarOpen(false);
-            }}
+            className={`absolute inset-0 bg-slate-900/30 backdrop-blur-sm transition-opacity duration-75 ${isSidebarOpen ? "opacity-100" : "opacity-0"}`}
+            onClick={closeSidebar}
+            aria-hidden="true"
+          />
+          <div
+            className={`absolute inset-y-0 left-0 h-full w-[280px] max-w-[85vw] overflow-hidden bg-neu-bg shadow-neu-flat-lg transition-transform duration-75 ease-out ${isSidebarOpen ? "translate-x-0" : "-translate-x-full"}`}
+            role="dialog"
+            aria-modal={isSidebarOpen ? "true" : undefined}
+            aria-label="Navigation menu"
           >
-            <div
-              className="absolute inset-0 bg-slate-900/30 backdrop-blur-sm"
-              onClick={() => setIsSidebarOpen(false)}
-              aria-hidden="true"
-            />
-            <div
-              className="absolute inset-y-0 left-0 w-[280px] max-w-[85vw] h-full bg-neu-bg overflow-hidden shadow-neu-flat-lg"
-              role="dialog"
-              aria-modal="true"
-              aria-label="Navigation menu"
-            >
-              <Suspense fallback={null}>
-                <Sidebar
-                  user={user}
-                  onNavigate={() => setIsSidebarOpen(false)}
-                  isVisible={true}
-                  mode="drawer"
-                />
-              </Suspense>
-            </div>
+            <Suspense fallback={null}>
+              <Sidebar
+                user={user}
+                onNavigate={closeSidebar}
+                isVisible={isSidebarOpen}
+                mode="drawer"
+              />
+            </Suspense>
           </div>
-        )}
+        </div>
 
         <div className="flex-1 min-w-0 flex flex-col pt-14 lg:pt-0">
           {/* Mobile header - Fixed position with safe area support */}
           <header className={mobileHeaderClass}>
             <div className="h-14 px-4 flex items-center justify-between max-w-[100vw]">
               <button
-                onClick={() => {
-                  // iOS Safari: avoid touch default handling delays/double events
-                  requestAnimationFrame(() => setIsSidebarOpen(true));
-                }}
+                onPointerDown={openSidebar}
+                onClick={openSidebar}
                 className="neu-icon-btn touch-target"
                 aria-label="Open navigation menu"
                 type="button"
@@ -297,7 +297,7 @@ function AppShellContent({ children }: AppShellProps) {
               </button>
 
               <div className="flex items-center gap-3 min-w-0 flex-1 justify-center">
-                <div className="relative w-9 h-9 flex items-center justify-center overflow-hidden flex-shrink-0 neu-icon-btn !rounded-full">
+                <div className="relative w-9 h-9 flex items-center justify-center overflow-hidden flex-shrink-0 neu-icon-btn !rounded-full !bg-white dark:!bg-white">
                   <Image
                     src="/logo.png"
                     alt="Emerald Cash"
@@ -308,7 +308,7 @@ function AppShellContent({ children }: AppShellProps) {
                 </div>
                 <div className="flex flex-col min-w-0">
                   <span className="font-bold text-neu-text text-sm leading-tight truncate">Emerald Cash</span>
-                  <span className="text-[10px] text-neu-green font-bold uppercase tracking-wider">VMS PRO</span>
+                  <span className="text-[10px] text-neu-green font-bold">{systemsLabel}</span>
                 </div>
               </div>
 

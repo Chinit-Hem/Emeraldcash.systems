@@ -14,7 +14,13 @@ const LanguageContext = createContext<LanguageContextType | undefined>(undefined
 
 const LANGUAGE_KEY = "vms.language";
 const TRANSLATABLE_ATTRIBUTES = ["aria-label", "placeholder", "title", "alt"] as const;
-const SKIP_TRANSLATION_SELECTOR = [
+type TranslatableAttribute = (typeof TRANSLATABLE_ATTRIBUTES)[number];
+
+const originalTextValues = new WeakMap<Text, string>();
+const originalAttributeValues = new WeakMap<Element, Partial<Record<TranslatableAttribute, string>>>();
+const originalInputValues = new WeakMap<HTMLInputElement, string>();
+
+const SKIP_TEXT_TRANSLATION_SELECTOR = [
   "script",
   "style",
   "code",
@@ -24,32 +30,133 @@ const SKIP_TRANSLATION_SELECTOR = [
   "[contenteditable='true']",
 ].join(",");
 
-function shouldSkipTranslation(element: Element | null): boolean {
-  return Boolean(element?.closest(SKIP_TRANSLATION_SELECTOR));
+const SKIP_ATTRIBUTE_TRANSLATION_SELECTOR = [
+  "script",
+  "style",
+  "code",
+  "pre",
+  "[data-no-translate]",
+  "[contenteditable='true']",
+].join(",");
+
+function shouldSkipTextTranslation(element: Element | null): boolean {
+  return Boolean(element?.closest(SKIP_TEXT_TRANSLATION_SELECTOR));
+}
+
+function shouldSkipAttributeTranslation(element: Element | null): boolean {
+  return Boolean(element?.closest(SKIP_ATTRIBUTE_TRANSLATION_SELECTOR));
+}
+
+function containsKhmer(text: string): boolean {
+  return /[\u1780-\u17FF]/.test(text);
+}
+
+function translateSourceForLanguage(source: string, language: Language): string {
+  if (language === "en") {
+    return containsKhmer(source) ? translatePhrase(source, "en") : source;
+  }
+
+  return translatePhrase(source, language);
+}
+
+function isKnownLanguageValue(value: string, source: string): boolean {
+  return (
+    value === source ||
+    value === translateSourceForLanguage(source, "en") ||
+    value === translateSourceForLanguage(source, "km")
+  );
+}
+
+function resolveOriginalText(node: Text, value: string): string {
+  const existing = originalTextValues.get(node);
+  if (!existing) {
+    originalTextValues.set(node, value);
+    return value;
+  }
+
+  if (!isKnownLanguageValue(value, existing)) {
+    originalTextValues.set(node, value);
+    return value;
+  }
+
+  return existing;
+}
+
+function resolveOriginalAttribute(
+  element: Element,
+  attr: TranslatableAttribute,
+  value: string
+): string {
+  const existingAttrs = originalAttributeValues.get(element) ?? {};
+  const existing = existingAttrs[attr];
+  if (!existing) {
+    originalAttributeValues.set(element, { ...existingAttrs, [attr]: value });
+    return value;
+  }
+
+  if (!isKnownLanguageValue(value, existing)) {
+    originalAttributeValues.set(element, { ...existingAttrs, [attr]: value });
+    return value;
+  }
+
+  return existing;
+}
+
+function resolveOriginalInputValue(element: HTMLInputElement, value: string): string {
+  const existing = originalInputValues.get(element);
+  if (!existing) {
+    originalInputValues.set(element, value);
+    return value;
+  }
+
+  if (!isKnownLanguageValue(value, existing)) {
+    originalInputValues.set(element, value);
+    return value;
+  }
+
+  return existing;
 }
 
 function translateTextNode(node: Text, language: Language) {
   const value = node.nodeValue;
-  if (!value?.trim() || shouldSkipTranslation(node.parentElement)) return;
+  if (!value?.trim() || shouldSkipTextTranslation(node.parentElement)) return;
 
-  const translated = translatePhrase(value, language);
+  const source = resolveOriginalText(node, value);
+  const translated = translateSourceForLanguage(source, language);
   if (translated !== value) {
     node.nodeValue = translated;
   }
 }
 
+function translateInputValue(element: Element, language: Language) {
+  if (!(element instanceof HTMLInputElement)) return;
+  if (!["button", "submit", "reset"].includes(element.type)) return;
+
+  const value = element.value;
+  if (!value?.trim()) return;
+
+  const source = resolveOriginalInputValue(element, value);
+  const translated = translateSourceForLanguage(source, language);
+  if (translated !== value) {
+    element.value = translated;
+  }
+}
+
 function translateElementAttributes(element: Element, language: Language) {
-  if (shouldSkipTranslation(element)) return;
+  if (shouldSkipAttributeTranslation(element)) return;
 
   for (const attr of TRANSLATABLE_ATTRIBUTES) {
     const value = element.getAttribute(attr);
     if (!value?.trim()) continue;
 
-    const translated = translatePhrase(value, language);
+    const source = resolveOriginalAttribute(element, attr, value);
+    const translated = translateSourceForLanguage(source, language);
     if (translated !== value) {
       element.setAttribute(attr, translated);
     }
   }
+
+  translateInputValue(element, language);
 }
 
 function translateSubtree(root: ParentNode, language: Language) {
@@ -60,7 +167,7 @@ function translateSubtree(root: ParentNode, language: Language) {
   const textWalker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
     acceptNode(node) {
       const textNode = node as Text;
-      if (!textNode.nodeValue?.trim() || shouldSkipTranslation(textNode.parentElement)) {
+      if (!textNode.nodeValue?.trim() || shouldSkipTextTranslation(textNode.parentElement)) {
         return NodeFilter.FILTER_REJECT;
       }
       return NodeFilter.FILTER_ACCEPT;
@@ -73,7 +180,12 @@ function translateSubtree(root: ParentNode, language: Language) {
   }
   textNodes.forEach((node) => translateTextNode(node, language));
 
-  const attributeSelector = TRANSLATABLE_ATTRIBUTES.map((attr) => `[${attr}]`).join(",");
+  const attributeSelector = [
+    ...TRANSLATABLE_ATTRIBUTES.map((attr) => `[${attr}]`),
+    "input[type='button']",
+    "input[type='submit']",
+    "input[type='reset']",
+  ].join(",");
   root.querySelectorAll?.(attributeSelector).forEach((element) => {
     translateElementAttributes(element, language);
   });
@@ -81,12 +193,19 @@ function translateSubtree(root: ParentNode, language: Language) {
 
 function useDocumentLanguage(language: Language) {
   useEffect(() => {
-    document.documentElement.lang = language;
-    document.documentElement.dir = "ltr";
+    const applyDocumentChrome = () => {
+      document.documentElement.lang = language;
+      document.documentElement.dir = "ltr";
+      document.title = translatePhrase("Emerald Cash Systems", language);
+    };
 
-    const run = () => translateSubtree(document.body, language);
+    const run = () => {
+      applyDocumentChrome();
+      translateSubtree(document.body, language);
+    };
     run();
     const rafId = window.requestAnimationFrame(run);
+    const titleRefreshIds = [window.setTimeout(run, 250), window.setTimeout(run, 1000)];
 
     const observer = new MutationObserver((mutations) => {
       for (const mutation of mutations) {
@@ -120,6 +239,7 @@ function useDocumentLanguage(language: Language) {
 
     return () => {
       window.cancelAnimationFrame(rafId);
+      titleRefreshIds.forEach((id) => window.clearTimeout(id));
       observer.disconnect();
     };
   }, [language]);

@@ -137,7 +137,7 @@ export function OptimizedNavLink({
 /**
  * PrefetchProvider - Component that prefetches critical routes on mount
  */
-const CRITICAL_ROUTES = ["/", "/vehicles", "/settings"];
+const CRITICAL_ROUTES = ["/", "/vehicles", "/lms", "/settings"];
 
 export function PrefetchProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();

@@ -66,6 +66,15 @@ type LastWatchedLesson = {
   watchPercentage: number;
 };
 
+const EMPTY_LMS_STATS: LmsDashboardStats = {
+  total_staff: 0,
+  total_categories: 0,
+  total_lessons: 0,
+  overall_completion_rate: 0,
+  staff_progress: [],
+  category_completion: [],
+};
+
 // API Service
 class LmsApiService {
   private static readonly BASE_URL = "/api/lms";
@@ -164,21 +173,6 @@ class LmsApiService {
       throw new Error(data.error || "Failed to delete LMS staff record");
     }
   }
-}
-
-// Skeleton Component
-function CardSkeleton() {
-  return (
-    <div className="p-6 rounded-3xl bg-gradient-to-br from-[#f0f4f8] to-[#e6e9ef] shadow-sm">
-      <div className="flex items-center gap-4 mb-4">
-        <div className="h-12 w-12 rounded-xl bg-slate-200 animate-pulse" />
-        <div className="flex-1 space-y-2">
-          <div className="h-4 w-1/3 bg-slate-200 rounded animate-pulse" />
-          <div className="h-3 w-1/4 bg-slate-200 rounded animate-pulse" />
-        </div>
-      </div>
-    </div>
-  );
 }
 
 // Stat Card Component
@@ -529,6 +523,7 @@ function LmsDashboard({ initialData }: LmsDashboardProps) {
 
   const user = useAuthUser();
   const isAdmin = user?.role === "Admin";
+  const dashboardStats = stats ?? EMPTY_LMS_STATS;
 
   const [searchQuery, setSearchQuery] = useState("");
   const debouncedSearch = useDebouncedValue(searchQuery, 300);
@@ -698,16 +693,16 @@ function LmsDashboard({ initialData }: LmsDashboardProps) {
   const completedLessons = useMemo(() => lessons.filter((l) => l.is_completed).length, [lessons]);
   const totalLessons = lessons.length;
   const overallProgress = totalLessons > 0 ? Math.round((completedLessons / totalLessons) * 100) : 0;
-  const staffAddedTrend = (stats?.staff_added_this_week ?? 0) > 0
-    ? `+${stats?.staff_added_this_week} this week`
+  const staffAddedTrend = (dashboardStats.staff_added_this_week ?? 0) > 0
+    ? `+${dashboardStats.staff_added_this_week} this week`
     : undefined;
   const groupedStaffProgress = useMemo(
-    () => summarizeStaffProgress(stats?.staff_progress ?? []),
-    [stats?.staff_progress]
+    () => summarizeStaffProgress(dashboardStats.staff_progress),
+    [dashboardStats.staff_progress]
   );
   const completionRateSubtitle =
-    stats?.completed_lessons_total !== undefined && stats?.total_possible_completions !== undefined
-      ? `${stats.completed_lessons_total} of ${stats.total_possible_completions} staff-lessons`
+    dashboardStats.completed_lessons_total !== undefined && dashboardStats.total_possible_completions !== undefined
+      ? `${dashboardStats.completed_lessons_total} of ${dashboardStats.total_possible_completions} staff-lessons`
       : undefined;
 
   const filteredCategories = useMemo(() => {
@@ -729,24 +724,7 @@ function LmsDashboard({ initialData }: LmsDashboardProps) {
     }
   }, [categories, continueLessonId, router]);
 
-  // Instant render with skeleton if no initial data or refreshing
-  const isSkeleton = loading || !stats || !categories.length;
-
-  if (isSkeleton) {
-    return (
-      <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-5 sm:py-8">
-        <div className="space-y-8">
-          <div className="h-8 w-48 bg-slate-200 rounded-lg animate-pulse" />
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            {Array.from({ length: 4 }).map((_, i) => <CardSkeleton key={i} />)}
-          </div>
-          <div className="h-96 bg-slate-200 rounded-3xl animate-pulse" />
-        </div>
-      </div>
-    );
-  }
-
-  if (!stats) {
+  if (!loading && !stats && categories.length === 0) {
     return (
       <div className="max-w-2xl mx-auto">
         <div className="text-center py-20">
@@ -809,6 +787,12 @@ function LmsDashboard({ initialData }: LmsDashboardProps) {
             </div>
           </div>
           <div className="flex items-center gap-3">
+            {loading && (
+              <span className="hidden items-center gap-2 rounded-xl bg-white px-3 py-2 text-sm font-medium text-slate-500 shadow-sm sm:inline-flex">
+                <RefreshCw className="h-4 w-4 animate-spin text-emerald-500" />
+                Loading
+              </span>
+            )}
             <button onClick={handleRefresh} disabled={isRefreshing} className="p-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 transition-all active:scale-95 disabled:opacity-50" title="Refresh data">
               <RefreshCw className={`w-5 h-5 ${isRefreshing ? 'animate-spin' : ''}`} />
             </button>
@@ -824,11 +808,11 @@ function LmsDashboard({ initialData }: LmsDashboardProps) {
         {/* Stats Grid */}
         <div className={`grid gap-4 sm:gap-6 ${isAdmin ? 'grid-cols-1 min-[420px]:grid-cols-2 lg:grid-cols-4' : 'grid-cols-1 min-[420px]:grid-cols-2 lg:grid-cols-3'}`}>
           {isAdmin && (
-            <StatCard title="Total Staff" value={stats.total_staff} icon={Users} color="blue" trend={staffAddedTrend} trendUp={true} />
+            <StatCard title="Total Staff" value={dashboardStats.total_staff} icon={Users} color="blue" trend={staffAddedTrend} trendUp={true} />
           )}
-          <StatCard title="Categories" value={stats.total_categories} subtitle={`${categories.length} active`} icon={BookOpen} color="emerald" />
+          <StatCard title="Categories" value={dashboardStats.total_categories} subtitle={`${categories.length} active`} icon={BookOpen} color="emerald" />
           <StatCard title="Your Progress" value={`${overallProgress}%`} subtitle={`${completedLessons} of ${totalLessons} lessons`} icon={Trophy} color="purple" />
-          <StatCard title="Completion Rate" value={`${stats.overall_completion_rate}%`} subtitle={completionRateSubtitle} icon={TrendingUp} color="amber" />
+          <StatCard title="Completion Rate" value={`${dashboardStats.overall_completion_rate}%`} subtitle={completionRateSubtitle} icon={TrendingUp} color="amber" />
         </div>
 
         {/* Tab Navigation */}
@@ -939,7 +923,7 @@ function LmsDashboard({ initialData }: LmsDashboardProps) {
               {filteredCategories.length > 0 ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                   {filteredCategories.map((category) => {
-                    const completion = stats.category_completion?.find((c) => c.category_id === category.id);
+                    const completion = dashboardStats.category_completion.find((c) => c.category_id === category.id);
                     const categoryLessons = lessons.filter((l) => l.category_id === category.id);
                     return (
                       <CategoryCard key={category.id} category={category} completionRate={completion?.completion_rate || 0} lessonCount={categoryLessons.length} onClick={() => handleCategoryClick(category.id)} />
@@ -949,8 +933,16 @@ function LmsDashboard({ initialData }: LmsDashboardProps) {
               ) : (
                 <div className="text-center py-12 bg-white rounded-3xl shadow-sm">
                   <Search className="w-12 h-12 mx-auto mb-4 text-slate-300" />
-                  <h3 className="text-lg font-semibold text-slate-800 mb-2">No Categories Found</h3>
-                  <p className="text-slate-500">Try adjusting your search query</p>
+                  <h3 className="text-lg font-semibold text-slate-800 mb-2">
+                    {loading ? "Loading Training Content" : "No Categories Found"}
+                  </h3>
+                  <p className="text-slate-500">
+                    {loading
+                      ? "Your LMS data will appear here as soon as it finishes loading."
+                      : debouncedSearch.trim()
+                        ? "Try adjusting your search query"
+                        : "No training categories are available yet."}
+                  </p>
                 </div>
               )}
             </div>
@@ -994,7 +986,7 @@ function LmsDashboard({ initialData }: LmsDashboardProps) {
                   <div>
                     <h3 className="text-lg font-bold text-slate-800">Staff Progress</h3>
                     <p className="text-sm text-slate-500">
-                      {groupedStaffProgress.length} names shown from {stats.staff_progress.length} LMS staff records
+                      {groupedStaffProgress.length} names shown from {dashboardStats.staff_progress.length} LMS staff records
                     </p>
                   </div>
                   <button
@@ -1157,8 +1149,8 @@ function LmsDashboard({ initialData }: LmsDashboardProps) {
               title="Category Master"
               description="Complete all lessons in a category"
               icon={Target}
-              unlocked={stats.category_completion?.some((c) => c.completion_rate === 100) ?? false}
-              progress={stats.category_completion?.length ? Math.max(...stats.category_completion.map((c) => c.completion_rate), 0) : 0}
+              unlocked={dashboardStats.category_completion.some((c) => c.completion_rate === 100)}
+              progress={dashboardStats.category_completion.length ? Math.max(...dashboardStats.category_completion.map((c) => c.completion_rate), 0) : 0}
               color="blue"
             />
             <AchievementCard
@@ -1222,6 +1214,10 @@ function LmsDashboard({ initialData }: LmsDashboardProps) {
                     </div>
                       <span className="self-start whitespace-nowrap text-xs px-2 py-1 bg-emerald-100 text-emerald-700 rounded-full sm:self-auto">In Progress</span>
                   </div>
+                ) : loading ? (
+                  <div className="text-center p-4 text-slate-500">
+                    Loading your current training status...
+                  </div>
                 ) : (
                   <div className="text-center p-4 text-slate-500">
                     🎉 All lessons completed! Great job!
@@ -1277,7 +1273,7 @@ function LmsDashboard({ initialData }: LmsDashboardProps) {
                   ))}
                 {lessons.filter((l) => l.is_completed).length === 0 && (
                   <div className="text-center p-4 text-slate-500">
-                    No completed lessons yet. Start learning to see your progress!
+                    {loading ? "Loading recent activity..." : "No completed lessons yet. Start learning to see your progress!"}
                   </div>
                 )}
               </div>

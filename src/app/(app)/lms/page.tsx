@@ -13,22 +13,18 @@
  * @module lms/page
  */
 
-import { Suspense } from "react";
 import { Metadata } from "next";
-import { NeuLmsSkeleton } from "@/app/components/skeletons/NeuLmsSkeleton";
 import LmsClientShell from "./LmsClientShell";
 
 export const metadata: Metadata = {
-  title: "Training Portal | Emerald Cash VMS",
+  title: "Training Portal | Emerald Cash Systems",
   description: "Staff training and certification portal",
 };
 
 export default function LmsPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-slate-100 to-slate-200">
-      <Suspense fallback={<NeuLmsSkeleton />}>
-        <LmsClientShell />
-      </Suspense>
+      <LmsClientShell />
     </div>
   );
 }

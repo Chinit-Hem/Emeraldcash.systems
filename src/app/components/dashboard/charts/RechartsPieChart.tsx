@@ -11,6 +11,7 @@
 
 import { Cell, Legend, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 import type { PieDatum } from "@/lib/analytics";
+import { useChartTheme } from "./useChartTheme";
 
 type RechartsPieChartProps = {
   data: PieDatum[];
@@ -19,6 +20,8 @@ type RechartsPieChartProps = {
 };
 
 export default function RechartsPieChart({ data, width = 300, height = 300 }: RechartsPieChartProps) {
+  const chartTheme = useChartTheme();
+
   return (
     <ResponsiveContainer width={width} height={height} minWidth={0} minHeight={0}>
       <PieChart>
@@ -29,7 +32,7 @@ export default function RechartsPieChart({ data, width = 300, height = 300 }: Re
           innerRadius={60}
           outerRadius={100}
           paddingAngle={2}
-          stroke="#e5e7eb"
+          stroke={chartTheme.pieStroke}
           strokeOpacity={0.5}
           strokeWidth={1}
         >
@@ -39,25 +42,11 @@ export default function RechartsPieChart({ data, width = 300, height = 300 }: Re
         </Pie>
         <Tooltip
           formatter={(value: unknown) => [String(value), "Vehicles"]}
-          contentStyle={{
-            background: "rgba(255, 255, 255, 0.95)",
-            border: "1px solid #e5e7eb",
-            borderRadius: "12px",
-            backdropFilter: "blur(12px)",
-            boxShadow: "0 10px 26px rgba(0, 0, 0, 0.1)",
-            color: "#1f2937",
-          }}
-          labelStyle={{ color: "#6b7280", fontWeight: 600 }}
-          itemStyle={{ color: "#1f2937" }}
+          contentStyle={chartTheme.tooltipContentStyle}
+          labelStyle={chartTheme.tooltipLabelStyle}
+          itemStyle={chartTheme.tooltipItemStyle}
         />
-        <Legend 
-          wrapperStyle={{ 
-            color: "#6b7280", 
-            fontSize: 12, 
-            fontWeight: 500,
-            paddingTop: "20px"
-          }} 
-        />
+        <Legend wrapperStyle={chartTheme.legendStyle} />
       </PieChart>
     </ResponsiveContainer>
   );

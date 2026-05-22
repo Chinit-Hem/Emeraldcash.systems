@@ -1,5 +1,5 @@
-// Khmer Language Support for Emerald Cash VMS
-// ភាសាខ្មែរសម្រាប់ Emerald Cash VMS
+// Khmer Language Support for Emerald Cash
+// ភាសាខ្មែរសម្រាប់ អេមើរ៉ល ឃែស
 
 export type Language = "en" | "km";
 
@@ -890,6 +890,12 @@ const extraEnglishToKhmer: Record<string, string> = {
   "Open menu": "បើកម៉ឺនុយ",
   "Go back": "ត្រឡប់ក្រោយ",
   "VMS PRO": "VMS PRO",
+  "EmeraldCash": "អេមើរ៉ល ឃែស",
+  "Emerald Cash": "អេមើរ៉ល ឃែស",
+  "Emerald Cash VMS": "ប្រព័ន្ធ អេមើរ៉ល ឃែស",
+  "Vehicle Management": "ការគ្រប់គ្រងយានយន្ត",
+  "Vehicle Management System by Emerald Cash": "ប្រព័ន្ធគ្រប់គ្រងយានយន្តដោយ អេមើរ៉ល ឃែស",
+  "Emerald Cash Systems": "ប្រព័ន្ធ អេមើរ៉ល ឃែស",
 
   // Login and account
   "Login failed": "ការចូលបរាជ័យ",
@@ -920,6 +926,19 @@ const extraEnglishToKhmer: Record<string, string> = {
   "Platform": "វេទិកា",
   "Version": "ជំនាន់",
   "All rights reserved": "រក្សាសិទ្ធិគ្រប់យ៉ាង",
+  "Application Error": "កំហុសកម្មវិធី",
+  "Try Again": "ព្យាយាមម្តងទៀត",
+  "Go Back": "ត្រឡប់ក្រោយ",
+  "Unknown": "មិនស្គាល់",
+  "Unknown error": "កំហុសមិនស្គាល់",
+  "Access denied": "គ្មានសិទ្ធិចូលប្រើ",
+  "Database error": "កំហុសមូលដ្ឋានទិន្នន័យ",
+  "User not found": "រកមិនឃើញអ្នកប្រើប្រាស់",
+  "Form Errors": "កំហុសទម្រង់",
+  "ID": "លេខសម្គាល់",
+  "ID:": "លេខសម្គាល់៖",
+  "Error ID:": "លេខសម្គាល់កំហុស៖",
+  "N/A": "មិនមាន",
 
   // Dashboard
   "Failed to load dashboard data": "បរាជ័យក្នុងការផ្ទុកទិន្នន័យផ្ទាំងគ្រប់គ្រង",
@@ -933,11 +952,31 @@ const extraEnglishToKhmer: Record<string, string> = {
   "Export": "នាំចេញ",
   "Show": "បង្ហាញ",
   "Show:": "បង្ហាញ៖",
+  "Showing all": "បង្ហាញទាំងអស់",
   "of": "នៃ",
   "vehicles": "យានយន្ត",
   "Filters": "តម្រង",
   "Reset": "កំណត់ឡើងវិញ",
   "All Colors": "ពណ៌ទាំងអស់",
+  "No data available": "គ្មានទិន្នន័យ",
+  "Total Staff": "បុគ្គលិកសរុប",
+  "Categories": "ប្រភេទ",
+  "Completion": "ការបញ្ចប់",
+  "Details": "ព័ត៌មានលម្អិត",
+  "Last Activity": "សកម្មភាពចុងក្រោយ",
+  "Last sync:": "សមកាលកម្មចុងក្រោយ៖",
+  "Never": "មិនដែល",
+  "More": "ច្រើនទៀត",
+  "Less": "តិចជាង",
+  "No Images": "គ្មានរូបភាព",
+  "No Image": "គ្មានរូបភាព",
+  "Avg Price:": "តម្លៃមធ្យម៖",
+  "Brand Chart": "គំនូសតាងម៉ាក",
+  "Category Chart": "គំនូសតាងប្រភេទ",
+  "Condition Chart": "គំនូសតាងស្ថានភាព",
+  "Monthly Trends Chart": "គំនូសតាងនិន្នាការប្រចាំខែ",
+  "D.O.C. 40%": "D.O.C. 40%",
+  "D.O.C. 40%:": "D.O.C. 40%៖",
 
   // Vehicles
   "Vehicle Inventory": "បញ្ជីយានយន្ត",
@@ -988,14 +1027,35 @@ const extraEnglishToKhmer: Record<string, string> = {
   "Price 70% ($)": "តម្លៃ 70% ($)",
   "Price 40%": "តម្លៃ 40%",
   "Price 70%": "តម្លៃ 70%",
+  "Price": "តម្លៃ",
+  "PriceNew": "តម្លៃថ្មី",
+  "priceNew": "តម្លៃថ្មី",
+  "TaxType": "ប្រភេទពន្ធ",
+  "taxType": "ប្រភេទពន្ធ",
+  "BodyType": "ប្រភេទតួ",
+  "bodyType": "ប្រភេទតួ",
   "DOC 40%": "DOC 40%",
   "DOC 70%": "DOC 70%",
+  "DOC 40% (Auto)": "DOC 40% (ស្វ័យប្រវត្តិ)",
+  "Vehicles 70% (Auto)": "យានយន្ត 70% (ស្វ័យប្រវត្តិ)",
   "Vehicles 70%": "យានយន្ត 70%",
   "Down payment": "ប្រាក់កក់",
   "Installment": "បង់រំលស់",
   "Full vehicle value": "តម្លៃយានយន្តពេញ",
   "Vehicle Details": "ព័ត៌មានលម្អិតយានយន្ត",
   "Vehicle ID": "លេខសម្គាល់យានយន្ត",
+  "Vehicle": "យានយន្ត",
+  "All": "ទាំងអស់",
+  "All Vehicles": "យានយន្តទាំងអស់",
+  "Tuk Tuks": "កង់បី",
+  "Basic Information": "ព័ត៌មានមូលដ្ឋាន",
+  "Specifications": "លក្ខណៈសម្បត្តិ",
+  "Pricing": "តម្លៃ",
+  "Additional Information": "ព័ត៌មានបន្ថែម",
+  "Core information used in search, records, and vehicle display.": "ព័ត៌មានសំខាន់ដែលប្រើសម្រាប់ស្វែងរក កំណត់ត្រា និងការបង្ហាញយានយន្ត។",
+  "40% and 70% values are recalculated automatically when the new price changes.": "តម្លៃ 40% និង 70% ត្រូវបានគណនាឡើងវិញស្វ័យប្រវត្តិ ពេលតម្លៃថ្មីផ្លាស់ប្តូរ។",
+  "Operational classification for tax and condition reporting.": "ការចាត់ថ្នាក់ប្រតិបត្តិការសម្រាប់របាយការណ៍ពន្ធ និងស្ថានភាព។",
+  "Optional internal description for this vehicle record.": "សេចក្តីពិពណ៌នាផ្ទៃក្នុងជាជម្រើសសម្រាប់កំណត់ត្រាយានយន្តនេះ។",
   "Information": "ព័ត៌មាន",
   "Added": "បានបន្ថែម",
   "Added Time": "ពេលបានបន្ថែម",
@@ -1005,9 +1065,61 @@ const extraEnglishToKhmer: Record<string, string> = {
   "No image available": "គ្មានរូបភាព",
   "No image selected": "មិនទាន់ជ្រើសរើសរូបភាព",
   "Vehicle image": "រូបភាពយានយន្ត",
+  "Image preview": "មើលរូបភាពជាមុន",
+  "Image viewer": "កម្មវិធីមើលរូបភាព",
+  "Close image viewer": "បិទកម្មវិធីមើលរូបភាព",
+  "Open image": "បើករូបភាព",
+  "Next image": "រូបភាពបន្ទាប់",
+  "Previous image": "រូបភាពមុន",
+  "Compressed preview": "មើលរូបភាពដែលបានបង្ហាប់ជាមុន",
+  "Preview": "មើលជាមុន",
+  "No image": "គ្មានរូបភាព",
+  "No Plate": "គ្មានស្លាកលេខ",
   "Select category": "ជ្រើសរើសប្រភេទ",
+  "Select condition": "ជ្រើសរើសស្ថានភាព",
+  "Filter by category": "តម្រងតាមប្រភេទ",
+  "Filter by condition": "តម្រងតាមស្ថានភាព",
+  "Filter by tax type": "តម្រងតាមប្រភេទពន្ធ",
+  "Group vehicles by": "ដាក់ក្រុមយានយន្តតាម",
+  "Refresh data": "ធ្វើឱ្យទិន្នន័យថ្មី",
+  "Search vehicles...": "ស្វែងរកយានយន្ត...",
+  "Loading vehicles...": "កំពុងផ្ទុកយានយន្ត...",
+  "Loading Vehicles": "កំពុងផ្ទុកយានយន្ត",
+  "Items per page": "ចំនួនក្នុងមួយទំព័រ",
+  "Showing": "បង្ហាញ",
+  "Prev": "មុន",
+  "Next page": "ទំព័របន្ទាប់",
+  "Previous page": "ទំព័រមុន",
+  "Back to Vehicles": "ត្រឡប់ទៅយានយន្ត",
+  "Add New Vehicle": "បន្ថែមយានយន្តថ្មី",
+  "Save Vehicle": "រក្សាទុកយានយន្ត",
+  "Save Changes": "រក្សាទុកការផ្លាស់ប្តូរ",
+  "Updating...": "កំពុងធ្វើបច្ចុប្បន្នភាព...",
+  "Saving...": "កំពុងរក្សាទុក...",
+  "Deleting...": "កំពុងលុប...",
+  "Creating...": "កំពុងបង្កើត...",
+  "Processing image...": "កំពុងដំណើរការរូបភាព...",
+  "Processing Image...": "កំពុងដំណើរការរូបភាព...",
+  "You have unsaved changes": "អ្នកមានការផ្លាស់ប្តូរដែលមិនទាន់រក្សាទុក",
+  "Drag & drop, click to upload, paste URL, or Ctrl+V to paste image": "អូស និងទម្លាក់ ចុចដើម្បីផ្ទុកឡើង បិទភ្ជាប់ URL ឬ Ctrl+V ដើម្បីបិទភ្ជាប់រូបភាព",
+  "Drag & drop, click to upload, paste image URL, or Ctrl+V to paste image": "អូស និងទម្លាក់ ចុចដើម្បីផ្ទុកឡើង បិទភ្ជាប់ URL រូបភាព ឬ Ctrl+V ដើម្បីបិទភ្ជាប់រូបភាព",
+  "Type or select color": "វាយ ឬជ្រើសរើសពណ៌",
+  "Type or select tax type": "វាយ ឬជ្រើសរើសប្រភេទពន្ធ",
+  "e.g. Toyota": "ឧ. តូយ៉ូតា",
+  "e.g. Camry": "ឧ. កាមរី",
+  "e.g. 2023": "ឧ. ២០២៣",
+  "e.g. 2022": "ឧ. ២០២២",
+  "e.g. PP-1234": "ឧ. PP-1234",
+  "e.g. New, Used": "ឧ. ថ្មី, បានប្រើ",
+  "e.g. New, Used, Excellent": "ឧ. ថ្មី, បានប្រើ, ល្អឥតខ្ចោះ",
+  "e.g. Sedan, SUV": "ឧ. សេដាន, SUV",
+  "e.g. Sedan, SUV, Truck": "ឧ. សេដាន, SUV, រថយន្តដឹក",
+  "Enter market price": "បញ្ចូលតម្លៃទីផ្សារ",
+  "Enter vehicle description...": "បញ្ចូលសេចក្តីពិពណ៌នាយានយន្ត...",
+  "Additional details...": "ព័ត៌មានបន្ថែម...",
   "Error Loading Vehicle": "កំហុសក្នុងការផ្ទុកយានយន្ត",
   "Vehicle Not Found": "រកមិនឃើញយានយន្ត",
+  "The vehicle you&apos;re looking for doesn&apos;t exist or has been removed.": "យានយន្តដែលអ្នកកំពុងរកមិនមាន ឬត្រូវបានដកចេញហើយ។",
   "The vehicle you're looking for doesn't exist or has been removed.": "យានយន្តដែលអ្នកកំពុងរកមិនមាន ឬត្រូវបានដកចេញហើយ។",
   "Auto-calculated": "គណនាស្វ័យប្រវត្តិ",
   "Only Admin users can delete vehicles. Please contact an administrator if you need to remove this vehicle.": "មានតែអ្នកគ្រប់គ្រងប៉ុណ្ណោះអាចលុបយានយន្តបាន។ សូមទាក់ទងអ្នកគ្រប់គ្រង ប្រសិនបើអ្នកត្រូវការលុបយានយន្តនេះ។",
@@ -1018,6 +1130,7 @@ const extraEnglishToKhmer: Record<string, string> = {
   "Good": "ល្អ",
   "Fair": "មធ្យម",
   "Poor": "ខ្សោយ",
+  "Excellent": "ល្អឥតខ្ចោះ",
 
   // Stock
   "Stock Management": "គ្រប់គ្រងស្តុក",
@@ -1047,6 +1160,9 @@ const extraEnglishToKhmer: Record<string, string> = {
   "Return failed": "ការត្រឡប់បរាជ័យ",
   "Available": "ទំនេរ",
   "Reserved": "បានកក់",
+  "KB": "KB",
+  "Adjustment reason for audit trail...": "មូលហេតុកែតម្រូវសម្រាប់កំណត់ហេតុត្រួតពិនិត្យ...",
+  "+10 or -5": "+10 ឬ -5",
 
   // SMS assets and transfers
   "Return to Stock": "ត្រឡប់ទៅស្តុក",
@@ -1055,6 +1171,7 @@ const extraEnglishToKhmer: Record<string, string> = {
   "Back to SMS": "ត្រឡប់ទៅ SMS",
   "Back to SMS Dashboard": "ត្រឡប់ទៅផ្ទាំងគ្រប់គ្រង SMS",
   "Transfer Inbox": "ប្រអប់ការផ្ទេរ",
+  "New Transfer": "ការផ្ទេរថ្មី",
   "Mark read": "សម្គាល់ថាបានអាន",
   "unread notification": "ការជូនដំណឹងមិនទាន់អាន",
   "unread notifications": "ការជូនដំណឹងមិនទាន់អាន",
@@ -1075,6 +1192,10 @@ const extraEnglishToKhmer: Record<string, string> = {
   "PNG, JPG up to 10MB": "PNG, JPG រហូតដល់ 10MB",
   "Reference ID": "លេខសម្គាល់យោង",
   "View details": "មើលព័ត៌មានលម្អិត",
+  "Asset preview": "មើលទ្រព្យសម្បត្តិជាមុន",
+  "Last Movement": "ចលនាចុងក្រោយ",
+  "Return proof": "ភស្តុតាងត្រឡប់",
+  "Copy JSON": "ចម្លង JSON",
   "Search assets by name, code, location, assigned person...": "ស្វែងរកទ្រព្យសម្បត្តិតាមឈ្មោះ កូដ ទីតាំង ឬអ្នកទទួល...",
   "Filter by asset status": "តម្រងតាមស្ថានភាពទ្រព្យសម្បត្តិ",
   "Assigned to...": "ចាត់តាំងឱ្យ...",
@@ -1108,6 +1229,23 @@ const extraEnglishToKhmer: Record<string, string> = {
   "JPG, PNG, WebP, or GIF": "JPG, PNG, WebP ឬ GIF",
   "Remove return image": "យករូបភាពត្រឡប់ចេញ",
   "Returning...": "កំពុងត្រឡប់...",
+  "Additional details about this asset...": "ព័ត៌មានបន្ថែមអំពីទ្រព្យសម្បត្តិនេះ...",
+  "e.g. DELL-XPS-13-2024": "ឧ. DELL-XPS-13-2024",
+  "e.g. Laptop, Desk Chair": "ឧ. កុំព្យូទ័រយួរដៃ, កៅអីតុ",
+  "e.g. Office Laptop Dell XPS": "ឧ. កុំព្យូទ័រយួរដៃការិយាល័យ Dell XPS",
+  "e.g. Phnom Penh Office": "ឧ. ការិយាល័យភ្នំពេញ",
+  "e.g. PO-2024-001": "ឧ. PO-2024-001",
+  "e.g. Warehouse A, Office Building": "ឧ. ឃ្លាំង A, អាគារការិយាល័យ",
+  "Enter sender username": "បញ្ចូលឈ្មោះអ្នកផ្ញើ",
+  "Enter receiver username": "បញ្ចូលឈ្មោះអ្នកទទួល",
+  "Enter rejection reason...": "បញ្ចូលមូលហេតុបដិសេធ...",
+  "Message to receiver": "សារទៅអ្នកទទួល",
+  "Message to receiver (Optional)": "សារទៅអ្នកទទួល (មិនបាច់)",
+  "Example: Please accept this projector for the Sen Sok meeting room...": "ឧទាហរណ៍៖ សូមទទួលយកម៉ាស៊ីនបញ្ចាំងនេះសម្រាប់បន្ទប់ប្រជុំសែនសុខ...",
+  "Select an asset or enter asset ID": "ជ្រើសរើសទ្រព្យសម្បត្តិ ឬបញ្ចូលលេខសម្គាល់ទ្រព្យសម្បត្តិ",
+  "Transfer Image": "រូបភាពផ្ទេរ",
+  "Transfer Image (Optional)": "រូបភាពផ្ទេរ (មិនបាច់)",
+  "Upload transfer photo": "ផ្ទុកឡើងរូបថតផ្ទេរ",
   "Signed in as": "បានចូលជា",
   "Status:": "ស្ថានភាព៖",
   "Assigned:": "បានចាត់តាំង៖",
@@ -1115,6 +1253,23 @@ const extraEnglishToKhmer: Record<string, string> = {
   // LMS and training
   "Training Portal": "ផ្ទាំងបណ្តុះបណ្តាល",
   "Master vehicle valuation skills": "រៀនជំនាញវាយតម្លៃយានយន្ត",
+  "Valuation": "ការវាយតម្លៃ",
+  "System Training": "ការបណ្តុះបណ្តាលប្រព័ន្ធ",
+  "Customer Service": "សេវាអតិថិជន",
+  "Compliance": "ការអនុលោមតាមច្បាប់",
+  "Introduction to Emerald Cloud System": "ការណែនាំអំពីប្រព័ន្ធអេមើរ៉ល ក្លោដ",
+  "Emerald Cloud": "អេមើរ៉ល ក្លោដ",
+  "Introduction to Vehicle Valuation": "ការណែនាំអំពីការវាយតម្លៃយានយន្ត",
+  "VMS Platform Overview": "ទិដ្ឋភាពទូទៅនៃវេទិកា VMS",
+  "Advanced Pricing Strategies": "យុទ្ធសាស្ត្រកំណត់តម្លៃកម្រិតខ្ពស់",
+  "How to become an outstanding employee": "របៀបក្លាយជាបុគ្គលិកឆ្នើម",
+  "Learn vehicle valuation techniques and pricing strategies": "រៀនបច្ចេកទេសវាយតម្លៃយានយន្ត និងយុទ្ធសាស្ត្រកំណត់តម្លៃ",
+  "How to use the VMS platform effectively": "របៀបប្រើវេទិកា VMS ឱ្យមានប្រសិទ្ធភាព",
+  "Best practices for customer interactions": "ការអនុវត្តល្អបំផុតសម្រាប់ការទំនាក់ទំនងជាមួយអតិថិជន",
+  "Legal requirements and documentation standards": "តម្រូវការផ្លូវច្បាប់ និងស្តង់ដារឯកសារ",
+  "Learn the basics of vehicle valuation and pricing": "រៀនមូលដ្ឋាននៃការវាយតម្លៃ និងកំណត់តម្លៃយានយន្ត",
+  "Deep dive into pricing models and depreciation": "សិក្សាជ្រាលជ្រៅអំពីគំរូកំណត់តម្លៃ និងការរំលោះតម្លៃ",
+  "Getting started with the Vehicle Management System": "ចាប់ផ្តើមប្រើប្រព័ន្ធគ្រប់គ្រងយានយន្ត",
   "Learning": "ការរៀន",
   "Progress": "វឌ្ឍនភាព",
   "Achievements": "សមិទ្ធផល",
@@ -1126,12 +1281,20 @@ const extraEnglishToKhmer: Record<string, string> = {
   "Resume": "បន្ត",
   "Training Categories": "ប្រភេទបណ្តុះបណ្តាល",
   "lessons": "មេរៀន",
+  "Start": "ចាប់ផ្តើម",
+  "Review": "ពិនិត្យឡើងវិញ",
+  "Unlocked": "បានដោះសោ",
+  "Overall": "សរុប",
   "Completed": "បានបញ្ចប់",
   "In Progress": "កំពុងដំណើរការ",
   "Locked": "ជាប់សោ",
   "Overall Completion": "ការបញ្ចប់សរុប",
   "Staff Progress": "វឌ្ឍនភាពបុគ្គលិក",
   "No staff data available": "គ្មានទិន្នន័យបុគ្គលិក",
+  "Loading users...": "កំពុងផ្ទុកអ្នកប្រើប្រាស់...",
+  "Go to Settings to sync users with LMS staff": "ទៅការកំណត់ ដើម្បីសមកាលកម្មអ្នកប្រើប្រាស់ជាមួយបុគ្គលិក LMS",
+  "LMS Only": "តែ LMS",
+  "Settings Only": "តែការកំណត់",
   "Sync from Settings": "សមកាលកម្មពីការកំណត់",
   "First Steps": "ជំហានដំបូង",
   "Complete your first lesson": "បញ្ចប់មេរៀនដំបូងរបស់អ្នក",
@@ -1154,6 +1317,47 @@ const extraEnglishToKhmer: Record<string, string> = {
   "Back to Dashboard": "ត្រឡប់ទៅផ្ទាំងគ្រប់គ្រង",
   "No lessons available in this category": "គ្មានមេរៀនក្នុងប្រភេទនេះទេ",
   "Loading lesson...": "កំពុងផ្ទុកមេរៀន...",
+  "Lesson not found": "រកមិនឃើញមេរៀន",
+  "Test": "តេស្ត",
+  "Course Content": "មាតិកាវគ្គសិក្សា",
+  "Back to course": "ត្រឡប់ទៅវគ្គសិក្សា",
+  "Mark Complete": "សម្គាល់ថាបញ្ចប់",
+  "Mark as Complete": "សម្គាល់ថាបញ្ចប់",
+  "Mark lesson complete": "សម្គាល់មេរៀនថាបញ្ចប់",
+  "Lesson Progress": "វឌ្ឍនភាពមេរៀន",
+  "Instruction Progress": "វឌ្ឍនភាពការណែនាំ",
+  "Follow along with the video": "អនុវត្តតាមវីដេអូ",
+  "No instructions available for this lesson": "គ្មានការណែនាំសម្រាប់មេរៀននេះទេ",
+  "First watch: seek and speed protected": "មើលលើកដំបូង៖ ការរំកិល និងល្បឿនត្រូវបានការពារ",
+  "Replay: seek and speed unlocked": "ចាក់ឡើងវិញ៖ អាចរំកិល និងប្តូរល្បឿនបាន",
+  "Replay unlocked": "បានដោះសោការចាក់ឡើងវិញ",
+  "Finished the lesson?": "បានបញ្ចប់មេរៀនហើយឬនៅ?",
+  "Lesson Locked": "មេរៀនជាប់សោ",
+  "Please complete previous lessons first.": "សូមបញ្ចប់មេរៀនមុនៗជាមុនសិន។",
+  "Go to Available Lesson": "ទៅមេរៀនដែលអាចរៀនបាន",
+  "Loading secure player...": "កំពុងផ្ទុកកម្មវិធីចាក់វីដេអូសុវត្ថិភាព...",
+  "Video player unavailable": "កម្មវិធីចាក់វីដេអូមិនអាចប្រើបាន",
+  "The embedded video player cannot load due to browser or network restrictions.": "កម្មវិធីចាក់វីដេអូដែលបានបង្កប់មិនអាចផ្ទុកបាន ដោយសារការកំណត់របស់កម្មវិធីរុករក ឬបណ្ដាញ។",
+  "Open video on YouTube": "បើកវីដេអូនៅលើ YouTube",
+  "Restart video": "ចាប់ផ្តើមវីដេអូឡើងវិញ",
+  "Toggle fullscreen": "បិទ/បើកពេញអេក្រង់",
+  "Hide instructions": "លាក់ការណែនាំ",
+  "Show instructions": "បង្ហាញការណែនាំ",
+  "Next Step": "ជំហានបន្ទាប់",
+  "Playback speed above 1.25x is not allowed. Speed reset to 1x.": "មិនអនុញ្ញាតឱ្យប្រើល្បឿនចាក់លើស 1.25x ទេ។ ល្បឿនត្រូវបានកំណត់ត្រឡប់ទៅ 1x។",
+  "Video paused because the tab is no longer active.": "វីដេអូត្រូវបានផ្អាក ព្រោះផ្ទាំងនេះលែងសកម្ម។",
+  "Higher playback speeds unlock after you finish watching this lesson.": "ល្បឿនចាក់ខ្ពស់នឹងដោះសោ បន្ទាប់ពីអ្នកមើលមេរៀននេះចប់។",
+  "Speeds above 1.25x unlock after completing": "ល្បឿនលើស 1.25x នឹងដោះសោបន្ទាប់ពីបញ្ចប់",
+  "Unable to mark this lesson complete. Please try again.": "មិនអាចសម្គាល់មេរៀននេះថាបញ្ចប់បានទេ។ សូមព្យាយាមម្តងទៀត។",
+  "Watched": "បានមើល",
+  "Watching": "កំពុងមើល",
+  "Not started": "មិនទាន់ចាប់ផ្តើម",
+  "Playback speed": "ល្បឿនចាក់វីដេអូ",
+  "Play video": "ចាក់វីដេអូ",
+  "Pause video": "ផ្អាកវីដេអូ",
+  "Step-by-Step Instructions": "ការណែនាំជាជំហានៗ",
+  "Markdown formatting supported. Each line becomes a step.": "គាំទ្រទ្រង់ទ្រាយ Markdown។ បន្ទាត់នីមួយៗក្លាយជាជំហានមួយ។",
+  "1. First step&#10;2. Second step&#10;3. Third step...": "1. ជំហានទីមួយ&#10;2. ជំហានទីពីរ&#10;3. ជំហានទីបី...",
   "Create users and sync to LMS": "បង្កើតអ្នកប្រើប្រាស់ និងសមកាលកម្មទៅ LMS",
   "Admin Access Required": "ត្រូវការសិទ្ធិអ្នកគ្រប់គ្រង",
   "Default Admin Credentials:": "គណនីអ្នកគ្រប់គ្រងលំនាំដើម៖",
@@ -1162,12 +1366,36 @@ const extraEnglishToKhmer: Record<string, string> = {
   "Edit Profile": "កែប្រែប្រវត្តិរូប",
   "Create and edit training categories": "បង្កើត និងកែប្រែប្រភេទបណ្តុះបណ្តាល",
   "Category Name": "ឈ្មោះប្រភេទ",
+  "Add New Category": "បន្ថែមប្រភេទថ្មី",
+  "Brief description of this category...": "សេចក្តីពិពណ៌នាសង្ខេបអំពីប្រភេទនេះ...",
+  "Brief description of what this category covers": "សេចក្តីពិពណ៌នាសង្ខេបអំពីអ្វីដែលប្រភេទនេះគ្របដណ្ដប់",
+  "e.g., Vehicle Basics": "ឧ. មូលដ្ឋានយានយន្ត",
+  "e.g., Vehicle Valuation": "ឧ. ការវាយតម្លៃយានយន្ត",
+  "e.g., Learn vehicle valuation techniques and pricing strategies...": "ឧ. រៀនបច្ចេកទេសវាយតម្លៃយានយន្ត និងយុទ្ធសាស្ត្រកំណត់តម្លៃ...",
+  "Icon": "រូបតំណាង",
+  "Select an icon to represent this category": "ជ្រើសរើសរូបតំណាងសម្រាប់តំណាងប្រភេទនេះ",
+  "Select a color theme for this category": "ជ្រើសរើសពណ៌សម្រាប់ប្រភេទនេះ",
+  "Position in the category list (0 = first)": "ទីតាំងក្នុងបញ្ជីប្រភេទ (0 = ដំបូង)",
   "Order": "លំដាប់",
   "No Categories Yet": "មិនទាន់មានប្រភេទ",
   "Create your first category to get started": "បង្កើតប្រភេទដំបូងដើម្បីចាប់ផ្តើម",
   "Create and organize training content": "បង្កើត និងរៀបចំមាតិកាបណ្តុះបណ្តាល",
   "Filter by category:": "តម្រងតាមប្រភេទ៖",
   "Lesson Title": "ចំណងជើងមេរៀន",
+  "Add New Lesson": "បន្ថែមមេរៀនថ្មី",
+  "Brief description of this lesson...": "សេចក្តីពិពណ៌នាសង្ខេបអំពីមេរៀននេះ...",
+  "Brief overview of the lesson content": "ទិដ្ឋភាពសង្ខេបនៃមាតិកាមេរៀន",
+  "Brief description of the lesson content...": "សេចក្តីពិពណ៌នាសង្ខេបនៃមាតិកាមេរៀន...",
+  "Enter a descriptive title for the lesson": "បញ្ចូលចំណងជើងពិពណ៌នាសម្រាប់មេរៀន",
+  "e.g., Introduction to Vehicle Valuation": "ឧ. ការណែនាំអំពីការវាយតម្លៃយានយន្ត",
+  "e.g., 8": "ឧ. 8",
+  "Lesson duration:": "រយៈពេលមេរៀន៖",
+  "Visible to": "បង្ហាញដល់",
+  "Admin can always view every lesson.": "អ្នកគ្រប់គ្រងអាចមើលមេរៀនទាំងអស់ជានិច្ច។",
+  "No categories available": "គ្មានប្រភេទ",
+  "Please create a category first before adding lessons.": "សូមបង្កើតប្រភេទជាមុន មុនពេលបន្ថែមមេរៀន។",
+  "Order in Category": "លំដាប់ក្នុងប្រភេទ",
+  "Position within the category (0 = first)": "ទីតាំងក្នុងប្រភេទ (0 = ដំបូង)",
   "Duration (minutes)": "រយៈពេល (នាទី)",
   "YouTube URL": "URL YouTube",
   "Active (visible to staff)": "សកម្ម (បង្ហាញឱ្យបុគ្គលិក)",
@@ -1175,6 +1403,21 @@ const extraEnglishToKhmer: Record<string, string> = {
   "Create your first lesson to get started": "បង្កើតមេរៀនដំបូងដើម្បីចាប់ផ្តើម",
   "Video": "វីដេអូ",
   "Valid YouTube URL": "URL YouTube ត្រឹមត្រូវ",
+  "YouTube thumbnail preview": "មើលរូបភាពតូច YouTube ជាមុន",
+  "Branch Location": "ទីតាំងសាខា",
+  "Phone Number": "លេខទូរស័ព្ទ",
+  "Optional: Staff member's email address": "ជាជម្រើស៖ អាសយដ្ឋានអ៊ីមែលរបស់បុគ្គលិក",
+  "Optional: Which branch they work at": "ជាជម្រើស៖ សាខាដែលពួកគេធ្វើការ",
+  "Optional: Contact phone number": "ជាជម្រើស៖ លេខទូរស័ព្ទទំនាក់ទំនង",
+  "Enter the staff member's full name": "បញ្ចូលឈ្មោះពេញរបស់បុគ្គលិក",
+  "Minimum 4 characters": "យ៉ាងហោចណាស់ 4 តួអក្សរ",
+  "e.g. John Doe": "ឧ. John Doe",
+  "e.g. user@example.com": "ឧ. user@example.com",
+  "e.g. employee01": "ឧ. employee01",
+  "e.g. +1 234 567 890": "ឧ. +1 234 567 890",
+  "hem chinit": "ហែម ជិនិត",
+  "hem.chinit@example.com": "hem.chinit@example.com",
+  "Phnom Penh": "ភ្នំពេញ",
 
   // Shared UI
   "Only administrators can manage roles.": "មានតែអ្នកគ្រប់គ្រងប៉ុណ្ណោះអាចគ្រប់គ្រងតួនាទីបាន។",
@@ -1182,6 +1425,13 @@ const extraEnglishToKhmer: Record<string, string> = {
   "vs last month": "ធៀបនឹងខែមុន",
   "Failed to load image": "បរាជ័យក្នុងការផ្ទុករូបភាព",
   "Close alert": "បិទការជូនដំណឹង",
+  "Close notification": "បិទការជូនដំណឹង",
+  "Close staff details": "បិទព័ត៌មានលម្អិតបុគ្គលិក",
+  "Clear": "សម្អាត",
+  "Clear search": "សម្អាតការស្វែងរក",
+  "Exporting...": "កំពុងនាំចេញ...",
+  "Deleting": "កំពុងលុប",
+  "Own": "ផ្ទាល់ខ្លួន",
   "Did you mean?": "តើអ្នកចង់សំដៅដល់នេះឬ?",
   "Very Similar": "ស្រដៀងខ្លាំង",
   "Similar": "ស្រដៀង",
@@ -1202,6 +1452,13 @@ const extraEnglishToKhmer: Record<string, string> = {
   "Search": "ស្វែងរក",
   "Refresh": "ធ្វើឱ្យថ្មី",
   "Retry": "ព្យាយាមម្តងទៀត",
+  "Change password": "ប្តូរពាក្យសម្ងាត់",
+  "Current Password": "ពាក្យសម្ងាត់បច្ចុប្បន្ន",
+  "New Password": "ពាក្យសម្ងាត់ថ្មី",
+  "Confirm New Password": "បញ្ជាក់ពាក្យសម្ងាត់ថ្មី",
+  "Confirm new password": "បញ្ជាក់ពាក្យសម្ងាត់ថ្មី",
+  "Enter current password": "បញ្ចូលពាក្យសម្ងាត់បច្ចុប្បន្ន",
+  "Enter new password (min 4 characters)": "បញ្ចូលពាក្យសម្ងាត់ថ្មី (យ៉ាងហោចណាស់ 4 តួអក្សរ)",
   "Description": "សេចក្តីពិពណ៌នា",
   "Location": "ទីតាំង",
   "Quantity": "បរិមាណ",
@@ -1217,6 +1474,164 @@ const extraEnglishToKhmer: Record<string, string> = {
   "Full Name": "ឈ្មោះពេញ",
   "New": "ថ្មី",
   "Used": "បានប្រើ",
+  "Award": "រង្វាន់",
+  "Book": "សៀវភៅ",
+  "BookOpen": "បើកសៀវភៅ",
+  "Calculator": "ម៉ាស៊ីនគិតលេខ",
+  "Document": "ឯកសារ",
+  "FileText": "អត្ថបទឯកសារ",
+  "HelpCircle": "ជំនួយ",
+  "Monitor": "ម៉ូនីទ័រ",
+  "Shield": "ខែល",
+  "Blue": "ខៀវ",
+  "Cyan": "ខៀវស្រាល",
+  "Emerald": "បៃតងមរកត",
+  "Indigo": "ខៀវជាំ",
+  "Orange": "ទឹកក្រូច",
+  "Pink": "ផ្កាឈូក",
+  "Purple": "ស្វាយ",
+  "Red": "ក្រហម",
+  "Amber": "លឿងទុំ",
+  "Cambodia Flag": "ទង់ជាតិកម្ពុជា",
+  "Create Role": "បង្កើតតួនាទី",
+  "Delete role": "លុបតួនាទី",
+  "Brief description of this role's responsibilities": "សេចក្តីពិពណ៌នាសង្ខេបអំពីការទទួលខុសត្រូវរបស់តួនាទីនេះ",
+  "e.g., Manager, Supervisor, Viewer": "ឧ. អ្នកគ្រប់គ្រង, អ្នកត្រួតពិនិត្យ, អ្នកមើល",
+
+  // Coverage sweep for remaining visible labels, help text, and dialogs
+  "40% Price": "តម្លៃ 40%",
+  "70% Price": "តម្លៃ 70%",
+  "New Price": "តម្លៃថ្មី",
+  "New Price *": "តម្លៃថ្មី *",
+  "Max Year": "ឆ្នាំអតិបរមា",
+  "Min Year": "ឆ្នាំអប្បបរមា",
+  "Notes": "កំណត់សម្គាល់",
+  "Pricing Information": "ព័ត៌មានតម្លៃ",
+  "Ready": "រួចរាល់",
+  "Ready:": "រួចរាល់៖",
+  "Ready to complete": "រួចរាល់សម្រាប់បញ្ចប់",
+  "Refreshing...": "កំពុងធ្វើឱ្យថ្មី...",
+  "Reload": "ផ្ទុកឡើងវិញ",
+  "Reload Page": "ផ្ទុកទំព័រឡើងវិញ",
+  "Repeat password": "បញ្ចូលពាក្យសម្ងាត់ម្តងទៀត",
+  "Retry loading the original image": "ព្យាយាមផ្ទុករូបភាពដើមម្តងទៀត",
+  "Search all fields: brand, model, plate, color, year, price, condition...": "ស្វែងរកគ្រប់វាល៖ ម៉ាក ម៉ូដែល ស្លាកលេខ ពណ៌ ឆ្នាំ តម្លៃ ស្ថានភាព...",
+  "Search by name, email, branch, or role...": "ស្វែងរកតាមឈ្មោះ អ៊ីមែល សាខា ឬតួនាទី...",
+  "Search categories... (Cmd/Ctrl+K)": "ស្វែងរកប្រភេទ... (Cmd/Ctrl+K)",
+  "Search name, code, location...": "ស្វែងរកឈ្មោះ កូដ ទីតាំង...",
+  "Search users by name, email, or phone...": "ស្វែងរកអ្នកប្រើប្រាស់តាមឈ្មោះ អ៊ីមែល ឬទូរស័ព្ទ...",
+  "Search vehicles (Brand, Model, Category, Plate...)...": "ស្វែងរកយានយន្ត (ម៉ាក ម៉ូដែល ប្រភេទ ស្លាកលេខ...)...",
+  "Select a category...": "ជ្រើសរើសប្រភេទ...",
+  "Select All": "ជ្រើសរើសទាំងអស់",
+  "Select color": "ជ្រើសរើសពណ៌",
+  "Select or type a type...": "ជ្រើសរើស ឬវាយប្រភេទ...",
+  "Select tax type": "ជ្រើសរើសប្រភេទពន្ធ",
+  "Select the staff member's role": "ជ្រើសរើសតួនាទីរបស់បុគ្គលិក",
+  "Select the training category": "ជ្រើសរើសប្រភេទបណ្តុះបណ្តាល",
+  "Select theme": "ជ្រើសរើសរូបរាង",
+  "Send an SMS asset to another user, with an optional photo and receiver note.": "ផ្ញើទ្រព្យសម្បត្តិ SMS ទៅអ្នកប្រើផ្សេង ជាមួយរូបថត និងកំណត់សម្គាល់អ្នកទទួលជាជម្រើស។",
+  "Something went wrong in this section. You can try again or navigate elsewhere.": "មានអ្វីមួយខុសក្នុងផ្នែកនេះ។ អ្នកអាចព្យាយាមម្តងទៀត ឬទៅកន្លែងផ្សេង។",
+  "Standard": "ស្តង់ដារ",
+  "Start Learning": "ចាប់ផ្តើមរៀន",
+  "Step Content": "មាតិកាជំហាន",
+  "Supports standard, unlisted, and embed URLs": "គាំទ្រ URL ស្តង់ដារ មិនបង្ហាញសាធារណៈ និងបង្កប់",
+  "Synced": "បានសមកាលកម្ម",
+  "Syncing...": "កំពុងសមកាលកម្ម...",
+  "Tax": "ពន្ធ",
+  "Technical Specifications": "លក្ខណៈបច្ចេកទេស",
+  "Theme mode": "របៀបរូបរាង",
+  "This action cannot be undone": "សកម្មភាពនេះមិនអាចត្រឡប់វិញបានទេ",
+  "Transfer proof": "ភស្តុតាងផ្ទេរ",
+  "Trending": "កំពុងពេញនិយម",
+  "TrendingUp": "និន្នាការកើនឡើង",
+  "Type to search...": "វាយដើម្បីស្វែងរក...",
+  "UK Flag": "ទង់ជាតិអង់គ្លេស",
+  "Updated:": "បានធ្វើបច្ចុប្បន្នភាព៖",
+  "Upload one or more clear vehicle photos. The first photo is used in lists.": "ផ្ទុករូបថតយានយន្តច្បាស់មួយ ឬច្រើន។ រូបទីមួយនឹងត្រូវប្រើក្នុងបញ្ជី។",
+  "Video ID:": "លេខសម្គាល់វីដេអូ៖",
+  "Video progress": "វឌ្ឍនភាពវីដេអូ",
+  "You cannot delete your own account": "អ្នកមិនអាចលុបគណនីខ្លួនឯងបានទេ",
+  "You cannot delete your own LMS staff record": "អ្នកមិនអាចលុបកំណត់ត្រាបុគ្គលិក LMS ផ្ទាល់ខ្លួនបានទេ",
+  "Delete LMS staff record": "លុបកំណត់ត្រាបុគ្គលិក LMS",
+  "Remove transfer image": "យករូបភាពផ្ទេរចេញ",
+  "Failed to refresh data": "បរាជ័យក្នុងការធ្វើឱ្យទិន្នន័យថ្មី",
+  "Invalid image format. Please upload a valid image file.": "ទ្រង់ទ្រាយរូបភាពមិនត្រឹមត្រូវ។ សូមផ្ទុកឯកសាររូបភាពត្រឹមត្រូវ។",
+  "Quantity must be positive": "បរិមាណត្រូវតែជាចំនួនវិជ្ជមាន",
+  "All Staff": "បុគ្គលិកទាំងអស់",
+  "All Selected": "បានជ្រើសរើសទាំងអស់",
+  "All Cleared": "បានសម្អាតទាំងអស់",
+  "All car types": "ប្រភេទរថយន្តទាំងអស់",
+  "All motorcycle types": "ប្រភេទម៉ូតូទាំងអស់",
+  "All tuk tuk types": "ប្រភេទកង់បីទាំងអស់",
+  "All-time": "គ្រប់ពេល",
+  "All-time Totals": "សរុបគ្រប់ពេល",
+  "Apply Filters": "អនុវត្តតម្រង",
+  "Advanced Filters": "តម្រងកម្រិតខ្ពស់",
+  "Filtered": "បានតម្រង",
+  "Filtered view": "ទិដ្ឋភាពបានតម្រង",
+  "Grouped by": "ដាក់ក្រុមតាម",
+  "Sorted by": "តម្រៀបតាម",
+  "Minimal": "តិចតួច",
+  "Viewer": "អ្នកមើល",
+  "price40": "តម្លៃ 40%",
+  "price70": "តម្លៃ 70%",
+  "Your VMS data will appear here as soon as it finishes loading.": "ទិន្នន័យ VMS របស់អ្នកនឹងបង្ហាញទីនេះភ្លាមៗបន្ទាប់ពីផ្ទុករួច។",
+  "Audit": "សវនកម្ម",
+  "Audit Logs": "កំណត់ហេតុសវនកម្ម",
+  "Back to Stock": "ត្រឡប់ទៅស្តុក",
+  "Branch": "សាខា",
+  "Brand / Model": "ម៉ាក / ម៉ូដែល",
+  "Buses": "រថយន្តក្រុង",
+  "Cambodia Market Price": "តម្លៃទីផ្សារកម្ពុជា",
+  "Category name is required": "ត្រូវការឈ្មោះប្រភេទ",
+  "Certificate": "វិញ្ញាបនបត្រ",
+  "Change Photo": "ប្តូររូបថត",
+  "Changes will sync with LMS staff automatically": "ការផ្លាស់ប្តូរនឹងសមកាលកម្មជាមួយបុគ្គលិក LMS ដោយស្វ័យប្រវត្តិ",
+  "Chart failed to load": "គំនូសតាងផ្ទុកបរាជ័យ",
+  "Cleaned Vehicles": "យានយន្តដែលបានសម្អាត",
+  "Click error to replay": "ចុចកំហុសដើម្បីចាក់ឡើងវិញ",
+  "Click to upload or drag & drop": "ចុចដើម្បីផ្ទុកឡើង ឬអូសនិងទម្លាក់",
+  "Click to view": "ចុចដើម្បីមើល",
+  "Completed Lessons": "មេរៀនដែលបានបញ្ចប់",
+  "Confirm Logout": "បញ្ជាក់ការចាកចេញ",
+  "Confirm Permanent Deletion": "បញ្ជាក់ការលុបជាអចិន្ត្រៃយ៍",
+  "Copied": "បានចម្លង",
+  "Copy Error Details": "ចម្លងព័ត៌មានលម្អិតកំហុស",
+  "Copy link": "ចម្លងតំណ",
+  "Create a staff member for training tracking": "បង្កើតបុគ្គលិកសម្រាប់តាមដានការបណ្តុះបណ្តាល",
+  "Create a training category for organizing lessons": "បង្កើតប្រភេទបណ្តុះបណ្តាលសម្រាប់រៀបចំមេរៀន",
+  "Create a training lesson with YouTube video": "បង្កើតមេរៀនបណ្តុះបណ្តាលជាមួយវីដេអូ YouTube",
+  "Create and manage custom roles with granular permissions": "បង្កើត និងគ្រប់គ្រងតួនាទីផ្ទាល់ខ្លួនជាមួយសិទ្ធិលម្អិត",
+  "Create Lesson": "បង្កើតមេរៀន",
+  "Create New Role": "បង្កើតតួនាទីថ្មី",
+  "Create Transfer + Stock": "បង្កើតការផ្ទេរ + ស្តុក",
+  "Create User": "បង្កើតអ្នកប្រើប្រាស់",
+  "Created by": "បង្កើតដោយ",
+  "Critical Error": "កំហុសធ្ងន់ធ្ងរ",
+  "Current Status": "ស្ថានភាពបច្ចុប្បន្ន",
+  "Custom Role": "តួនាទីផ្ទាល់ខ្លួន",
+  "Danger Zone": "តំបន់គ្រោះថ្នាក់",
+  "Dark": "ងងឹត",
+  "Light": "ភ្លឺ",
+  "Date": "កាលបរិច្ឆេទ",
+  "Date Range": "ចន្លោះកាលបរិច្ឆេទ",
+  "Time": "ពេលវេលា",
+  "asc": "ឡើង",
+  "desc": "ចុះ",
+  "Delete user": "លុបអ្នកប្រើប្រាស់",
+  "Development Mode - Error Details:": "របៀបអភិវឌ្ឍន៍ - ព័ត៌មានលម្អិតកំហុស៖",
+  "Dismiss": "បិទ",
+  "Done": "រួចរាល់",
+  "Drop an image file or a direct image URL.": "ទម្លាក់ឯកសាររូបភាព ឬ URL រូបភាពផ្ទាល់។",
+  "Enter a descriptive name for the category": "បញ្ចូលឈ្មោះពិពណ៌នាសម្រាប់ប្រភេទ",
+  "Enter the staff member&apos;s full name": "បញ្ចូលឈ្មោះពេញរបស់បុគ្គលិក",
+  "Error details copied! Paste in message to developer.": "បានចម្លងព័ត៌មានលម្អិតកំហុស! បិទភ្ជាប់ក្នុងសារទៅអ្នកអភិវឌ្ឍន៍។",
+  "© 2024 Emerald Cash": "© 2024 អេមើរ៉ល ឃែស",
+  "© 2024 Emerald Cash - All rights reserved": "© 2024 អេមើរ៉ល ឃែស - រក្សាសិទ្ធិគ្រប់យ៉ាង",
+  "© 2025 Emerald Cash": "© 2025 អេមើរ៉ល ឃែស",
+  "© 2024 Emerald Cash VMS - All rights reserved": "© 2024 ប្រព័ន្ធ អេមើរ៉ល ឃែស - រក្សាសិទ្ធិគ្រប់យ៉ាង",
+  "© 2024 Emerald Cash VMS - រក្សាសិទ្ធិគ្រប់យ៉ាង": "© 2024 ប្រព័ន្ធ អេមើរ៉ល ឃែស - រក្សាសិទ្ធិគ្រប់យ៉ាង",
+  "© 2024 Emerald Cash Systems - All rights reserved": "© 2024 ប្រព័ន្ធ អេមើរ៉ល ឃែស - រក្សាសិទ្ធិគ្រប់យ៉ាង",
 };
 
 const normalizedEnglishToKhmer = createNormalizedMap({
@@ -1225,6 +1640,7 @@ const normalizedEnglishToKhmer = createNormalizedMap({
   ),
   ...extraEnglishToKhmer,
 });
+const normalizedEnglishToKhmerCaseless = createCaseInsensitiveMap(normalizedEnglishToKhmer);
 
 const normalizedKhmerToEnglish = createNormalizedMap(
   Object.fromEntries(
@@ -1244,6 +1660,20 @@ function createNormalizedMap(entries: Record<string, string>): Record<string, st
   );
 }
 
+function createCaseInsensitiveMap(entries: Record<string, string>): Record<string, string> {
+  return Object.fromEntries(
+    Object.entries(entries).map(([source, target]) => [source.toLocaleLowerCase("en-US"), target])
+  );
+}
+
+function lookupTranslation(core: string, lang: Language): string | null {
+  if (lang === "km") {
+    return normalizedEnglishToKhmer[core] ?? normalizedEnglishToKhmerCaseless[core.toLocaleLowerCase("en-US")] ?? null;
+  }
+
+  return normalizedKhmerToEnglish[core] ?? null;
+}
+
 function preserveOuterWhitespace(source: string, translated: string): string {
   const leading = source.match(/^\s*/)?.[0] ?? "";
   const trailing = source.match(/\s*$/)?.[0] ?? "";
@@ -1252,6 +1682,147 @@ function preserveOuterWhitespace(source: string, translated: string): string {
 
 function translateDynamicPhrase(core: string, lang: Language): string | null {
   if (lang === "km") {
+    const decoratedMatch = core.match(/^([^\p{L}\p{N}"']+)\s*(.+)$/u);
+    if (decoratedMatch) {
+      const translatedRest = translatePhrase(decoratedMatch[2], lang);
+      if (translatedRest !== decoratedMatch[2]) return `${decoratedMatch[1]} ${translatedRest}`.replace(/\s+/g, " ").trim();
+    }
+
+    const slashParts = core.split(/\s+\/\s+/);
+    if (slashParts.length > 1) {
+      const translatedParts = slashParts.map((part) => translatePhrase(part, lang));
+      if (translatedParts.some((part, index) => part !== slashParts[index])) return translatedParts.join(" / ");
+    }
+
+    const requiredMatch = core.match(/^(.+?)\s+\*$/);
+    if (requiredMatch) {
+      const translatedBase = lookupTranslation(requiredMatch[1], lang);
+      if (translatedBase) return `${translatedBase} *`;
+    }
+
+    const quotedMatch = core.match(/^["“](.+)["”]$/);
+    if (quotedMatch) {
+      const translatedBase = translatePhrase(quotedMatch[1], lang);
+      if (translatedBase !== quotedMatch[1]) return `"${translatedBase}"`;
+    }
+
+    const autoMatch = core.match(/^(.+?)\s+\(Auto\)$/i);
+    if (autoMatch) {
+      const translatedBase = translatePhrase(autoMatch[1], lang);
+      if (translatedBase !== autoMatch[1]) return `${translatedBase} (ស្វ័យប្រវត្តិ)`;
+    }
+
+    const optionalMatch = core.match(/^(.+?)\s+\((optional)\)$/i);
+    if (optionalMatch) {
+      const translatedBase = translatePhrase(optionalMatch[1], lang);
+      if (translatedBase !== optionalMatch[1]) return `${translatedBase} (មិនបាច់)`;
+    }
+
+    const loadingMatch = core.match(/^Loading\s+(.+?)(\.\.\.)?$/i);
+    if (loadingMatch) {
+      return `កំពុងផ្ទុក${translatePhrase(loadingMatch[1], lang)}${loadingMatch[2] ?? ""}`;
+    }
+
+    const failedToLoadMatch = core.match(/^Failed to load\s+(.+)$/i);
+    if (failedToLoadMatch) {
+      return `បរាជ័យក្នុងការផ្ទុក${translatePhrase(failedToLoadMatch[1], lang)}`;
+    }
+
+    const failedToFetchMatch = core.match(/^Failed to fetch\s+(.+)$/i);
+    if (failedToFetchMatch) {
+      return `បរាជ័យក្នុងការទាញយក${translatePhrase(failedToFetchMatch[1], lang)}`;
+    }
+
+    const notFoundMatch = core.match(/^(.+?)\s+not found$/i);
+    if (notFoundMatch) return `រកមិនឃើញ${translatePhrase(notFoundMatch[1], lang)}`;
+
+    const noAvailableMatch = core.match(/^No\s+(.+?)\s+available$/i);
+    if (noAvailableMatch) return `គ្មាន${translatePhrase(noAvailableMatch[1], lang)}ទេ`;
+
+    const noFoundMatch = core.match(/^No\s+(.+?)\s+found$/i);
+    if (noFoundMatch) return `រកមិនឃើញ${translatePhrase(noFoundMatch[1], lang)}`;
+
+    const noYetMatch = core.match(/^No\s+(.+?)\s+yet$/i);
+    if (noYetMatch) return `មិនទាន់មាន${translatePhrase(noYetMatch[1], lang)}`;
+
+    const verbObjectMatch = core.match(/^(Add|Edit|Delete|Create|Manage|Select|Enter|Open|Close|Remove|Upload|Filter by|Search|Back to|Go to|Clear|Save)\s+(.+?)$/i);
+    if (verbObjectMatch) {
+      const translatedVerb = lookupTranslation(verbObjectMatch[1], lang);
+      const translatedObject = translatePhrase(verbObjectMatch[2], lang);
+      if (translatedVerb && translatedObject !== verbObjectMatch[2]) return `${translatedVerb} ${translatedObject}`;
+    }
+
+    const egMatch = core.match(/^(e\.g\.|Example:)\s+(.+)$/i);
+    if (egMatch) return `${egMatch[1].toLowerCase().startsWith("example") ? "ឧទាហរណ៍៖" : "ឧ."} ${egMatch[2]}`;
+
+    const percentCompleteMatch = core.match(/^%\s+(complete|latest)$/i);
+    if (percentCompleteMatch) return percentCompleteMatch[1].toLowerCase() === "complete" ? "% បានបញ្ចប់" : "% ចុងក្រោយ";
+
+    const numericCompletedMatch = core.match(/^(\d+)%\s+completed$/i);
+    if (numericCompletedMatch) return `${numericCompletedMatch[1]}% បានបញ្ចប់`;
+
+    const completeUnlocksMatch = core.match(/^Complete unlocks at\s+(\d+)%$/i);
+    if (completeUnlocksMatch) return `ការបញ្ចប់នឹងដោះសោនៅ ${completeUnlocksMatch[1]}%`;
+
+    const watchToUnlockMatch = core.match(/^Watch\s+(\d+)%\s+to unlock completion\.?$/i);
+    if (watchToUnlockMatch) return `មើល ${watchToUnlockMatch[1]}% ដើម្បីដោះសោការបញ្ចប់`;
+
+    const watchAtLeastMatch = core.match(/^Watch at least\s+(\d+)%\s+to unlock completion\.?$/i);
+    if (watchAtLeastMatch) return `មើលយ៉ាងហោចណាស់ ${watchAtLeastMatch[1]}% ដើម្បីដោះសោការបញ្ចប់។`;
+
+    const pleaseWatchAtLeastMatch = core.match(/^Please watch at least\s+(\d+)%\s+before completing this lesson\.?$/i);
+    if (pleaseWatchAtLeastMatch) return `សូមមើលយ៉ាងហោចណាស់ ${pleaseWatchAtLeastMatch[1]}% មុនពេលបញ្ចប់មេរៀននេះ។`;
+
+    const watchedPercentMatch = core.match(/^(.+?)\s+•\s+(\d+)%\s+watched$/i);
+    if (watchedPercentMatch) {
+      return `${translatePhrase(watchedPercentMatch[1], lang)} • បានមើល ${watchedPercentMatch[2]}%`;
+    }
+
+    const standaloneWatchedPercentMatch = core.match(/^(\d+)%\s+watched$/i);
+    if (standaloneWatchedPercentMatch) return `បានមើល ${standaloneWatchedPercentMatch[1]}%`;
+
+    const watchedLabelPercentMatch = core.match(/^Watched\s+(\d+)%$/i);
+    if (watchedLabelPercentMatch) return `បានមើល ${watchedLabelPercentMatch[1]}%`;
+
+    const durationMatch = core.match(/^(.+?)\s+•\s+(\d+)\s+min$/i);
+    if (durationMatch) {
+      return `${translatePhrase(durationMatch[1], lang)} • ${durationMatch[2]} នាទី`;
+    }
+
+    const minutesMatch = core.match(/^(\d+)\s+(min|minutes?)$/i);
+    if (minutesMatch) return `${minutesMatch[1]} នាទី`;
+
+    const activeCountMatch = core.match(/^(\d+)\s+active$/i);
+    if (activeCountMatch) return `${activeCountMatch[1]} សកម្ម`;
+
+    const thisWeekMatch = core.match(/^([+-]?\d+)\s+this week$/i);
+    if (thisWeekMatch) return `${thisWeekMatch[1]} សប្តាហ៍នេះ`;
+
+    const lessonProgressMatch = core.match(/^(\d+)\s+of\s+(\d+)\s+(lessons?|staff-lessons)$/i);
+    if (lessonProgressMatch) {
+      return `${lessonProgressMatch[1]} នៃ ${lessonProgressMatch[2]} ${lessonProgressMatch[3].toLowerCase().startsWith("staff") ? "មេរៀនបុគ្គលិក" : "មេរៀន"}`;
+    }
+
+    const slashLessonProgressMatch = core.match(/^(\d+)\s*\/\s*(\d+)\s+(lessons?|staff-lessons)$/i);
+    if (slashLessonProgressMatch) {
+      return `${slashLessonProgressMatch[1]} / ${slashLessonProgressMatch[2]} ${slashLessonProgressMatch[3].toLowerCase().startsWith("staff") ? "មេរៀនបុគ្គលិក" : "មេរៀន"}`;
+    }
+
+    const lessonPositionMatch = core.match(/^Lesson\s+(\d+)\s+of\s+(\d+)$/i);
+    if (lessonPositionMatch) return `មេរៀន ${lessonPositionMatch[1]} នៃ ${lessonPositionMatch[2]}`;
+
+    const stepPositionMatch = core.match(/^Step\s+(\d+)\s+of\s+(\d+)$/i);
+    if (stepPositionMatch) return `ជំហាន ${stepPositionMatch[1]} នៃ ${stepPositionMatch[2]}`;
+
+    const lessonCountMatch = core.match(/^(\d+)\s+lessons?$/i);
+    if (lessonCountMatch) return `${lessonCountMatch[1]} មេរៀន`;
+
+    const completeLessonMatch = core.match(/^Complete:\s+(.+)$/i);
+    if (completeLessonMatch) return `បញ្ចប់៖ ${translatePhrase(completeLessonMatch[1], lang)}`;
+
+    const testNameMatch = core.match(/^test\s*([0-9]+)$/i);
+    if (testNameMatch) return `តេស្ត${testNameMatch[1]}`;
+
     const unreadMatch = core.match(/^(\d+)\s+unread notifications?$/i);
     if (unreadMatch) return `${unreadMatch[1]} ការជូនដំណឹងមិនទាន់អាន`;
 
@@ -1263,6 +1834,9 @@ function translateDynamicPhrase(core: string, lang: Language): string | null {
 
     const showingVehiclesMatch = core.match(/^Showing\s+(.+)\s+of\s+(.+)\s+vehicles$/i);
     if (showingVehiclesMatch) return `បង្ហាញ ${showingVehiclesMatch[1]} នៃ ${showingVehiclesMatch[2]} យានយន្ត`;
+
+    const showingAllVehiclesMatch = core.match(/^Showing\s+all\s+(.+)\s+vehicles$/i);
+    if (showingAllVehiclesMatch) return `បង្ហាញយានយន្តទាំងអស់ ${showingAllVehiclesMatch[1]}`;
 
     const suggestionsMatch = core.match(/^Showing suggestions for "(.+)"$/i);
     if (suggestionsMatch) return `បង្ហាញសំណើសម្រាប់ "${suggestionsMatch[1]}"`;
@@ -1308,13 +1882,12 @@ export function translatePhrase(text: string, lang: Language): string {
   if (!text.trim()) return text;
 
   const core = normalizePhrase(text);
-  const maps = lang === "km" ? normalizedEnglishToKhmer : normalizedKhmerToEnglish;
-  const direct = maps[core];
+  const direct = lookupTranslation(core, lang);
   if (direct) return preserveOuterWhitespace(text, direct);
 
   const punctuationMatch = core.match(/^(.+?)([:：])$/);
   if (punctuationMatch) {
-    const base = maps[normalizePhrase(punctuationMatch[1])];
+    const base = lookupTranslation(normalizePhrase(punctuationMatch[1]), lang);
     if (base) return preserveOuterWhitespace(text, `${base}${punctuationMatch[2]}`);
   }
 

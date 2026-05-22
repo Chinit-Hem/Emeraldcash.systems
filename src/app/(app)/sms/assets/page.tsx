@@ -1,12 +1,21 @@
 "use client";
 
 import { useAuthUser } from '@/app/components/AuthContext';
-import { AlertCircle, ArrowLeft, Edit3, Eye, Filter, ImageIcon, Loader2, Plus, Search, Trash2 } from 'lucide-react';
+import { AlertCircle, Edit3, Eye, Filter, ImageIcon, Loader2, Package, Plus, Search, Trash2 } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import AssetFormModal from './components/AssetFormModal';
 import ImageModal from './components/ImageModal';
+import {
+  SmsPageHeader,
+  SmsPageShell,
+  smsInputClass,
+  smsPanelClass,
+  smsPrimaryButtonClass,
+  smsSecondaryButtonClass,
+  smsSelectClass,
+} from '../components/SmsShared';
 
 interface SmsAsset {
   id: string;
@@ -67,7 +76,7 @@ export default function AssetsPage() {
     pageSize: 20
   });
   const [totalPages, setTotalPages] = useState(1);
-const [createModalOpen, setCreateModalOpen] = useState(false);
+  const [createModalOpen, setCreateModalOpen] = useState(false);
   const [editingAsset, setEditingAsset] = useState<SmsAsset | null>(null);
   const [imageErrors, setImageErrors] = useState<Set<string>>(new Set());
   const [viewImage, setViewImage] = useState<{ src: string; alt: string } | null>(null);
@@ -199,29 +208,6 @@ const handleSaveAsset = async (data: Omit<SmsAsset, 'id'>): Promise<{ success: b
     }
   };
 
-  const handleReturn = async (asset: SmsAsset) => {
-    if (!confirm(`Return ${asset.name} to stock?`)) return;
-
-    try {
-      const response = await fetch(`/api/sms/assets/${asset.id}/return`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          location: asset.location || undefined,
-          remark: 'Returned from asset inventory',
-        }),
-      });
-      const result = await response.json().catch(() => ({}));
-      if (!response.ok || result.success === false) {
-        throw new Error(result.error || 'Return failed');
-      }
-      void fetchAssets(filters);
-      void fetchStats();
-    } catch (err) {
-      alert(err instanceof Error ? err.message : 'Return failed');
-    }
-  };
-
   const statusColor = (status: string) => ({
     'Available': 'bg-emerald-100 text-emerald-800 ring-emerald-200',
     'In Use': 'bg-amber-100 text-amber-800 ring-amber-200',
@@ -234,66 +220,51 @@ const handleSaveAsset = async (data: Omit<SmsAsset, 'id'>): Promise<{ success: b
     if (!stats) return [];
 
     return [
-      { label: 'Total Assets', value: stats.totalAssets, color: 'from-emerald-600 to-emerald-700' },
-      { label: 'Available', value: stats.available, color: 'from-emerald-500 to-emerald-600' },
-      { label: 'In Use', value: stats.inUse, color: 'from-amber-500 to-amber-600' },
-      { label: 'Borrowed', value: stats.borrowed, color: 'from-red-500 to-red-600' },
-      { label: 'Out', value: stats.out, color: 'from-orange-500 to-orange-600' },
-      { label: 'Not Returned', value: stats.notReturned, color: 'from-rose-500 to-rose-600' },
+      { label: 'Total Assets', value: stats.totalAssets, color: 'text-emerald-700', badge: 'bg-emerald-50' },
+      { label: 'Available', value: stats.available, color: 'text-emerald-700', badge: 'bg-emerald-50' },
+      { label: 'In Use', value: stats.inUse, color: 'text-amber-700', badge: 'bg-amber-50' },
+      { label: 'Borrowed', value: stats.borrowed, color: 'text-red-700', badge: 'bg-red-50' },
+      { label: 'Out', value: stats.out, color: 'text-orange-700', badge: 'bg-orange-50' },
+      { label: 'Not Returned', value: stats.notReturned, color: 'text-rose-700', badge: 'bg-rose-50' },
       {
         label: 'Today',
         value: stats.todayChange > 0 ? `+${stats.todayChange}` : stats.todayChange,
-        color: 'from-violet-500 to-violet-600',
+        color: 'text-purple-700',
+        badge: 'bg-purple-50',
       },
     ];
   }, [stats]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-emerald-50 px-4 py-4 sm:p-6">
-      {/* Header */}
-      <div className="max-w-7xl mx-auto">
-        <div className="mb-6 flex flex-col gap-4 sm:mb-8 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex items-start gap-3 sm:items-center sm:gap-4">
-            <Link
-              href="/sms"
-              className="group flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-2xl bg-white/80 text-slate-600 shadow-sm transition-colors hover:bg-slate-100 hover:text-slate-900 sm:h-12 sm:w-12"
-              aria-label="Back to SMS Dashboard"
-            >
-              <ArrowLeft className="w-5 h-5 group-hover:-translate-x-0.5 transition-transform" />
-            </Link>
-            <div className="min-w-0">
-              <h1 className="text-3xl font-bold leading-tight bg-gradient-to-r from-slate-800 via-slate-700 to-emerald-800 bg-clip-text text-transparent sm:text-4xl">
-                Asset Inventory
-              </h1>
-              <p className="mt-1 text-base leading-6 text-slate-600 sm:text-xl">
-                Manage SMS equipment and resources
-              </p>
-            </div>
-          </div>
-
-          <div className="flex flex-col sm:flex-row gap-3">
+    <SmsPageShell>
+      <SmsPageHeader
+        title="Asset Inventory"
+        description="Manage SMS equipment and resources"
+        icon={Package}
+        tone="emerald"
+        actions={
             <button
               onClick={() => setCreateModalOpen(true)}
-              className="flex min-h-12 w-full items-center justify-center gap-3 rounded-2xl bg-gradient-to-r from-emerald-600 to-emerald-700 px-6 py-3 font-bold text-white shadow-md transition-colors hover:from-emerald-700 hover:to-emerald-800 active:scale-[0.99] sm:w-auto sm:px-8"
+              className={`${smsPrimaryButtonClass} w-full sm:w-auto`}
             >
               <Plus className="w-5 h-5" />
               Add Asset
             </button>
-          </div>
-        </div>
+        }
+      />
 
         {/* Stats Cards */}
         {stats && (
-          <div className="mb-6 grid grid-cols-2 gap-3 sm:mb-8 sm:grid-cols-3 lg:grid-cols-7 lg:gap-4">
+          <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-7 lg:gap-4">
             {statCards.map((card) => (
               <div
                 key={card.label}
-                className="min-h-[92px] rounded-2xl border border-slate-200 bg-white/85 p-4 shadow-sm transition-shadow md:p-5 md:hover:shadow-lg"
+                className="min-h-[92px] rounded-lg bg-white p-4 shadow-sm ring-1 ring-slate-200 transition-shadow md:hover:shadow-md"
               >
-                <div className={`mb-2 bg-gradient-to-r ${card.color} bg-clip-text text-3xl font-bold leading-none text-transparent md:text-4xl`}>
+                <div className={`mb-3 inline-flex rounded-md px-2 py-1 text-2xl font-semibold leading-none ${card.badge} ${card.color}`}>
                   {card.value}
                 </div>
-                <div className="text-[11px] font-bold uppercase tracking-wide text-slate-600 sm:text-xs">
+                <div className="text-xs font-medium text-slate-500">
                   {card.label}
                 </div>
               </div>
@@ -302,7 +273,7 @@ const handleSaveAsset = async (data: Omit<SmsAsset, 'id'>): Promise<{ success: b
         )}
 
         {/* Filters */}
-        <div className="mb-6 rounded-2xl border border-slate-200 bg-white/85 p-4 shadow-sm sm:mb-8 sm:p-6 md:shadow-lg">
+        <div className={`${smsPanelClass} mb-6 p-4 sm:p-5`}>
           <div className="flex flex-col items-stretch gap-3 lg:flex-row lg:items-end">
             <div className="relative min-w-0 flex-1">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
@@ -311,7 +282,7 @@ const handleSaveAsset = async (data: Omit<SmsAsset, 'id'>): Promise<{ success: b
                 placeholder="Search name, code, location..."
                 value={filters.search}
                 onChange={(e) => handleFilterChange('search', e.target.value)}
-                className="h-12 w-full rounded-xl border border-slate-200 bg-white px-4 pl-12 text-base shadow-sm transition-colors focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/20 sm:h-14"
+                className={`${smsInputClass} pl-12`}
               />
             </div>
             <div className="flex w-full flex-col gap-3 sm:flex-row lg:w-auto">
@@ -321,7 +292,7 @@ const handleSaveAsset = async (data: Omit<SmsAsset, 'id'>): Promise<{ success: b
                   title="Filter by asset status"
                   value={filters.status}
                   onChange={(e) => handleFilterChange('status', e.target.value)}
-                  className="h-12 w-full rounded-xl border border-slate-200 bg-white pl-12 pr-10 text-base shadow-sm transition-colors focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/20 sm:h-14"
+                  className={`${smsSelectClass} pl-12`}
                 >
                   <option value="">All Status</option>
                   <option value="Available">Available</option>
@@ -336,18 +307,18 @@ const handleSaveAsset = async (data: Omit<SmsAsset, 'id'>): Promise<{ success: b
                 placeholder="Assigned to..."
                 value={filters.assignedTo}
                 onChange={(e) => handleFilterChange('assignedTo', e.target.value)}
-                className="h-12 w-full rounded-xl border border-slate-200 bg-white px-4 text-base shadow-sm transition-colors focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/20 sm:h-14 lg:w-48"
+                className={`${smsInputClass} lg:w-48`}
               />
             </div>
           </div>
         </div>
 
         {/* Assets */}
-        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white/85 shadow-sm md:shadow-lg">
+        <div className={`${smsPanelClass} overflow-hidden`}>
           {loading ? (
             <div className="p-8 text-center sm:p-12">
               <Loader2 className="mx-auto mb-4 h-10 w-10 animate-spin text-emerald-600 sm:h-12 sm:w-12" />
-              <p className="text-base text-slate-600 sm:text-lg">Loading assets...</p>
+              <p className="text-base text-slate-600">Loading assets...</p>
             </div>
           ) : error ? (
             <div className="p-8 text-center sm:p-12">
@@ -356,14 +327,14 @@ const handleSaveAsset = async (data: Omit<SmsAsset, 'id'>): Promise<{ success: b
               <p className="text-slate-600 mb-6">{error}</p>
               <button
                 onClick={() => fetchAssets(filters)}
-                className="min-h-11 rounded-xl bg-emerald-600 px-6 py-3 font-bold text-white transition-colors hover:bg-emerald-700"
+                className={smsPrimaryButtonClass}
               >
                 Retry
               </button>
             </div>
           ) : !Array.isArray(assets) || assets.length === 0 ? (
             <div className="p-8 text-center sm:p-14">
-              <div className="mx-auto mb-5 flex h-20 w-20 items-center justify-center rounded-2xl bg-slate-100 sm:h-24 sm:w-24">
+              <div className="mx-auto mb-5 flex h-20 w-20 items-center justify-center rounded-lg bg-slate-100 sm:h-24 sm:w-24">
                 <Search className="h-10 w-10 text-slate-500 sm:h-12 sm:w-12" />
               </div>
               <h3 className="mb-2 text-2xl font-bold leading-tight text-slate-800">No assets found</h3>
@@ -375,7 +346,7 @@ const handleSaveAsset = async (data: Omit<SmsAsset, 'id'>): Promise<{ success: b
               </p>
               <button
                 onClick={() => setCreateModalOpen(true)}
-                className="inline-flex min-h-12 w-full items-center justify-center gap-3 rounded-2xl bg-gradient-to-r from-emerald-600 to-emerald-700 px-6 py-3 font-bold text-white shadow-md transition-colors hover:from-emerald-700 hover:to-emerald-800 sm:w-auto sm:px-8"
+                className={`${smsPrimaryButtonClass} w-full sm:w-auto`}
               >
                 <Plus className="w-5 h-5" />
                 {filters.search ? 'Clear Filters & Add Asset' : 'Add First Asset'}
@@ -387,14 +358,14 @@ const handleSaveAsset = async (data: Omit<SmsAsset, 'id'>): Promise<{ success: b
                 {assets.map((asset) => (
                   <article
                     key={asset.id}
-                    className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
+                    className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm"
                   >
                     <div className="mb-4 flex items-start gap-3">
                       {asset.imageUrl && !imageErrors.has(asset.id) ? (
                         <button
                           type="button"
                           onClick={() => setViewImage({ src: asset.imageUrl!, alt: asset.name })}
-                          className="relative h-12 w-12 flex-shrink-0 overflow-hidden rounded-xl bg-slate-100 shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                          className="relative h-12 w-12 flex-shrink-0 overflow-hidden rounded-lg bg-slate-100 shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
                           aria-label={`View ${asset.name} larger`}
                         >
                           <Image
@@ -408,7 +379,7 @@ const handleSaveAsset = async (data: Omit<SmsAsset, 'id'>): Promise<{ success: b
                           />
                         </button>
                       ) : (
-                        <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl bg-slate-100 shadow-sm">
+                        <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-lg bg-slate-100 shadow-sm">
                           <ImageIcon className="h-6 w-6 text-slate-500" />
                         </div>
                       )}
@@ -426,20 +397,20 @@ const handleSaveAsset = async (data: Omit<SmsAsset, 'id'>): Promise<{ success: b
                     </div>
 
                     <div className="grid grid-cols-2 gap-2 text-sm">
-                      <div className="rounded-xl bg-slate-50 px-3 py-2">
-                        <div className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Type</div>
+                      <div className="rounded-lg bg-slate-50 px-3 py-2">
+                        <div className="text-[11px] font-semibold text-slate-500">Type</div>
                         <div className="truncate font-semibold text-slate-800">{asset.type}</div>
                       </div>
-                      <div className="rounded-xl bg-slate-50 px-3 py-2">
-                        <div className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Qty</div>
+                      <div className="rounded-lg bg-slate-50 px-3 py-2">
+                        <div className="text-[11px] font-semibold text-slate-500">Qty</div>
                         <div className="truncate font-semibold text-slate-800">{asset.quantity ?? '-'}</div>
                       </div>
-                      <div className="rounded-xl bg-slate-50 px-3 py-2">
-                        <div className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Location</div>
+                      <div className="rounded-lg bg-slate-50 px-3 py-2">
+                        <div className="text-[11px] font-semibold text-slate-500">Location</div>
                         <div className="truncate font-semibold text-slate-800">{asset.location || '-'}</div>
                       </div>
-                      <div className="rounded-xl bg-slate-50 px-3 py-2">
-                        <div className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Assigned</div>
+                      <div className="rounded-lg bg-slate-50 px-3 py-2">
+                        <div className="text-[11px] font-semibold text-slate-500">Assigned</div>
                         <div className="truncate font-semibold text-slate-800">{asset.assignedTo || 'Unassigned'}</div>
                       </div>
                     </div>
@@ -447,14 +418,14 @@ const handleSaveAsset = async (data: Omit<SmsAsset, 'id'>): Promise<{ success: b
                     <div className="mt-4 flex gap-2">
                       <Link
                         href={`/sms/assets/${asset.id}`}
-                        className="flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl bg-slate-100 px-3 text-sm font-bold text-slate-700 transition-colors hover:bg-slate-200"
+                        className={`${smsSecondaryButtonClass} flex-1 px-3`}
                       >
                         <Eye className="h-4 w-4" />
                         View
                       </Link>
                       <button
                         onClick={() => setEditingAsset(asset)}
-                        className="flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl bg-emerald-50 px-3 text-sm font-bold text-emerald-700 transition-colors hover:bg-emerald-100"
+                        className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-md bg-emerald-50 px-3 text-sm font-semibold text-emerald-700 transition-colors hover:bg-emerald-100"
                       >
                         <Edit3 className="h-4 w-4" />
                         Edit
@@ -462,7 +433,7 @@ const handleSaveAsset = async (data: Omit<SmsAsset, 'id'>): Promise<{ success: b
                       {isAdmin && (
                         <button
                           onClick={() => handleDelete(asset.id)}
-                          className="flex min-h-11 w-11 items-center justify-center rounded-xl bg-red-50 text-red-600 transition-colors hover:bg-red-100"
+                          className="flex min-h-11 w-11 items-center justify-center rounded-md bg-red-50 text-red-600 transition-colors hover:bg-red-100"
                           aria-label={`Delete ${asset.name}`}
                           title="Delete"
                         >
@@ -478,12 +449,12 @@ const handleSaveAsset = async (data: Omit<SmsAsset, 'id'>): Promise<{ success: b
                 <table className="w-full divide-y divide-slate-200">
                   <thead className="bg-slate-50/50">
                     <tr>
-                      <th className="px-6 py-5 text-left text-xs font-bold text-slate-700 uppercase tracking-wider">Asset</th>
-                      <th className="px-6 py-5 text-left text-xs font-bold text-slate-700 uppercase tracking-wider">Type</th>
-                      <th className="px-6 py-5 text-left text-xs font-bold text-slate-700 uppercase tracking-wider">Status</th>
-                      <th className="px-6 py-5 text-left text-xs font-bold text-slate-700 uppercase tracking-wider">Location</th>
-                      <th className="px-6 py-5 text-left text-xs font-bold text-slate-700 uppercase tracking-wider">Assigned</th>
-                      <th className="px-6 py-5 text-right text-xs font-bold text-slate-700 uppercase tracking-wider">Actions</th>
+                      <th className="px-6 py-5 text-left text-xs font-semibold text-slate-600">Asset</th>
+                      <th className="px-6 py-5 text-left text-xs font-semibold text-slate-600">Type</th>
+                      <th className="px-6 py-5 text-left text-xs font-semibold text-slate-600">Status</th>
+                      <th className="px-6 py-5 text-left text-xs font-semibold text-slate-600">Location</th>
+                      <th className="px-6 py-5 text-left text-xs font-semibold text-slate-600">Assigned</th>
+                      <th className="px-6 py-5 text-right text-xs font-semibold text-slate-600">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-200">
@@ -495,7 +466,7 @@ const handleSaveAsset = async (data: Omit<SmsAsset, 'id'>): Promise<{ success: b
                               <button
                                 type="button"
                                 onClick={() => setViewImage({ src: asset.imageUrl!, alt: asset.name })}
-                                className="relative w-14 h-14 rounded-2xl overflow-hidden shadow-md bg-slate-100 cursor-zoom-in focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                                className="relative w-14 h-14 rounded-lg overflow-hidden shadow-sm bg-slate-100 cursor-zoom-in focus:outline-none focus:ring-2 focus:ring-emerald-500"
                                 aria-label={`View ${asset.name} larger`}
                               >
                                 <Image
@@ -509,7 +480,7 @@ const handleSaveAsset = async (data: Omit<SmsAsset, 'id'>): Promise<{ success: b
                                 />
                               </button>
                             ) : (
-                              <div className="w-14 h-14 bg-gradient-to-br from-slate-200 to-slate-300 rounded-2xl flex items-center justify-center shadow-md">
+                              <div className="w-14 h-14 bg-slate-100 rounded-lg flex items-center justify-center shadow-sm">
                                 <ImageIcon className="w-8 h-8 text-slate-500" />
                               </div>
                             )}
@@ -522,12 +493,12 @@ const handleSaveAsset = async (data: Omit<SmsAsset, 'id'>): Promise<{ success: b
                           </div>
                         </td>
                         <td className="px-6 py-6 whitespace-nowrap">
-                          <span className="inline-flex px-3 py-1 text-sm font-semibold rounded-2xl bg-slate-100 text-slate-800">
+                          <span className="inline-flex px-3 py-1 text-sm font-semibold rounded-md bg-slate-100 text-slate-800">
                             {asset.type}
                           </span>
                         </td>
                         <td className="px-6 py-6 whitespace-nowrap">
-                          <span className={`px-3 py-1 rounded-2xl font-bold text-sm ring-2 ring-inset ${statusColor(asset.status)}`}>
+                          <span className={`px-3 py-1 rounded-md font-semibold text-sm ring-1 ring-inset ${statusColor(asset.status)}`}>
                             {asset.status}
                           </span>
                         </td>
@@ -541,7 +512,7 @@ const handleSaveAsset = async (data: Omit<SmsAsset, 'id'>): Promise<{ success: b
                           <div className="flex items-center gap-2 justify-end">
                             <Link
                               href={`/sms/assets/${asset.id}`}
-                              className="p-2 text-slate-500 hover:text-slate-900 hover:bg-slate-200 rounded-xl transition-colors"
+                                className="p-2 text-slate-500 hover:text-slate-900 hover:bg-slate-200 rounded-md transition-colors"
                               title="View details"
                             >
                               <Eye className="w-4 h-4" />
@@ -549,7 +520,7 @@ const handleSaveAsset = async (data: Omit<SmsAsset, 'id'>): Promise<{ success: b
                             </Link>
                             <button
                               onClick={() => setEditingAsset(asset)}
-                              className="p-2 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-100 rounded-xl transition-colors"
+                              className="p-2 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-100 rounded-md transition-colors"
                               title="Edit"
                             >
                               <Edit3 className="w-4 h-4" />
@@ -557,7 +528,7 @@ const handleSaveAsset = async (data: Omit<SmsAsset, 'id'>): Promise<{ success: b
                             {isAdmin && (
                               <button
                                 onClick={() => handleDelete(asset.id)}
-                                className="p-2 text-red-600 hover:text-red-700 hover:bg-red-100 rounded-xl transition-colors"
+                                className="p-2 text-red-600 hover:text-red-700 hover:bg-red-100 rounded-md transition-colors"
                                 title="Delete"
                               >
                                 <Trash2 className="w-4 h-4" />
@@ -582,14 +553,14 @@ const handleSaveAsset = async (data: Omit<SmsAsset, 'id'>): Promise<{ success: b
                       <button
                         onClick={() => handleFilterChange('page', filters.page - 1)}
                         disabled={filters.page === 1}
-                        className="min-h-11 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                        className={smsSecondaryButtonClass}
                       >
                         Previous
                       </button>
                       <button
                         onClick={() => handleFilterChange('page', filters.page + 1)}
                         disabled={filters.page === totalPages}
-                        className="min-h-11 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                        className={smsSecondaryButtonClass}
                       >
                         Next
                       </button>
@@ -600,7 +571,6 @@ const handleSaveAsset = async (data: Omit<SmsAsset, 'id'>): Promise<{ success: b
             </>
           )}
         </div>
-      </div>
 
       {/* Create/Edit Modal */}
       <AssetFormModal
@@ -622,7 +592,7 @@ const handleSaveAsset = async (data: Omit<SmsAsset, 'id'>): Promise<{ success: b
         isOpen={!!viewImage}
         onClose={() => setViewImage(null)}
       />
-    </div>
+    </SmsPageShell>
   );
 }
 
