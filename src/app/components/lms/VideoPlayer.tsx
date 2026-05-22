@@ -85,6 +85,26 @@ interface YouTubeNamespace {
   };
 }
 
+type FullscreenCapableElement = HTMLElement & {
+  webkitRequestFullscreen?: () => Promise<void> | void;
+  mozRequestFullScreen?: () => Promise<void> | void;
+  msRequestFullscreen?: () => Promise<void> | void;
+};
+
+type FullscreenCapableDocument = Document & {
+  webkitFullscreenElement?: Element | null;
+  webkitExitFullscreen?: () => Promise<void> | void;
+  mozFullScreenElement?: Element | null;
+  mozCancelFullScreen?: () => Promise<void> | void;
+  msFullscreenElement?: Element | null;
+  msExitFullscreen?: () => Promise<void> | void;
+};
+
+type OrientationController = {
+  lock?: (orientation: "landscape" | "portrait" | "any" | "natural") => Promise<void>;
+  unlock?: () => void;
+};
+
 declare global {
   interface Window {
     YT?: YouTubeNamespace;
@@ -196,6 +216,125 @@ function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
 }
 
+function getActiveFullscreenElement() {
+  const fullscreenDocument = document as FullscreenCapableDocument;
+
+  return (
+    document.fullscreenElement ??
+    fullscreenDocument.webkitFullscreenElement ??
+    fullscreenDocument.mozFullScreenElement ??
+    fullscreenDocument.msFullscreenElement ??
+    null
+  );
+}
+
+async function requestFullscreenElement(element: HTMLElement) {
+  const fullscreenElement = element as FullscreenCapableElement;
+
+  try {
+    if (element.requestFullscreen) {
+      await element.requestFullscreen({ navigationUI: "hide" } as FullscreenOptions);
+      return true;
+    }
+
+    if (fullscreenElement.webkitRequestFullscreen) {
+      await fullscreenElement.webkitRequestFullscreen();
+      return true;
+    }
+
+    if (fullscreenElement.mozRequestFullScreen) {
+      await fullscreenElement.mozRequestFullScreen();
+      return true;
+    }
+
+    if (fullscreenElement.msRequestFullscreen) {
+      await fullscreenElement.msRequestFullscreen();
+      return true;
+    }
+  } catch {
+    return false;
+  }
+
+  return false;
+}
+
+async function exitFullscreenElement() {
+  const fullscreenDocument = document as FullscreenCapableDocument;
+
+  try {
+    if (document.exitFullscreen && document.fullscreenElement) {
+      await document.exitFullscreen();
+      return;
+    }
+
+    if (fullscreenDocument.webkitExitFullscreen && fullscreenDocument.webkitFullscreenElement) {
+      await fullscreenDocument.webkitExitFullscreen();
+      return;
+    }
+
+    if (fullscreenDocument.mozCancelFullScreen && fullscreenDocument.mozFullScreenElement) {
+      await fullscreenDocument.mozCancelFullScreen();
+      return;
+    }
+
+    if (fullscreenDocument.msExitFullscreen && fullscreenDocument.msFullscreenElement) {
+      await fullscreenDocument.msExitFullscreen();
+    }
+  } catch {
+    // The app-level fullscreen fallback is still closed by local state.
+  }
+}
+
+async function lockLandscapeOrientation() {
+  if (typeof screen === "undefined") {
+    return false;
+  }
+
+  const orientation = screen.orientation as OrientationController | undefined;
+
+  if (!orientation?.lock) {
+    return false;
+  }
+
+  try {
+    await orientation.lock("landscape");
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function unlockScreenOrientation() {
+  if (typeof screen === "undefined") {
+    return;
+  }
+
+  try {
+    (screen.orientation as OrientationController | undefined)?.unlock?.();
+  } catch {
+    // Some mobile browsers expose unlock but reject outside native fullscreen.
+  }
+}
+
+function isMobileViewport() {
+  if (typeof window === "undefined") {
+    return false;
+  }
+
+  return window.matchMedia("(pointer: coarse)").matches || window.innerWidth < 900;
+}
+
+function isIOSMobileBrowser() {
+  if (typeof navigator === "undefined") {
+    return false;
+  }
+
+  return (
+    /\b(iPad|iPhone|iPod)\b/i.test(navigator.userAgent) ||
+    (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1)
+  );
+}
+
 function InstructionsPanel({
   steps,
   currentStep,
@@ -281,6 +420,8 @@ export function VideoPlayer({
   const [isCompleted, setIsCompleted] = useState(initialCompleted);
   const [showInstructions, setShowInstructions] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [hasRequestedLandscapeFullscreen, setHasRequestedLandscapeFullscreen] = useState(false);
+  const [isLandscapeFullscreen, setIsLandscapeFullscreen] = useState(false);
   const [hasError, setHasError] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isReady, setIsReady] = useState(false);
@@ -302,7 +443,7 @@ export function VideoPlayer({
   const durationRef = useRef(0);
   const isCompletedRef = useRef(initialCompleted);
   const playbackUnlockedRef = useRef(initialCompleted);
-const isScrubbingRef = useRef(false);
+  const isScrubbingRef = useRef(false);
   const lastTapRef = useRef<{ x: number; y: number; time: number } | null>(null);
   const doubleTapTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const onProgressChangeRef = useRef(onProgressChange);
@@ -366,6 +507,19 @@ const isScrubbingRef = useRef(false);
     }
   }, [clearControlsHideTimeout, isPlaying, isReady]);
 
+  const syncFullscreenVideoLayout = useCallback(() => {
+    window.requestAnimationFrame(() => {
+      const iframe = playerMountRef.current?.querySelector("iframe");
+
+      if (iframe instanceof HTMLIFrameElement) {
+        iframe.style.width = "100%";
+        iframe.style.height = "100%";
+      }
+
+      revealVideoControls();
+    });
+  }, [revealVideoControls]);
+
   useEffect(() => {
     setIsCompleted(initialCompleted);
     isCompletedRef.current = initialCompleted;
@@ -390,6 +544,20 @@ const isScrubbingRef = useRef(false);
     revealVideoControls();
     return clearControlsHideTimeout;
   }, [clearControlsHideTimeout, isPlaying, isReady, revealVideoControls, warning]);
+
+  useEffect(() => {
+    document.documentElement.classList.toggle("lms-video-fullscreen-open", isFullscreen);
+    document.body.classList.toggle("lms-video-fullscreen-open", isFullscreen);
+
+    if (isFullscreen) {
+      syncFullscreenVideoLayout();
+    }
+
+    return () => {
+      document.documentElement.classList.remove("lms-video-fullscreen-open");
+      document.body.classList.remove("lms-video-fullscreen-open");
+    };
+  }, [isFullscreen, syncFullscreenVideoLayout]);
 
   const updateWatchState = useCallback(
     (
@@ -680,21 +848,32 @@ useEffect(() => {
       saveProgress();
     };
 
-    // Track fullscreen changes (works on mobile and desktop)
     const handleFullscreenChange = () => {
-      setIsFullscreen(!!document.fullscreenElement);
+      const isNativeFullscreen = !!getActiveFullscreenElement();
+      setIsFullscreen(isNativeFullscreen);
+
+      if (!isNativeFullscreen) {
+        setHasRequestedLandscapeFullscreen(false);
+        setIsLandscapeFullscreen(false);
+        unlockScreenOrientation();
+      }
+
+      syncFullscreenVideoLayout();
     };
 
-    // Handle orientation change on mobile - re-center video
     const handleOrientationChange = () => {
-      // Small delay to allow orientation to complete
       setTimeout(() => {
-        revealVideoControls();
+        if (window.innerWidth > window.innerHeight) {
+          setIsLandscapeFullscreen(false);
+        }
+
+        syncFullscreenVideoLayout();
       }, 100);
     };
 
     document.addEventListener("visibilitychange", handleVisibilityChange);
     document.addEventListener("fullscreenchange", handleFullscreenChange);
+    document.addEventListener("webkitfullscreenchange", handleFullscreenChange);
     window.addEventListener("beforeunload", handleBeforeUnload);
     window.addEventListener("orientationchange", handleOrientationChange);
     window.addEventListener("resize", handleOrientationChange);
@@ -702,12 +881,14 @@ useEffect(() => {
     return () => {
       document.removeEventListener("visibilitychange", handleVisibilityChange);
       document.removeEventListener("fullscreenchange", handleFullscreenChange);
+      document.removeEventListener("webkitfullscreenchange", handleFullscreenChange);
       window.removeEventListener("beforeunload", handleBeforeUnload);
       window.removeEventListener("orientationchange", handleOrientationChange);
       window.removeEventListener("resize", handleOrientationChange);
       clearControlsHideTimeout();
+      unlockScreenOrientation();
     };
-  }, [clearControlsHideTimeout, saveProgress, showWarning, revealVideoControls]);
+  }, [clearControlsHideTimeout, saveProgress, showWarning, syncFullscreenVideoLayout]);
 
   const togglePlay = useCallback(() => {
     if (!isReady || !playerRef.current) {
@@ -878,37 +1059,43 @@ const handleSeekCommit = (event: React.PointerEvent<HTMLInputElement>) => {
     updateWatchState(0, maxWatchedRef.current, safeDuration);
   };
 
-const toggleFullscreen = useCallback(() => {
+  const toggleFullscreen = useCallback(async () => {
     revealVideoControls();
     const container = containerRef.current;
     if (!container) return;
 
-    // Check if already in fullscreen
-    if (document.fullscreenElement) {
-      document.exitFullscreen().catch(() => {});
-      setIsFullscreen(false);
-      return;
-    }
-
-    // Detect iOS Safari and use webkit fullscreen (with type assertion)
-    const isIOSafari = /iPad|iPhone|iPod/.test(navigator.userAgent) && 
-      /Safari/.test(navigator.userAgent) && 
-      !/Chrome/.test(navigator.userAgent);
-    
-    // Try iOS webkit fullscreen first for iOS devices
-    if (isIOSafari && (container as unknown as { webkitRequestFullscreen?: () => Promise<void> }).webkitRequestFullscreen) {
-      (container as unknown as { webkitRequestFullscreen: () => Promise<void> }).webkitRequestFullscreen();
+    if (!isFullscreen) {
       setIsFullscreen(true);
+      setHasRequestedLandscapeFullscreen(false);
+      setIsLandscapeFullscreen(false);
+      await requestFullscreenElement(container);
+      syncFullscreenVideoLayout();
       return;
     }
 
-    // Standard fullscreen API for Android and desktop
-    container.requestFullscreen().catch(() => {
-      // Fallback: rely on YouTube's native fullscreen button (fs:1)
-      // which will trigger fullscreen in the iframe
-    });
-    setIsFullscreen(true);
-  }, [revealVideoControls]);
+    if (isMobileViewport() && !hasRequestedLandscapeFullscreen) {
+      setHasRequestedLandscapeFullscreen(true);
+      const isPortraitViewport = window.innerHeight > window.innerWidth;
+      const didLockLandscape = isIOSMobileBrowser() ? false : await lockLandscapeOrientation();
+      setIsLandscapeFullscreen(!didLockLandscape && isPortraitViewport);
+      syncFullscreenVideoLayout();
+      return;
+    }
+
+    if (getActiveFullscreenElement()) {
+      await exitFullscreenElement();
+    }
+
+    unlockScreenOrientation();
+    setHasRequestedLandscapeFullscreen(false);
+    setIsLandscapeFullscreen(false);
+    setIsFullscreen(false);
+  }, [
+    hasRequestedLandscapeFullscreen,
+    isFullscreen,
+    revealVideoControls,
+    syncFullscreenVideoLayout,
+  ]);
 
   const handleComplete = async () => {
     if (!completionAllowed) {
@@ -997,17 +1184,23 @@ const toggleFullscreen = useCallback(() => {
 
         <main className="grid grid-cols-1 gap-6 lg:grid-cols-3">
           <section className="space-y-4 lg:col-span-2">
-<div
+            <div
               ref={containerRef}
-              className={isFullscreen ? "fixed inset-0 z-50 bg-black flex items-center justify-center" : ""}
+              className={isFullscreen ? "lms-video-fullscreen-shell" : ""}
             >
-<GlassCard className={`overflow-hidden rounded-2xl p-0 ${isFullscreen ? "w-full h-full max-w-full max-h-full" : ""}`}>
+              <GlassCard
+                className={`overflow-hidden rounded-2xl p-0 ${
+                  isFullscreen ? "lms-video-fullscreen-card" : ""
+                }`}
+              >
                 <div
-className={`relative bg-black ${
+                  className={`lms-video-stage relative bg-black ${
                     shouldShowVideoControls ? "" : "cursor-none"
                   } ${
-                    isFullscreen 
-                      ? "w-full h-full aspect-video md:aspect-video flex items-center justify-center" 
+                    isFullscreen
+                      ? `lms-video-stage-fullscreen ${
+                          isLandscapeFullscreen ? "lms-video-stage-fullscreen-landscape" : ""
+                        }`
                       : "aspect-video"
                   }`}
                   onMouseMove={revealVideoControls}
@@ -1026,7 +1219,10 @@ className={`relative bg-black ${
 
                   {!hasError ? (
                     <>
-                      <div ref={playerMountRef} className="absolute inset-0 h-full w-full" />
+                      <div
+                        ref={playerMountRef}
+                        className="lms-youtube-mount absolute inset-0 h-full w-full"
+                      />
 
                       <button
                         type="button"
@@ -1162,7 +1358,13 @@ className={`relative bg-black ${
                             type="button"
                             onClick={toggleFullscreen}
                             className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white transition hover:bg-white/20"
-                            aria-label="Toggle fullscreen"
+                            aria-label={
+                              isFullscreen
+                                ? hasRequestedLandscapeFullscreen
+                                  ? "Exit fullscreen"
+                                  : "Rotate fullscreen to landscape"
+                                : "Enter fullscreen"
+                            }
                           >
                             <Maximize2 className="h-5 w-5" />
                           </button>
