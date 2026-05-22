@@ -2,6 +2,72 @@
 
 This is a Next.js App Router application. Keep framework-owned routes in `src/app`, shared code in top-level `src/*` folders, and operational artifacts out of the project root.
 
+## Full Stack Map
+
+The reference `frontend + backend + database` structure maps to this repo as a single full-stack Next.js application. Next.js owns both the React UI and the backend HTTP endpoints, so the stack is organized by responsibility instead of separate `frontend/` and `backend/` apps.
+
+```text
+emeraldcash_vms_next/
+├── public/                # Static files served directly by Next.js
+├── src/
+│   ├── app/               # Frontend routes plus backend route handlers
+│   │   ├── (app)/         # Authenticated app pages
+│   │   ├── api/           # Backend API endpoints
+│   │   ├── login/         # Public login page
+│   │   └── components/    # Route-shared legacy components
+│   ├── components/        # Shared reusable React UI
+│   ├── features/          # Feature-owned UI modules
+│   ├── services/          # Business logic and domain operations
+│   ├── repositories/      # Data access abstractions
+│   ├── lib/               # DB clients, cache, auth, helpers, schemas, hooks
+│   ├── styles/            # Global/shared CSS
+│   └── types/             # Shared TypeScript types
+├── apps-script/           # Google Apps Script integrations
+├── scripts/               # Maintenance, migrations, deploy helpers
+├── docs/                  # Project documentation and work notes
+└── tests/                 # Automated tests
+```
+
+### Frontend Layer
+
+- `src/app/(app)/**/page.tsx` contains authenticated UI routes such as dashboard, vehicles, SMS, LMS, settings, and admin screens.
+- `src/app/login/page.tsx`, `src/app/stock/page.tsx`, and `src/app/cleaned-vehicles/**` contain public or special-purpose routes.
+- `src/components` contains shared UI such as navigation, optimized media/link helpers, reusable controls, and design-system primitives.
+- `src/features/<feature>/components` is the preferred home for feature-specific client components as route-adjacent UI is cleaned up.
+- `src/lib/use*.ts` and feature hooks support client data fetching, form state, optimistic UI, search, and UI behavior.
+
+### Backend Layer
+
+- `src/app/api/**/route.ts` contains Next.js Route Handlers for HTTP endpoints.
+- Major API areas include `auth`, `vehicles`, `cleaned-vehicles`, `dashboard`, `sms`, `lms`, `stock`, `upload`, `cloudinary-signature`, `market-price`, and `cron`.
+- `src/services` contains business logic such as vehicle operations, LMS logic, SMS workflows, user/staff operations, validation, and cache coordination.
+- `src/repositories` contains reusable data access classes, especially the LMS repositories and the generic repository base.
+- `middleware.ts` handles request-level routing/auth concerns before pages and route handlers run.
+- `src/lib/api-error-wrapper.ts`, `src/lib/logger.ts`, and related helpers standardize API errors, request IDs, timeouts, and logs.
+
+### Database And Storage Layer
+
+- `src/lib/db-singleton.ts` manages the Neon PostgreSQL client, lazy connection setup, retry logic, health checks, and query execution.
+- `src/lib/db.ts` re-exports the database manager and compatibility helpers used by services and APIs.
+- `scripts/migrations` stores SQL migration artifacts.
+- `src/lib/redis.ts` and `@vercel/kv` support cache reads, writes, and invalidation.
+- `src/lib/cloudinary*.ts`, `src/app/api/upload`, and `src/app/api/cloudinary-signature` support image upload and media storage.
+- `apps-script` and the README-documented Apps Script URLs support legacy or external Google Sheet/Drive workflows.
+
+### Request Flow
+
+```text
+User
+  -> Next.js page/layout in src/app
+  -> Client hook or Server Component data request
+  -> Route Handler in src/app/api
+  -> Service in src/services
+  -> Repository or db helper in src/repositories or src/lib/db*
+  -> Neon PostgreSQL, Vercel KV, Cloudinary, or Apps Script
+  -> JSON/data response
+  -> React UI update
+```
+
 ## Root
 
 ```text

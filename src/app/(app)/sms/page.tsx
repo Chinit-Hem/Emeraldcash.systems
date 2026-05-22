@@ -203,6 +203,8 @@ export default function SmsDashboard() {
   const [error, setError] = useState<string | null>(null);
   const [notifications, setNotifications] = useState<SmsNotification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [notificationError, setNotificationError] = useState<string | null>(null);
+  const [markingNotificationsRead, setMarkingNotificationsRead] = useState(false);
   const { language } = useLanguage();
   const { t } = useTranslation(language);
 
@@ -347,13 +349,28 @@ export default function SmsDashboard() {
   ];
 
   const markNotificationsRead = async () => {
-    await fetch('/api/sms/notifications', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({}),
-    });
-    setUnreadCount(0);
-    setNotifications([]);
+    setNotificationError(null);
+    setMarkingNotificationsRead(true);
+
+    try {
+      const response = await fetch('/api/sms/notifications', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      });
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok || data.success === false) {
+        throw new Error(data.error || 'Failed to mark notifications as read');
+      }
+
+      setUnreadCount(0);
+      setNotifications([]);
+    } catch (err) {
+      setNotificationError(err instanceof Error ? err.message : 'Failed to mark notifications as read');
+    } finally {
+      setMarkingNotificationsRead(false);
+    }
   };
 
   return (
@@ -402,13 +419,17 @@ export default function SmsDashboard() {
               </div>
               <button
                 type='button'
-                onClick={markNotificationsRead}
-                className='inline-flex items-center justify-center gap-2 rounded-md bg-white px-3 py-2 text-sm font-semibold text-slate-600 shadow-sm ring-1 ring-slate-200 transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/30 dark:bg-slate-900 dark:text-slate-300 dark:ring-slate-700 dark:hover:bg-slate-800'
+                onClick={() => void markNotificationsRead()}
+                disabled={markingNotificationsRead}
+                className='inline-flex items-center justify-center gap-2 rounded-md bg-white px-3 py-2 text-sm font-semibold text-slate-600 shadow-sm ring-1 ring-slate-200 transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/30 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-slate-900 dark:text-slate-300 dark:ring-slate-700 dark:hover:bg-slate-800'
               >
                 <CheckCheck className='h-4 w-4' />
-                {tr('Mark read')}
+                {markingNotificationsRead ? tr('Marking...') : tr('Mark read')}
               </button>
             </div>
+            {notificationError && (
+              <p className='mb-4 text-sm font-medium text-red-600 dark:text-red-400'>{translatePhrase(notificationError, language)}</p>
+            )}
             <div className='grid gap-3 md:grid-cols-3'>
               {notifications.map((notification) => (
                 <Link

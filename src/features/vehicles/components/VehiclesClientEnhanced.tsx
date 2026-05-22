@@ -40,6 +40,7 @@ import {
   Trash2,
   X
 } from "lucide-react";
+import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 
@@ -712,10 +713,12 @@ return (
       {/* Image */}
       <div className="relative aspect-[4/3] overflow-hidden bg-slate-100 dark:bg-slate-800">
         {imageUrl ? (
-            <img
+            <Image
               src={imageUrl}
               alt={`${vehicle.Brand} ${vehicle.Model}`}
-              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+              fill
+              sizes="(max-width: 768px) 100vw, 33vw"
+              className="object-cover group-hover:scale-105 transition-transform duration-500"
               onError={(e) => {
                 console.warn('[Image onError]', imageUrl);
                 e.currentTarget.style.display = "none";
@@ -853,12 +856,13 @@ function MobileVehicleListCard({
         <div className="relative h-16 w-16 flex-shrink-0 overflow-hidden rounded-xl bg-slate-100 shadow-sm dark:bg-slate-800">
           <Car className="absolute inset-0 m-auto h-6 w-6 text-slate-300 dark:text-slate-600" aria-hidden="true" />
           {imageUrl && (
-            <img
+            <Image
               src={imageUrl}
               alt={vehicle.Model || "Vehicle"}
-              className="relative h-full w-full object-cover"
+              fill
+              sizes="64px"
+              className="object-cover"
               loading="lazy"
-              decoding="async"
               onError={(e) => {
                 e.currentTarget.style.display = "none";
               }}
@@ -1201,7 +1205,7 @@ const isTukTukCategory = useCallback((cat: string | undefined): boolean => {
     vehicles: Vehicle[];
   }
 
-  const getGroupKey = (vehicle: Vehicle, groupBy: GroupByOption): string => {
+  const getGroupKey = useCallback((vehicle: Vehicle, groupBy: GroupByOption): string => {
     switch (groupBy) {
       case "category": return vehicle.Category || "Uncategorized";
       case "brand": return vehicle.Brand || "Unknown Brand";
@@ -1210,9 +1214,9 @@ const isTukTukCategory = useCallback((cat: string | undefined): boolean => {
       case "color": return vehicle.Color || "Unknown Color";
       default: return "All";
     }
-  };
+  }, []);
 
-  const getGroupLabel = (key: string, groupBy: GroupByOption): string => {
+  const getGroupLabel = useCallback((key: string, groupBy: GroupByOption): string => {
     if (groupBy === "none") return "All Vehicles";
     if (!key || key === "undefined" || key === "null") {
       switch (groupBy) {
@@ -1224,9 +1228,9 @@ const isTukTukCategory = useCallback((cat: string | undefined): boolean => {
       }
     }
     return key;
-  };
+  }, []);
 
-  const groupVehicles = (vehicles: Vehicle[], groupBy: GroupByOption): GroupedVehicles[] => {
+  const groupVehicles = useCallback((vehicles: Vehicle[], groupBy: GroupByOption): GroupedVehicles[] => {
     if (groupBy === "none") {
       return [{
         key: "all",
@@ -1262,7 +1266,7 @@ const isTukTukCategory = useCallback((cat: string | undefined): boolean => {
       avgPrice: groupVehicles.reduce((sum, v) => sum + (v.PriceNew || 0), 0) / (groupVehicles.length || 1),
       vehicles: groupVehicles
     }));
-  };
+  }, [getGroupKey, getGroupLabel]);
 
   // ==========================================================================
   // Filtering Logic
@@ -1377,7 +1381,7 @@ const isTukTukCategory = useCallback((cat: string | undefined): boolean => {
     });
 
     return result;
-  }, [vehicles, deferredQuickFilter, deferredFilters, sortField, sortDirection, isCarCategory, isMotorcycleCategory, isTukTukCategory]);
+  }, [vehicles, deferredQuickFilter, deferredFilters, sortField, sortDirection]);
 
   // ==========================================================================
   // Fuzzy Suggestions (when search returns no exact matches)
@@ -1431,7 +1435,7 @@ const isTukTukCategory = useCallback((cat: string | undefined): boolean => {
 
   const visibleVehicleGroups = useMemo(
     () => groupVehicles(groupBy === "none" && !deferredFilters.search ? paginatedVehicles : filteredVehicles, groupBy),
-    [deferredFilters.search, filteredVehicles, groupBy, paginatedVehicles]
+    [deferredFilters.search, filteredVehicles, groupBy, paginatedVehicles, groupVehicles]
   );
 
   // ==========================================================================
@@ -2281,10 +2285,12 @@ const getVehicleImageUrl = useCallback((imageValue: unknown): string | null => {
                                   return imageUrl ? (
                                     <div className="relative h-12 w-12 overflow-hidden rounded-xl bg-slate-100 shadow-sm ring-2 ring-white dark:bg-slate-800 dark:ring-slate-700">
                                       <Car className="absolute inset-0 m-auto h-5 w-5 text-slate-300 dark:text-slate-600" aria-hidden="true" />
-                                      <img
+                                      <Image
                                         src={imageUrl}
                                         alt={vehicle.Model || "Vehicle"}
-                                        className="relative h-full w-full object-cover"
+                                        fill
+                                        sizes="48px"
+                                        className="object-cover"
                                         onError={(e) => {
                                           e.currentTarget.style.display = "none";
                                         }}

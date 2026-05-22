@@ -13,13 +13,13 @@ This document describes the backup strategy for the EmeraldCash VMS application,
 |---------|--------|--------|
 | Point-in-time Recovery | ✅ | Neon Console |
 | Automated Exports | ❌ | Not implemented |
-| Verification Script | ✅ | `check-cleaned-table-data.mjs` |
+| Backup Table Creation | ✅ | `npm run backup:create` with explicit confirmation |
+| Verification Script | ✅ | `npm run backup:verify` |
 | Restore Script | ✅ | `restore-vehicles-from-csv.mjs` |
 
 **Neon Project Details:**
-- Project: `long-hill-90158403`
-- Branch: `br-lingering-cell-ai19xt06`
-- Console: https://console.neon.tech/app/projects/long-hill-90158403/branches/br-lingering-cell-ai19xt06/tables
+- Store project and branch identifiers in the team password manager or deployment runbook.
+- Do not commit Neon credentials, branch URLs, or connection strings.
 
 **To restore from Neon:**
 1. Go to Neon Console → Branch → Restore
@@ -32,18 +32,20 @@ The project uses a dual-table strategy for vehicle data:
 
 | Table | Purpose | Row Count |
 |-------|---------|-----------|
-| `vehicles` | Production table | ~1190 |
-| `cleaned_vehicles_for_google_sheets` | Backup/Archive | ~1222 |
+| `vehicles` | Production table | Current production vehicle records |
+| `cleaned_vehicles_for_google_sheets` | Backup/Archive | Must exist before production release |
 
-**Configuration (from scripts/check-cleaned-table-data.mjs):**
-```javascript
-BACKUP_TABLE_NAME: "cleaned_vehicles_for_google_sheets",
-PRODUCTION_TABLE_NAME: "vehicles",
-EXPECTED_MAX_VEHICLE_ID: 1222,
-ACTUAL_MAX_VEHICLE_ID: 1190,
+**Configuration:**
+```bash
+BACKUP_TABLE_NAME=cleaned_vehicles_for_google_sheets
+PRODUCTION_TABLE_NAME=vehicles
+EXPECTED_MAX_VEHICLE_ID=1222
+ACTUAL_MAX_VEHICLE_ID=1190
 ```
 
-**Note:** There is a discrepancy of 32 vehicles between production and backup. The backup table contains more records which can be used for restoration.
+**Release note:** If `npm run backup:verify` fails with `relation
+"cleaned_vehicles_for_google_sheets" does not exist`, create the backup table or
+point `BACKUP_TABLE_NAME` at the approved production backup table before release.
 
 ### 3. Image Backup (Cloudinary)
 
@@ -67,8 +69,18 @@ ACTUAL_MAX_VEHICLE_ID: 1190,
 
 Run verification to check backup integrity:
 ```bash
-node scripts/check-cleaned-table-data.mjs
+npm run backup:verify
 ```
+
+Create the backup table from the current `vehicles` table:
+
+```powershell
+$env:CONFIRM_CREATE_BACKUP_TABLE="true"; npm run backup:create
+```
+
+This command is intentionally guarded because it writes to the connected
+database. Verify `DATABASE_URL` points to the intended environment before
+running it.
 
 **Functions exported:**
 - `createDatabaseConnection(databaseUrl)` - Create Neon connection
@@ -114,18 +126,18 @@ node scripts/restore-vehicles-from-csv.mjs
    - Select branch → Restore
    - Choose point-in-time or create new branch
 3. **Update DATABASE_URL** in environment
-4. **Verify data:** Run `node scripts/check-cleaned-table-data.mjs`
+4. **Verify data:** Run `npm run backup:verify`
 
 ### Scenario 2: Accidental Data Deletion
 
-1. **Run verification:** `node scripts/check-cleaned-table-data.mjs`
+1. **Run verification:** `npm run backup:verify`
 2. **Check missing vehicles:** Review the discrepancy report
 3. **Restore from backup table:**
    - Use the restore script: `node scripts/restore-vehicles-from-csv.mjs`
    - Or manually copy from backup table using SQL:
    ```sql
-   INSERT INTO vehicles 
-   SELECT * FROM cleaned_vehicles_for_google_sheets 
+   INSERT INTO vehicles
+   SELECT * FROM cleaned_vehicles_for_google_sheets
    WHERE id > (SELECT MAX(id) FROM vehicles);
    ```
 
@@ -190,6 +202,8 @@ Required for backup operations:
 | Variable | Description |
 |----------|-------------|
 | `DATABASE_URL` | Neon connection string |
+| `BACKUP_TABLE_NAME` | Vehicle backup table used by `npm run backup:verify` |
+| `CONFIRM_CREATE_BACKUP_TABLE` | Must be `true` to run `npm run backup:create` |
 | `CLOUDINARY_CLOUD_NAME` | Cloudinary cloud name |
 | `CLOUDINARY_API_KEY` | Cloudinary API key |
 | `CLOUDINARY_API_SECRET` | Cloudinary API secret |
@@ -199,7 +213,7 @@ Required for backup operations:
 
 ## Security Considerations
 
-1. **Credentials in Scripts:** The current scripts contain hardcoded database URLs. Consider moving to environment variables.
+1. **Credentials in Scripts:** Scripts must read `DATABASE_URL` from the environment. Never commit a database URL.
 
 2. **GitIgnore:** Verify `.env.local` and credentials are in `.gitignore` (✅ confirmed).
 
@@ -209,13 +223,16 @@ Required for backup operations:
 
 ## Last Verified
 
-Date: 2024
-Status: Backup verification script functional, 32 vehicles need restoration
+Date: 2026-05-23
+Status: Backup verification script uses environment-provided credentials and
+loads `.env` locally. Run `npm run backup:verify` with `DATABASE_URL` set before
+release. If the backup table is missing, run the guarded `npm run backup:create`
+command after confirming the target database.
 
 ---
 
 ## Contact
 
 For backup-related issues:
-- Check verification output: `node scripts/check-cleaned-table-data.mjs`
+- Check verification output: `npm run backup:verify`
 - Review test results: `node scripts/test-backup-verification.mjs`

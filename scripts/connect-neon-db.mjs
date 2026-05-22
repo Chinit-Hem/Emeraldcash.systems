@@ -1,11 +1,11 @@
 // Connect to your Neon database
-// Project: long-hill-90158403
-// Branch: br-lingering-cell-ai19xt06
+// Project: [neon-project-id]
+// Branch: [neon-branch-id]
 // Database: neondb
 import { neon } from "@neondatabase/serverless";
 
 // Your Neon database connection
-// Get your connection string from: https://console.neon.tech/app/projects/long-hill-90158403/branches/br-lingering-cell-ai19xt06/tables?database=neondb
+// Get your connection string from: https://console.neon.tech/app/projects/[neon-project-id]/branches/[neon-branch-id]/tables?database=neondb
 // Click "Connect" button and copy the connection string
 
 const DATABASE_URL = process.env.DATABASE_URL;
@@ -15,7 +15,7 @@ if (!DATABASE_URL) {
 ❌ DATABASE_URL not set!
 
 To get your connection string:
-1. Go to: https://console.neon.tech/app/projects/long-hill-90158403/branches/br-lingering-cell-ai19xt06/tables?database=neondb
+1. Go to: https://console.neon.tech/app/projects/[neon-project-id]/branches/[neon-branch-id]/tables?database=neondb
 2. Click the "Connect" button
 3. Copy the connection string
 4. Set it as environment variable:
@@ -32,8 +32,8 @@ const sql = neon(DATABASE_URL);
 async function testConnection() {
   try {
     console.log("🔌 Connecting to Neon database...");
-    console.log(`   Project: long-hill-90158403`);
-    console.log(`   Branch: br-lingering-cell-ai19xt06`);
+    console.log(`   Project: [neon-project-id]`);
+    console.log(`   Branch: [neon-branch-id]`);
     console.log(`   Database: neondb\n`);
     
     // Test connection
@@ -85,7 +85,7 @@ async function testConnection() {
   } catch (error) {
     console.error("\n❌ Connection failed:", error.message);
     console.log("\n💡 Make sure your DATABASE_URL is correct.");
-    console.log("   Get it from: https://console.neon.tech/app/projects/long-hill-90158403/branches/br-lingering-cell-ai19xt06/tables?database=neondb");
+    console.log("   Get it from: https://console.neon.tech/app/projects/[neon-project-id]/branches/[neon-branch-id]/tables?database=neondb");
     process.exit(1);
   }
 }

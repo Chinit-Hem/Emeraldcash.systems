@@ -4,10 +4,14 @@ import { NextRequest, NextResponse } from "next/server";
 
 export const dynamic = 'force-dynamic';
 
+function debugEndpointDisabled() {
+  return process.env.NODE_ENV === "production" && process.env.ENABLE_AUTH_DEBUG !== "true";
+}
+
 /**
  * Debug endpoint to check current session status
  * GET /api/auth/debug-session
- * 
+ *
  * Returns:
  * - authenticated: boolean
  * - session: session payload (if authenticated)
@@ -15,12 +19,16 @@ export const dynamic = 'force-dynamic';
  * - cookies: info about session cookie presence
  */
 export async function GET(req: NextRequest) {
+  if (debugEndpointDisabled()) {
+    return NextResponse.json({ ok: false, error: "Not found" }, { status: 404 });
+  }
+
   const requestId = `${Date.now()}-${Math.random().toString(36).substring(2, 15)}`;
-  
+
   try {
     const sessionCookie = req.cookies.get("session");
     const session = getSession(req);
-    
+
     const debugInfo = {
       requestId,
       timestamp: new Date().toISOString(),
@@ -41,9 +49,9 @@ export async function GET(req: NextRequest) {
         forwardedProto: req.headers.get("x-forwarded-proto") || "not set",
       },
     };
-    
+
     log("INFO", "Debug session check", debugInfo);
-    
+
     return NextResponse.json(debugInfo, {
       status: 200,
       headers: {
@@ -56,7 +64,7 @@ export async function GET(req: NextRequest) {
       requestId,
       error: error instanceof Error ? error.message : String(error),
     });
-    
+
     return NextResponse.json(
       {
         requestId,

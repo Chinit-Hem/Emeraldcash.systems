@@ -7,27 +7,13 @@
 
 import { createErrorResponse, createSuccessResponse, withErrorHandling } from "@/lib/api-error-wrapper";
 import { requirePermission } from "@/lib/auth-helpers";
+import { buildCorsHeaders } from "@/lib/cors";
 import { vehicleService } from "@/services/VehicleService";
 import { NextRequest, NextResponse } from "next/server";
 import type { Vehicle } from "@/lib/types";
 import type { VehicleDB } from "@/services/VehicleService";
 import { clearCachedVehicles } from "../_cache";
 import { normalizeImageUrl } from "@/lib/cloudinary";
-
-// ============================================================================
-// CORS Headers (match existing pattern)
-function buildCorsHeaders(req: NextRequest): Headers {
-  const allowedOrigin = process.env.NEXT_PUBLIC_APP_ORIGIN || "*";
-  const headers = new Headers({
-    "Access-Control-Allow-Origin": allowedOrigin,
-    "Access-Control-Allow-Methods": "POST, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type, Authorization",
-  });
-  if (allowedOrigin !== "*") {
-    headers.set("Access-Control-Allow-Credentials", "true");
-  }
-  return headers;
-}
 
 // ============================================================================
 // OPTIONS (CORS Preflight)

@@ -19,6 +19,7 @@ import {
   smsSelectClass,
   smsTextareaClass,
 } from "../components/SmsShared";
+import { uploadSmsImage } from "../components/smsUpload";
 
 type SmsStatus = "Available" | "In Use" | "Borrowed" | "Out" | "Not Returned";
 
@@ -81,27 +82,6 @@ export default function ReturnToStockPage() {
     }
   }, [selectedAsset]);
 
-  const uploadReturnImage = async (): Promise<string | null> => {
-    if (!imageFile || !selectedAsset) return null;
-
-    const formData = new FormData();
-    formData.append("file", imageFile);
-    formData.append("folder", "sms/returns/images");
-    formData.append("publicId", `return_${selectedAsset.id}_${Date.now()}`);
-
-    const response = await fetch("/api/sms/assets/upload", {
-      method: "POST",
-      body: formData,
-    });
-    const result = await response.json().catch(() => ({}));
-
-    if (!response.ok || result.success === false || !result.url) {
-      throw new Error(result.error || "Image upload failed");
-    }
-
-    return result.url as string;
-  };
-
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     setGeneralError("");
@@ -114,14 +94,19 @@ export default function ReturnToStockPage() {
 
     setLoading(true);
     try {
-      const imageUrl = await uploadReturnImage();
+      const imageUrl = await uploadSmsImage({
+        file: imageFile,
+        folder: "sms/returns/images",
+        publicIdPrefix: "return",
+        entityId: selectedAsset?.id,
+      });
       const response = await fetch(`/api/sms/assets/${assetId}/return`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           location: location.trim() || selectedAsset?.location || "Stock",
           remark: remark.trim() || "Returned to stock",
-          imageUrl: imageUrl || undefined,
+          imageUrl,
         }),
       });
       const result = await response.json().catch(() => ({}));

@@ -1,4 +1,5 @@
 import { estimatePriceRuleBased, fetchMarketPrices } from "@/lib/market-price";
+import { requirePermission } from "@/lib/auth-helpers";
 import { NextRequest, NextResponse } from "next/server";
 
 // GET /api/market-price/fetch
@@ -6,14 +7,17 @@ import { NextRequest, NextResponse } from "next/server";
 // Returns market price data from Cambodian marketplaces
 
 export async function GET(request: NextRequest) {
+  const auth = requirePermission(request, "vehicles:view");
+  if (auth.response) return auth.response;
+
   const searchParams = request.nextUrl.searchParams;
-  
+
   const category = searchParams.get("category") || "";
   const brand = searchParams.get("brand") || "";
   const model = searchParams.get("model") || "";
   const yearStr = searchParams.get("year");
   const condition = searchParams.get("condition") || "";
-  
+
   // Validate required fields
   if (!category || !brand || !model) {
     return NextResponse.json(
@@ -24,17 +28,17 @@ export async function GET(request: NextRequest) {
       { status: 400 }
     );
   }
-  
+
 const parsedYear = yearStr ? parseInt(yearStr, 10) : null;
   const year = parsedYear !== null && !isNaN(parsedYear) ? parsedYear : null;
   const isValidYear = year !== null && !isNaN(year);
-  
+
   try {
     // Check for fallback mode (use estimated prices instead of fetching)
     const useFallback = searchParams.get("fallback") === "true";
-    
+
     let result;
-    
+
     if (useFallback) {
       // Use rule-based estimation
       result = estimatePriceRuleBased(brand, model, year, category);
@@ -48,7 +52,7 @@ const parsedYear = yearStr ? parseInt(yearStr, 10) : null;
         year: isValidYear ? year : null,
         condition: condition || undefined,
       });
-      
+
       // If no data found, fall back to estimation
       if (result.confidence === "Unknown") {
         console.log(`No market data found for ${category} ${brand} ${model} ${year || ""}, using estimation`);
@@ -56,7 +60,7 @@ const parsedYear = yearStr ? parseInt(yearStr, 10) : null;
         result.cacheHit = false;
       }
     }
-    
+
     return NextResponse.json({
       ok: true,
       data: {
@@ -69,10 +73,10 @@ const parsedYear = yearStr ? parseInt(yearStr, 10) : null;
     });
   } catch (error) {
     console.error("Error fetching market prices:", error);
-    
+
     // Fall back to estimation on error
     const fallbackResult = estimatePriceRuleBased(brand, model, year, category);
-    
+
     return NextResponse.json({
       ok: true,
       data: {
@@ -86,4 +90,3 @@ const parsedYear = yearStr ? parseInt(yearStr, 10) : null;
     });
   }
 }
-

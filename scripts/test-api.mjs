@@ -1,5 +1,5 @@
 // Test API routes directly using Neon REST API
-const API_URL = "https://ep-little-bar-aij99s0n.apirest.c-4.us-east-1.aws.neon.tech/neondb/rest/v1";
+const API_URL = "https://[neon-api-host]/neondb/rest/v1";
 
 const headers = {
   "Content-Type": "application/json",

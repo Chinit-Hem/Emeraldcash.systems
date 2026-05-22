@@ -49,7 +49,7 @@ export default function CategoriesAdminPage() {
       if (data.success) {
         setCategories(data.data);
       }
-    } catch (_err) {
+    } catch {
       setError("Failed to load categories");
     } finally {
       setLoading(false);
@@ -130,7 +130,7 @@ export default function CategoriesAdminPage() {
         }
         setError(data.error || "Failed to save category");
       }
-    } catch (_err) {
+    } catch {
       // Rollback on error
       if (editingId) {
         setCategories(prev => prev.map(c => c.id === editingId ? categories.find(oc => oc.id === editingId) || c : c));
@@ -160,7 +160,7 @@ export default function CategoriesAdminPage() {
       } else {
         setError(data.error || "Failed to delete category");
       }
-    } catch (_err) {
+    } catch {
       setError("Failed to delete category");
     }
   };

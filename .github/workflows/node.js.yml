@@ -12,6 +12,9 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
 
     strategy:
       matrix:
@@ -28,6 +31,7 @@ jobs:
     - run: npm ci
     - run: npm run structure:check
     - run: npm run lint
+    - run: npm run typecheck
     - name: Build with dummy env vars
       env:
         # Dummy values for CI build - real values are set in Vercel/production
@@ -41,3 +45,5 @@ jobs:
         NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET: dummy-preset
         CRON_SECRET: dummy-cron-secret
       run: npm run build --if-present
+    - name: Production dependency audit
+      run: npm run audit:prod

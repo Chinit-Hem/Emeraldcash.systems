@@ -5,7 +5,7 @@ import Image from "next/image";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useLanguage } from "@/lib/LanguageContext";
 import { useTranslation } from "@/lib/i18n";
-import { OptimizedLink } from "./OptimizedLink";
+import { OptimizedLink } from "@/components/OptimizedLink";
 import { useVehicleStats } from "@/lib/useVehiclesNeon";
 import { TukTukIcon } from "@/components/icons/TukTukIcon";
 import { Bike, Boxes, Car, Package } from "lucide-react";

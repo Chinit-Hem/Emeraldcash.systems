@@ -90,16 +90,16 @@ await sqlQuery(`SELECT * FROM ${tableName}`); // SQL Injection risk!
 
 ### 3. Configuration Management
 ```javascript
-export const CONFIG = Object.freeze({
-  DATABASE_URL: "postgresql://...",
+export const CONFIG = {
+  DATABASE_URL: process.env.DATABASE_URL || "",
   BACKUP_TABLE_NAME: "cleaned_vehicles_for_google_sheets",
   PRODUCTION_TABLE_NAME: "vehicles",
   EXPECTED_MAX_VEHICLE_ID: 1222,
   ACTUAL_MAX_VEHICLE_ID: 1190,
-});
+};
 ```
 
-**ហេតុផល:** `Object.freeze()` ធានាថា configuration មិនអាចត្រូវបានផ្លាស់ប្តូរក្នុង runtime។
+**ហេតុផល:** Database credentials are provided through environment variables so secrets are not committed to the repository.
 
 ---
 
@@ -165,7 +165,7 @@ export const CONFIG = Object.freeze({
 ## ព័ត៌មានបន្ថែម (Additional Information)
 
 - **Database:** Neon PostgreSQL (Serverless)
-- **Connection Pooling:** ប្រើ `ep-little-bar-aij99s0n-pooler` endpoint
+- **Connection Pooling:** ប្រើ `[neon-project-host]-pooler` endpoint
 - **SSL Mode:** Required with channel binding
 - **Author:** Data Integrity Team
 - **Version:** 1.0.0

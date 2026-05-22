@@ -6,6 +6,7 @@
 
 import { createErrorResponse, createSuccessResponse, withErrorHandling } from "@/lib/api-error-wrapper";
 import { requirePermission } from "@/lib/auth-helpers";
+import { buildCorsHeaders } from "@/lib/cors";
 import { vehicleService } from "@/services/VehicleService";
 import { normalizeImageUrl } from "@/lib/cloudinary";
 import { mergeVehicleImages } from "@/lib/vehicle-helpers";
@@ -87,32 +88,6 @@ async function normalizeVehicleImages(...values: unknown[]): Promise<string[]> {
     rawImages.map((image) => normalizeImageUrl(image))
   );
   return mergeVehicleImages(normalizedImages);
-}
-
-// ============================================================================
-// CORS Configuration
-function buildCorsHeaders(req: NextRequest): Headers {
-  const appOrigin = process.env.NEXT_PUBLIC_APP_ORIGIN?.trim();
-  const vercelUrl = process.env.NEXT_PUBLIC_VERCEL_URL?.trim();
-  const vercelOrigin = vercelUrl
-    ? vercelUrl.startsWith("http")
-      ? vercelUrl
-      : `https://${vercelUrl}`
-    : "";
-  const requestOrigin = req.headers.get("origin") || "";
-  const allowedOrigin = appOrigin || vercelOrigin || requestOrigin || "*";
-
-  const headers = new Headers({
-    "Access-Control-Allow-Origin": allowedOrigin,
-    "Access-Control-Allow-Methods": "GET, PUT, DELETE, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Requested-With",
-  });
-
-  if (allowedOrigin !== "*") {
-    headers.set("Access-Control-Allow-Credentials", "true");
-  }
-
-  return headers;
 }
 
 // ============================================================================
@@ -222,7 +197,7 @@ const putHandler = withErrorHandling(async (req: NextRequest, { logger, requestI
 
   // Log incoming payload for debugging image update issues
   console.log('[🚀 API UPDATE FULL PAYLOAD]:', JSON.stringify({
-    vehicleId: id, 
+    vehicleId: id,
     dbPayload,
     payloadKeys: Object.keys(payload)
   }, null, 2));
@@ -270,28 +245,28 @@ const putHandler = withErrorHandling(async (req: NextRequest, { logger, requestI
 
   logger.debug("[UPDATE]", { vehicleId: id, plate: dbPayload.plate, hasImage: !!dbPayload.image_id });
 
-  console.error('[🚀 VEHICLE API UPDATE START]', { 
-    vehicleId: id, 
+  console.error('[🚀 VEHICLE API UPDATE START]', {
+    vehicleId: id,
     image_id: dbPayload.image_id ? `${dbPayload.image_id.substring(0,50)}...` : null,
     image_format: dbPayload.image_id ? (dbPayload.image_id.startsWith('http') ? 'URL' : dbPayload.image_id.startsWith('data:') ? 'DATA' : 'PUBLIC_ID') : null,
     plate: dbPayload.plate,
-    requestId 
+    requestId
   });
-  
+
   const result = await vehicleService.updateVehicle(id, dbPayload);
-  
-  console.error('[🚀 VEHICLE API UPDATE RESULT]', { 
-    success: result.success, 
+
+  console.error('[🚀 VEHICLE API UPDATE RESULT]', {
+    success: result.success,
     error: result.error,
     image_saved: dbPayload.image_id,
-    requestId 
+    requestId
   });
 
   if (!result.success) {
     const errorMsg = result.error || 'Unknown database error (no error message returned)';
     logger.error("[UPDATE FAILED]", { error: errorMsg, vehicleId: id, dbPayloadKeys: Object.keys(dbPayload), requestId });
     return createErrorResponse(
-      `Update failed: ${errorMsg}`, 
+      `Update failed: ${errorMsg}`,
       requestId, Date.now() - startTime, 500, buildCorsHeaders(req)
     );
   }

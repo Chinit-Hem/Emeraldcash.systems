@@ -148,7 +148,7 @@ console.log("Expected behavior:");
 console.log("  - Should use handleSubmitVehicle for both add and edit");
 console.log("  - handleSubmitVehicle should route to updateVehicle when editing");
 
-const vehiclesClientPath = path.join(__dirname, '../src/app/(app)/vehicles/VehiclesClient.tsx');
+const vehiclesClientPath = path.join(__dirname, '../src/features/vehicles/components/VehiclesClient.tsx');
 if (fs.existsSync(vehiclesClientPath)) {
   const content = fs.readFileSync(vehiclesClientPath, 'utf8');
   

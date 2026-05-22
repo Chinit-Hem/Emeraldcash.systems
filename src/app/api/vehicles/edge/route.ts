@@ -4,6 +4,7 @@
  */
 import { vehicleService } from "@/services/VehicleService";
 import { requirePermission } from "@/lib/auth-helpers";
+import { buildCorsHeaders } from "@/lib/cors";
 import { NextRequest, NextResponse } from "next/server";
 import { createErrorResponse, createSuccessResponse, withErrorHandling } from "@/lib/api-error-wrapper";
 import type { VehicleFilters } from "@/types/vehicle";
@@ -11,19 +12,6 @@ import type { VehicleFilters } from "@/types/vehicle";
 // Use edge runtime for faster cold starts
 // Removed edge runtime - Neon deps incompatible
 // export const runtime = "edge";
-
-function buildCorsHeaders(req: NextRequest): Headers {
-  const allowedOrigin = process.env.NEXT_PUBLIC_APP_ORIGIN || "*";
-  const headers = new Headers({
-    "Access-Control-Allow-Origin": allowedOrigin,
-    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type, Authorization",
-  });
-  if (allowedOrigin !== "*") {
-    headers.set("Access-Control-Allow-Credentials", "true");
-  }
-  return headers;
-}
 
 export async function OPTIONS(req: NextRequest) {
   return new NextResponse(null, { status: 204, headers: buildCorsHeaders(req) });

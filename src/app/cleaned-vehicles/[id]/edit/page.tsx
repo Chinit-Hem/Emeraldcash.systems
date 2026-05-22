@@ -2,8 +2,8 @@
 
 import { useAuthUser } from "@/app/components/AuthContext";
 import ImageModal from "@/app/components/ImageModal";
-import Sidebar from "@/app/components/Sidebar";
-import TopBar from "@/app/components/TopBar";
+import Sidebar from "@/components/Sidebar";
+import TopBar from "@/components/TopBar";
 import { useRouter, useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { getVehicleFullImageUrl, getVehicleThumbnailUrl, formatPrice } from "@/lib/vehicle-helpers";

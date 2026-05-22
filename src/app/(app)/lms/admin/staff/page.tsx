@@ -19,6 +19,7 @@ import {
   Trash2,
   Users
 } from "lucide-react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 
@@ -268,7 +269,7 @@ export default function StaffAdminPage() {
       
       setUserActionSuccess(`Synced ${users.length} users to LMS`);
       await loadData();
-    } catch (_error) {
+    } catch {
       setUserActionError("Failed to sync some users to LMS");
     } finally {
       setIsSyncingAll(false);
@@ -742,9 +743,11 @@ export default function StaffAdminPage() {
                     <div className="relative shrink-0">
                       {managedUser.profile_picture ? (
 
-                        <img
+                        <Image
                           src={managedUser.profile_picture}
                           alt={managedUser.username}
+                          width={56}
+                          height={56}
                           className="h-14 w-14 rounded-2xl object-cover border-2 border-slate-200"
                         />
                       ) : (
@@ -899,9 +902,11 @@ export default function StaffAdminPage() {
                 <div className="relative">
                   {editProfilePicture ? (
                      
-                    <img
+                    <Image
                       src={editProfilePicture}
                       alt="Profile"
+                      width={96}
+                      height={96}
                       className="h-24 w-24 rounded-2xl object-cover border-4 border-white shadow-lg"
                     />
                   ) : (

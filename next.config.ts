@@ -14,8 +14,8 @@ const contentSecurityPolicy = [
   "img-src 'self' data: blob: https:",
   "font-src 'self' data: https:",
   "connect-src 'self' data: https://script.google.com https://script.googleusercontent.com https://*.googleapis.com https://*.googleusercontent.com https://api.cloudinary.com https://www.youtube.com https://*.youtube.com https: ws: wss: *.localhost:* localhost:*", // 🚀 FIX: Enhanced HMR and websocket support
-  "frame-src 'self' https://www.youtube.com https://*.youtube.com",
-  "child-src 'self' https://www.youtube.com https://*.youtube.com",
+  "frame-src 'self' https://vercel.live https://www.youtube.com https://*.youtube.com https://www.youtube-nocookie.com https://*.youtube-nocookie.com",
+  "child-src 'self' https://vercel.live https://www.youtube.com https://*.youtube.com https://www.youtube-nocookie.com https://*.youtube-nocookie.com",
 ].join("; ");
 
 const securityHeaders = [

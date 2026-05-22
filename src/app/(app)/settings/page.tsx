@@ -10,7 +10,7 @@ import dynamic from "next/dynamic";
 import { NeuSettingsSkeleton } from "@/app/components/skeletons/NeuSettingsSkeleton";
 
 // Lazy load the heavy settings component
-const SettingsContent = dynamic(() => import("./SettingsContent"), {
+const SettingsContent = dynamic(() => import("@/features/settings/components/SettingsContent"), {
   loading: () => <NeuSettingsSkeleton />,
 });
 

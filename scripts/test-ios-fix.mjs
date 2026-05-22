@@ -14,7 +14,7 @@ const rootDir = join(__dirname, '..');
 
 try {
   // Check VehiclesClient.tsx
-  const vehiclesClientPath = join(rootDir, 'src', 'app', '(app)', 'vehicles', 'VehiclesClient.tsx');
+  const vehiclesClientPath = join(rootDir, 'src', 'features', 'vehicles', 'components', 'VehiclesClient.tsx');
   const vehiclesClient = readFileSync(vehiclesClientPath, 'utf-8');
   
   console.log("✓ VehiclesClient.tsx exists");

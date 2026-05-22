@@ -115,7 +115,7 @@ node scripts/check-cleaned-table-data.mjs
 
 #### ជំហានទី ១៖ ពិនិត្យស្ថានភាព Neon DB
 1. ចូលទៅកាន់ **[Neon Console](https://console.neon.tech)**
-2. ជ្រើសរើស project `ep-little-bar-aij99s0n`
+2. ជ្រើសរើស project `[neon-project-host]`
 3. ពិនិត្យ **Connection Pool** status
 4. ប្រសិនបើ **Active connections** > 80% នៃ limit:
    - រង់ចាំ 30 វិនាទី ហើយព្យាយាមម្តងទៀត
@@ -124,10 +124,10 @@ node scripts/check-cleaned-table-data.mjs
 #### ជំហានទី ២៖ ពិនិត្យ Network Connectivity
 ```bash
 # ពិនិត្យថាតើអាចភ្ជាប់ទៅ Neon host បានឬទេ
-ping ep-little-bar-aij99s0n-pooler.c-4.us-east-1.aws.neon.tech
+ping [neon-pooler-host]
 
 # ពិនិត្យ port 5432 (PostgreSQL)
-telnet ep-little-bar-aij99s0n-pooler.c-4.us-east-1.aws.neon.tech 5432
+telnet [neon-pooler-host] 5432
 ```
 
 #### ជំហានទី ៣៖ ពិនិត្យ SSL Configuration
@@ -248,7 +248,7 @@ const DATABASE_URL = "postgresql://...?sslmode=disable";
 #### ជំហានទី ៣៖ ពិនិត្យ Certificate
 ```bash
 # ពិនិត្យថាតើ certificate ត្រឹមត្រូវឬទេ
-openssl s_client -connect ep-little-bar-aij99s0n-pooler.c-4.us-east-1.aws.neon.tech:5432
+openssl s_client -connect [neon-pooler-host]:5432
 ```
 
 ---
@@ -268,7 +268,7 @@ echo "================================"
 echo "1. Testing Database Connection..."
 node -e "
 import { createDatabaseConnection } from './scripts/check-cleaned-table-data.mjs';
-const sql = createDatabaseConnection('postgresql://neondb_owner:npg_3XTHYOQhPr9A@ep-little-bar-aij99s0n-pooler.c-4.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require');
+const sql = createDatabaseConnection(process.env.DATABASE_URL);
 sql\`SELECT 1\`.then(() => console.log('   ✅ Database: OK')).catch(e => console.log('   ❌ Database:', e.message));
 "
 
@@ -276,7 +276,7 @@ sql\`SELECT 1\`.then(() => console.log('   ✅ Database: OK')).catch(e => consol
 echo "2. Checking Production Table..."
 node -e "
 import { createDatabaseConnection, getTableRowCount } from './scripts/check-cleaned-table-data.mjs';
-const sql = createDatabaseConnection('postgresql://neondb_owner:npg_3XTHYOQhPr9A@ep-little-bar-aij99s0n-pooler.c-4.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require');
+const sql = createDatabaseConnection(process.env.DATABASE_URL);
 getTableRowCount(sql, 'vehicles').then(count => console.log('   ✅ Vehicles table:', count, 'records')).catch(e => console.log('   ❌ Error:', e.message));
 "
 
@@ -284,7 +284,7 @@ getTableRowCount(sql, 'vehicles').then(count => console.log('   ✅ Vehicles tab
 echo "3. Checking Backup Table..."
 node -e "
 import { createDatabaseConnection, getTableRowCount } from './scripts/check-cleaned-table-data.mjs';
-const sql = createDatabaseConnection('postgresql://neondb_owner:npg_3XTHYOQhPr9A@ep-little-bar-aij99s0n-pooler.c-4.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require');
+const sql = createDatabaseConnection(process.env.DATABASE_URL);
 getTableRowCount(sql, 'cleaned_vehicles_for_google_sheets').then(count => console.log('   ✅ Backup table:', count, 'records')).catch(e => console.log('   ⚠️  Backup table:', e.message));
 "
 

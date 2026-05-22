@@ -95,7 +95,7 @@ export default function LessonsAdminPage() {
       if (lessonsData.success) {
         setLessons(lessonsData.data);
       }
-    } catch (_err) {
+    } catch {
       setError("Failed to load data");
     } finally {
       setLoading(false);
@@ -185,7 +185,7 @@ export default function LessonsAdminPage() {
         }
         setError(data.error || "Failed to save lesson");
       }
-    } catch (_err) {
+    } catch {
       // Rollback on error
       if (editingId) {
         setLessons(prev => prev.map(l => l.id === editingId ? lessons.find(ol => ol.id === editingId) || l : l));
@@ -215,7 +215,7 @@ export default function LessonsAdminPage() {
       } else {
         setError(data.error || "Failed to delete lesson");
       }
-    } catch (_err) {
+    } catch {
       setError("Failed to delete lesson");
     }
   };

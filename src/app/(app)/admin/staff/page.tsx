@@ -62,8 +62,6 @@ export default function UnifiedStaffPage() {
   const isAdmin = user?.role === "Admin";
   
   const [unifiedStaff, setUnifiedStaff] = useState<UnifiedStaffMember[]>([]);
-  const [_settingsUsers, setSettingsUsers] = useState<SettingsUser[]>([]);
-  const [_lmsStaff, setLmsStaff] = useState<StaffMember[]>([]);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -83,9 +81,6 @@ export default function UnifiedStaffPage() {
       const staffRes = await fetch("/api/lms/staff");
       const staffData = await staffRes.json();
       const lmsData = staffData.success ? staffData.data : [];
-
-      setSettingsUsers(settingsData);
-      setLmsStaff(lmsData);
 
       // Merge into unified view
       const unified = mergeStaffData(settingsData, lmsData);
@@ -193,7 +188,7 @@ export default function UnifiedStaffPage() {
       } else {
         setSyncMessage(`Failed to sync ${member.name}: ${data.error}`);
       }
-    } catch (_err) {
+    } catch {
       setSyncMessage(`Error syncing ${member.name}`);
     }
   };
@@ -231,7 +226,7 @@ export default function UnifiedStaffPage() {
           if (data.success) success++;
           else failed++;
         }
-      } catch (_err) {
+      } catch {
         failed++;
       }
     }

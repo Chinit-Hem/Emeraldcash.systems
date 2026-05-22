@@ -23,6 +23,7 @@ import {
   type LucideIcon
 } from "lucide-react";
 import Link from "next/link";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
@@ -63,6 +64,11 @@ const UserAvatar = memo(({
     md: "w-14 h-14 text-lg",
     lg: "w-24 h-24 text-2xl"
   };
+  const sizePixels = {
+    sm: 40,
+    md: 56,
+    lg: 96,
+  }[size];
 
   const initial = (user.full_name || user.username).charAt(0).toUpperCase();
 
@@ -70,9 +76,11 @@ const UserAvatar = memo(({
     <div className="relative shrink-0">
       {user.profile_picture ? (
          
-        <img
+        <Image
           src={user.profile_picture}
           alt={user.username}
+          width={sizePixels}
+          height={sizePixels}
           className={`${sizeClasses[size]} rounded-xl object-cover border-2 border-white dark:border-slate-700 shadow-sm`}
           loading="lazy"
         />
@@ -846,9 +854,11 @@ export default function SettingsContent() {
                 <div className="relative">
                   {editProfilePicture ? (
                      
-                    <img
+                    <Image
                       src={editProfilePicture}
                       alt="Profile"
+                      width={96}
+                      height={96}
                       className="w-24 h-24 rounded-2xl object-cover border-4 border-white dark:border-slate-700 shadow-lg"
                     />
                   ) : (

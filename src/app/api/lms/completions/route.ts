@@ -15,6 +15,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { lmsService } from "@/services/LmsService";
 import { canAccessLMS, canManageLMS, getSession } from "@/lib/auth-helpers";
+import { logAuditEvent } from "@/lib/audit-log";
 import { dbManager } from "@/lib/db-singleton";
 import { resolveLmsStaffContext } from "@/lib/lms-auth";
 import { invalidateSequentialLessonsCache } from "@/lib/lms-cache";
@@ -124,6 +125,16 @@ const isAdmin = canManageLMS(session);
     // staffId = 0 means admin without staff profile, allow completion without checking percentage
     if (staffId === 0 && isAdmin) {
       console.log('[COMPLETIONS API] Admin without staff profile - allowing completion');
+      await logAuditEvent(request, session, {
+        action: "lms.lesson.complete",
+        entityType: "lms_lesson",
+        entityId: lessonId,
+        metadata: {
+          staffId,
+          adminWithoutStaffProfile: true,
+        },
+      });
+
       return NextResponse.json({
         success: true,
         data: {
@@ -205,6 +216,17 @@ const isAdmin = canManageLMS(session);
     if (Number.isInteger(categoryId) && categoryId > 0) {
       await invalidateSequentialLessonsCache(categoryId, staffId);
     }
+
+    await logAuditEvent(request, session, {
+      action: "lms.lesson.complete",
+      entityType: "lms_lesson",
+      entityId: lessonId,
+      metadata: {
+        staffId,
+        timeSpentSeconds: typeof timeSpentSeconds === "number" ? timeSpentSeconds : null,
+        watchPercentage,
+      },
+    });
 
     return NextResponse.json({
       success: true,

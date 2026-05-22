@@ -12,6 +12,11 @@
     "start": "next start",
     "preview": "npm run build && next start",
     "lint": "eslint src --ext .ts,.tsx --max-warnings 200",
+    "typecheck": "tsc --noEmit --pretty false",
+    "audit:prod": "npm audit --omit=dev --audit-level=high",
+    "verify:ci": "npm run structure:check && npm run lint && npm run typecheck && npm run build && npm run audit:prod",
+    "backup:create": "node scripts/backup-verification/create-vehicles-backup-table.mjs",
+    "backup:verify": "node scripts/check-cleaned-table-data.mjs",
     "structure:check": "node structure-check.mjs",
     "db:check": "node scripts/test-neon-connection.mjs"
   },
@@ -30,7 +35,7 @@
     "date-fns": "^4.1.0",
     "dotenv": "^17.3.1",
     "lucide-react": "^0.563.0",
-    "next": "^16.2.4",
+    "next": "^16.2.6",
     "pg": "^8.20.0",
     "react": "^19.2.5",
     "react-dom": "^19.2.5",
@@ -47,9 +52,14 @@
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
     "eslint": "^9",
-    "eslint-config-next": "16.1.4",
+    "eslint-config-next": "^16.2.6",
     "tailwindcss": "^4",
     "typescript": "^5"
+  },
+  "overrides": {
+    "next": {
+      "postcss": "8.5.15"
+    }
   },
   "type": "module"
 }

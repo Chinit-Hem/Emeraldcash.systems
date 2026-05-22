@@ -1,21 +1,29 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireSessionFromRequest, getClientIp, getClientUserAgent } from "@/lib/auth";
 
+function debugEndpointDisabled() {
+  return process.env.NODE_ENV === "production" && process.env.ENABLE_AUTH_DEBUG !== "true";
+}
+
 /**
  * Debug endpoint for authentication troubleshooting
  * Helps verify cookie presence and session validity on mobile browsers
  */
 export async function GET(req: NextRequest) {
+  if (debugEndpointDisabled()) {
+    return NextResponse.json({ ok: false, error: "Not found" }, { status: 404 });
+  }
+
   const ip = getClientIp(req.headers);
   const userAgent = getClientUserAgent(req.headers);
-  
+
   // Get all cookies for debugging
   const allCookies = req.cookies.getAll();
   const sessionCookie = req.cookies.get("session");
-  
+
   // Check session
   const { session, debug } = requireSessionFromRequest(req);
-  
+
   // Build detailed debug response
   const debugInfo = {
     timestamp: new Date().toISOString(),
@@ -65,8 +73,8 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({
     ok: !!session,
     debug: debugInfo,
-    message: session 
-      ? "Session is valid" 
+    message: session
+      ? "Session is valid"
       : "No valid session found. Check debug info for details.",
   });
 }
@@ -75,9 +83,13 @@ export async function GET(req: NextRequest) {
  * POST endpoint to test cookie setting
  */
 export async function POST(req: NextRequest) {
+  if (debugEndpointDisabled()) {
+    return NextResponse.json({ ok: false, error: "Not found" }, { status: 404 });
+  }
+
   const body = await req.json().catch(() => ({}));
   const testValue = body.testValue || "test";
-  
+
   const res = NextResponse.json({
     ok: true,
     message: "Test cookie set",

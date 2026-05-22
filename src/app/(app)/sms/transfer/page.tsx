@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useAuthUser } from "@/app/components/AuthContext";
 import { AlertCircle, ArrowLeftRight, CheckCircle, ImageIcon, Loader2, Upload, X } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { validateTransferForm } from "@/lib/sms-validation";
 import {
   SmsPageHeader,
@@ -21,6 +21,7 @@ import {
   smsSelectClass,
   smsTextareaClass,
 } from "../components/SmsShared";
+import { uploadSmsImage } from "../components/smsUpload";
 
 interface SmsAssetOption {
   id: string;
@@ -42,24 +43,87 @@ interface SettingsUser {
   profile_picture?: string | null;
 }
 
+type TransferFormState = {
+  assetSearch: string;
+  senderId: string;
+  receiverId: string;
+  location: string;
+  remark: string;
+};
+
+type CreateAssetResult =
+  | { success: true; assetId: string }
+  | { success: false; error: string };
+
+const SMS_ASSETS_URL = "/api/sms/assets?pageSize=100";
+const NEW_ASSET_VALIDATION_ID = "00000000-0000-4000-8000-000000000000";
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 const smsInvalidFieldClass =
   "border-red-500 bg-red-50 focus:ring-red-500 dark:border-red-700 dark:bg-red-900/20 dark:focus:ring-red-500";
+
+function toAssetOption(asset: SmsAssetApiItem): SmsAssetOption {
+  return { id: asset.id, name: asset.name, itemCode: asset.itemCode };
+}
+
+async function fetchAssetOptions(): Promise<SmsAssetOption[]> {
+  const response = await fetch(SMS_ASSETS_URL);
+  const data = await response.json().catch(() => ({}));
+  return data.success && Array.isArray(data.data) ? data.data.map(toAssetOption) : [];
+}
+
+function isValidUUID(value: string): boolean {
+  return UUID_PATTERN.test(value);
+}
+
+function findAssetByInput(assets: SmsAssetOption[], input: string): SmsAssetOption | undefined {
+  const query = input.toLowerCase();
+  return assets.find(
+    (asset) =>
+      asset.name.toLowerCase() === query ||
+      asset.itemCode?.toLowerCase() === query
+  );
+}
+
+async function createAssetFromTransfer(assetName: string): Promise<CreateAssetResult> {
+  try {
+    const response = await fetch("/api/sms/assets", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: assetName.trim(),
+        type: "Other",
+        quantity: 1,
+        status: "Available",
+      }),
+    });
+
+    const result = await response.json().catch(() => ({}));
+
+    if (!response.ok || !result.success || typeof result.data?.id !== "string") {
+      return { success: false, error: result.error || "Failed to create asset" };
+    }
+
+    return { success: true, assetId: result.data.id };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : "Failed to create asset" };
+  }
+}
 
 export default function TransferPage() {
   const user = useAuthUser();
   const canChooseSender = user.role === "Admin" || user.role === "Transfer";
   const router = useRouter();
 
-const [form, setForm] = useState({
-    assetId: "",
-    assetSearch: "", // Display name in input
+  const [form, setForm] = useState<TransferFormState>({
+    assetSearch: "",
     senderId: "",
     receiverId: "",
     location: "",
     remark: "",
   });
 
-const [selectedAssetId, setSelectedAssetId] = useState(""); // Actual ID when selected from dropdown
+  const [selectedAssetId, setSelectedAssetId] = useState("");
   const [assets, setAssets] = useState<SmsAssetOption[]>([]);
   const [assetsLoading, setAssetsLoading] = useState(true);
   const [assetDropdownOpen, setAssetDropdownOpen] = useState(false);
@@ -71,19 +135,17 @@ const [selectedAssetId, setSelectedAssetId] = useState(""); // Actual ID when se
   const [generalError, setGeneralError] = useState("");
   const [success, setSuccess] = useState("");
 
+  const loadAssets = useCallback(async () => {
+    setAssets(await fetchAssetOptions());
+  }, []);
+
   useEffect(() => {
-    fetch('/api/sms/assets?pageSize=100')
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.success && Array.isArray(data.data)) {
-          setAssets(data.data.map((a: SmsAssetApiItem) => ({ id: a.id, name: a.name, itemCode: a.itemCode })));
-        }
-      })
+    loadAssets()
       .catch(() => {
         // silently fail; user can still type a UUID manually
       })
       .finally(() => setAssetsLoading(false));
-  }, []);
+  }, [loadAssets]);
 
   useEffect(() => {
     fetch('/api/auth/users')
@@ -99,7 +161,7 @@ const [selectedAssetId, setSelectedAssetId] = useState(""); // Actual ID when se
       .finally(() => setUsersLoading(false));
   }, []);
 
-useEffect(() => {
+  useEffect(() => {
     if (!canChooseSender && user.username) {
       setForm((prev) => ({ ...prev, senderId: user.username }));
     }
@@ -123,9 +185,8 @@ useEffect(() => {
     }
   }, [assetDropdownOpen]);
 
-  const handleChange = (field: string, value: string | number) => {
+  const handleChange = (field: keyof TransferFormState, value: string) => {
     setForm((prev) => ({ ...prev, [field]: value }));
-    // Clear field error when user starts typing
     if (fieldErrors[field]) {
       setFieldErrors((prev) => {
         const next = { ...prev };
@@ -135,146 +196,66 @@ useEffect(() => {
     }
   };
 
-const uploadTransferImage = async (): Promise<string | null> => {
-    if (!imageFile) return null;
-    
-    // Use selectedAssetId if available, otherwise use assetSearch (typed value)
-    const assetIdForUpload = selectedAssetId || form.assetSearch;
-    if (!assetIdForUpload.trim()) return null;
+  const buildTransferPayload = (assetId: string) => ({
+    assetId: assetId.trim(),
+    senderId: form.senderId.trim(),
+    receiverId: form.receiverId.trim(),
+    location: form.location.trim(),
+    remark: form.remark.trim() || undefined,
+  });
 
-    const formData = new FormData();
-    formData.append("file", imageFile);
-    formData.append("folder", "sms/transfers/images");
-    formData.append("publicId", `transfer_${assetIdForUpload.trim()}_${Date.now()}`);
+  const validateTransferPayload = (assetId: string) => {
+    const validation = validateTransferForm(buildTransferPayload(assetId));
 
-    const response = await fetch("/api/sms/assets/upload", {
-      method: "POST",
-      body: formData,
-    });
-    const result = await response.json().catch(() => ({}));
-
-    if (!response.ok || result.success === false || !result.url) {
-      throw new Error(result.error || "Image upload failed");
+    if (!validation.isValid) {
+      setFieldErrors(validation.errors);
+      setGeneralError("Please fix the errors below.");
     }
 
-    return result.url as string;
+    return validation.isValid;
   };
 
-// Helper to check if input is a valid UUID
-const isValidUUID = (value: string): boolean => {
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
-};
-
-// Helper to create a new asset from transfer form
-const createAssetFromTransfer = async (assetName: string): Promise<{ success: boolean; assetId?: string; error?: string }> => {
-  try {
-    const response = await fetch("/api/sms/assets", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        name: assetName.trim(),
-        type: "Other",
-        quantity: 1,
-        status: "Available",
-      }),
-    });
-
-    const result = await response.json().catch(() => ({}));
-
-    if (!response.ok || !result.success) {
-      return { success: false, error: result.error || "Failed to create asset" };
-    }
-
-    return { success: true, assetId: result.data?.id };
-  } catch (err) {
-    return { success: false, error: err instanceof Error ? err.message : "Failed to create asset" };
-  }
-};
-
-const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setGeneralError("");
     setSuccess("");
     setFieldErrors({});
 
-    // Use selectedAssetId if available (from dropdown), otherwise resolve asset name to ID
-    let finalAssetId = selectedAssetId || form.assetSearch.trim();
-    
-    // Check if input is a new asset name (not UUID, not matching existing asset)
-    const assetInput = finalAssetId.trim();
-    const isNewAsset = assetInput.length >= 2 && 
-      !isValidUUID(assetInput) && 
-      !assets.some(
-        (a) => a.name.toLowerCase() === assetInput.toLowerCase() ||
-              (a.itemCode?.toLowerCase() === assetInput.toLowerCase())
-      );
+    const assetInput = (selectedAssetId || form.assetSearch).trim();
+    const matchedAsset = selectedAssetId ? undefined : findAssetByInput(assets, assetInput);
+    const isNewAsset = assetInput.length >= 2 && !selectedAssetId && !isValidUUID(assetInput) && !matchedAsset;
+    let finalAssetId = selectedAssetId || matchedAsset?.id || assetInput;
 
-    // If typed value doesn't look like UUID, try to find matching asset by name or itemCode
-    if (!isValidUUID(finalAssetId) && !isNewAsset) {
-      const matchedAsset = assets.find(
-        (a) => a.name.toLowerCase() === finalAssetId.toLowerCase() ||
-              (a.itemCode?.toLowerCase() === finalAssetId.toLowerCase())
-      );
-      if (matchedAsset) {
-        finalAssetId = matchedAsset.id;
-      }
-    }
-
-    // If it's a new asset, create it first
-    if (isNewAsset) {
-      setLoading(true);
-      setGeneralError("");
-      try {
-        const createResult = await createAssetFromTransfer(assetInput);
-        if (!createResult.success) {
-          setGeneralError(createResult.error || "Failed to create new asset");
-          return;
-        }
-        finalAssetId = createResult.assetId!;
-        
-        // Refresh assets list for future selections
-        const assetsRes = await fetch('/api/sms/assets?pageSize=100');
-        const assetsData = await assetsRes.json().catch(() => ({}));
-        if (assetsData.success && Array.isArray(assetsData.data)) {
-          setAssets(assetsData.data.map((a: SmsAssetApiItem) => ({ id: a.id, name: a.name, itemCode: a.itemCode })));
-        }
-      } catch (err) {
-        setGeneralError(err instanceof Error ? err.message : "Failed to create new asset");
-        setLoading(false);
-        return;
-      }
-    }
-    
-    // Validate form using schema
-    const validation = validateTransferForm({
-      assetId: finalAssetId,
-      senderId: form.senderId.trim(),
-      receiverId: form.receiverId.trim(),
-      location: form.location.trim(),
-      remark: form.remark.trim() || undefined,
-    });
-
-    if (!validation.isValid) {
-      setFieldErrors(validation.errors);
-      setGeneralError("Please fix the errors below.");
+    if (!validateTransferPayload(isNewAsset ? NEW_ASSET_VALIDATION_ID : finalAssetId)) {
       return;
     }
 
     setLoading(true);
     try {
-      const imageUrl = await uploadTransferImage();
+      if (isNewAsset) {
+        const createResult = await createAssetFromTransfer(assetInput);
+        if (!createResult.success) {
+          throw new Error(createResult.error || "Failed to create new asset");
+        }
+
+        finalAssetId = createResult.assetId;
+        void loadAssets().catch(() => undefined);
+      }
+
+      const imageUrl = await uploadSmsImage({
+        file: imageFile,
+        folder: "sms/transfers/images",
+        publicIdPrefix: "transfer",
+        entityId: finalAssetId,
+      });
       const res = await fetch("/api/sms/transfers", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          assetId: finalAssetId.trim(),
-          senderId: form.senderId.trim(),
-          receiverId: form.receiverId.trim(),
-          location: form.location.trim(),
-          remark: form.remark.trim() || undefined,
-          imageUrl: imageUrl || undefined,
+          ...buildTransferPayload(finalAssetId),
+          imageUrl,
         }),
       });
 
@@ -283,9 +264,7 @@ const handleSubmit = async (e: React.FormEvent) => {
         throw new Error(data.error || "Failed to create transfer");
       }
 
-      setSuccess(isNewAsset 
-        ? "New asset created and transfer successful!" 
-        : "Transfer created successfully!");
+      setSuccess(isNewAsset ? "New asset created and transfer successful!" : "Transfer created successfully!");
       setTimeout(() => router.push("/sms"), 1200);
     } catch (err) {
       setGeneralError(err instanceof Error ? err.message : "Failed to create transfer");
@@ -296,6 +275,17 @@ const handleSubmit = async (e: React.FormEvent) => {
 
   const userLabel = (u: SettingsUser) =>
     u.full_name ? `${u.full_name} (@${u.username})` : `@${u.username}`;
+
+  const assetSearchQuery = form.assetSearch.toLowerCase();
+  const visibleAssets = assets
+    .filter(
+      (asset) =>
+        !assetSearchQuery ||
+        asset.name.toLowerCase().includes(assetSearchQuery) ||
+        (asset.itemCode?.toLowerCase().includes(assetSearchQuery) ?? false) ||
+        asset.id.toLowerCase().includes(assetSearchQuery)
+    )
+    .slice(0, 10);
 
   return (
     <SmsPageShell maxWidth="max-w-2xl">
@@ -342,7 +332,6 @@ const handleSubmit = async (e: React.FormEvent) => {
                 value={form.assetSearch}
                 onChange={(e) => {
                   handleChange("assetSearch", e.target.value);
-                  // Clear selected asset when user types (treating as manual UUID entry)
                   if (selectedAssetId) setSelectedAssetId("");
                 }}
                 onFocus={() => setAssetDropdownOpen(true)}
@@ -358,32 +347,23 @@ const handleSubmit = async (e: React.FormEvent) => {
               />
               {!loading && assets.length > 0 && assetDropdownOpen && (
                 <div className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-lg bg-white py-1 shadow-xl ring-1 ring-gray-200 dark:bg-gray-900 dark:ring-gray-700">
-                  {assets
-                    .filter(
-                      (asset) =>
-                        !form.assetSearch ||
-                        asset.name.toLowerCase().includes(form.assetSearch.toLowerCase()) ||
-                        (asset.itemCode?.toLowerCase().includes(form.assetSearch.toLowerCase()) ?? false) ||
-                        asset.id.toLowerCase().includes(form.assetSearch.toLowerCase())
-                    )
-                    .slice(0, 10)
-                    .map((asset) => (
-                      <button
-                        key={asset.id}
-                        type="button"
-                        onClick={() => {
-                          setSelectedAssetId(asset.id);
-                          handleChange("assetSearch", asset.name);
-                          setAssetDropdownOpen(false);
-                        }}
-                        className="flex w-full items-center justify-between gap-3 px-3 py-2.5 text-left text-sm transition-colors hover:bg-emerald-50 dark:hover:bg-emerald-900/20"
-                      >
-                        <span className="font-medium text-gray-900 dark:text-white">{asset.name}</span>
-                        <span className="text-sm text-gray-500 dark:text-gray-400">
-                          {asset.itemCode ? `(${asset.itemCode})` : asset.id.slice(0, 8)}
-                        </span>
-                      </button>
-                    ))}
+                  {visibleAssets.map((asset) => (
+                    <button
+                      key={asset.id}
+                      type="button"
+                      onClick={() => {
+                        setSelectedAssetId(asset.id);
+                        handleChange("assetSearch", asset.name);
+                        setAssetDropdownOpen(false);
+                      }}
+                      className="flex w-full items-center justify-between gap-3 px-3 py-2.5 text-left text-sm transition-colors hover:bg-emerald-50 dark:hover:bg-emerald-900/20"
+                    >
+                      <span className="font-medium text-gray-900 dark:text-white">{asset.name}</span>
+                      <span className="text-sm text-gray-500 dark:text-gray-400">
+                        {asset.itemCode ? `(${asset.itemCode})` : asset.id.slice(0, 8)}
+                      </span>
+                    </button>
+                  ))}
                 </div>
               )}
             </>

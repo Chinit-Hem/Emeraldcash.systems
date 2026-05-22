@@ -10,7 +10,7 @@ import { useRouter } from "next/navigation";
 import { useState, useRef, useEffect, useCallback } from "react";
 import { formatPrice, getVehicleThumbnailUrl } from "@/lib/vehicle-helpers";
 import { useOptimisticVehicles } from "@/lib/useOptimisticVehicles";
-import { OptimizedImage } from "@/app/components/OptimizedImage";
+import { OptimizedImage } from "@/components/OptimizedImage";
 
 // Color name to hex mapping for visual indicators
 const getColorHex = (colorName: string): string => {

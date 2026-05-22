@@ -7,7 +7,7 @@ import type { LucideIcon } from "lucide-react";
 import { isIOSSafariBrowser } from "@/lib/platform";
 import { useMounted } from "@/lib/useMounted";
 import { useLanguage } from "@/lib/LanguageContext";
-import { OptimizedLink } from "./OptimizedLink";
+import { OptimizedLink } from "@/components/OptimizedLink";
 
 type NavItem = {
   label: string;

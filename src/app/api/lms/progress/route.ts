@@ -9,11 +9,15 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSession, canAccessLMS } from "@/lib/auth-helpers";
 import { dbManager } from "@/lib/db-singleton";
 import { getRequestedStaffId, resolveLmsStaffContext } from "@/lib/lms-auth";
-import { invalidateSequentialLessonsCache } from "@/lib/lms-cache";
 import { canAccessLessonForRole } from "@/lib/lms-lesson-access";
 
 const COMPLETE_THRESHOLD_PERCENT = 95;
 const COMPLETE_END_TOLERANCE_SECONDS = 5;
+const MAX_INITIAL_PROGRESS_SECONDS = 45;
+const PROGRESS_GRACE_SECONDS = 20;
+const MAX_TRUSTED_PLAYBACK_RATE = 1.25;
+const MAX_PROGRESS_ADVANCE_SECONDS = 10 * 60;
+const MIN_DURATION_FOR_COMPLETION_SECONDS = 60;
 
 type ProgressRow = {
   staff_id: number;
@@ -29,9 +33,69 @@ type ProgressRow = {
   last_watched_at: string | null;
 };
 
+type LessonDurationRow = {
+  duration_minutes: number | string | null;
+};
+
 function toNumber(value: unknown, fallback = 0) {
   const numberValue = Number(value);
   return Number.isFinite(numberValue) ? numberValue : fallback;
+}
+
+function getAllowedProgressAdvance(previous: ProgressRow | undefined) {
+  if (!previous) return MAX_INITIAL_PROGRESS_SECONDS;
+
+  const lastWatchedMs = previous.last_watched_at ? Date.parse(previous.last_watched_at) : NaN;
+  const elapsedSeconds = Number.isFinite(lastWatchedMs)
+    ? Math.max(0, (Date.now() - lastWatchedMs) / 1000)
+    : 0;
+
+  return Math.min(
+    MAX_PROGRESS_ADVANCE_SECONDS,
+    Math.max(
+      PROGRESS_GRACE_SECONDS,
+      Math.floor(elapsedSeconds * MAX_TRUSTED_PLAYBACK_RATE + PROGRESS_GRACE_SECONDS)
+    )
+  );
+}
+
+function buildTrustedProgressUpdate(input: {
+  previous?: ProgressRow;
+  requestedCurrentTimeSeconds: number;
+  requestedMaxWatchedSeconds: number;
+  requestedDurationSeconds: number;
+  lessonDurationSeconds: number;
+}) {
+  const previousMaxWatchedSeconds = Math.max(0, Math.floor(toNumber(input.previous?.max_watched_seconds)));
+  const previousDurationSeconds = Math.max(0, Math.floor(toNumber(input.previous?.duration_seconds)));
+  const allowedAdvanceSeconds = getAllowedProgressAdvance(input.previous);
+  const trustedMaxWatchedSeconds = Math.max(
+    previousMaxWatchedSeconds,
+    Math.min(
+      input.requestedMaxWatchedSeconds,
+      previousMaxWatchedSeconds + allowedAdvanceSeconds
+    )
+  );
+  const durationSeconds = Math.max(
+    previousDurationSeconds,
+    input.requestedDurationSeconds,
+    input.lessonDurationSeconds,
+    MIN_DURATION_FOR_COMPLETION_SECONDS,
+    trustedMaxWatchedSeconds
+  );
+  const maxWatchedSeconds = Math.min(trustedMaxWatchedSeconds, durationSeconds);
+  const currentTimeSeconds = Math.min(input.requestedCurrentTimeSeconds, maxWatchedSeconds);
+  const watchPercentage =
+    durationSeconds > 0
+      ? Math.min(100, Number(((maxWatchedSeconds / durationSeconds) * 100).toFixed(2)))
+      : 0;
+
+  return {
+    currentTimeSeconds,
+    maxWatchedSeconds,
+    durationSeconds,
+    watchPercentage,
+  };
 }
 
 function normalizeProgress(row: ProgressRow | undefined, staffName: string) {
@@ -92,77 +156,6 @@ async function ensureCompletionTable() {
       UNIQUE(staff_id, lesson_id)
     )
   `);
-}
-
-async function markLessonCompleteFromProgress(
-  staffId: number,
-  lessonId: number,
-  timeSpentSeconds: number
-) {
-  await ensureCompletionTable();
-
-  const existingRows = await dbManager.executeUnsafe<{ completed_at: string | null }>(
-    `
-      SELECT completed_at
-      FROM lms_lesson_completions
-      WHERE staff_id = $1 AND lesson_id = $2
-      LIMIT 1
-    `,
-    [staffId, lessonId]
-  );
-
-  if (existingRows[0]) {
-    await dbManager.executeUnsafe(
-      `
-        UPDATE lms_lesson_completions
-        SET time_spent_seconds = CASE
-          WHEN time_spent_seconds IS NULL THEN $3
-          ELSE GREATEST(time_spent_seconds, $3)
-        END
-        WHERE staff_id = $1 AND lesson_id = $2
-      `,
-      [staffId, lessonId, timeSpentSeconds]
-    );
-
-    return {
-      completedAt: existingRows[0].completed_at,
-      inserted: false,
-    };
-  }
-
-  const completionRows = await dbManager.executeUnsafe<{
-    completed_at: string | null;
-    category_id: number | string | null;
-  }>(
-    `
-      WITH completed AS (
-        INSERT INTO lms_lesson_completions (staff_id, lesson_id, time_spent_seconds)
-        VALUES ($1, $2, $3)
-        ON CONFLICT (staff_id, lesson_id)
-        DO UPDATE SET
-          time_spent_seconds = CASE
-            WHEN lms_lesson_completions.time_spent_seconds IS NULL THEN EXCLUDED.time_spent_seconds
-            ELSE GREATEST(lms_lesson_completions.time_spent_seconds, EXCLUDED.time_spent_seconds)
-          END
-        RETURNING lesson_id, completed_at
-      )
-      SELECT completed.completed_at, l.category_id
-      FROM completed
-      JOIN lms_lessons l ON l.id = completed.lesson_id
-      LIMIT 1
-    `,
-    [staffId, lessonId, timeSpentSeconds]
-  );
-
-  const categoryId = Number(completionRows[0]?.category_id);
-  if (Number.isInteger(categoryId) && categoryId > 0) {
-    await invalidateSequentialLessonsCache(categoryId, staffId);
-  }
-
-  return {
-    completedAt: completionRows[0]?.completed_at ?? null,
-    inserted: true,
-  };
 }
 
 async function ensureLastWatchedTable() {
@@ -380,16 +373,12 @@ export async function POST(request: NextRequest) {
   }
 
   const lessonId = Number(body.lessonId);
-  const durationSeconds = Math.max(0, Math.floor(toNumber(body.durationSeconds)));
-  const currentTimeSeconds = Math.max(0, Math.floor(toNumber(body.currentTimeSeconds)));
-  const maxWatchedSeconds = Math.max(
-    currentTimeSeconds,
+  const requestedDurationSeconds = Math.max(0, Math.floor(toNumber(body.durationSeconds)));
+  const requestedCurrentTimeSeconds = Math.max(0, Math.floor(toNumber(body.currentTimeSeconds)));
+  const requestedMaxWatchedSeconds = Math.max(
+    requestedCurrentTimeSeconds,
     Math.floor(toNumber(body.maxWatchedSeconds))
   );
-  const watchPercentage =
-    durationSeconds > 0
-      ? Math.min(100, Number(((maxWatchedSeconds / durationSeconds) * 100).toFixed(2)))
-      : 0;
 
   if (!Number.isInteger(lessonId) || lessonId <= 0) {
     return NextResponse.json(
@@ -428,6 +417,38 @@ const staffContext = await resolveLmsStaffContext(
       data: normalizeProgress(undefined, effectiveStaffName),
     });
   }
+
+  const lessonRows = await dbManager.executeUnsafe<LessonDurationRow>(
+    `
+      SELECT duration_minutes
+      FROM lms_lessons
+      WHERE id = $1
+      LIMIT 1
+    `,
+    [lessonId]
+  );
+  const lessonDurationSeconds = Math.max(
+    0,
+    Math.floor(toNumber(lessonRows[0]?.duration_minutes) * 60)
+  );
+
+  const existingProgressRows = await dbManager.executeUnsafe<ProgressRow>(
+    `
+      SELECT *
+      FROM lms_lesson_progress
+      WHERE staff_id = $1 AND lesson_id = $2
+      LIMIT 1
+    `,
+    [effectiveStaffId, lessonId]
+  );
+
+  const trustedProgress = buildTrustedProgressUpdate({
+    previous: existingProgressRows[0],
+    requestedCurrentTimeSeconds,
+    requestedMaxWatchedSeconds,
+    requestedDurationSeconds,
+    lessonDurationSeconds,
+  });
 
 const rows = await dbManager.executeUnsafe<ProgressRow>(
     `
@@ -471,10 +492,10 @@ const rows = await dbManager.executeUnsafe<ProgressRow>(
     [
       effectiveStaffId,
       lessonId,
-      currentTimeSeconds,
-      maxWatchedSeconds,
-      durationSeconds,
-      watchPercentage,
+      trustedProgress.currentTimeSeconds,
+      trustedProgress.maxWatchedSeconds,
+      trustedProgress.durationSeconds,
+      trustedProgress.watchPercentage,
       body.playbackRateViolation ? 1 : 0,
       body.tabHiddenPause ? 1 : 0,
     ]
@@ -495,22 +516,7 @@ const rows = await dbManager.executeUnsafe<ProgressRow>(
     [effectiveStaffId, lessonId]
   );
 
-  let progressData = normalizeProgress(rows[0], effectiveStaffName);
-
-  if (progressData.canComplete) {
-    const completion = await markLessonCompleteFromProgress(
-      effectiveStaffId,
-      lessonId,
-      Math.max(maxWatchedSeconds, currentTimeSeconds)
-    );
-
-    progressData = {
-      ...progressData,
-      isCompleted: true,
-      completedAt: completion.completedAt,
-      watchPercentage: Math.max(progressData.watchPercentage, COMPLETE_THRESHOLD_PERCENT),
-    };
-  }
+  const progressData = normalizeProgress(rows[0], effectiveStaffName);
 
   return NextResponse.json({
     success: true,

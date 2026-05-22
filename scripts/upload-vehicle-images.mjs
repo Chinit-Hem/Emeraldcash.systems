@@ -29,7 +29,7 @@ cloudinary.config({
 });
 
 // Database connection
-const DATABASE_URL = process.env.DATABASE_URL || "postgresql://neondb_owner:npg_3XTHYOQhPr9A@ep-little-bar-aij99s0n-pooler.c-4.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require";
+const DATABASE_URL = process.env.DATABASE_URL || "";
 const sql = neon(DATABASE_URL);
 
 // Folders in Cloudinary

@@ -2,7 +2,7 @@ BACKUP VERIFICATION SERVICE - TEST RESULTS
 ==========================================
 Generated: 2026-03-13T15:59:42.558Z
 Test Suite: Comprehensive Function Testing
-Database: ep-little-bar-aij99s0n-pooler.c-4.us-east-1.aws.neon.tech
+Database: [neon-pooler-host]
 
 SUMMARY
 -------

@@ -3,6 +3,9 @@ export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 import type { Vehicle } from "@/lib/types";
+import { logAuditEvent } from "@/lib/audit-log";
+import { requirePermission } from "@/lib/auth-helpers";
+import { buildCorsHeaders } from "@/lib/cors";
 import { vehicleService, type VehicleDB } from "@/services/VehicleService";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -15,7 +18,7 @@ import { NextRequest, NextResponse } from "next/server";
  */
 function toVehicleDB(vehicle: Partial<Vehicle>): Partial<VehicleDB> {
   const dbVehicle: Partial<VehicleDB> = {};
-  
+
   if (vehicle.Brand !== undefined) dbVehicle.brand = vehicle.Brand;
   if (vehicle.Model !== undefined) dbVehicle.model = vehicle.Model;
   if (vehicle.Category !== undefined) dbVehicle.category = vehicle.Category;
@@ -27,7 +30,7 @@ function toVehicleDB(vehicle: Partial<Vehicle>): Partial<VehicleDB> {
   if (vehicle.BodyType !== undefined) dbVehicle.body_type = vehicle.BodyType;
   if (vehicle.TaxType !== undefined) dbVehicle.tax_type = vehicle.TaxType;
   if (vehicle.Image !== undefined) dbVehicle.image_id = vehicle.Image;
-  
+
   return dbVehicle;
 }
 
@@ -51,31 +54,6 @@ year: (vehicle.Year ?? undefined) as number ?? null,
   };
 }
 
-// CORS headers
-function buildCorsHeaders(req: NextRequest) {
-  const appOrigin = process.env.NEXT_PUBLIC_APP_ORIGIN?.trim();
-  const vercelUrl = process.env.NEXT_PUBLIC_VERCEL_URL?.trim();
-  const vercelOrigin = vercelUrl
-    ? vercelUrl.startsWith("http")
-      ? vercelUrl
-      : `https://${vercelUrl}`
-    : "";
-  const requestOrigin = req.headers.get("origin") || "";
-  const allowedOrigin = appOrigin || vercelOrigin || requestOrigin || "*";
-
-  const headers = new Headers({
-    "Access-Control-Allow-Origin": allowedOrigin,
-    "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Requested-With",
-  });
-
-  if (allowedOrigin !== "*") {
-    headers.set("Access-Control-Allow-Credentials", "true");
-  }
-
-  return headers;
-}
-
 export async function OPTIONS(req: NextRequest) {
   return new NextResponse(null, {
     status: 204,
@@ -86,11 +64,14 @@ export async function OPTIONS(req: NextRequest) {
 // GET /api/cleaned-vehicles - Get all cleaned vehicles or a single vehicle by ID
 // Uses VehicleService for optimized ILIKE filtering and SSR performance
 export async function GET(req: NextRequest) {
+  const auth = requirePermission(req, "vehicles:view");
+  if (auth.response) return auth.response;
+
   const startTime = Date.now();
 
   try {
     const { searchParams } = new URL(req.url);
-    
+
     // Check if requesting a single vehicle by ID
     const vehicleId = searchParams.get("id");
     if (vehicleId) {
@@ -107,7 +88,7 @@ export async function GET(req: NextRequest) {
 
       // Fetch single vehicle
       const result = await vehicleService.getVehicleById(vehicleIdNum);
-      
+
       if (!result.success) {
         return NextResponse.json({
           success: false,
@@ -172,7 +153,7 @@ const limit = parseInt(searchParams.get("limit") || "500"); // Increased for pag
           headers: buildCorsHeaders(req),
         });
       }
-      
+
       return NextResponse.json({
         success: true,
         data: statsResult.data,
@@ -211,7 +192,7 @@ const total = totalResult.success ? totalResult.data ?? 0 : 0;
     }, {
       headers: responseHeaders,
     });
-    
+
   } catch (error) {
     console.error("[API /cleaned-vehicles] Error:", error);
     return NextResponse.json({
@@ -227,15 +208,18 @@ const total = totalResult.success ? totalResult.data ?? 0 : 0;
 // POST /api/cleaned-vehicles - Create a new vehicle
 // Uses VehicleService for optimized insert with validation
 export async function POST(req: NextRequest) {
+  const auth = requirePermission(req, "vehicles:create");
+  if (auth.response) return auth.response;
+
   const startTime = Date.now();
 
   try {
     const body = await req.json();
-    
+
     // Validate required fields
     const requiredFields = ["Brand", "Model", "Category", "Plate"];
     const missingFields = requiredFields.filter(field => !body[field]);
-    
+
     if (missingFields.length > 0) {
       return NextResponse.json({
         success: false,
@@ -274,6 +258,17 @@ export async function POST(req: NextRequest) {
       });
     }
 
+    await logAuditEvent(req, auth.session, {
+      action: "vehicle.create",
+      entityType: "vehicle",
+      entityId: result.data?.VehicleId,
+      metadata: {
+        source: "cleaned-vehicles",
+        plate: result.data?.Plate ?? vehicleData.plate,
+        category: result.data?.Category ?? vehicleData.category,
+      },
+    });
+
     // Add performance headers
     const responseHeaders = new Headers(buildCorsHeaders(req));
     responseHeaders.set("X-Response-Time", `${Date.now() - startTime}ms`);
@@ -304,11 +299,14 @@ export async function POST(req: NextRequest) {
 // PUT /api/cleaned-vehicles - Update an existing vehicle
 // Uses VehicleService for optimized update with validation
 export async function PUT(req: NextRequest) {
+  const auth = requirePermission(req, "vehicles:edit");
+  if (auth.response) return auth.response;
+
   const startTime = Date.now();
 
   try {
     const body = await req.json();
-    
+
     // Validate required fields
     if (!body.VehicleId) {
       return NextResponse.json({
@@ -322,7 +320,7 @@ export async function PUT(req: NextRequest) {
 
     // Prepare update data (only include defined fields)
     const updateData: Partial<Vehicle> = {};
-    
+
     if (body.Brand !== undefined) updateData.Brand = body.Brand.trim();
     if (body.Model !== undefined) updateData.Model = body.Model.trim();
     if (body.Category !== undefined) updateData.Category = body.Category.trim();
@@ -340,7 +338,7 @@ export async function PUT(req: NextRequest) {
     // Convert to database format and update vehicle
     const dbUpdateData = toVehicleDB(updateData);
     const vehicleId = parseInt(body.VehicleId);
-    
+
     if (isNaN(vehicleId)) {
       return NextResponse.json({
         success: false,
@@ -363,6 +361,17 @@ export async function PUT(req: NextRequest) {
         headers: buildCorsHeaders(req),
       });
     }
+
+    await logAuditEvent(req, auth.session, {
+      action: "vehicle.update",
+      entityType: "vehicle",
+      entityId: vehicleId,
+      metadata: {
+        source: "cleaned-vehicles",
+        fields: Object.keys(dbUpdateData),
+        plate: result.data?.Plate,
+      },
+    });
 
     // Add performance headers
     const responseHeaders = new Headers(buildCorsHeaders(req));
@@ -393,6 +402,9 @@ export async function PUT(req: NextRequest) {
 // DELETE /api/cleaned-vehicles - Delete a vehicle
 // Uses VehicleService for optimized delete with validation
 export async function DELETE(req: NextRequest) {
+  const auth = requirePermission(req, "vehicles:delete");
+  if (auth.response) return auth.response;
+
   const startTime = Date.now();
 
   try {
@@ -433,6 +445,15 @@ export async function DELETE(req: NextRequest) {
         headers: buildCorsHeaders(req),
       });
     }
+
+    await logAuditEvent(req, auth.session, {
+      action: "vehicle.delete",
+      entityType: "vehicle",
+      entityId: vehicleIdNum,
+      metadata: {
+        source: "cleaned-vehicles",
+      },
+    });
 
     // Add performance headers
     const responseHeaders = new Headers(buildCorsHeaders(req));

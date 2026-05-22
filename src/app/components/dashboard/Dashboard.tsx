@@ -20,6 +20,7 @@ import type { Vehicle } from "@/lib/types";
 import { useDebouncedValue } from "@/lib/useDebouncedValue";
 import { CATEGORY_COLORS } from "@/lib/categoryColors";
 import { safeGetMonthKey } from "@/lib/safeDate";
+import { MotorcycleIcon } from "@/components/icons/MotorcycleIcon";
 import { TukTukIcon } from "@/components/icons/TukTukIcon";
 
 // ============================================================================
@@ -315,13 +316,7 @@ const Icons = {
     </svg>
   ),
   motorcycle: (
-    <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <circle cx="5.5" cy="17.5" r="2.5" strokeWidth={1.5} />
-      <circle cx="17.5" cy="17.5" r="2.5" strokeWidth={1.5} />
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 17h7l3-6H8.5" />
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M14 11l2 6" />
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M10 11l2-3h3" />
-    </svg>
+    <MotorcycleIcon className="w-5 h-5 sm:w-6 sm:h-6" />
   ),
   tuk: (
     <TukTukIcon className="w-5 h-5 sm:w-6 sm:h-6" />

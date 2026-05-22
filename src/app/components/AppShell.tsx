@@ -5,7 +5,7 @@ import Image from "next/image";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Suspense, type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 
-import Sidebar from "@/app/components/Sidebar";
+import Sidebar from "@/components/Sidebar";
 import { AuthUserProvider } from "@/app/components/AuthContext";
 import { UIProvider } from "@/app/components/UIContext";
 import { clearCachedUser, getCachedUser, setCachedUser } from "@/app/components/authCache";

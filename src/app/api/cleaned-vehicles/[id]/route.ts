@@ -2,6 +2,9 @@
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
+import { logAuditEvent } from "@/lib/audit-log";
+import { requirePermission } from "@/lib/auth-helpers";
+import { buildCorsHeaders } from "@/lib/cors";
 import { vehicleService } from "@/services/VehicleService";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -14,7 +17,7 @@ import { NextRequest, NextResponse } from "next/server";
  */
 function toVehicleDB(vehicle: Record<string, unknown>): Record<string, unknown> {
   const dbVehicle: Record<string, unknown> = {};
-  
+
   if (vehicle.Brand !== undefined) dbVehicle.brand = vehicle.Brand;
   if (vehicle.Model !== undefined) dbVehicle.model = vehicle.Model;
   if (vehicle.Category !== undefined) dbVehicle.category = vehicle.Category;
@@ -26,33 +29,8 @@ function toVehicleDB(vehicle: Record<string, unknown>): Record<string, unknown> 
   if (vehicle.BodyType !== undefined) dbVehicle.body_type = vehicle.BodyType;
   if (vehicle.TaxType !== undefined) dbVehicle.tax_type = vehicle.TaxType;
   if (vehicle.Image !== undefined) dbVehicle.image_id = vehicle.Image;
-  
+
   return dbVehicle;
-}
-
-// CORS headers
-function buildCorsHeaders(req: NextRequest) {
-  const appOrigin = process.env.NEXT_PUBLIC_APP_ORIGIN?.trim();
-  const vercelUrl = process.env.NEXT_PUBLIC_VERCEL_URL?.trim();
-  const vercelOrigin = vercelUrl
-    ? vercelUrl.startsWith("http")
-      ? vercelUrl
-      : `https://${vercelUrl}`
-    : "";
-  const requestOrigin = req.headers.get("origin") || "";
-  const allowedOrigin = appOrigin || vercelOrigin || requestOrigin || "*";
-
-  const headers = new Headers({
-    "Access-Control-Allow-Origin": allowedOrigin,
-    "Access-Control-Allow-Methods": "GET, PUT, DELETE, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Requested-With",
-  });
-
-  if (allowedOrigin !== "*") {
-    headers.set("Access-Control-Allow-Credentials", "true");
-  }
-
-  return headers;
 }
 
 export async function OPTIONS(req: NextRequest) {
@@ -69,6 +47,9 @@ export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const auth = requirePermission(req, "vehicles:view");
+  if (auth.response) return auth.response;
+
   const startTime = Date.now();
 
   try {
@@ -87,7 +68,7 @@ export async function GET(
 
     // Fetch single vehicle by ID
     const result = await vehicleService.getVehicleById(vehicleIdNum);
-    
+
     if (!result.success) {
       return NextResponse.json({
         success: false,
@@ -131,6 +112,9 @@ export async function PUT(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const auth = requirePermission(req, "vehicles:edit");
+  if (auth.response) return auth.response;
+
   const startTime = Date.now();
 
   try {
@@ -151,7 +135,7 @@ export async function PUT(
 
     // Trim string fields
     const updateData: Record<string, unknown> = {};
-    
+
     if (body.Brand !== undefined) updateData.Brand = String(body.Brand).trim();
     if (body.Model !== undefined) updateData.Model = String(body.Model).trim();
     if (body.Category !== undefined) updateData.Category = String(body.Category).trim();
@@ -181,6 +165,17 @@ export async function PUT(
         headers: buildCorsHeaders(req),
       });
     }
+
+    await logAuditEvent(req, auth.session, {
+      action: "vehicle.update",
+      entityType: "vehicle",
+      entityId: vehicleIdNum,
+      metadata: {
+        source: "cleaned-vehicles-id",
+        fields: Object.keys(dbUpdateData),
+        plate: result.data?.Plate,
+      },
+    });
 
     // Add performance headers
     const responseHeaders = new Headers(buildCorsHeaders(req));
@@ -215,6 +210,9 @@ export async function DELETE(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const auth = requirePermission(req, "vehicles:delete");
+  if (auth.response) return auth.response;
+
   const startTime = Date.now();
 
   try {
@@ -243,6 +241,15 @@ export async function DELETE(
         headers: buildCorsHeaders(req),
       });
     }
+
+    await logAuditEvent(req, auth.session, {
+      action: "vehicle.delete",
+      entityType: "vehicle",
+      entityId: vehicleIdNum,
+      metadata: {
+        source: "cleaned-vehicles-id",
+      },
+    });
 
     // Add performance headers
     const responseHeaders = new Headers(buildCorsHeaders(req));

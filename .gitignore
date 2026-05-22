@@ -76,6 +76,8 @@ build.log
 /scripts/*
 !/scripts/dev-reset.mjs
 !/scripts/test-neon-connection.mjs
+!/scripts/backup-verification/
+!/scripts/backup-verification/**
 !/scripts/deploy/
 !/scripts/deploy/**
 !/scripts/migrations/

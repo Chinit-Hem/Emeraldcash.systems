@@ -8,7 +8,7 @@ import { cn } from "@/lib/ui";
 import type { AppRouterInstance } from "next/dist/shared/lib/app-router-context.shared-runtime";
 import { useState, useCallback, useEffect, type CSSProperties, type Dispatch, type SetStateAction } from "react";
 import { formatPrice, getVehicleThumbnailUrl } from "@/lib/vehicle-helpers";
-import { OptimizedImage } from "@/app/components/OptimizedImage";
+import { OptimizedImage } from "@/components/OptimizedImage";
 
 // Color name to hex mapping for visual indicators
 const getColorHex = (colorName: string): string => {
