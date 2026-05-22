@@ -1,11 +1,26 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuthUser } from "@/app/components/AuthContext";
-import { ArrowLeft, AlertCircle, CheckCircle, ImageIcon, Loader2, Upload, X } from "lucide-react";
+import { AlertCircle, ArrowLeftRight, CheckCircle, ImageIcon, Loader2, Upload, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { validateTransferForm } from "@/lib/sms-validation";
+import {
+  SmsPageHeader,
+  SmsPageShell,
+  smsDividerClass,
+  smsDropzoneClass,
+  smsErrorTextClass,
+  smsHelperClass,
+  smsInputClass,
+  smsLabelClass,
+  smsLoadingFieldClass,
+  smsPanelClass,
+  smsPrimaryButtonClass,
+  smsSecondaryButtonClass,
+  smsSelectClass,
+  smsTextareaClass,
+} from "../components/SmsShared";
 
 interface SmsAssetOption {
   id: string;
@@ -26,6 +41,9 @@ interface SettingsUser {
   email?: string | null;
   profile_picture?: string | null;
 }
+
+const smsInvalidFieldClass =
+  "border-red-500 bg-red-50 focus:ring-red-500 dark:border-red-700 dark:bg-red-900/20 dark:focus:ring-red-500";
 
 export default function TransferPage() {
   const user = useAuthUser();
@@ -280,55 +298,46 @@ const handleSubmit = async (e: React.FormEvent) => {
     u.full_name ? `${u.full_name} (@${u.username})` : `@${u.username}`;
 
   return (
-    <div className="max-w-2xl mx-auto p-6">
-      {/* Back */}
-      <Link
-        href="/sms"
-        className="inline-flex items-center gap-2 text-slate-600 hover:text-slate-900 mb-6 transition-colors"
-      >
-        <ArrowLeft className="w-5 h-5" />
-        Back to SMS
-      </Link>
+    <SmsPageShell maxWidth="max-w-2xl">
+      <SmsPageHeader
+        title="New Transfer"
+        description="Send an SMS asset to another user, with an optional photo and receiver note."
+        icon={ArrowLeftRight}
+        tone="amber"
+      />
 
-      {/* Title */}
-      <h1 className="text-2xl font-bold mb-6 text-slate-900">New Transfer</h1>
-
-      {/* General Error Alert */}
       {generalError && (
-        <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex gap-3">
-          <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+        <div className="mb-4 flex items-start gap-3 rounded-lg border border-red-200 bg-red-50 p-4 dark:border-red-800 dark:bg-red-900/20">
+          <AlertCircle className="mt-0.5 h-5 w-5 flex-shrink-0 text-red-600" />
           <div>
-            <p className="font-semibold text-red-900">{generalError}</p>
+            <p className="text-sm font-semibold text-red-700 dark:text-red-400">{generalError}</p>
           </div>
         </div>
       )}
 
-      {/* Success Alert */}
       {success && (
-        <div className="mb-6 p-4 bg-emerald-50 border border-emerald-200 rounded-lg flex gap-3">
-          <CheckCircle className="w-5 h-5 text-emerald-600 flex-shrink-0 mt-0.5" />
-          <p className="font-semibold text-emerald-900">{success}</p>
+        <div className="mb-4 flex items-start gap-3 rounded-lg border border-emerald-200 bg-emerald-50 p-4 dark:border-emerald-800 dark:bg-emerald-900/20">
+          <CheckCircle className="mt-0.5 h-5 w-5 flex-shrink-0 text-emerald-600 dark:text-emerald-400" />
+          <p className="text-sm font-semibold text-emerald-700 dark:text-emerald-400">{success}</p>
         </div>
       )}
 
-      {/* Form */}
       <form
         onSubmit={handleSubmit}
-        className="bg-white border border-slate-200 rounded-xl p-6 space-y-5 shadow-sm"
+        className={`${smsPanelClass} space-y-6 p-4 md:p-6`}
       >
-{/* Asset ID - Hybrid: Select from dropdown OR type manually */}
         <div id="asset-dropdown-container" className="relative">
-          <label className="block text-sm font-semibold text-slate-700 mb-2">
+          <label className={smsLabelClass}>
             Asset <span className="text-red-500">*</span>
           </label>
           {assetsLoading ? (
-            <div className="w-full border border-slate-200 rounded-lg p-3 flex items-center gap-2 text-slate-500">
+            <div className={smsLoadingFieldClass}>
               <Loader2 className="w-4 h-4 animate-spin" />
               Loading assets...
             </div>
           ) : (
             <>
-<input
+              <input
                 type="text"
                 value={form.assetSearch}
                 onChange={(e) => {
@@ -337,19 +346,18 @@ const handleSubmit = async (e: React.FormEvent) => {
                   if (selectedAssetId) setSelectedAssetId("");
                 }}
                 onFocus={() => setAssetDropdownOpen(true)}
-                className={`w-full border rounded-lg p-3 focus:outline-none focus:ring-2 transition-all ${
+                className={`${smsInputClass} ${
                   fieldErrors.assetId
-                    ? "border-red-300 focus:ring-red-500 bg-red-50"
-                    : "border-slate-300 focus:ring-emerald-500"
+                    ? smsInvalidFieldClass
+                    : ""
                 }`}
                 placeholder="Select an asset or enter asset ID"
                 disabled={loading}
                 autoComplete="off"
                 title="Select an asset or enter asset ID"
               />
-{/* Dropdown suggestions - show all on focus, filter when typing */}
               {!loading && assets.length > 0 && assetDropdownOpen && (
-                <div className="absolute z-10 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg max-h-60 overflow-auto">
+                <div className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-lg bg-white py-1 shadow-xl ring-1 ring-gray-200 dark:bg-gray-900 dark:ring-gray-700">
                   {assets
                     .filter(
                       (asset) =>
@@ -368,10 +376,10 @@ const handleSubmit = async (e: React.FormEvent) => {
                           handleChange("assetSearch", asset.name);
                           setAssetDropdownOpen(false);
                         }}
-                        className="w-full px-4 py-3 text-left hover:bg-emerald-50 transition-colors flex items-center justify-between"
+                        className="flex w-full items-center justify-between gap-3 px-3 py-2.5 text-left text-sm transition-colors hover:bg-emerald-50 dark:hover:bg-emerald-900/20"
                       >
-                        <span className="font-medium text-slate-900">{asset.name}</span>
-                        <span className="text-sm text-slate-500">
+                        <span className="font-medium text-gray-900 dark:text-white">{asset.name}</span>
+                        <span className="text-sm text-gray-500 dark:text-gray-400">
                           {asset.itemCode ? `(${asset.itemCode})` : asset.id.slice(0, 8)}
                         </span>
                       </button>
@@ -381,36 +389,39 @@ const handleSubmit = async (e: React.FormEvent) => {
             </>
           )}
           {fieldErrors.assetId && (
-            <p className="mt-1 text-sm text-red-600">{fieldErrors.assetId}</p>
+            <p className={smsErrorTextClass}>
+              <AlertCircle className="h-4 w-4" />
+              {fieldErrors.assetId}
+            </p>
           )}
         </div>
 
         {/* Sender */}
         <div>
-          <label className="block text-sm font-semibold text-slate-700 mb-2">
+          <label className={smsLabelClass}>
             Sender <span className="text-red-500">*</span>
           </label>
           {!canChooseSender ? (
             <input
               type="text"
               value={user.full_name ? `${user.full_name} (@${user.username})` : `@${user.username}`}
-              className="w-full border rounded-lg p-3 bg-slate-100 text-slate-600 border-slate-200"
+              className={smsInputClass}
               disabled
             />
           ) : usersLoading ? (
-            <div className="w-full border border-slate-200 rounded-lg p-3 flex items-center gap-2 text-slate-500">
+            <div className={smsLoadingFieldClass}>
               <Loader2 className="w-4 h-4 animate-spin" />
               Loading users...
             </div>
-) : users.length > 0 ? (
+          ) : users.length > 0 ? (
             <select
               title="Select sender"
               value={form.senderId}
               onChange={(e) => handleChange("senderId", e.target.value)}
-              className={`w-full border rounded-lg p-3 focus:outline-none focus:ring-2 transition-all bg-white ${
+              className={`${smsSelectClass} ${
                 fieldErrors.senderId
-                  ? "border-red-300 focus:ring-red-500 bg-red-50"
-                  : "border-slate-300 focus:ring-emerald-500"
+                  ? smsInvalidFieldClass
+                  : ""
               }`}
               disabled={loading}
             >
@@ -426,39 +437,42 @@ const handleSubmit = async (e: React.FormEvent) => {
               type="text"
               value={form.senderId}
               onChange={(e) => handleChange("senderId", e.target.value)}
-              className={`w-full border rounded-lg p-3 focus:outline-none focus:ring-2 transition-all ${
+              className={`${smsInputClass} ${
                 fieldErrors.senderId
-                  ? "border-red-300 focus:ring-red-500 bg-red-50"
-                  : "border-slate-300 focus:ring-emerald-500"
+                  ? smsInvalidFieldClass
+                  : ""
               }`}
               placeholder="Enter sender username"
               disabled={loading}
             />
           )}
           {fieldErrors.senderId && (
-            <p className="mt-1 text-sm text-red-600">{fieldErrors.senderId}</p>
+            <p className={smsErrorTextClass}>
+              <AlertCircle className="h-4 w-4" />
+              {fieldErrors.senderId}
+            </p>
           )}
         </div>
 
         {/* Receiver */}
         <div>
-          <label className="block text-sm font-semibold text-slate-700 mb-2">
+          <label className={smsLabelClass}>
             Receiver <span className="text-red-500">*</span>
           </label>
           {usersLoading ? (
-            <div className="w-full border border-slate-200 rounded-lg p-3 flex items-center gap-2 text-slate-500">
+            <div className={smsLoadingFieldClass}>
               <Loader2 className="w-4 h-4 animate-spin" />
               Loading users...
             </div>
-) : users.length > 0 ? (
+          ) : users.length > 0 ? (
             <select
               title="Select receiver"
               value={form.receiverId}
               onChange={(e) => handleChange("receiverId", e.target.value)}
-              className={`w-full border rounded-lg p-3 focus:outline-none focus:ring-2 transition-all bg-white ${
+              className={`${smsSelectClass} ${
                 fieldErrors.receiverId
-                  ? "border-red-300 focus:ring-red-500 bg-red-50"
-                  : "border-slate-300 focus:ring-emerald-500"
+                  ? smsInvalidFieldClass
+                  : ""
               }`}
               disabled={loading}
             >
@@ -474,97 +488,106 @@ const handleSubmit = async (e: React.FormEvent) => {
               type="text"
               value={form.receiverId}
               onChange={(e) => handleChange("receiverId", e.target.value)}
-              className={`w-full border rounded-lg p-3 focus:outline-none focus:ring-2 transition-all ${
+              className={`${smsInputClass} ${
                 fieldErrors.receiverId
-                  ? "border-red-300 focus:ring-red-500 bg-red-50"
-                  : "border-slate-300 focus:ring-emerald-500"
+                  ? smsInvalidFieldClass
+                  : ""
               }`}
               placeholder="Enter receiver username"
               disabled={loading}
             />
           )}
           {fieldErrors.receiverId && (
-            <p className="mt-1 text-sm text-red-600">{fieldErrors.receiverId}</p>
+            <p className={smsErrorTextClass}>
+              <AlertCircle className="h-4 w-4" />
+              {fieldErrors.receiverId}
+            </p>
           )}
         </div>
 
         {/* Location */}
         <div>
-          <label className="block text-sm font-semibold text-slate-700 mb-2">
+          <label className={smsLabelClass}>
             Location <span className="text-red-500">*</span>
           </label>
           <input
             type="text"
             value={form.location}
             onChange={(e) => handleChange("location", e.target.value)}
-            className={`w-full border rounded-lg p-3 focus:outline-none focus:ring-2 transition-all ${
+            className={`${smsInputClass} ${
               fieldErrors.location
-                ? "border-red-300 focus:ring-red-500 bg-red-50"
-                : "border-slate-300 focus:ring-emerald-500"
+                ? smsInvalidFieldClass
+                : ""
             }`}
             placeholder="e.g. Warehouse A, Office Building"
             disabled={loading}
             maxLength={128}
           />
           {fieldErrors.location && (
-            <p className="mt-1 text-sm text-red-600">{fieldErrors.location}</p>
+            <p className={smsErrorTextClass}>
+              <AlertCircle className="h-4 w-4" />
+              {fieldErrors.location}
+            </p>
           )}
         </div>
 
         {/* Message */}
         <div>
-          <label className="block text-sm font-semibold text-slate-700 mb-2">
+          <label className={smsLabelClass}>
             Message to receiver (Optional)
           </label>
           <textarea
             value={form.remark}
             onChange={(e) => handleChange("remark", e.target.value)}
-            className={`w-full border rounded-lg p-3 h-24 focus:outline-none focus:ring-2 transition-all resize-none ${
+            className={`${smsTextareaClass} h-24 resize-none ${
               fieldErrors.remark
-                ? "border-red-300 focus:ring-red-500 bg-red-50"
-                : "border-slate-300 focus:ring-emerald-500"
+                ? smsInvalidFieldClass
+                : ""
             }`}
             placeholder="Example: Please accept this projector for the Sen Sok meeting room..."
             disabled={loading}
             maxLength={500}
           />
           {fieldErrors.remark && (
-            <p className="mt-1 text-sm text-red-600">{fieldErrors.remark}</p>
+            <p className={smsErrorTextClass}>
+              <AlertCircle className="h-4 w-4" />
+              {fieldErrors.remark}
+            </p>
           )}
-          <p className="mt-1 text-xs text-slate-500">{form.remark.length}/500</p>
+          <p className={smsHelperClass}>{form.remark.length}/500</p>
         </div>
 
         {/* Image */}
         <div>
-          <label className="block text-sm font-semibold text-slate-700 mb-2">
+          <label className={smsLabelClass}>
             Transfer Image (Optional)
           </label>
-          <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-4">
+          <div className={smsDropzoneClass}>
             {imageFile ? (
               <div className="flex items-center justify-between gap-3">
                 <div className="flex min-w-0 items-center gap-3">
-                  <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700">
+                  <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300">
                     <ImageIcon className="h-5 w-5" />
                   </div>
                   <div className="min-w-0">
-                    <div className="truncate text-sm font-semibold text-slate-900">{imageFile.name}</div>
-                    <div className="text-xs text-slate-500">{(imageFile.size / 1024).toFixed(1)} KB</div>
+                    <div className="truncate text-sm font-semibold text-gray-900 dark:text-white">{imageFile.name}</div>
+                    <div className="text-xs text-gray-500 dark:text-gray-400">{(imageFile.size / 1024).toFixed(1)} KB</div>
                   </div>
                 </div>
                 <button
                   type="button"
                   onClick={() => setImageFile(null)}
                   disabled={loading}
-                  className="rounded-lg p-2 text-slate-500 transition hover:bg-white hover:text-slate-900"
+                  className="rounded-lg p-2 text-gray-500 transition hover:bg-white hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-white"
                   aria-label="Remove transfer image"
                 >
                   <X className="h-4 w-4" />
                 </button>
               </div>
             ) : (
-              <label className="flex cursor-pointer flex-col items-center justify-center gap-2 text-center text-sm text-slate-600">
-                <Upload className="h-6 w-6 text-slate-400" />
-                <span className="font-semibold text-slate-800">Upload transfer photo</span>
+              <label className="flex cursor-pointer flex-col items-center justify-center gap-2 text-center text-sm text-gray-600 dark:text-gray-300">
+                <Upload className="h-6 w-6 text-gray-400 dark:text-gray-500" />
+                <span className="font-semibold text-gray-800 dark:text-white">Upload transfer photo</span>
                 <span>JPG, PNG, WebP, or GIF</span>
                 <input
                   type="file"
@@ -578,13 +601,12 @@ const handleSubmit = async (e: React.FormEvent) => {
           </div>
         </div>
 
-        {/* Actions */}
-        <div className="flex gap-3 pt-4 border-t border-slate-200">
+        <div className={`flex flex-col gap-3 pt-4 sm:flex-row ${smsDividerClass}`}>
           <button
             type="button"
             onClick={() => router.back()}
             disabled={loading}
-            className="px-4 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 disabled:opacity-50 font-medium transition-colors"
+            className={smsSecondaryButtonClass}
           >
             Cancel
           </button>
@@ -592,13 +614,13 @@ const handleSubmit = async (e: React.FormEvent) => {
           <button
             type="submit"
             disabled={loading}
-            className="flex-1 px-4 py-2 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50 font-medium transition-colors"
+            className={`${smsPrimaryButtonClass} flex-1`}
           >
             {loading ? "Creating..." : "Create Transfer + Stock"}
           </button>
         </div>
       </form>
-    </div>
+    </SmsPageShell>
   );
 }
 

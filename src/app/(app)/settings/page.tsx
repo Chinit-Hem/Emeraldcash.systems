@@ -15,7 +15,7 @@ const SettingsContent = dynamic(() => import("./SettingsContent"), {
 });
 
 export const metadata: Metadata = {
-  title: "Settings | Emerald Cash VMS",
+  title: "Settings | Emerald Cash Systems",
   description: "Manage your account, users, and system preferences",
 };
 

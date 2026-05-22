@@ -11,11 +11,15 @@ import {
 } from "react";
 
 type ResolvedTheme = "light" | "dark";
-export type ThemeMode = ResolvedTheme | "system";
+export type ThemeMode = ResolvedTheme;
 
 const THEME_MODE_KEY = "vms.theme-mode";
 const LEGACY_THEME_KEYS = ["theme", "vms.theme"] as const;
-const SYSTEM_THEME_QUERY = "(prefers-color-scheme: dark)";
+const DEFAULT_THEME: ThemeMode = "light";
+const THEME_COLORS: Record<ResolvedTheme, string> = {
+  light: "#ecfdf5",
+  dark: "#020617",
+};
 
 interface ThemeContextValue {
   mode: ThemeMode;
@@ -28,23 +32,7 @@ interface ThemeContextValue {
 const ThemeContext = createContext<ThemeContextValue | undefined>(undefined);
 
 function isThemeMode(value: unknown): value is ThemeMode {
-  return value === "light" || value === "dark" || value === "system";
-}
-
-function isResolvedTheme(value: unknown): value is ResolvedTheme {
   return value === "light" || value === "dark";
-}
-
-function getSystemPrefersDark(): boolean {
-  if (typeof window === "undefined") return false;
-  return window.matchMedia?.(SYSTEM_THEME_QUERY).matches ?? false;
-}
-
-function resolveTheme(mode: ThemeMode, systemPrefersDark: boolean): ResolvedTheme {
-  if (mode === "system") {
-    return systemPrefersDark ? "dark" : "light";
-  }
-  return mode;
 }
 
 function readStoredThemeMode(): ThemeMode | null {
@@ -58,7 +46,7 @@ function readStoredThemeMode(): ThemeMode | null {
 
     for (const legacyKey of LEGACY_THEME_KEYS) {
       const legacy = localStorage.getItem(legacyKey);
-      if (isResolvedTheme(legacy)) {
+      if (isThemeMode(legacy)) {
         return legacy;
       }
     }
@@ -74,14 +62,6 @@ function persistThemeMode(mode: ThemeMode): void {
 
   try {
     localStorage.setItem(THEME_MODE_KEY, mode);
-
-    if (mode === "system") {
-      for (const legacyKey of LEGACY_THEME_KEYS) {
-        localStorage.removeItem(legacyKey);
-      }
-      return;
-    }
-
     for (const legacyKey of LEGACY_THEME_KEYS) {
       localStorage.setItem(legacyKey, mode);
     }
@@ -98,6 +78,15 @@ function applyTheme(resolvedTheme: ResolvedTheme, mode: ThemeMode): void {
   root.classList.add(resolvedTheme);
   root.dataset.theme = resolvedTheme;
   root.dataset.themeMode = mode;
+  root.style.colorScheme = resolvedTheme;
+
+  let themeColorMeta = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
+  if (!themeColorMeta) {
+    themeColorMeta = document.createElement("meta");
+    themeColorMeta.name = "theme-color";
+    document.head.appendChild(themeColorMeta);
+  }
+  themeColorMeta.content = THEME_COLORS[resolvedTheme];
 }
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
@@ -110,35 +99,13 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     }
 
     if (typeof window === "undefined") {
-      return "system";
+      return DEFAULT_THEME;
     }
 
-    return readStoredThemeMode() ?? "system";
+    return readStoredThemeMode() ?? DEFAULT_THEME;
   });
 
-  const [systemPrefersDark, setSystemPrefersDark] = useState<boolean>(() => getSystemPrefersDark());
-
-  const resolvedTheme = useMemo(
-    () => resolveTheme(mode, systemPrefersDark),
-    [mode, systemPrefersDark]
-  );
-
-  useEffect(() => {
-    const mediaQuery = window.matchMedia?.(SYSTEM_THEME_QUERY);
-    if (!mediaQuery) return;
-
-    const onMediaQueryChange = () => {
-      setSystemPrefersDark(mediaQuery.matches);
-    };
-
-    if (typeof mediaQuery.addEventListener === "function") {
-      mediaQuery.addEventListener("change", onMediaQueryChange);
-      return () => mediaQuery.removeEventListener("change", onMediaQueryChange);
-    }
-
-    mediaQuery.addListener(onMediaQueryChange);
-    return () => mediaQuery.removeListener(onMediaQueryChange);
-  }, []);
+  const resolvedTheme = mode;
 
   useEffect(() => {
     applyTheme(resolvedTheme, mode);
@@ -153,7 +120,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      setMode(readStoredThemeMode() ?? "system");
+      setMode(readStoredThemeMode() ?? DEFAULT_THEME);
     };
 
     window.addEventListener("storage", onStorage);

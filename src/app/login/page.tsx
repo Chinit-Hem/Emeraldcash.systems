@@ -166,24 +166,21 @@ function LoginForm() {
 
 
   return (
-    <div className="relative flex min-h-screen items-center justify-center p-4 bg-gradient-to-br from-slate-50 via-white to-slate-100">
-      {/* Background decoration */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-40 -right-40 w-80 h-80 bg-emerald-200/30 rounded-full blur-3xl" />
-        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-blue-200/30 rounded-full blur-3xl" />
-      </div>
+    <div className="relative flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-50 via-white to-slate-100 p-4 dark:from-slate-950 dark:via-slate-950 dark:to-slate-900">
+      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(135deg,rgba(16,185,129,0.08),transparent_36%,rgba(37,99,235,0.06))] dark:bg-[linear-gradient(135deg,rgba(16,185,129,0.12),transparent_42%,rgba(59,130,246,0.08))]" />
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-emerald-300/60 to-transparent dark:via-emerald-500/40" />
       
       <div className="w-full max-w-[400px] relative z-10">
         {/* Glassmorphism Card */}
-        <div className="relative overflow-hidden rounded-2xl bg-white/80 backdrop-blur-xl border border-white/40 shadow-[0_8px_32px_rgba(0,0,0,0.08)]">
+        <div className="relative overflow-hidden rounded-2xl border border-white/60 bg-white/90 shadow-[0_18px_60px_rgba(15,23,42,0.12)] backdrop-blur-xl dark:border-slate-700/70 dark:bg-slate-900/90 dark:shadow-[0_18px_70px_rgba(2,6,23,0.55)]">
           
           {/* Header - Emerald Gradient */}
           <div className="relative h-32 bg-gradient-to-br from-emerald-500 to-emerald-600 overflow-visible">
-            <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent" />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/25 to-transparent" />
             
             {/* Logo */}
             <div className="absolute -bottom-8 left-1/2 -translate-x-1/2">
-              <div className="w-16 h-16 rounded-2xl bg-white shadow-lg shadow-emerald-500/25 flex items-center justify-center p-2 ring-4 ring-white/50">
+              <div className="w-16 h-16 rounded-2xl bg-white shadow-lg shadow-emerald-500/25 flex items-center justify-center p-2 ring-4 ring-white/60 dark:bg-white dark:ring-slate-800/80">
                 { }
                 <img
                   src="/logo.png"
@@ -197,10 +194,10 @@ function LoginForm() {
           {/* Content */}
           <div className="pt-10 pb-6 px-6">
             <div className="text-center mb-6">
-              <h1 className="text-xl font-bold text-slate-900 bg-gradient-to-r from-slate-900 to-slate-700 bg-clip-text">
+              <h1 className="text-xl font-bold text-slate-950 dark:text-white">
                 Emerald Cash
               </h1>
-              <p className="text-xs text-slate-500 uppercase tracking-wider mt-1">
+              <p className="mt-1 text-xs uppercase tracking-wider text-slate-500 dark:text-slate-400">
                 {t.vehicleManagementSystem}
               </p>
             </div>
@@ -208,7 +205,7 @@ function LoginForm() {
             <form onSubmit={handleLogin} className="space-y-4">
               {/* Username */}
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">
+                <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
                   {t.usernameLabel}
                 </label>
                 <input
@@ -219,13 +216,13 @@ function LoginForm() {
                   autoComplete="username"
                   required
                   disabled={loading}
-                  className="w-full px-4 py-3 rounded-xl bg-white/60 backdrop-blur-sm border border-slate-200 text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500/50 transition-all shadow-sm"
+                  className="w-full rounded-xl border border-slate-200 bg-white/80 px-4 py-3 text-slate-900 shadow-sm backdrop-blur-sm transition-all placeholder:text-slate-400 focus:border-emerald-500/60 focus:outline-none focus:ring-2 focus:ring-emerald-500/25 disabled:cursor-not-allowed disabled:opacity-70 dark:border-slate-700 dark:bg-slate-800/80 dark:text-white dark:placeholder:text-slate-500 dark:focus:border-emerald-400/70 dark:focus:ring-emerald-400/20"
                 />
               </div>
 
               {/* Password */}
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">
+                <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
                   {t.passwordLabel}
                 </label>
                 <div className="relative">
@@ -237,12 +234,12 @@ function LoginForm() {
                     autoComplete="current-password"
                     required
                     disabled={loading}
-                    className="w-full px-4 py-3 rounded-xl bg-white/60 backdrop-blur-sm border border-slate-200 text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500/50 transition-all shadow-sm pr-12"
+                    className="w-full rounded-xl border border-slate-200 bg-white/80 px-4 py-3 pr-12 text-slate-900 shadow-sm backdrop-blur-sm transition-all placeholder:text-slate-400 focus:border-emerald-500/60 focus:outline-none focus:ring-2 focus:ring-emerald-500/25 disabled:cursor-not-allowed disabled:opacity-70 dark:border-slate-700 dark:bg-slate-800/80 dark:text-white dark:placeholder:text-slate-500 dark:focus:border-emerald-400/70 dark:focus:ring-emerald-400/20"
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 p-2 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 rounded-lg p-2 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700 dark:text-slate-500 dark:hover:bg-slate-700 dark:hover:text-slate-200"
                     tabIndex={-1}
                     aria-label={showPassword ? "Hide password" : "Show password"}
                   >
@@ -290,21 +287,21 @@ function LoginForm() {
                   checked={rememberMe}
                   onChange={(e) => setRememberMe(e.target.checked)}
                   disabled={loading}
-                  className="w-4 h-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500/20"
+                  className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500/20 disabled:cursor-not-allowed disabled:opacity-70 dark:border-slate-600 dark:bg-slate-800"
                 />
-                <span className="text-sm text-slate-500">{t.rememberMe}</span>
+                <span className="text-sm text-slate-500 dark:text-slate-400">{t.rememberMe}</span>
               </label>
 
               {/* Success message */}
               {success && (
-                <div className="p-3 rounded-xl bg-emerald-50/80 border border-emerald-200/50 text-emerald-700 text-sm text-center backdrop-blur-sm">
+                <div className="rounded-xl border border-emerald-200/70 bg-emerald-50/90 p-3 text-center text-sm text-emerald-700 backdrop-blur-sm dark:border-emerald-800/70 dark:bg-emerald-900/25 dark:text-emerald-300">
                   {success}
                 </div>
               )}
 
               {/* Error message */}
               {error && (
-                <div className="p-3 rounded-xl bg-red-50/80 border border-red-200/50 text-red-700 text-sm text-center backdrop-blur-sm">
+                <div className="rounded-xl border border-red-200/70 bg-red-50/90 p-3 text-center text-sm text-red-700 backdrop-blur-sm dark:border-red-800/70 dark:bg-red-900/25 dark:text-red-300">
                   {error}
                 </div>
               )}
@@ -313,10 +310,10 @@ function LoginForm() {
               {debugInfo && (
                 <div className="mt-4">
                   <details className="text-xs">
-                    <summary className="cursor-pointer text-slate-500 hover:text-slate-700">
+                    <summary className="cursor-pointer text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200">
                       Debug Info (tap to expand)
                     </summary>
-                    <pre className="mt-2 overflow-x-auto rounded-lg border border-slate-200 bg-slate-50/80 p-2 text-slate-600 backdrop-blur-sm">
+                    <pre className="mt-2 overflow-x-auto rounded-lg border border-slate-200 bg-slate-50/80 p-2 text-slate-600 backdrop-blur-sm dark:border-slate-700 dark:bg-slate-800/80 dark:text-slate-300">
                       {debugInfo}
                     </pre>
                     <button
@@ -328,7 +325,7 @@ function LoginForm() {
                           alert("Clipboard API is not available in this browser.");
                         }
                       }}
-                      className="mt-2 text-emerald-600 hover:text-emerald-700 text-xs underline"
+                      className="mt-2 text-xs text-emerald-600 underline hover:text-emerald-700 dark:text-emerald-400 dark:hover:text-emerald-300"
                     >
                       Copy to clipboard
                     </button>
@@ -347,8 +344,8 @@ function LoginForm() {
             </form>
 
             {/* Footer */}
-            <div className="mt-6 pt-4 border-t border-slate-100 flex items-center justify-center">
-              <p className="text-xs text-slate-400">© 2024 Emerald Cash</p>
+            <div className="mt-6 flex items-center justify-center border-t border-slate-100 pt-4 dark:border-slate-800">
+              <p className="text-xs text-slate-400 dark:text-slate-500">© 2024 Emerald Cash</p>
             </div>
           </div>
         </div>

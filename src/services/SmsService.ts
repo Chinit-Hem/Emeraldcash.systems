@@ -14,6 +14,11 @@
 
 import { dbManager } from "@/lib/db-singleton";
 import { delCache, getCache, setCache } from "@/lib/redis";
+import {
+  timestampWithoutTimeZoneToCambodiaIso,
+  timestampWithoutTimeZoneToUtcIso,
+  toIsoInstantString,
+} from "@/lib/cambodiaTime";
 import type {
   SmsStatus, TransferStatus
 } from "@/lib/sms-types";
@@ -185,6 +190,44 @@ export class SmsAssetService extends BaseService<SmsAssetEntity, SmsAssetDB> {
     );
   }
 
+  private async getAdminNotificationRecipients(): Promise<string[]> {
+    try {
+      const rows = await dbManager.executeUnsafe<{ username: string }>(
+        `SELECT username FROM users WHERE role = 'Admin' ORDER BY username`,
+        [],
+        5000
+      );
+      const recipients = rows
+        .map((row) => row.username?.trim())
+        .filter((username): username is string => Boolean(username));
+      const uniqueRecipients = [...new Set(recipients)];
+
+      return uniqueRecipients.length > 0 ? uniqueRecipients : ["admin"];
+    } catch (error) {
+      console.error("[SmsAssetService.getAdminNotificationRecipients] Error:", error);
+      return ["admin"];
+    }
+  }
+
+  private async markRequestNotificationsRead(transferId: string): Promise<void> {
+    try {
+      await this.ensureNotificationsTable();
+      await dbManager.executeUnsafe(
+        `
+          UPDATE sms_notifications
+          SET read_at = COALESCE(read_at, NOW())
+          WHERE transfer_id = $1::uuid
+            AND type IN ('transfer_request', 'return_request')
+            AND read_at IS NULL
+        `,
+        [transferId],
+        5000
+      );
+    } catch (error) {
+      console.error("[SmsAssetService.markRequestNotificationsRead] Error:", error);
+    }
+  }
+
   private async ensureTransferImagesTable(): Promise<void> {
     await dbManager.executeUnsafe(
       `
@@ -215,8 +258,8 @@ export class SmsAssetService extends BaseService<SmsAssetEntity, SmsAssetDB> {
       actorId: row.actor_id,
       assetId: row.asset_id,
       transferId: row.transfer_id,
-      readAt: row.read_at,
-      createdAt: row.created_at,
+      readAt: row.read_at ? toIsoInstantString(row.read_at) : null,
+      createdAt: toIsoInstantString(row.created_at),
     };
   }
 
@@ -303,8 +346,8 @@ export class SmsAssetService extends BaseService<SmsAssetEntity, SmsAssetDB> {
   protected toEntity(dbAsset: SmsAssetDB): SmsAssetEntity {
     return {
       id: dbAsset.id.toString(),
-      createdAt: dbAsset.created_at,
-      updatedAt: dbAsset.updated_at || dbAsset.created_at,
+      createdAt: timestampWithoutTimeZoneToUtcIso(dbAsset.created_at),
+      updatedAt: timestampWithoutTimeZoneToUtcIso(dbAsset.updated_at || dbAsset.created_at),
 
       name: dbAsset.name,
       itemCode: dbAsset.item_code,
@@ -322,14 +365,14 @@ export class SmsAssetService extends BaseService<SmsAssetEntity, SmsAssetDB> {
   }
 
   protected buildCacheKey(filters?: SmsFilters): string {
-    if (!filters) return "sms-assets:all";
+    if (!filters) return "sms-assets:v2:all";
     const sortedFilters = Object.keys(filters)
       .sort()
       .reduce((acc, key) => {
         acc[key] = filters[key as keyof SmsFilters];
         return acc;
       }, {} as Record<string, unknown>);
-    return `sms-assets:${JSON.stringify(sortedFilters)}`;
+    return `sms-assets:v2:${JSON.stringify(sortedFilters)}`;
   }
 
   protected applyFilters(
@@ -411,7 +454,7 @@ export class SmsAssetService extends BaseService<SmsAssetEntity, SmsAssetDB> {
   public async getAsset(id: string): Promise<ServiceResult<SmsAssetEntity | null>> {
     const startTime = Date.now();
     try {
-      const cacheKey = `${this.serviceName}:${id}`;
+      const cacheKey = `${this.serviceName}:v2:${id}`;
       const cached = await this.getFromCache<SmsAssetEntity>(cacheKey);
       if (cached) {
         return { success: true, data: cached, meta: { durationMs: 0, queryCount: 0, cacheHit: true } };
@@ -453,6 +496,7 @@ export class SmsAssetService extends BaseService<SmsAssetEntity, SmsAssetDB> {
       const entity = this.toEntity(result[0]);
       this.invalidateCache();
       await delCache('sms:stats');
+      await delCache('sms:stats:v2');
       return { success: true, data: entity, meta: { durationMs: Date.now() - startTime, queryCount: 1 } };
     } catch (error) {
       return this.handleError(error, 'updateAsset');
@@ -465,11 +509,40 @@ export class SmsAssetService extends BaseService<SmsAssetEntity, SmsAssetDB> {
   public async deleteAsset(id: string): Promise<ServiceResult<boolean>> { // Overriding BaseService.delete which expects number
     const startTime = Date.now();
     try {
-      const query = `DELETE FROM ${this.tableName} WHERE id = $1 RETURNING *`;
-      const result = await dbManager.executeUnsafe(query, [id]);
+      await this.ensureNotificationsTable();
+      const result = await dbManager.executeUnsafe<{ deletedAssets: number }>(
+        `
+          WITH related_transfers AS MATERIALIZED (
+            SELECT id FROM sms_transfers WHERE asset_id = $1::uuid
+          ),
+          resolved_notifications AS (
+            UPDATE sms_notifications
+            SET read_at = COALESCE(read_at, NOW())
+            WHERE read_at IS NULL
+              AND (
+                asset_id = $1::uuid
+                OR transfer_id IN (SELECT id FROM related_transfers)
+              )
+            RETURNING 1
+          ),
+          deleted_asset AS (
+            DELETE FROM sms_assets
+            WHERE id = $1::uuid
+            RETURNING 1
+          )
+          SELECT (SELECT COUNT(*) FROM deleted_asset)::integer AS "deletedAssets"
+        `,
+        [id],
+        8000
+      );
       await this.invalidateCache();
       await delCache('sms:stats');
-      return { success: true, data: result.length > 0, meta: { durationMs: Date.now() - startTime, queryCount: 1 } };
+      await delCache('sms:stats:v2');
+      return {
+        success: true,
+        data: Number(result[0]?.deletedAssets || 0) > 0,
+        meta: { durationMs: Date.now() - startTime, queryCount: 2 },
+      };
     } catch (error) {
       return this.handleError(error, 'deleteAsset');
     }
@@ -490,6 +563,7 @@ export class SmsAssetService extends BaseService<SmsAssetEntity, SmsAssetDB> {
     const result = await this.create(data);
     if (result.success) {
       await delCache('sms:stats');
+      await delCache('sms:stats:v2');
       await this.logAudit('system', 'create_asset', { assetId: result.data!.id, data: assetData.name || 'unknown' });
     }
     return result;
@@ -543,8 +617,8 @@ export class SmsAssetService extends BaseService<SmsAssetEntity, SmsAssetDB> {
         status: row.status as TransferStatus,
         remark: row.remark as string | null,
         imageUrl: row.imageUrl as string | null,
-        createdAt: row.createdAt as string,
-        acceptedAt: row.acceptedAt as string | null,
+        createdAt: toIsoInstantString(row.createdAt),
+        acceptedAt: row.acceptedAt ? toIsoInstantString(row.acceptedAt) : null,
       }));
 
       return {
@@ -603,7 +677,7 @@ export class SmsAssetService extends BaseService<SmsAssetEntity, SmsAssetDB> {
         status: 'pending' as TransferStatus,
         remark: transfer.remark as string | null,
         imageUrl: transferData.imageUrl || null,
-        createdAt: transfer.created_at as string,
+        createdAt: timestampWithoutTimeZoneToCambodiaIso(transfer.created_at),
         acceptedAt: null,
       };
 
@@ -639,6 +713,7 @@ export class SmsAssetService extends BaseService<SmsAssetEntity, SmsAssetDB> {
         });
       }
       await delCache('sms:stats');
+      await delCache('sms:stats:v2');
 
       return {
         success: true,
@@ -669,7 +744,7 @@ export class SmsAssetService extends BaseService<SmsAssetEntity, SmsAssetDB> {
         `WITH updated_transfer AS (
            UPDATE sms_transfers
            SET status = $1,
-               accepted_at = CASE WHEN $1 = 'accepted' THEN NOW() ELSE NULL END
+               accepted_at = CASE WHEN $1 = 'accepted' THEN (NOW() AT TIME ZONE 'Asia/Phnom_Penh') ELSE NULL END
            WHERE id = $2
            RETURNING id, asset_id, sender_id, receiver_id, location
          )
@@ -743,21 +818,36 @@ if (status === 'accepted') {
       }
 
       await this.logAudit(userId, 'update_transfer_status', { transferId, status });
+      await this.markRequestNotificationsRead(transferId);
       const updatedTransfer = result[0];
       const senderId = String(updatedTransfer.sender_id || "");
       if (senderId && senderId !== userId) {
         const assetName = String(updatedTransfer.asset_name || "SMS asset");
-        await this.createNotification({
-          type: status === "accepted" ? "transfer_accepted" : "transfer_rejected",
-          title: status === "accepted" ? "Transfer accepted" : "Transfer rejected",
-          message: `${userId} ${status === "accepted" ? "accepted" : "rejected"} your ${assetName} transfer request.`,
-          recipientId: senderId,
-          actorId: userId,
-          assetId: String(updatedTransfer.asset_id || ""),
-          transferId,
-        });
+        const isReturnToStock = String(updatedTransfer.receiver_id || "") === "stock";
+        if (isReturnToStock && status === "rejected") {
+          await this.createNotification({
+            type: "return_rejected",
+            title: "Return to stock rejected",
+            message: `${userId} rejected your return to stock request for ${assetName}.`,
+            recipientId: senderId,
+            actorId: userId,
+            assetId: String(updatedTransfer.asset_id || ""),
+            transferId,
+          });
+        } else if (!isReturnToStock) {
+          await this.createNotification({
+            type: status === "accepted" ? "transfer_accepted" : "transfer_rejected",
+            title: status === "accepted" ? "Transfer accepted" : "Transfer rejected",
+            message: `${userId} ${status === "accepted" ? "accepted" : "rejected"} your ${assetName} transfer request.`,
+            recipientId: senderId,
+            actorId: userId,
+            assetId: String(updatedTransfer.asset_id || ""),
+            transferId,
+          });
+        }
       }
       await delCache('sms:stats');
+      await delCache('sms:stats:v2');
 
       return {
         success: true,
@@ -834,7 +924,27 @@ if (status === 'accepted') {
         `
           SELECT *
           FROM sms_notifications
-          WHERE recipient_id = $1
+          WHERE LOWER(recipient_id) = LOWER($1)
+            AND NOT (
+              asset_id IS NOT NULL
+              AND NOT EXISTS (
+                SELECT 1
+                FROM sms_assets
+                WHERE sms_assets.id = sms_notifications.asset_id
+              )
+            )
+            AND NOT (
+              type IN ('transfer_request', 'return_request')
+              AND (
+                transfer_id IS NULL
+                OR NOT EXISTS (
+                  SELECT 1
+                  FROM sms_transfers
+                  WHERE sms_transfers.id = sms_notifications.transfer_id
+                    AND sms_transfers.status = 'pending'
+                )
+              )
+            )
             AND ($2::boolean = false OR read_at IS NULL)
           ORDER BY created_at DESC
           LIMIT $3
@@ -843,7 +953,32 @@ if (status === 'accepted') {
         8000
       );
       const countRows = await dbManager.executeUnsafe<{ count: number }>(
-        `SELECT COUNT(*)::integer AS count FROM sms_notifications WHERE recipient_id = $1 AND read_at IS NULL`,
+        `
+          SELECT COUNT(*)::integer AS count
+          FROM sms_notifications
+          WHERE LOWER(recipient_id) = LOWER($1)
+            AND read_at IS NULL
+            AND NOT (
+              asset_id IS NOT NULL
+              AND NOT EXISTS (
+                SELECT 1
+                FROM sms_assets
+                WHERE sms_assets.id = sms_notifications.asset_id
+              )
+            )
+            AND NOT (
+              type IN ('transfer_request', 'return_request')
+              AND (
+                transfer_id IS NULL
+                OR NOT EXISTS (
+                  SELECT 1
+                  FROM sms_transfers
+                  WHERE sms_transfers.id = sms_notifications.transfer_id
+                    AND sms_transfers.status = 'pending'
+                )
+              )
+            )
+        `,
         [recipientId],
         5000
       );
@@ -877,7 +1012,7 @@ if (status === 'accepted') {
         `
           UPDATE sms_notifications
           SET read_at = COALESCE(read_at, NOW())
-          WHERE recipient_id = $1
+          WHERE LOWER(recipient_id) = LOWER($1)
             AND ($2::integer IS NULL OR id = $2::integer)
         `,
         [recipientId, notificationId || null],
@@ -930,25 +1065,40 @@ if (status === 'accepted') {
     const startTime = Date.now();
 
     try {
+      await this.ensureNotificationsTable();
       const result = await dbManager.executeUnsafe<{
         deletedTransfers: string | number;
         deletedAuditLogs: string | number;
       }>(
         `
-          WITH deleted_audits AS (
+          WITH transfer_ids AS (
+            SELECT id FROM sms_transfers WHERE asset_id = $1::uuid
+          ),
+          resolved_notifications AS (
+            UPDATE sms_notifications
+            SET read_at = COALESCE(read_at, NOW())
+            WHERE read_at IS NULL
+              AND type IN ('transfer_request', 'return_request')
+              AND (
+                asset_id = $1::uuid
+                OR transfer_id IN (SELECT id FROM transfer_ids)
+              )
+            RETURNING 1
+          ),
+          deleted_audits AS (
             DELETE FROM sms_audit_logs
             WHERE (
               metadata->>'assetId' = $1::text
               OR metadata @> jsonb_build_object('assetId', $1::text)
               OR metadata->>'transferId' IN (
-                SELECT id::text FROM sms_transfers WHERE asset_id = $1::uuid
+                SELECT id::text FROM transfer_ids
               )
             )
             RETURNING 1
           ),
           deleted_transfers AS (
             DELETE FROM sms_transfers
-            WHERE asset_id = $1::uuid
+            WHERE id IN (SELECT id FROM transfer_ids)
             RETURNING 1
           )
           SELECT
@@ -1063,7 +1213,7 @@ if (status === 'accepted') {
         status: 'pending' as TransferStatus,
         remark: transfer.remark as string | null,
         imageUrl: imageUrl || null,
-        createdAt: transfer.created_at as string,
+        createdAt: timestampWithoutTimeZoneToCambodiaIso(transfer.created_at),
         acceptedAt: null,
       };
 
@@ -1082,18 +1232,24 @@ if (status === 'accepted') {
         imageUrl: imageUrl || null,
       });
 
-      // Notify admins about the return request
-      await this.createNotification({
-        type: "return_request",
-        title: "Return to stock requested",
-        message: `${returnedBy} requests to return ${asset.name} to stock. Awaiting admin approval.`,
-        recipientId: 'Admin', // This will need to be sent to admins
-        actorId: returnedBy,
-        assetId,
-        transferId: transferEntity.id,
-      });
+      // Notify each real admin account about the return request.
+      const adminRecipients = await this.getAdminNotificationRecipients();
+      await Promise.all(
+        adminRecipients.map((recipientId) =>
+          this.createNotification({
+            type: "return_request",
+            title: "Return to stock requested",
+            message: `${returnedBy} requests to return ${asset.name} to stock. Awaiting admin approval.`,
+            recipientId,
+            actorId: returnedBy,
+            assetId,
+            transferId: transferEntity.id,
+          })
+        )
+      );
 
       await delCache('sms:stats');
+      await delCache('sms:stats:v2');
 
       return {
         success: true,
@@ -1114,7 +1270,7 @@ if (status === 'accepted') {
    * Get SMS asset stats (inventory counts) - FIXED: Pure SMS stats, no vehicle pricing
    */
   public async getAssetStats(): Promise<ServiceResult<Record<string, number>>> {
-    const cacheKey = 'sms:stats';
+    const cacheKey = 'sms:stats:v2';
     const startTime = Date.now();
 
     try {
@@ -1145,7 +1301,16 @@ if (status === 'accepted') {
       const pendingCount = pendingStats[0]?.count || 0;
 
       // Count assets created today for "todayChange" stat
-      const todayResult = await dbManager.execute`SELECT COUNT(*)::integer as count FROM sms_assets WHERE created_at >= CURRENT_DATE` as Array<{count: number}>;
+      const todayResult = await dbManager.execute`
+        SELECT COUNT(*)::integer as count
+        FROM sms_assets
+        WHERE created_at >= (
+          (
+            date_trunc('day', NOW() AT TIME ZONE 'Asia/Phnom_Penh')
+            AT TIME ZONE 'Asia/Phnom_Penh'
+          ) AT TIME ZONE 'UTC'
+        )
+      ` as Array<{count: number}>;
       const todayChange = todayResult[0]?.count || 0;
 
 const stats: Record<string, number> = {
@@ -1260,8 +1425,8 @@ const stats: Record<string, number> = {
           description: t.description as string,
           location: t.location as string,
           status: t.status as string,
-          timestamp: t.timestamp as string,
-          acceptedAt: t.acceptedAt as string | null,
+          timestamp: toIsoInstantString(t.timestamp),
+          acceptedAt: t.acceptedAt ? toIsoInstantString(t.acceptedAt) : null,
           metadata: {
             senderId: t.senderId,
             receiverId: t.receiverId,
@@ -1274,7 +1439,7 @@ const stats: Record<string, number> = {
           assetId,
           userId: String(a.user_id || ''),
           description: a.description as string,
-          timestamp: a.timestamp as string,
+          timestamp: timestampWithoutTimeZoneToUtcIso(a.timestamp),
           metadata: a.metadata,
         }))
       ].sort((a, b) => new Date(b.timestamp as string).getTime() - new Date(a.timestamp as string).getTime());

@@ -9,6 +9,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSession, canAccessLMS } from "@/lib/auth-helpers";
 import { dbManager } from "@/lib/db-singleton";
 import { getRequestedStaffId, resolveLmsStaffContext } from "@/lib/lms-auth";
+import { invalidateSequentialLessonsCache } from "@/lib/lms-cache";
 import { canAccessLessonForRole } from "@/lib/lms-lesson-access";
 
 const COMPLETE_THRESHOLD_PERCENT = 95;
@@ -22,6 +23,7 @@ type ProgressRow = {
   duration_seconds: number | string | null;
   watch_percentage: number | string | null;
   is_completed?: boolean | null;
+  completed_at?: string | null;
   playback_rate_violations: number | string | null;
   tab_hidden_count: number | string | null;
   last_watched_at: string | null;
@@ -44,6 +46,8 @@ function normalizeProgress(row: ProgressRow | undefined, staffName: string) {
 
   return {
     staffName,
+    isCompleted,
+    completedAt: row?.completed_at ?? null,
     currentTimeSeconds: toNumber(row?.current_time_seconds),
     maxWatchedSeconds,
     durationSeconds,
@@ -73,6 +77,92 @@ async function ensureProgressTable() {
       UNIQUE(staff_id, lesson_id)
     )
   `);
+}
+
+async function ensureCompletionTable() {
+  await dbManager.executeUnsafe(`
+    CREATE TABLE IF NOT EXISTS lms_lesson_completions (
+      id SERIAL PRIMARY KEY,
+      staff_id INTEGER NOT NULL REFERENCES lms_staff(id) ON DELETE CASCADE,
+      lesson_id INTEGER NOT NULL REFERENCES lms_lessons(id) ON DELETE CASCADE,
+      completed_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+      time_spent_seconds INTEGER,
+      notes TEXT,
+      created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(staff_id, lesson_id)
+    )
+  `);
+}
+
+async function markLessonCompleteFromProgress(
+  staffId: number,
+  lessonId: number,
+  timeSpentSeconds: number
+) {
+  await ensureCompletionTable();
+
+  const existingRows = await dbManager.executeUnsafe<{ completed_at: string | null }>(
+    `
+      SELECT completed_at
+      FROM lms_lesson_completions
+      WHERE staff_id = $1 AND lesson_id = $2
+      LIMIT 1
+    `,
+    [staffId, lessonId]
+  );
+
+  if (existingRows[0]) {
+    await dbManager.executeUnsafe(
+      `
+        UPDATE lms_lesson_completions
+        SET time_spent_seconds = CASE
+          WHEN time_spent_seconds IS NULL THEN $3
+          ELSE GREATEST(time_spent_seconds, $3)
+        END
+        WHERE staff_id = $1 AND lesson_id = $2
+      `,
+      [staffId, lessonId, timeSpentSeconds]
+    );
+
+    return {
+      completedAt: existingRows[0].completed_at,
+      inserted: false,
+    };
+  }
+
+  const completionRows = await dbManager.executeUnsafe<{
+    completed_at: string | null;
+    category_id: number | string | null;
+  }>(
+    `
+      WITH completed AS (
+        INSERT INTO lms_lesson_completions (staff_id, lesson_id, time_spent_seconds)
+        VALUES ($1, $2, $3)
+        ON CONFLICT (staff_id, lesson_id)
+        DO UPDATE SET
+          time_spent_seconds = CASE
+            WHEN lms_lesson_completions.time_spent_seconds IS NULL THEN EXCLUDED.time_spent_seconds
+            ELSE GREATEST(lms_lesson_completions.time_spent_seconds, EXCLUDED.time_spent_seconds)
+          END
+        RETURNING lesson_id, completed_at
+      )
+      SELECT completed.completed_at, l.category_id
+      FROM completed
+      JOIN lms_lessons l ON l.id = completed.lesson_id
+      LIMIT 1
+    `,
+    [staffId, lessonId, timeSpentSeconds]
+  );
+
+  const categoryId = Number(completionRows[0]?.category_id);
+  if (Number.isInteger(categoryId) && categoryId > 0) {
+    await invalidateSequentialLessonsCache(categoryId, staffId);
+  }
+
+  return {
+    completedAt: completionRows[0]?.completed_at ?? null,
+    inserted: true,
+  };
 }
 
 async function ensureLastWatchedTable() {
@@ -220,6 +310,7 @@ export async function GET(request: NextRequest) {
   }
 
   await ensureProgressTable();
+  await ensureCompletionTable();
 
   const staffContext = await resolveLmsStaffContext(
     request,
@@ -234,7 +325,8 @@ export async function GET(request: NextRequest) {
     `
       SELECT
         lp.*,
-        CASE WHEN lc.lesson_id IS NULL THEN false ELSE true END AS is_completed
+        CASE WHEN lc.lesson_id IS NULL THEN false ELSE true END AS is_completed,
+        lc.completed_at
       FROM lms_lesson_progress lp
       LEFT JOIN lms_lesson_completions lc
         ON lc.staff_id = lp.staff_id
@@ -403,8 +495,25 @@ const rows = await dbManager.executeUnsafe<ProgressRow>(
     [effectiveStaffId, lessonId]
   );
 
+  let progressData = normalizeProgress(rows[0], effectiveStaffName);
+
+  if (progressData.canComplete) {
+    const completion = await markLessonCompleteFromProgress(
+      effectiveStaffId,
+      lessonId,
+      Math.max(maxWatchedSeconds, currentTimeSeconds)
+    );
+
+    progressData = {
+      ...progressData,
+      isCompleted: true,
+      completedAt: completion.completedAt,
+      watchPercentage: Math.max(progressData.watchPercentage, COMPLETE_THRESHOLD_PERCENT),
+    };
+  }
+
   return NextResponse.json({
     success: true,
-    data: normalizeProgress(rows[0], effectiveStaffName),
+    data: progressData,
   });
 }

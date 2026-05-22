@@ -2,9 +2,22 @@
 
 import { compressImage } from '@/lib/compressImage';
 import { generateShortUUID } from '@/lib/uuid';
-import { Loader2, Save, Upload, X } from 'lucide-react';
+import { AlertCircle, Loader2, Package, Save, Upload, X } from 'lucide-react';
 import Image from 'next/image';
 import { useEffect, useState } from 'react';
+import {
+  smsDropzoneClass,
+  smsErrorTextClass,
+  smsHelperClass,
+  smsInputClass,
+  smsLabelClass,
+  smsModalFooterClass,
+  smsModalHeaderClass,
+  smsModalPanelClass,
+  smsPrimaryButtonClass,
+  smsSecondaryButtonClass,
+  smsTextareaClass,
+} from '../../components/SmsShared';
 
 interface SmsAsset {
   id?: string;
@@ -262,57 +275,74 @@ const handleSubmit = async (e: React.FormEvent) => {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="bg-white/90 backdrop-blur-xl rounded-3xl border border-slate-200 shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/50 p-4 backdrop-blur-sm">
+      <div className="flex min-h-full items-center justify-center py-4">
+      <div className={smsModalPanelClass}>
         {/* Header */}
-        <div className="p-8 pb-4 border-b border-slate-200 sticky top-0 bg-white/95 backdrop-blur-sm z-10">
+        <div className={smsModalHeaderClass}>
           <div className="flex items-center justify-between">
-            <h2 className="text-2xl font-bold bg-gradient-to-r from-slate-800 to-slate-900 bg-clip-text text-transparent">
-              {title}
-            </h2>
-<button
+            <div className="flex items-center gap-3">
+              <div className="rounded-lg bg-emerald-100 p-2 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400">
+                <Package className="h-5 w-5" />
+              </div>
+              <div>
+                <h2 className="text-xl font-bold text-gray-900 dark:text-white md:text-2xl">
+                  {title}
+                </h2>
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  {isEdit ? 'Update SMS asset details' : 'Create an SMS stock asset'}
+                </p>
+              </div>
+            </div>
+            <button
               onClick={onClose}
-              className="p-2 hover:bg-slate-200 rounded-2xl transition-all group"
+              className="rounded-lg p-2 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900 dark:hover:bg-gray-800 dark:hover:text-white"
               disabled={loading}
               title="Close modal"
             >
-              <X className="w-5 h-5 text-slate-500 group-hover:text-slate-700" />
+              <X className="h-5 w-5" />
             </button>
           </div>
         </div>
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="p-8 space-y-6">
+        <form onSubmit={handleSubmit} className="space-y-5 p-5 sm:p-6">
           {errors.general && (
-            <div className="p-4 bg-amber-100 border border-amber-200 rounded-2xl text-amber-800 text-sm">
-              {errors.general}
+            <div className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4 dark:border-amber-800 dark:bg-amber-900/20">
+              <AlertCircle className="mt-0.5 h-5 w-5 flex-shrink-0 text-amber-600 dark:text-amber-400" />
+              <p className="text-sm font-medium text-amber-800 dark:text-amber-300">{errors.general}</p>
             </div>
           )}
 
           {/* Basic Info */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-2">
+              <label className={smsLabelClass}>
                 Asset Name *
               </label>
               <input
                 type="text"
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                className="w-full px-4 py-3 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all bg-white/70 backdrop-blur-sm"
+                className={smsInputClass}
                 placeholder="e.g. Office Laptop Dell XPS"
                 disabled={loading}
               />
-              {errors.name && <p className="mt-1 text-xs text-amber-600">{errors.name}</p>}
+              {errors.name && (
+                <p className={smsErrorTextClass}>
+                  <AlertCircle className="h-4 w-4" />
+                  {errors.name}
+                </p>
+              )}
             </div>
 
             <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-2">Item Code</label>
+              <label className={smsLabelClass}>Item Code</label>
               <input
                 type="text"
                 value={formData.itemCode || ''}
                 onChange={(e) => setFormData({ ...formData, itemCode: e.target.value })}
-                className="w-full px-4 py-3 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all bg-white/70 backdrop-blur-sm"
+                className={smsInputClass}
                 placeholder="e.g. DELL-XPS-13-2024"
                 disabled={loading}
               />
@@ -320,15 +350,15 @@ const handleSubmit = async (e: React.FormEvent) => {
           </div>
 
           {/* Type & Category */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-2">Type *</label>
+              <label className={smsLabelClass}>Type *</label>
               <input
                 list="asset-types"
                 type="text"
                 value={formData.type}
                 onChange={(e) => setFormData({ ...formData, type: e.target.value })}
-                className="w-full px-4 py-3 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all bg-white/70 backdrop-blur-sm"
+                className={smsInputClass}
                 placeholder="Select or type a type..."
                 disabled={loading}
               />
@@ -340,55 +370,65 @@ const handleSubmit = async (e: React.FormEvent) => {
                 <option value="Office Supply" />
                 <option value="Other" />
               </datalist>
-              {errors.type && <p className="mt-1 text-xs text-amber-600">{errors.type}</p>}
+              {errors.type && (
+                <p className={smsErrorTextClass}>
+                  <AlertCircle className="h-4 w-4" />
+                  {errors.type}
+                </p>
+              )}
             </div>
 
             <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-2">Category</label>
+              <label className={smsLabelClass}>Category</label>
               <input
                 type="text"
                 value={formData.category || ''}
                 onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                className="w-full px-4 py-3 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all bg-white/70 backdrop-blur-sm"
+                className={smsInputClass}
                 placeholder="e.g. Laptop, Desk Chair"
               />
             </div>
           </div>
 
           {/* Quantity, Location, Assigned */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
             <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-2">Quantity</label>
+              <label className={smsLabelClass}>Quantity</label>
               <input
                 type="number"
                 min="1"
                 max="999"
                 value={formData.quantity || 1}
                 onChange={(e) => setFormData({ ...formData, quantity: parseInt(e.target.value) || 1 })}
-                className="w-full px-4 py-3 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all bg-white/70 backdrop-blur-sm"
+                className={smsInputClass}
                 placeholder="1"
               />
-              {errors.quantity && <p className="mt-1 text-xs text-amber-600">{errors.quantity}</p>}
+              {errors.quantity && (
+                <p className={smsErrorTextClass}>
+                  <AlertCircle className="h-4 w-4" />
+                  {errors.quantity}
+                </p>
+              )}
             </div>
 
             <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-2">Location</label>
+              <label className={smsLabelClass}>Location</label>
               <input
                 type="text"
                 value={formData.location || ''}
                 onChange={(e) => setFormData({ ...formData, location: e.target.value })}
-                className="w-full px-4 py-3 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all bg-white/70 backdrop-blur-sm"
+                className={smsInputClass}
                 placeholder="e.g. Phnom Penh Office"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-2">Assigned To</label>
+              <label className={smsLabelClass}>Assigned To</label>
               <input
                 type="text"
                 value={formData.assignedTo || ''}
                 onChange={(e) => setFormData({ ...formData, assignedTo: e.target.value })}
-                className="w-full px-4 py-3 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all bg-white/70 backdrop-blur-sm"
+                className={smsInputClass}
                 placeholder="e.g. John Doe"
               />
             </div>
@@ -396,20 +436,27 @@ const handleSubmit = async (e: React.FormEvent) => {
 
           {/* Status */}
           <div>
-            <label className="block text-sm font-semibold text-slate-700 mb-4">Status</label>
-            <div className="flex flex-wrap gap-3">
+            <label className={smsLabelClass}>Status</label>
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
               {(['Available', 'In Use', 'Borrowed', 'Out', 'Not Returned'] as const).map((status) => (
-                <label key={status} className="flex items-center space-x-2 cursor-pointer group">
+                <label
+                  key={status}
+                  className={`flex cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium ring-1 transition-colors ${
+                    formData.status === status
+                      ? "bg-emerald-50 text-emerald-800 ring-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-300 dark:ring-emerald-800"
+                      : "bg-white text-gray-700 ring-gray-200 hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:ring-gray-700 dark:hover:bg-gray-700"
+                  }`}
+                >
                   <input
                     type="radio"
                     name="status"
                     value={status}
                     checked={formData.status === status}
                     onChange={() => setFormData({ ...formData, status })}
-                    className="w-5 h-5 text-emerald-600 focus:ring-emerald-500 border-slate-300"
+                    className="h-4 w-4 text-emerald-600 focus:ring-emerald-500"
                     disabled={loading}
                   />
-                  <span className="text-sm font-medium text-slate-700 group-hover:text-slate-900 capitalize">
+                  <span>
                     {status.replace(/([A-Z])/g, ' $1').trim()}
                   </span>
                 </label>
@@ -419,8 +466,8 @@ const handleSubmit = async (e: React.FormEvent) => {
 
           {/* Image Upload */}
           <div>
-            <label className="block text-sm font-semibold text-slate-700 mb-4">Image (Optional)</label>
-            <div className="border-2 border-dashed border-slate-200 rounded-3xl p-8 text-center hover:border-emerald-300 transition-all bg-gradient-to-b from-slate-50/50 to-white/70">
+            <label className={smsLabelClass}>Image (Optional)</label>
+            <div className={`${smsDropzoneClass} text-center`}>
               <input
                 id="image-upload"
                 type="file"
@@ -431,17 +478,17 @@ const handleSubmit = async (e: React.FormEvent) => {
               />
               <label
                 htmlFor="image-upload"
-                className="cursor-pointer flex flex-col items-center gap-3 p-6 hover:bg-emerald-50/50 rounded-2xl transition-all group"
+                className="flex cursor-pointer flex-col items-center gap-2 rounded-lg p-5 text-sm text-gray-600 transition-colors hover:bg-emerald-50 dark:text-gray-300 dark:hover:bg-emerald-900/20"
               >
-                <div className="w-16 h-16 bg-emerald-100 rounded-2xl flex items-center justify-center group-hover:bg-emerald-200 transition-all">
-                  <Upload className="w-8 h-8 text-emerald-600" />
+                <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300">
+                  <Upload className="h-5 w-5" />
                 </div>
                 <div>
-                  <p className="font-semibold text-slate-700">Upload Image</p>
-                  <p className="text-xs text-slate-500">PNG, JPG up to 10MB</p>
+                  <p className="font-semibold text-gray-800 dark:text-white">Upload Image</p>
+                  <p className={smsHelperClass}>PNG, JPG up to 10MB</p>
                 </div>
-{uploadProgress > 0 && (
-                  <div className="w-full bg-slate-200 rounded-full h-2 overflow-hidden">
+                {uploadProgress > 0 && (
+                  <div className="h-2 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700">
                     <div
                       className="bg-emerald-600 h-2 rounded-full transition-all"
                       style={{ width: `${uploadProgress}%`, flexShrink: 0 }}
@@ -451,60 +498,65 @@ const handleSubmit = async (e: React.FormEvent) => {
               </label>
             </div>
             {imagePreview && (
-              <div className="mt-4 flex items-center gap-3 p-4 bg-slate-50 rounded-2xl">
+              <div className="mt-4 flex items-center gap-3 rounded-lg bg-gray-50 p-3 ring-1 ring-gray-200 dark:bg-gray-800/50 dark:ring-gray-700">
                 <Image
                   src={imagePreview!}
                   alt="Asset preview"
                   width={80}
                   height={80}
-                  className="object-cover rounded-2xl shadow-md w-20 h-20"
+                  className="h-16 w-16 rounded-md object-cover"
                 />
                 <div className="flex-1">
-                  <p className="font-medium text-slate-800 truncate">{formData.imageUrl}</p>
-<button
+                  <p className="truncate font-medium text-gray-800 dark:text-gray-200">{formData.imageUrl}</p>
+                  <button
                     type="button"
                     onClick={removeImage}
                     title="Remove image"
-                    className="text-xs text-amber-600 hover:text-amber-700 font-medium -mt-1"
+                    className="text-xs font-medium text-red-600 hover:text-red-700"
                   >
                     Remove
                   </button>
                 </div>
               </div>
             )}
-            {errors.image && <p className="mt-2 text-xs text-amber-600">{errors.image}</p>}
+            {errors.image && (
+              <p className={smsErrorTextClass}>
+                <AlertCircle className="h-4 w-4" />
+                {errors.image}
+              </p>
+            )}
           </div>
 
           {/* Description & Ref */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-2">Description</label>
+              <label className={smsLabelClass}>Description</label>
               <textarea
                 rows={4}
                 value={formData.description || ''}
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                className="w-full px-4 py-3 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all resize-vertical bg-white/70 backdrop-blur-sm"
+                className={`${smsTextareaClass} resize-y`}
                 placeholder="Additional details about this asset..."
               />
             </div>
             <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-2">Reference ID</label>
+              <label className={smsLabelClass}>Reference ID</label>
               <input
                 type="text"
                 value={formData.refId || ''}
                 onChange={(e) => setFormData({ ...formData, refId: e.target.value })}
-                className="w-full px-4 py-3 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all bg-white/70 backdrop-blur-sm"
+                className={smsInputClass}
                 placeholder="e.g. PO-2024-001"
               />
             </div>
           </div>
 
           {/* Actions */}
-          <div className="flex flex-col sm:flex-row gap-4 pt-4 border-t border-slate-200 sticky bottom-0 bg-white/95 backdrop-blur-sm px-1 -mx-8">
+          <div className={smsModalFooterClass}>
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 py-3 px-6 border border-slate-200 text-slate-700 rounded-2xl hover:bg-slate-50 font-semibold transition-all disabled:opacity-50"
+              className={`${smsSecondaryButtonClass} flex-1`}
               disabled={loading}
             >
               Cancel
@@ -512,7 +564,7 @@ const handleSubmit = async (e: React.FormEvent) => {
             <button
               type="submit"
               disabled={loading}
-              className="flex-1 py-3 px-6 bg-gradient-to-r from-emerald-600 to-emerald-700 text-white rounded-2xl font-bold hover:from-emerald-700 hover:to-emerald-800 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+              className={`${smsPrimaryButtonClass} flex-1`}
             >
               {loading ? (
                 <>
@@ -528,6 +580,7 @@ const handleSubmit = async (e: React.FormEvent) => {
             </button>
           </div>
         </form>
+      </div>
       </div>
     </div>
   );

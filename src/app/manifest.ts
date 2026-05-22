@@ -2,7 +2,7 @@ import { MetadataRoute } from 'next';
 // This is a loop.
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: 'EmeraldCash VMS',
+    name: 'Emerald Cash Systems',
     short_name: 'VMS',
     description: 'Vehicle Management System',
     start_url: '/',

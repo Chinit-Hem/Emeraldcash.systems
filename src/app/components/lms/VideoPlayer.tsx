@@ -34,15 +34,19 @@ interface VideoPlayerProps {
   staffName?: string;
   thumbnailUrl?: string | null;
   completionThreshold?: number;
-  onComplete: () => void;
+  onComplete: (progress?: VideoProgressSnapshot) => void | Promise<boolean | void>;
   onBack: () => void;
-  onProgressChange?: (progress: {
-    watchPercentage: number;
-    canComplete: boolean;
-    currentTimeSeconds: number;
-    maxWatchedSeconds: number;
-  }) => void;
+  onProgressChange?: (progress: VideoProgressSnapshot) => void;
 }
+
+type VideoProgressSnapshot = {
+  watchPercentage: number;
+  canComplete: boolean;
+  currentTimeSeconds: number;
+  maxWatchedSeconds: number;
+  isCompleted: boolean;
+  completedAt: string | null;
+};
 
 interface YouTubePlayer {
   playVideo: () => void;
@@ -92,6 +96,8 @@ type ProgressResponse = {
   success: boolean;
   data?: {
     staffName?: string;
+    isCompleted?: boolean;
+    completedAt?: string | null;
     currentTimeSeconds: number;
     maxWatchedSeconds: number;
     durationSeconds: number;
@@ -299,6 +305,7 @@ export function VideoPlayer({
 const isScrubbingRef = useRef(false);
   const lastTapRef = useRef<{ x: number; y: number; time: number } | null>(null);
   const doubleTapTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const onProgressChangeRef = useRef(onProgressChange);
 
   const instructionSteps = useMemo(
     () => parseInstructionSteps(stepByStepInstructions),
@@ -366,6 +373,10 @@ const isScrubbingRef = useRef(false);
   }, [initialCompleted, lessonId]);
 
   useEffect(() => {
+    onProgressChangeRef.current = onProgressChange;
+  }, [onProgressChange]);
+
+  useEffect(() => {
     playbackUnlockedRef.current = playbackUnlocked;
   }, [playbackUnlocked]);
 
@@ -381,7 +392,12 @@ const isScrubbingRef = useRef(false);
   }, [clearControlsHideTimeout, isPlaying, isReady, revealVideoControls, warning]);
 
   const updateWatchState = useCallback(
-    (nextCurrentTime: number, nextMaxWatched: number, nextDuration: number) => {
+    (
+      nextCurrentTime: number,
+      nextMaxWatched: number,
+      nextDuration: number,
+      completion?: { isCompleted?: boolean; completedAt?: string | null }
+    ) => {
       const safeCurrent = Math.max(0, nextCurrentTime);
       const safeMax = Math.max(0, nextMaxWatched);
       const safeDuration = Math.max(0, nextDuration);
@@ -392,12 +408,17 @@ const isScrubbingRef = useRef(false);
       const reachedVideoEnd =
         safeDuration > 0 &&
         safeMax >= Math.max(0, safeDuration - COMPLETE_END_TOLERANCE_SECONDS);
+      const nextIsCompleted = Boolean(completion?.isCompleted ?? isCompletedRef.current);
 
       currentTimeRef.current = safeCurrent;
       maxWatchedRef.current = safeMax;
       durationRef.current = safeDuration;
       const nextCanComplete =
-        isCompletedRef.current || nextPercentage >= completionThreshold || reachedVideoEnd;
+        nextIsCompleted || nextPercentage >= completionThreshold || reachedVideoEnd;
+      if (nextIsCompleted) {
+        isCompletedRef.current = true;
+        setIsCompleted(true);
+      }
       playbackUnlockedRef.current = nextCanComplete;
 
       setCurrentTime(safeCurrent);
@@ -405,14 +426,16 @@ const isScrubbingRef = useRef(false);
       setVideoDuration(safeDuration);
       setWatchPercentage(nextPercentage);
 
-      onProgressChange?.({
+      onProgressChangeRef.current?.({
         watchPercentage: nextPercentage,
         canComplete: nextCanComplete,
         currentTimeSeconds: safeCurrent,
         maxWatchedSeconds: safeMax,
+        isCompleted: nextIsCompleted,
+        completedAt: completion?.completedAt ?? null,
       });
     },
-    [completionThreshold, onProgressChange]
+    [completionThreshold]
   );
 
   const saveProgress = useCallback(
@@ -447,7 +470,11 @@ const isScrubbingRef = useRef(false);
           updateWatchState(
             result.data.currentTimeSeconds,
             result.data.maxWatchedSeconds,
-            result.data.durationSeconds || durationRef.current
+            result.data.durationSeconds || durationRef.current,
+            {
+              isCompleted: result.data.isCompleted,
+              completedAt: result.data.completedAt ?? null,
+            }
           );
         }
       } catch {
@@ -512,7 +539,11 @@ const isScrubbingRef = useRef(false);
           updateWatchState(
             savedProgress.currentTimeSeconds,
             savedProgress.maxWatchedSeconds,
-            savedProgress.durationSeconds
+            savedProgress.durationSeconds,
+            {
+              isCompleted: savedProgress.isCompleted,
+              completedAt: savedProgress.completedAt ?? null,
+            }
           );
         }
 
@@ -879,17 +910,40 @@ const toggleFullscreen = useCallback(() => {
     setIsFullscreen(true);
   }, [revealVideoControls]);
 
-  const handleComplete = () => {
+  const handleComplete = async () => {
     if (!completionAllowed) {
       showWarning(`Please watch at least ${completionThreshold}% before completing this lesson.`);
       return;
     }
 
+    const wasCompleted = isCompletedRef.current;
+    const completedAt = new Date().toISOString();
     isCompletedRef.current = true;
     playbackUnlockedRef.current = true;
     setIsCompleted(true);
-    saveProgress();
-    onComplete();
+
+    try {
+      await saveProgress();
+      const result = await onComplete({
+        watchPercentage,
+        canComplete: true,
+        currentTimeSeconds: currentTimeRef.current,
+        maxWatchedSeconds: maxWatchedRef.current,
+        isCompleted: true,
+        completedAt,
+      });
+
+      if (result === false && !wasCompleted) {
+        isCompletedRef.current = false;
+        setIsCompleted(false);
+      }
+    } catch {
+      if (!wasCompleted) {
+        isCompletedRef.current = false;
+        setIsCompleted(false);
+      }
+      showWarning("Unable to mark this lesson complete. Please try again.");
+    }
   };
 
   return (
@@ -1183,23 +1237,24 @@ className={`relative bg-black ${
               </div>
             </GlassCard>
 
-            <GlassCard className="rounded-2xl p-4">
-              <div className="mb-2 flex items-center justify-between gap-3">
-                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Instruction Progress
-                </span>
-                <span className="text-sm text-gray-500 dark:text-gray-400">
-                  Step {instructionSteps.length > 0 ? currentStep + 1 : 0} of{" "}
-                  {instructionSteps.length}
-                </span>
-              </div>
-              <div className="h-2 w-full rounded-full bg-gray-200 dark:bg-gray-700">
-                <div
-                  className="h-2 rounded-full bg-blue-500 transition-all duration-300"
-                  style={{ width: `${lessonProgress}%` }}
-                />
-              </div>
-            </GlassCard>
+            {instructionSteps.length > 0 && (
+              <GlassCard className="rounded-2xl p-4">
+                <div className="mb-2 flex items-center justify-between gap-3">
+                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                    Instruction Progress
+                  </span>
+                  <span className="text-sm text-gray-500 dark:text-gray-400">
+                    {`Step ${currentStep + 1} of ${instructionSteps.length}`}
+                  </span>
+                </div>
+                <div className="h-2 w-full rounded-full bg-gray-200 dark:bg-gray-700">
+                  <div
+                    className="h-2 rounded-full bg-blue-500 transition-all duration-300"
+                    style={{ width: `${lessonProgress}%` }}
+                  />
+                </div>
+              </GlassCard>
+            )}
           </section>
 
           {showInstructions && (

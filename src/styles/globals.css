@@ -1,6 +1,11 @@
 @import "tailwindcss";
+@config "../../tailwind.config.ts";
+
+@custom-variant dark (&:where(.dark, .dark *, [data-theme="dark"], [data-theme="dark"] *));
 
 :root {
+  color-scheme: light;
+
   --neu-bg: #f1f5f9;
   --neu-bg-dark: #e2e8f0;
   --neu-green: #10b981;
@@ -41,6 +46,8 @@
 
 .dark,
 [data-theme="dark"] {
+  color-scheme: dark;
+
   --neu-bg: #0f172a;
   --neu-bg-dark: #1e293b;
   --neu-green: #34d399;
@@ -83,6 +90,225 @@ body {
   font-family: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
   min-height: 100%;
   margin: 0;
+}
+
+.dark .ec-dark-scope,
+[data-theme="dark"] .ec-dark-scope {
+  color: var(--text-primary);
+}
+
+.dark .ec-dark-scope .bg-white,
+.dark .ec-dark-scope .bg-white\/70,
+.dark .ec-dark-scope .bg-white\/80,
+.dark .ec-dark-scope .bg-white\/90,
+.dark .ec-dark-scope .bg-white\/95,
+[data-theme="dark"] .ec-dark-scope .bg-white,
+[data-theme="dark"] .ec-dark-scope .bg-white\/70,
+[data-theme="dark"] .ec-dark-scope .bg-white\/80,
+[data-theme="dark"] .ec-dark-scope .bg-white\/90,
+[data-theme="dark"] .ec-dark-scope .bg-white\/95 {
+  background-color: rgba(15, 23, 42, 0.94) !important;
+}
+
+.dark .ec-dark-scope .bg-slate-50,
+.dark .ec-dark-scope .bg-slate-50\/50,
+.dark .ec-dark-scope .bg-slate-50\/70,
+.dark .ec-dark-scope .bg-gray-50,
+.dark .ec-dark-scope .bg-gray-50\/50,
+[data-theme="dark"] .ec-dark-scope .bg-slate-50,
+[data-theme="dark"] .ec-dark-scope .bg-slate-50\/50,
+[data-theme="dark"] .ec-dark-scope .bg-slate-50\/70,
+[data-theme="dark"] .ec-dark-scope .bg-gray-50,
+[data-theme="dark"] .ec-dark-scope .bg-gray-50\/50 {
+  background-color: rgba(15, 23, 42, 0.78) !important;
+}
+
+.dark .ec-dark-scope .bg-slate-100,
+.dark .ec-dark-scope .bg-slate-100\/50,
+.dark .ec-dark-scope .bg-gray-100,
+.dark .ec-dark-scope .bg-gray-100\/50,
+[data-theme="dark"] .ec-dark-scope .bg-slate-100,
+[data-theme="dark"] .ec-dark-scope .bg-slate-100\/50,
+[data-theme="dark"] .ec-dark-scope .bg-gray-100,
+[data-theme="dark"] .ec-dark-scope .bg-gray-100\/50 {
+  background-color: rgba(30, 41, 59, 0.84) !important;
+}
+
+.dark .ec-dark-scope .bg-slate-200,
+.dark .ec-dark-scope .bg-gray-200,
+[data-theme="dark"] .ec-dark-scope .bg-slate-200,
+[data-theme="dark"] .ec-dark-scope .bg-gray-200 {
+  background-color: rgb(51, 65, 85) !important;
+}
+
+.dark .ec-dark-scope .hover\:bg-slate-50:hover,
+.dark .ec-dark-scope .hover\:bg-slate-100:hover,
+.dark .ec-dark-scope .hover\:bg-gray-50:hover,
+.dark .ec-dark-scope .hover\:bg-gray-100:hover,
+.dark .ec-dark-scope .active\:bg-slate-100:active,
+.dark .ec-dark-scope .active\:bg-gray-100:active,
+[data-theme="dark"] .ec-dark-scope .hover\:bg-slate-50:hover,
+[data-theme="dark"] .ec-dark-scope .hover\:bg-slate-100:hover,
+[data-theme="dark"] .ec-dark-scope .hover\:bg-gray-50:hover,
+[data-theme="dark"] .ec-dark-scope .hover\:bg-gray-100:hover,
+[data-theme="dark"] .ec-dark-scope .active\:bg-slate-100:active,
+[data-theme="dark"] .ec-dark-scope .active\:bg-gray-100:active {
+  background-color: rgb(30, 41, 59) !important;
+}
+
+.dark .ec-dark-scope .bg-emerald-50,
+.dark .ec-dark-scope .bg-emerald-100,
+[data-theme="dark"] .ec-dark-scope .bg-emerald-50,
+[data-theme="dark"] .ec-dark-scope .bg-emerald-100 {
+  background-color: rgba(16, 185, 129, 0.16) !important;
+}
+
+.dark .ec-dark-scope .bg-blue-50,
+.dark .ec-dark-scope .bg-blue-100,
+[data-theme="dark"] .ec-dark-scope .bg-blue-50,
+[data-theme="dark"] .ec-dark-scope .bg-blue-100 {
+  background-color: rgba(59, 130, 246, 0.16) !important;
+}
+
+.dark .ec-dark-scope .bg-purple-50,
+.dark .ec-dark-scope .bg-purple-100,
+[data-theme="dark"] .ec-dark-scope .bg-purple-50,
+[data-theme="dark"] .ec-dark-scope .bg-purple-100 {
+  background-color: rgba(168, 85, 247, 0.16) !important;
+}
+
+.dark .ec-dark-scope .bg-amber-50,
+.dark .ec-dark-scope .bg-amber-100,
+[data-theme="dark"] .ec-dark-scope .bg-amber-50,
+[data-theme="dark"] .ec-dark-scope .bg-amber-100 {
+  background-color: rgba(245, 158, 11, 0.16) !important;
+}
+
+.dark .ec-dark-scope .bg-orange-50,
+.dark .ec-dark-scope .bg-orange-100,
+[data-theme="dark"] .ec-dark-scope .bg-orange-50,
+[data-theme="dark"] .ec-dark-scope .bg-orange-100 {
+  background-color: rgba(249, 115, 22, 0.16) !important;
+}
+
+.dark .ec-dark-scope .bg-red-50,
+.dark .ec-dark-scope .bg-red-100,
+[data-theme="dark"] .ec-dark-scope .bg-red-50,
+[data-theme="dark"] .ec-dark-scope .bg-red-100 {
+  background-color: rgba(239, 68, 68, 0.16) !important;
+}
+
+.dark .ec-dark-scope [class~="text-[#1a1a2e]"],
+[data-theme="dark"] .ec-dark-scope [class~="text-[#1a1a2e]"],
+.dark .ec-dark-scope .text-slate-950,
+.dark .ec-dark-scope .text-slate-900,
+.dark .ec-dark-scope .text-slate-800,
+.dark .ec-dark-scope .text-gray-950,
+.dark .ec-dark-scope .text-gray-900,
+.dark .ec-dark-scope .text-gray-800,
+[data-theme="dark"] .ec-dark-scope .text-slate-950,
+[data-theme="dark"] .ec-dark-scope .text-slate-900,
+[data-theme="dark"] .ec-dark-scope .text-slate-800,
+[data-theme="dark"] .ec-dark-scope .text-gray-950,
+[data-theme="dark"] .ec-dark-scope .text-gray-900,
+[data-theme="dark"] .ec-dark-scope .text-gray-800 {
+  color: rgb(226, 232, 240) !important;
+}
+
+.dark .ec-dark-scope [class~="text-[#4a4a5a]"],
+[data-theme="dark"] .ec-dark-scope [class~="text-[#4a4a5a]"],
+.dark .ec-dark-scope .text-slate-700,
+.dark .ec-dark-scope .text-slate-600,
+.dark .ec-dark-scope .text-slate-500,
+.dark .ec-dark-scope .text-slate-400,
+.dark .ec-dark-scope .text-gray-700,
+.dark .ec-dark-scope .text-gray-600,
+.dark .ec-dark-scope .text-gray-500,
+.dark .ec-dark-scope .text-gray-400,
+[data-theme="dark"] .ec-dark-scope .text-slate-700,
+[data-theme="dark"] .ec-dark-scope .text-slate-600,
+[data-theme="dark"] .ec-dark-scope .text-slate-500,
+[data-theme="dark"] .ec-dark-scope .text-slate-400,
+[data-theme="dark"] .ec-dark-scope .text-gray-700,
+[data-theme="dark"] .ec-dark-scope .text-gray-600,
+[data-theme="dark"] .ec-dark-scope .text-gray-500,
+[data-theme="dark"] .ec-dark-scope .text-gray-400 {
+  color: rgb(148, 163, 184) !important;
+}
+
+.dark .ec-dark-scope .border-slate-100,
+.dark .ec-dark-scope .border-slate-200,
+.dark .ec-dark-scope .border-slate-300,
+.dark .ec-dark-scope .border-gray-100,
+.dark .ec-dark-scope .border-gray-200,
+.dark .ec-dark-scope .border-gray-300,
+[data-theme="dark"] .ec-dark-scope .border-slate-100,
+[data-theme="dark"] .ec-dark-scope .border-slate-200,
+[data-theme="dark"] .ec-dark-scope .border-slate-300,
+[data-theme="dark"] .ec-dark-scope .border-gray-100,
+[data-theme="dark"] .ec-dark-scope .border-gray-200,
+[data-theme="dark"] .ec-dark-scope .border-gray-300 {
+  border-color: rgb(51, 65, 85) !important;
+}
+
+.dark .ec-dark-scope .ring-slate-100,
+.dark .ec-dark-scope .ring-slate-200,
+.dark .ec-dark-scope .ring-slate-300,
+.dark .ec-dark-scope .ring-gray-100,
+.dark .ec-dark-scope .ring-gray-200,
+.dark .ec-dark-scope .ring-gray-300,
+[data-theme="dark"] .ec-dark-scope .ring-slate-100,
+[data-theme="dark"] .ec-dark-scope .ring-slate-200,
+[data-theme="dark"] .ec-dark-scope .ring-slate-300,
+[data-theme="dark"] .ec-dark-scope .ring-gray-100,
+[data-theme="dark"] .ec-dark-scope .ring-gray-200,
+[data-theme="dark"] .ec-dark-scope .ring-gray-300 {
+  --tw-ring-color: rgb(51, 65, 85) !important;
+}
+
+.dark .ec-dark-scope [class*="from-[#f0f4f8]"],
+.dark .ec-dark-scope [class*="from-[#e8ecf1]"],
+.dark .ec-dark-scope [class*="from-white"],
+.dark .ec-dark-scope [class*="from-slate-50"],
+.dark .ec-dark-scope [class*="from-gray-50"],
+.dark .ec-dark-scope [class*="via-slate-100"],
+.dark .ec-dark-scope [class*="to-[#e6e9ef]"],
+.dark .ec-dark-scope [class*="to-slate-50"],
+.dark .ec-dark-scope [class*="to-slate-100"],
+.dark .ec-dark-scope [class*="to-slate-200"],
+[data-theme="dark"] .ec-dark-scope [class*="from-[#f0f4f8]"],
+[data-theme="dark"] .ec-dark-scope [class*="from-[#e8ecf1]"],
+[data-theme="dark"] .ec-dark-scope [class*="from-white"],
+[data-theme="dark"] .ec-dark-scope [class*="from-slate-50"],
+[data-theme="dark"] .ec-dark-scope [class*="from-gray-50"],
+[data-theme="dark"] .ec-dark-scope [class*="via-slate-100"],
+[data-theme="dark"] .ec-dark-scope [class*="to-[#e6e9ef]"],
+[data-theme="dark"] .ec-dark-scope [class*="to-slate-50"],
+[data-theme="dark"] .ec-dark-scope [class*="to-slate-100"],
+[data-theme="dark"] .ec-dark-scope [class*="to-slate-200"] {
+  background-image: linear-gradient(to bottom right, rgb(2, 6, 23), rgb(15, 23, 42), rgb(30, 41, 59)) !important;
+}
+
+.dark .ec-dark-scope [class*="from-emerald-50"],
+[data-theme="dark"] .ec-dark-scope [class*="from-emerald-50"] {
+  background-image: linear-gradient(to bottom right, rgba(6, 78, 59, 0.5), rgba(15, 23, 42, 0.94)) !important;
+}
+
+.dark .ec-dark-scope [class*="from-blue-50"],
+[data-theme="dark"] .ec-dark-scope [class*="from-blue-50"] {
+  background-image: linear-gradient(to bottom right, rgba(30, 64, 175, 0.38), rgba(15, 23, 42, 0.94)) !important;
+}
+
+.dark .ec-dark-scope [class*="#e2e8f0"],
+.dark .ec-dark-scope [class*="#ffffff"],
+[data-theme="dark"] .ec-dark-scope [class*="#e2e8f0"],
+[data-theme="dark"] .ec-dark-scope [class*="#ffffff"] {
+  box-shadow: var(--shadow-soft) !important;
+}
+
+.dark .ec-dark-scope ::placeholder,
+[data-theme="dark"] .ec-dark-scope ::placeholder {
+  color: rgb(100, 116, 139) !important;
 }
 
 input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]),

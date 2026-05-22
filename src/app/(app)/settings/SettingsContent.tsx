@@ -126,9 +126,9 @@ export default function SettingsContent() {
   const isAdmin = user.role === "Admin";
   const formatRoleLabel = useCallback((role: Role) => {
     if (role === "Admin") return t.admin;
-    if (role === "Accounting") return "Accounting";
+    if (role === "Accounting") return language === "km" ? "គណនេយ្យ" : "Accounting";
     return t.staff;
-  }, [t.admin, t.staff]);
+  }, [language, t.admin, t.staff]);
   
   const [activeTab, setActiveTab] = useState<TabType>("profile");
   const [users, setUsers] = useState<ManagedUser[]>([]);
@@ -501,7 +501,7 @@ export default function SettingsContent() {
                       className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 shadow-sm hover:shadow-md dark:shadow-slate-900/20 dark:hover:shadow-slate-900/40 transition-all"
                     >
                       <option value="Staff">{t.staff}</option>
-                      <option value="Accounting">Accounting</option>
+                      <option value="Accounting">{formatRoleLabel("Accounting")}</option>
                       <option value="Admin">{t.admin}</option>
                     </select>
                   </div>
@@ -739,7 +739,7 @@ export default function SettingsContent() {
                     </div>
                     <div>
                       <p className="font-medium text-slate-800 dark:text-white">{language === 'km' ? 'របៀបងងឹត' : 'Dark Mode'}</p>
-                      <p className="text-sm text-slate-500 dark:text-slate-400">{language === 'km' ? 'បិទ/បើករបៀបងងឹត' : 'Toggle dark theme'}</p>
+                      <p className="text-sm text-slate-500 dark:text-slate-400">{language === 'km' ? 'ជ្រើសរើសរូបរាងកម្មវិធី' : 'Choose the app theme'}</p>
                     </div>
                   </div>
                   <ThemeToggle />
@@ -800,14 +800,14 @@ export default function SettingsContent() {
                   </div>
                   <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200/50 dark:border-slate-700/50">
                     <p className="text-sm text-slate-500 dark:text-slate-400 mb-1">{language === 'km' ? 'ប្រព័ន្ធប្រតិបត្តិការ' : 'Platform'}</p>
-                    <p className="text-lg font-semibold text-slate-800 dark:text-white">Emerald Cash VMS</p>
+                    <p className="text-lg font-semibold text-slate-800 dark:text-white">Emerald Cash Systems</p>
                   </div>
                 </div>
                 <div className="mt-4 p-4 rounded-2xl bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-900/20 dark:to-teal-900/20 border border-emerald-200/50 dark:border-emerald-800/50">
                   <p className="text-sm text-emerald-700 dark:text-emerald-300 text-center">
                     {language === 'km' 
-                      ? '© 2024 Emerald Cash VMS - រក្សាសិទ្ធិគ្រប់យ៉ាង' 
-                      : '© 2024 Emerald Cash VMS - All rights reserved'}
+                      ? '© 2024 អេមើរ៉ល ឃែស - រក្សាសិទ្ធិគ្រប់យ៉ាង' 
+                      : '© 2024 Emerald Cash - All rights reserved'}
                   </p>
                 </div>
               </div>

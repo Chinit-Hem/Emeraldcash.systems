@@ -66,6 +66,15 @@ interface LessonWithStatus extends LmsLesson {
   completed_at: string | null;
 }
 
+interface LessonWatchProgress {
+  watchPercentage: number;
+  canComplete: boolean;
+  currentTimeSeconds: number;
+  maxWatchedSeconds: number;
+  isCompleted: boolean;
+  completedAt: string | null;
+}
+
 // ============================================================================
 // Components
 // ============================================================================
@@ -239,12 +248,15 @@ export default function LessonPlayerPage() {
   const [showGuard, setShowGuard] = useState(false);
   const [previousLessonTitle, setPreviousLessonTitle] = useState<string>("");
   const [completionError, setCompletionError] = useState<string | null>(null);
-  const [watchProgress, setWatchProgress] = useState({
+  const [watchProgress, setWatchProgress] = useState<LessonWatchProgress>({
     watchPercentage: 0,
     canComplete: false,
     currentTimeSeconds: 0,
     maxWatchedSeconds: 0,
+    isCompleted: false,
+    completedAt: null,
   });
+  const currentLessonId = currentLesson?.id;
   
   // Fetch lesson data with sequential status
   const fetchLessonData = useCallback(async (id: number) => {
@@ -328,16 +340,76 @@ export default function LessonPlayerPage() {
     
     router.push(`/lms/lesson/${lesson.id}`, { scroll: false });
   };
-  
+
+  const applyLessonCompletion = useCallback((lessonIdToComplete: number, completedAt?: string | null) => {
+    const completedAtValue = completedAt || new Date().toISOString();
+
+    setCurrentLesson(prev => {
+      if (prev?.id !== lessonIdToComplete) {
+        return prev;
+      }
+
+      if (prev.is_completed && prev.completed_at === completedAtValue) {
+        return prev;
+      }
+
+      return { ...prev, is_completed: true, completed_at: completedAtValue };
+    });
+
+    setCategoryLessons(prev => {
+      const completedIndex = prev.findIndex(l => l.id === lessonIdToComplete);
+      let changed = false;
+
+      const nextLessons = prev.map((lesson, index) => {
+        if (lesson.id === lessonIdToComplete) {
+          if (lesson.is_completed && lesson.completed_at === completedAtValue) {
+            return lesson;
+          }
+
+          changed = true;
+          return { ...lesson, is_completed: true, completed_at: completedAtValue };
+        }
+
+        if (completedIndex >= 0 && index === completedIndex + 1) {
+          if (lesson.is_unlocked) {
+            return lesson;
+          }
+
+          changed = true;
+          return { ...lesson, is_unlocked: true };
+        }
+
+        return lesson;
+      });
+
+      return changed ? nextLessons : prev;
+    });
+
+    setCompletionError(null);
+  }, []);
+
+  const handleProgressChange = useCallback((progress: LessonWatchProgress) => {
+    setWatchProgress(progress);
+
+    if (currentLessonId && progress.isCompleted) {
+      applyLessonCompletion(currentLessonId, progress.completedAt);
+    }
+  }, [applyLessonCompletion, currentLessonId]);
+
   // Mark lesson as complete
-  const handleMarkComplete = async () => {
+  const handleMarkComplete = async (progressOverride?: LessonWatchProgress): Promise<boolean> => {
+    const progress = progressOverride ?? watchProgress;
+
     if (
       !currentLesson ||
       markingComplete ||
-      currentLesson.is_completed ||
-      !watchProgress.canComplete
+      !progress.canComplete
     ) {
-      return;
+      return currentLesson?.is_completed ?? false;
+    }
+
+    if (currentLesson.is_completed) {
+      return true;
     }
     
     try {
@@ -349,33 +421,23 @@ export default function LessonPlayerPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           lesson_id: currentLesson.id,
-          time_spent_seconds: Math.floor(watchProgress.maxWatchedSeconds),
+          time_spent_seconds: Math.floor(progress.maxWatchedSeconds),
         }),
       });
-      
+
+      const data = await response.json().catch(() => null);
+
       if (response.ok) {
-        // Update local state
-        const updatedLesson = { ...currentLesson, is_completed: true, completed_at: new Date().toISOString() };
-        setCurrentLesson(updatedLesson);
-        
-        // Update in category list
-        setCategoryLessons(prev => prev.map(l => 
-          l.id === currentLesson.id ? { ...l, is_completed: true, completed_at: new Date().toISOString() } : l
-        ));
-        
-        // Unlock next lesson if exists
-        const currentIndex = categoryLessons.findIndex(l => l.id === currentLesson.id);
-        if (currentIndex < categoryLessons.length - 1) {
-          setCategoryLessons(prev => prev.map((l, idx) => 
-            idx === currentIndex + 1 ? { ...l, is_unlocked: true } : l
-          ));
-        }
+        applyLessonCompletion(currentLesson.id, data?.data?.completed_at ?? progress.completedAt);
+        return true;
       } else {
-        const data = await response.json().catch(() => null);
         setCompletionError(data?.error || "Please watch at least 95% before marking complete.");
+        return false;
       }
     } catch (err) {
       console.error("Failed to mark complete:", err);
+      setCompletionError("Unable to mark this lesson complete. Please try again.");
+      return false;
     } finally {
       setMarkingComplete(false);
     }
@@ -487,7 +549,9 @@ export default function LessonPlayerPage() {
               {/* Mark Complete Button */}
               <GlassButton
                 variant={currentLesson.is_completed ? "secondary" : "primary"}
-                onClick={handleMarkComplete}
+                onClick={() => {
+                  void handleMarkComplete();
+                }}
                 disabled={
                   currentLesson.is_completed ||
                   markingComplete ||
@@ -540,7 +604,7 @@ export default function LessonPlayerPage() {
               isCompleted={currentLesson.is_completed}
               onComplete={handleMarkComplete}
               onBack={() => router.push("/lms")}
-              onProgressChange={setWatchProgress}
+              onProgressChange={handleProgressChange}
             />
             
             {/* Video Info */}
@@ -553,10 +617,10 @@ export default function LessonPlayerPage() {
                   <div className="flex items-center gap-4 text-sm text-gray-500 dark:text-gray-400">
                     <span className="flex items-center gap-1">
                       <Clock className="w-4 h-4" />
-                      {currentLesson.duration_minutes || 0} minutes
+                      {`${currentLesson.duration_minutes || 0} minutes`}
                     </span>
                     <span>•</span>
-                    <span>Lesson {currentIndex + 1} of {categoryLessons.length}</span>
+                    <span>{`Lesson ${currentIndex + 1} of ${categoryLessons.length}`}</span>
                     {!currentLesson.is_unlocked && (
                       <span className="text-amber-600 dark:text-amber-400 flex items-center gap-1">
                         <Lock className="w-3 h-3" />

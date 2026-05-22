@@ -10,6 +10,7 @@ import { getVehicleFullImageUrl, getVehicleThumbnailUrl } from "@/lib/vehicle-he
 import { GlassToast, useToast } from "@/components/ui/glass/GlassToast";
 import { VehicleHeader } from "@/app/components/vehicles/VehicleHeader";
 import { VehicleStatsCard } from "@/app/components/vehicles/VehicleStatsCard";
+import { TukTukIcon } from "@/components/icons/TukTukIcon";
 
 interface CleanedVehicleDetail {
   id: number;
@@ -118,9 +119,7 @@ export default function VehicleDetailView() {
   // TukTuk special icon
   const isTukTuk = vehicle.category.toLowerCase().includes("tuk");
   const categoryIcon = isTukTuk ? (
-    <svg className="w-12 h-12" fill="currentColor" viewBox="0 0 24 24">
-      <path d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
-    </svg>
+    <TukTukIcon className="w-12 h-12" strokeWidth={1.5} />
   ) : (
     <svg className="w-12 h-12" stroke="currentColor" fill="none" viewBox="0 0 24 24">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />

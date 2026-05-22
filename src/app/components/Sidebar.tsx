@@ -7,7 +7,8 @@ import { useLanguage } from "@/lib/LanguageContext";
 import { useTranslation } from "@/lib/i18n";
 import { OptimizedLink } from "./OptimizedLink";
 import { useVehicleStats } from "@/lib/useVehiclesNeon";
-import { Car, Bike, Boxes } from "lucide-react";
+import { TukTukIcon } from "@/components/icons/TukTukIcon";
+import { Bike, Boxes, Car, Package } from "lucide-react";
 import { startTransition, useCallback, useEffect, useMemo, useState } from "react";
 
 function normalizeCategory(value: unknown) {
@@ -58,20 +59,12 @@ function IconMotorcycle({ className }: { className?: string }) {
   return <Bike className={className || "w-5 h-5"} />;
 }
 
-function IconTukTuk() {
-  return (
-    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M4 16v-3a2 2 0 0 1 2-2h8l3 3v3" />
-      <path d="M14 13V9a2 2 0 0 1 2-2h2" />
-      <circle cx="7" cy="17" r="2" />
-      <circle cx="17" cy="17" r="2" />
-    </svg>
-  );
+function IconTukTuk({ className }: { className?: string }) {
+  return <TukTukIcon className={className || "w-5 h-5"} />;
 }
 
 function IconFleet({ className }: { className?: string }) {
-  // Reuses IconCar to avoid duplication - both use the same Car icon
-  return IconCar({ className });
+  return <Package className={className || "w-5 h-5"} />;
 }
 
 function IconSettings() {
@@ -267,6 +260,7 @@ export default function Sidebar({
 
   const { language } = useLanguage();
   const { t } = useTranslation(language);
+  const systemsLabel = language === "km" ? "ប្រព័ន្ធ" : "Systems";
   const [pendingHref, setPendingHref] = useState<string | null>(null);
 
   const isAdmin = user.role === "Admin";
@@ -369,7 +363,7 @@ export default function Sidebar({
       {/* Header */}
       <div className="p-6 pb-4">
         <div className="flex items-center gap-4">
-          <div className="w-14 h-14 flex items-center justify-center rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm bg-white dark:bg-slate-800">
+          <div className="w-14 h-14 flex items-center justify-center rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm bg-white dark:bg-white">
             <Image
               src="/logo.png"
               alt="Emerald Cash"
@@ -381,7 +375,7 @@ export default function Sidebar({
           </div>
           <div>
             <h1 className="text-lg font-bold text-slate-800 dark:text-slate-100">Emerald Cash</h1>
-            <span className="text-xs bg-emerald-500 text-white px-2 py-0.5 rounded-full">VMS PRO</span>
+            <span className="text-xs bg-emerald-500 text-white px-2 py-0.5 rounded-full">{systemsLabel}</span>
           </div>
         </div>
       </div>
