@@ -384,6 +384,7 @@ export default function TransferPage() {
           {!canChooseSender ? (
             <input
               type="text"
+              title="Sender"
               value={user.full_name ? `${user.full_name} (@${user.username})` : `@${user.username}`}
               className={smsInputClass}
               disabled
@@ -415,6 +416,7 @@ export default function TransferPage() {
           ) : (
             <input
               type="text"
+              title="Sender"
               value={form.senderId}
               onChange={(e) => handleChange("senderId", e.target.value)}
               className={`${smsInputClass} ${
@@ -466,6 +468,7 @@ export default function TransferPage() {
           ) : (
             <input
               type="text"
+              title="Receiver"
               value={form.receiverId}
               onChange={(e) => handleChange("receiverId", e.target.value)}
               className={`${smsInputClass} ${
@@ -492,6 +495,7 @@ export default function TransferPage() {
           </label>
           <input
             type="text"
+            title="Location"
             value={form.location}
             onChange={(e) => handleChange("location", e.target.value)}
             className={`${smsInputClass} ${
@@ -517,6 +521,7 @@ export default function TransferPage() {
             Message to receiver (Optional)
           </label>
           <textarea
+            title="Message to receiver"
             value={form.remark}
             onChange={(e) => handleChange("remark", e.target.value)}
             className={`${smsTextareaClass} h-24 resize-none ${
@@ -571,6 +576,7 @@ export default function TransferPage() {
                 <span>JPG, PNG, WebP, or GIF</span>
                 <input
                   type="file"
+                  title="Upload transfer photo"
                   accept="image/jpeg,image/png,image/webp,image/gif"
                   className="sr-only"
                   disabled={loading}

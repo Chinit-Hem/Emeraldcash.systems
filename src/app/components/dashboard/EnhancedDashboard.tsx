@@ -603,7 +603,7 @@ export default function EnhancedDashboard({
         </div>
       </header>
 
-      <main className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="space-y-8 animate-fade-in">
           {/* Quick Filters - Beautiful Vehicle Category Cards */}
           <div className="space-y-6">
@@ -994,7 +994,7 @@ href="/vehicles?withoutImage=true"
             ))}
           </div>
         </div>
-      </main>
+      </div>
     </div>
   );
 }

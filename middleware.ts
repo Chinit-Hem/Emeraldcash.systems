@@ -16,6 +16,7 @@ const PUBLIC_API_ROUTES = new Set([
   "/api/auth/me",
   "/api/auth/debug",
   "/api/health",
+  "/api/ping",
 ]);
 
 const IS_PRODUCTION = process.env.NODE_ENV === "production";

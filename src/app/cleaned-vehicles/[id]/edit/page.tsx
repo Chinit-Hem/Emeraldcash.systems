@@ -5,7 +5,7 @@ import ImageModal from "@/app/components/ImageModal";
 import Sidebar from "@/components/Sidebar";
 import TopBar from "@/components/TopBar";
 import { useRouter, useParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { getVehicleFullImageUrl, getVehicleThumbnailUrl, formatPrice } from "@/lib/vehicle-helpers";
 import { GlassToast, useToast } from "@/components/ui/glass/GlassToast";
 
@@ -42,7 +42,7 @@ export default function VehicleDetailEdit() {
   const [error, setError] = useState("");
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
 
-  const fetchVehicle = async () => {
+  const fetchVehicle = useCallback(async () => {
     setLoading(true);
     setError("");
     try {
@@ -61,7 +61,7 @@ export default function VehicleDetailEdit() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [id]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -102,7 +102,7 @@ export default function VehicleDetailEdit() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+      <div className="min-h-dvh flex items-center justify-center bg-slate-50">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-600 mx-auto mb-4"></div>
           <p>Loading...</p>
@@ -113,13 +113,13 @@ export default function VehicleDetailEdit() {
 
   if (error || !vehicle || !formData) {
     return (
-      <div className="min-h-screen bg-slate-50">
+      <div className="min-h-dvh overflow-x-hidden bg-slate-50">
         <TopBar user={user} />
         <Sidebar user={user} />
-        <main className="lg:pl-64 pt-16 p-8">
-          <div className="max-w-2xl mx-auto bg-white rounded-2xl shadow-lg p-8 text-center">
-            <h1 className="text-2xl font-bold text-slate-800 mb-4">{error || "Vehicle not found"}</h1>
-            <button onClick={() => router.back()} className="px-6 py-2 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700">
+        <main className="px-4 py-8 pt-20 lg:pl-64">
+          <div className="mx-auto max-w-2xl rounded-2xl bg-white p-4 text-center shadow-lg sm:p-8">
+            <h1 className="mb-4 break-words text-xl font-bold text-slate-800 sm:text-2xl">{error || "Vehicle not found"}</h1>
+            <button onClick={() => router.back()} className="min-h-11 rounded-xl bg-emerald-600 px-6 py-2 text-white hover:bg-emerald-700">
               Go Back
             </button>
           </div>
@@ -135,36 +135,36 @@ export default function VehicleDetailEdit() {
   const categories = ['Cars', 'Motorcycles', 'TukTuks', 'Trucks', 'Vans', 'Buses', 'Other'];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
+    <div className="min-h-dvh overflow-x-hidden bg-gradient-to-br from-slate-50 to-slate-100">
       <TopBar user={user} />
       <Sidebar user={user} />
       <GlassToast toasts={toasts} onRemove={removeToast} />
 
-      <main className="lg:pl-64 pt-16 pb-8">
-        <div className="p-6 lg:p-8 max-w-4xl mx-auto">
-          <div className="mb-8">
+      <main className="pt-16 pb-[max(2rem,env(safe-area-inset-bottom))] lg:pl-64">
+        <div className="mx-auto max-w-4xl px-3 py-6 sm:px-6 lg:p-8">
+          <div className="mb-6 sm:mb-8">
             <button
               onClick={() => router.back()}
-              className="inline-flex items-center gap-2 text-slate-600 hover:text-slate-900 font-medium mb-4"
+              className="mb-4 inline-flex min-h-11 items-center gap-2 rounded-xl pr-3 font-medium text-slate-600 hover:text-slate-900"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
               </svg>
               Back to list
             </button>
-            <h1 className="text-3xl font-bold text-slate-800">Edit Vehicle #{vehicle.id}</h1>
+            <h1 className="break-words text-2xl font-bold text-slate-800 sm:text-3xl">Edit Vehicle #{vehicle.id}</h1>
           </div>
 
-          <form onSubmit={handleSubmit} className="bg-white rounded-2xl shadow-xl p-8">
-            <div className="grid lg:grid-cols-2 gap-8">
+          <form onSubmit={handleSubmit} className="rounded-2xl bg-white p-4 shadow-xl sm:p-6 lg:p-8">
+            <div className="grid gap-6 lg:grid-cols-2 lg:gap-8">
               {/* Image Preview */}
-              <div>
+              <div className="min-w-0">
                 <label className="block text-sm font-semibold text-slate-700 mb-4">Vehicle Image</label>
                 {vehicle.image_id ? (
                   <button
                     type="button"
                     onClick={() => setSelectedImage(getVehicleFullImageUrl(vehicle.image_id))}
-                    className="block w-full max-w-sm aspect-[4/3] rounded-xl overflow-hidden shadow-lg hover:shadow-xl transition-all"
+                    className="block aspect-[4/3] w-full max-w-sm overflow-hidden rounded-xl shadow-lg transition-all hover:shadow-xl"
                   >
                     <img
                       src={getVehicleThumbnailUrl(vehicle.image_id) || "/placeholder-car.svg"}
@@ -173,65 +173,67 @@ export default function VehicleDetailEdit() {
                     />
                   </button>
                 ) : (
-                  <div className="w-full max-w-sm aspect-[4/3] bg-slate-100 rounded-xl flex items-center justify-center text-slate-400 border-2 border-dashed border-slate-300">
+                  <div className="flex aspect-[4/3] w-full max-w-sm items-center justify-center rounded-xl border-2 border-dashed border-slate-300 bg-slate-100 text-slate-400">
                     No Image
                   </div>
                 )}
               </div>
 
               {/* Quick Stats (readonly during edit) */}
-              <div className="space-y-4">
+              <div className="min-w-0 space-y-4">
                 <div>
-                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1">Market Price</label>
+                  <label className="mb-1 block text-sm font-semibold uppercase tracking-wide text-slate-500">Market Price</label>
                   <input
                     name="market_price"
                     type="number"
                     value={formData.market_price || ''}
                     onChange={handleInputChange}
-                    className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all text-lg font-bold"
+                    className="min-h-11 w-full rounded-xl border border-slate-200 px-4 py-3 text-base font-bold transition-all focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500 sm:text-lg"
                     placeholder="Enter market price"
                   />
                 </div>
-                <div className="grid grid-cols-2 gap-3 text-center p-4 bg-slate-50 rounded-xl">
-                  <div>
-                    <label className="text-xs text-slate-500 block mb-1">DOC 40%</label>
-                    <p className="text-xl font-bold text-slate-800">{formatPrice(price40)}</p>
+                <div className="grid grid-cols-1 gap-3 rounded-xl bg-slate-50 p-4 text-center sm:grid-cols-2">
+                  <div className="min-w-0">
+                    <label className="mb-1 block text-sm text-slate-500">DOC 40%</label>
+                    <p className="break-words text-lg font-bold text-slate-800 sm:text-xl">{formatPrice(price40)}</p>
                   </div>
-                  <div>
-                    <label className="text-xs text-slate-500 block mb-1">DOC 70%</label>
-                    <p className="text-xl font-bold text-slate-800">{formatPrice(price70)}</p>
+                  <div className="min-w-0">
+                    <label className="mb-1 block text-sm text-slate-500">DOC 70%</label>
+                    <p className="break-words text-lg font-bold text-slate-800 sm:text-xl">{formatPrice(price70)}</p>
                   </div>
                 </div>
               </div>
             </div>
 
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 mt-10">
+            <div className="mt-8 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:mt-10 lg:grid-cols-3 lg:gap-6">
               <div className="space-y-2">
-                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500">Brand</label>
+                <label className="block text-sm font-semibold uppercase tracking-wide text-slate-500">Brand</label>
                 <input
                   name="brand"
                   type="text"
                   value={formData.brand || ''}
                   onChange={handleInputChange}
-                  className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all"
+                  title="Enter vehicle brand"
+                  className="min-h-11 w-full rounded-xl border border-slate-200 px-4 py-3 text-base transition-all focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500 sm:text-sm"
                   required
                 />
               </div>
 
               <div className="space-y-2">
-                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500">Model</label>
+                <label className="block text-sm font-semibold uppercase tracking-wide text-slate-500">Model</label>
                 <input
                   name="model"
                   type="text"
                   value={formData.model || ''}
                   onChange={handleInputChange}
-                  className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all"
+                  title="Enter vehicle model"
+                  className="min-h-11 w-full rounded-xl border border-slate-200 px-4 py-3 text-base transition-all focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500 sm:text-sm"
                   required
                 />
               </div>
 
               <div className="space-y-2">
-                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500">Year</label>
+                <label className="block text-sm font-semibold uppercase tracking-wide text-slate-500">Year</label>
                 <input
                   name="year"
                   type="number"
@@ -239,49 +241,52 @@ export default function VehicleDetailEdit() {
                   max={new Date().getFullYear() + 1}
                   value={formData.year || ''}
                   onChange={handleInputChange}
-                  className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all"
+                  title="Enter vehicle year"
+                  className="min-h-11 w-full rounded-xl border border-slate-200 px-4 py-3 text-base transition-all focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500 sm:text-sm"
                   required
                 />
               </div>
 
               <div className="space-y-2">
-                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500">Plate</label>
+                <label className="block text-sm font-semibold uppercase tracking-wide text-slate-500">Plate</label>
                 <input
                   name="plate"
                   type="text"
                   value={formData.plate || ''}
                   onChange={handleInputChange}
-                  className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all font-mono uppercase"
+                  title="Enter vehicle plate"
+                  className="min-h-11 w-full rounded-xl border border-slate-200 px-4 py-3 font-mono text-base uppercase transition-all focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500 sm:text-sm"
                   required
                 />
               </div>
 
               <div className="space-y-2">
-                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500">Category</label>
+                <label className="block text-sm font-semibold uppercase tracking-wide text-slate-500">Category</label>
                 <select
                   name="category"
                   value={formData.category || ''}
                   onChange={handleInputChange}
-                  className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all"
+                  title="Select vehicle category"
+                  className="min-h-11 w-full rounded-xl border border-slate-200 px-4 py-3 text-base transition-all focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500 sm:text-sm"
                   required
                 >
                   <option value="">Select category</option>
-                  <option value="Cars">Cars</option>
-                  <option value="Motorcycles">Motorcycles</option>
-                  <option value="TukTuks">TukTuks</option>
-                  <option value="Trucks">Trucks</option>
-                  <option value="Vans">Vans</option>
-                  <option value="Buses">Buses</option>
+                  {categories.map((category) => (
+                    <option key={category} value={category}>
+                      {category}
+                    </option>
+                  ))}
                 </select>
               </div>
 
               <div className="space-y-2">
-                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500">Condition</label>
+                <label className="block text-sm font-semibold uppercase tracking-wide text-slate-500">Condition</label>
                 <select
                   name="condition"
                   value={formData.condition || ''}
                   onChange={handleInputChange}
-                  className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all"
+                  title="Select vehicle condition"
+                  className="min-h-11 w-full rounded-xl border border-slate-200 px-4 py-3 text-base transition-all focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500 sm:text-sm"
                   required
                 >
                   <option value="">Select condition</option>
@@ -290,45 +295,48 @@ export default function VehicleDetailEdit() {
                 </select>
               </div>
 
-              <div className="space-y-2 md:col-span-2 lg:col-span-1">
-                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500">Color</label>
+              <div className="space-y-2 sm:col-span-2 lg:col-span-1">
+                <label className="block text-sm font-semibold uppercase tracking-wide text-slate-500">Color</label>
                 <input
                   name="color"
                   type="text"
                   value={formData.color || ''}
                   onChange={handleInputChange}
-                  className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all capitalize"
+                  title="Enter vehicle color"
+                  className="min-h-11 w-full rounded-xl border border-slate-200 px-4 py-3 text-base capitalize transition-all focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500 sm:text-sm"
                 />
               </div>
 
-              <div className="space-y-2 md:col-span-2 lg:col-span-1">
-                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500">Body Type</label>
+              <div className="space-y-2 sm:col-span-2 lg:col-span-1">
+                <label className="block text-sm font-semibold uppercase tracking-wide text-slate-500">Body Type</label>
                 <input
                   name="body_type"
                   type="text"
                   value={formData.body_type || ''}
                   onChange={handleInputChange}
-                  className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all"
+                  title="Enter vehicle body type"
+                  className="min-h-11 w-full rounded-xl border border-slate-200 px-4 py-3 text-base transition-all focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500 sm:text-sm"
                 />
               </div>
 
-              <div className="space-y-2 md:col-span-2 lg:col-span-1">
-                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500">Tax Type</label>
+              <div className="space-y-2 sm:col-span-2 lg:col-span-1">
+                <label className="block text-sm font-semibold uppercase tracking-wide text-slate-500">Tax Type</label>
                 <input
                   name="tax_type"
                   type="text"
                   value={formData.tax_type || ''}
                   onChange={handleInputChange}
-                  className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all"
+                  title="Enter vehicle tax type"
+                  className="min-h-11 w-full rounded-xl border border-slate-200 px-4 py-3 text-base transition-all focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500 sm:text-sm"
                 />
               </div>
             </div>
 
-            <div className="flex gap-4 mt-12 pt-8 border-t border-slate-200">
+            <div className="mt-8 flex flex-col gap-3 border-t border-slate-200 pt-6 sm:mt-12 sm:flex-row sm:gap-4 sm:pt-8">
               <button
                 type="submit"
                 disabled={saving}
-                className="flex-1 bg-emerald-500 hover:bg-emerald-600 disabled:bg-emerald-400 text-white font-bold py-4 px-8 rounded-2xl text-lg shadow-lg hover:shadow-xl transition-all duration-200 flex items-center justify-center gap-2"
+                className="flex min-h-12 flex-1 items-center justify-center gap-2 rounded-2xl bg-emerald-500 px-6 py-4 text-base font-bold text-white shadow-lg transition-all duration-200 hover:bg-emerald-600 hover:shadow-xl disabled:bg-emerald-400 sm:px-8 sm:text-lg"
               >
                 {saving ? (
                   <>
@@ -343,7 +351,7 @@ export default function VehicleDetailEdit() {
                 type="button"
                 onClick={() => router.push(`/cleaned-vehicles/${id}/view`)}
                 disabled={saving}
-                className="flex-1 bg-slate-100 hover:bg-slate-200 disabled:bg-slate-50 text-slate-700 font-bold py-4 px-8 rounded-2xl text-lg shadow-lg hover:shadow-xl transition-all duration-200"
+                className="min-h-12 flex-1 rounded-2xl bg-slate-100 px-6 py-4 text-base font-bold text-slate-700 shadow-lg transition-all duration-200 hover:bg-slate-200 hover:shadow-xl disabled:bg-slate-50 sm:px-8 sm:text-lg"
               >
                 Cancel
               </button>

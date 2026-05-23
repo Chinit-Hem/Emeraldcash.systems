@@ -1,9 +1,10 @@
 "use client";
 
+import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useLanguage } from "@/lib/LanguageContext";
 import { useTranslation } from "@/lib/i18n";
-import React, { Suspense, useEffect, useState } from "react";
+import React, { Suspense, useCallback, useEffect, useRef, useState } from "react";
 
 // Safe client-side only hook to prevent hydration mismatches
 function useIsMounted() {
@@ -17,10 +18,14 @@ function useIsMounted() {
   return isMounted;
 }
 
-// Warm up database connection on page load
+// Warm up the database connection after the user shows login intent.
 function useConnectionWarmer() {
-  useEffect(() => {
-    // Ping serverless function to warm up connection
+  const hasWarmedRef = useRef(false);
+
+  return useCallback(() => {
+    if (hasWarmedRef.current) return;
+    hasWarmedRef.current = true;
+
     fetch('/api/ping', { 
       cache: 'no-store',
       credentials: 'include',
@@ -34,6 +39,9 @@ function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const isMounted = useIsMounted();
+  const usernameInputId = "login-username";
+  const passwordInputId = "login-password";
+  const rememberInputId = "login-remember";
   
   const { language } = useLanguage();
   const { t } = useTranslation(language);
@@ -45,8 +53,7 @@ function LoginForm() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
-  // Warm up serverless connection on page load
-  useConnectionWarmer();
+  const warmConnection = useConnectionWarmer();
 
   // Load remembered username (client-side only)
   useEffect(() => {
@@ -166,7 +173,7 @@ function LoginForm() {
 
 
   return (
-    <div className="relative flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-50 via-white to-slate-100 p-4 dark:from-slate-950 dark:via-slate-950 dark:to-slate-900">
+    <main className="relative flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-50 via-white to-slate-100 p-4 dark:from-slate-950 dark:via-slate-950 dark:to-slate-900">
       <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(135deg,rgba(16,185,129,0.08),transparent_36%,rgba(37,99,235,0.06))] dark:bg-[linear-gradient(135deg,rgba(16,185,129,0.12),transparent_42%,rgba(59,130,246,0.08))]" />
       <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-emerald-300/60 to-transparent dark:via-emerald-500/40" />
       
@@ -181,10 +188,13 @@ function LoginForm() {
             {/* Logo */}
             <div className="absolute -bottom-8 left-1/2 -translate-x-1/2">
               <div className="w-16 h-16 rounded-2xl bg-white shadow-lg shadow-emerald-500/25 flex items-center justify-center p-2 ring-4 ring-white/60 dark:bg-white dark:ring-slate-800/80">
-                { }
-                <img
+                <Image
                   src="/logo.png"
                   alt="Emerald Cash"
+                  width={64}
+                  height={64}
+                  priority
+                  sizes="64px"
                   className="w-full h-full object-contain"
                 />
               </div>
@@ -205,13 +215,15 @@ function LoginForm() {
             <form onSubmit={handleLogin} className="space-y-4">
               {/* Username */}
               <div>
-                <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
+                <label htmlFor={usernameInputId} className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
                   {t.usernameLabel}
                 </label>
                 <input
+                  id={usernameInputId}
                   type="text"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
+                  onFocus={warmConnection}
                   placeholder={t.enterUsername}
                   autoComplete="username"
                   required
@@ -222,14 +234,16 @@ function LoginForm() {
 
               {/* Password */}
               <div>
-                <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
+                <label htmlFor={passwordInputId} className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
                   {t.passwordLabel}
                 </label>
                 <div className="relative">
                   <input
+                    id={passwordInputId}
                     type={showPassword ? "text" : "password"}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
+                    onFocus={warmConnection}
                     placeholder={t.enterPassword}
                     autoComplete="current-password"
                     required
@@ -240,8 +254,9 @@ function LoginForm() {
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
                     className="absolute right-3 top-1/2 -translate-y-1/2 rounded-lg p-2 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700 dark:text-slate-500 dark:hover:bg-slate-700 dark:hover:text-slate-200"
-                    tabIndex={-1}
                     aria-label={showPassword ? "Hide password" : "Show password"}
+                    aria-controls={passwordInputId}
+                    aria-pressed={showPassword}
                   >
                     {showPassword ? (
                       <svg
@@ -281,8 +296,9 @@ function LoginForm() {
               </div>
 
               {/* t.rememberMe */}
-              <label className="flex items-center gap-2 cursor-pointer">
+              <label htmlFor={rememberInputId} className="flex items-center gap-2 cursor-pointer">
                 <input
+                  id={rememberInputId}
                   type="checkbox"
                   checked={rememberMe}
                   onChange={(e) => setRememberMe(e.target.checked)}
@@ -294,14 +310,14 @@ function LoginForm() {
 
               {/* Success message */}
               {success && (
-                <div className="rounded-xl border border-emerald-200/70 bg-emerald-50/90 p-3 text-center text-sm text-emerald-700 backdrop-blur-sm dark:border-emerald-800/70 dark:bg-emerald-900/25 dark:text-emerald-300">
+                <div role="status" aria-live="polite" className="rounded-xl border border-emerald-200/70 bg-emerald-50/90 p-3 text-center text-sm text-emerald-700 backdrop-blur-sm dark:border-emerald-800/70 dark:bg-emerald-900/25 dark:text-emerald-300">
                   {success}
                 </div>
               )}
 
               {/* Error message */}
               {error && (
-                <div className="rounded-xl border border-red-200/70 bg-red-50/90 p-3 text-center text-sm text-red-700 backdrop-blur-sm dark:border-red-800/70 dark:bg-red-900/25 dark:text-red-300">
+                <div role="alert" className="rounded-xl border border-red-200/70 bg-red-50/90 p-3 text-center text-sm text-red-700 backdrop-blur-sm dark:border-red-800/70 dark:bg-red-900/25 dark:text-red-300">
                   {error}
                 </div>
               )}
@@ -317,6 +333,7 @@ function LoginForm() {
                       {debugInfo}
                     </pre>
                     <button
+                      type="button"
                       onClick={() => {
                         if (navigator.clipboard?.writeText) {
                           navigator.clipboard.writeText(debugInfo);
@@ -344,25 +361,17 @@ function LoginForm() {
             </form>
 
             {/* Footer */}
-            <div className="mt-6 flex items-center justify-center border-t border-slate-100 pt-4 dark:border-slate-800">
+            <footer className="mt-6 flex items-center justify-center border-t border-slate-100 pt-4 dark:border-slate-800">
               <p className="text-xs text-slate-400 dark:text-slate-500">© 2024 Emerald Cash</p>
-            </div>
+            </footer>
           </div>
         </div>
       </div>
-    </div>
+    </main>
   );
 }
 
 export default function LoginPage() {
-  // Warm up connection in parallel while Suspense resolves
-  useEffect(() => {
-    fetch('/api/ping', { 
-      cache: 'no-store',
-      credentials: 'include',
-    }).catch(() => {});
-  }, []);
-
   return (
     <Suspense fallback={
       <div className="min-h-screen flex items-center justify-center p-4 bg-slate-50 dark:bg-slate-950">

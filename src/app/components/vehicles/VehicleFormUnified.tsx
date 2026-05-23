@@ -22,6 +22,7 @@ import { ImageInput } from "@/components/ui/ImageInput";
 import { SectionCard } from "@/components/ui/SectionCard";
 import { formatFileSize as formatImageSize } from "@/lib/compressImage";
 import { formatCurrency } from "@/lib/format";
+import { useLanguage } from "@/lib/LanguageContext";
 import {
   COLOR_OPTIONS,
   PLATE_NUMBER_HINTS,
@@ -29,6 +30,7 @@ import {
   TAX_TYPE_METADATA,
   type Vehicle,
 } from "@/lib/types";
+import { translateVehicleColor } from "@/lib/vehicleColors";
 import { userStaffService, type UnifiedUser } from "@/services/UserStaffService";
 import { useVehicleFormUnified as useVehicleForm, type UseVehicleFormOptions } from "@/lib/useVehicleFormUnified";
 import React, { useEffect, useMemo, useState } from "react";
@@ -328,6 +330,7 @@ const SpecsSection: React.FC<{
   onChange,
   layout
 }) => {
+  const { language } = useLanguage();
   const isCompact = layout === "compact";
   const gridCols = isCompact ? "grid-cols-1" : "grid-cols-1 md:grid-cols-2";
 
@@ -344,7 +347,7 @@ const SpecsSection: React.FC<{
         />
         <datalist id="colorsList">
           {COLOR_OPTIONS.map((color) => (
-            <option key={color.value} value={color.value} />
+            <option key={color.value} value={color.value} label={translateVehicleColor(color.value, language)} />
           ))}
         </datalist>
         <GlassField

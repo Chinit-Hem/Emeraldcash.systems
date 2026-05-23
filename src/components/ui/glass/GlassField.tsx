@@ -18,10 +18,15 @@ export const GlassField = forwardRef<HTMLInputElement | HTMLSelectElement | HTML
     const errorId = error ? `${fieldId}-error` : undefined;
     const helperId = helperText ? `${fieldId}-helper` : undefined;
 
-    const inputStyles = cn(ui.input.base, error && ui.input.error, className);
+    const inputStyles = cn(
+      ui.input.base,
+      "min-h-11 min-w-0 text-base sm:text-sm",
+      error && ui.input.error,
+      className
+    );
 
     return (
-      <div className="w-full">
+      <div className="w-full min-w-0">
         <label
           htmlFor={fieldId}
           className={cn(ui.text.label, "mb-1.5 block")}
@@ -45,7 +50,7 @@ export const GlassField = forwardRef<HTMLInputElement | HTMLSelectElement | HTML
           <textarea
             ref={ref as React.Ref<HTMLTextAreaElement>}
             id={fieldId}
-            className={`${inputStyles} h-auto min-h-[88px] py-3 resize-y`}
+            className={`${inputStyles} h-auto min-h-24 py-3 resize-y`}
             aria-invalid={!!error}
             aria-describedby={errorId || helperId}
             {...(props as unknown as React.TextareaHTMLAttributes<HTMLTextAreaElement>)}
@@ -63,16 +68,16 @@ export const GlassField = forwardRef<HTMLInputElement | HTMLSelectElement | HTML
         )}
 
         {error && (
-          <p id={errorId} className={cn(ui.text.danger, "mt-1.5 flex items-center gap-1")}>
+          <p id={errorId} className={cn(ui.text.danger, "mt-1.5 flex items-start gap-1 text-sm")}>
             <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
-            <span>{error}</span>
+            <span className="min-w-0 break-words">{error}</span>
           </p>
         )}
 
         {helperText && !error && (
-          <p id={helperId} className={cn(ui.text.helper, "mt-1.5")}>
+          <p id={helperId} className={cn(ui.text.helper, "mt-1.5 break-words text-sm")}>
             {helperText}
           </p>
         )}

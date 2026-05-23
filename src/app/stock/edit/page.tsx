@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type FormEvent } from 'react';
+import { useId, useState, type FormEvent } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 
 export default function StockEditPage() {
@@ -22,6 +22,18 @@ const [form, setForm] = useState({
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const locations = ['Warehouse A', 'Showroom', 'Parking Lot'];
+  const formId = useId();
+  const fieldIds = {
+    modelKey: `${formId}-model-key`,
+    location: `${formId}-location`,
+    action: `${formId}-action`,
+    quantityChange: `${formId}-quantity-change`,
+    fromLocation: `${formId}-from-location`,
+    toLocation: `${formId}-to-location`,
+    transferQuantity: `${formId}-transfer-quantity`,
+    minStock: `${formId}-min-stock`,
+    reason: `${formId}-reason`,
+  };
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -83,7 +95,7 @@ const [form, setForm] = useState({
         onClick={() => router.back()}
         className='inline-flex items-center gap-2 text-slate-600 hover:text-slate-900 font-medium mb-6 lg:mb-8'
       >
-        <svg className='w-5 h-5' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
+        <svg className='w-5 h-5' fill='none' stroke='currentColor' viewBox='0 0 24 24' aria-hidden='true'>
           <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M15 19l-7-7 7-7' />
         </svg>
         Back to Stock
@@ -95,19 +107,23 @@ const [form, setForm] = useState({
 
         <form onSubmit={handleSubmit} className='space-y-6'>
           <div className='space-y-2'>
-            <label className='block text-sm font-semibold uppercase tracking-wider text-slate-500'>Model Key</label>
+            <label htmlFor={fieldIds.modelKey} className='block text-sm font-semibold uppercase tracking-wider text-slate-500'>Model Key</label>
             <input
+              id={fieldIds.modelKey}
               value={form.modelKey}
               onChange={(e) => setForm({...form, modelKey: e.target.value})}
               className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all font-mono text-sm uppercase"
+              placeholder='Enter model key'
+              title='Model key identifier'
               required
             />
           </div>
 
 <div className='grid md:grid-cols-2 gap-6'>
             <div className='space-y-2'>
-              <label className='block text-sm font-semibold uppercase tracking-wider text-slate-500'>Location</label>
+              <label htmlFor={fieldIds.location} className='block text-sm font-semibold uppercase tracking-wider text-slate-500'>Location</label>
               <select
+                id={fieldIds.location}
                 value={form.location}
                 onChange={(e) => setForm({...form, location: e.target.value})}
                 className='w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all'
@@ -119,8 +135,9 @@ const [form, setForm] = useState({
             </div>
 
             <div className='space-y-2'>
-              <label className='block text-sm font-semibold uppercase tracking-wider text-slate-500'>Action</label>
+              <label htmlFor={fieldIds.action} className='block text-sm font-semibold uppercase tracking-wider text-slate-500'>Action</label>
               <select
+                id={fieldIds.action}
                 value={form.action}
                 onChange={(e) => setForm({...form, action: e.target.value})}
                 className='w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all'
@@ -135,8 +152,9 @@ const [form, setForm] = useState({
 {/* Show quantity for adjust, return; from/to for transfer */}
           {form.action !== 'transfer' ? (
             <div className='space-y-2'>
-              <label className='block text-sm font-semibold uppercase tracking-wider text-slate-500'>Quantity Change</label>
+              <label htmlFor={fieldIds.quantityChange} className='block text-sm font-semibold uppercase tracking-wider text-slate-500'>Quantity Change</label>
               <input
+                id={fieldIds.quantityChange}
                 type='number'
                 value={form.quantity}
                 onChange={(e) => setForm({...form, quantity: parseInt(e.target.value) || 0})}
@@ -148,8 +166,9 @@ const [form, setForm] = useState({
           ) : (
             <div className='grid grid-cols-2 gap-4'>
               <div className='space-y-2'>
-                <label className='block text-sm font-semibold uppercase tracking-wider text-slate-500'>From</label>
+                <label htmlFor={fieldIds.fromLocation} className='block text-sm font-semibold uppercase tracking-wider text-slate-500'>From</label>
                 <select
+                  id={fieldIds.fromLocation}
                   value={form.fromLocation}
                   onChange={(e) => setForm({...form, fromLocation: e.target.value})}
                   className='w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all'
@@ -160,8 +179,9 @@ const [form, setForm] = useState({
                 </select>
               </div>
               <div className='space-y-2'>
-                <label className='block text-sm font-semibold uppercase tracking-wider text-slate-500'>To</label>
+                <label htmlFor={fieldIds.toLocation} className='block text-sm font-semibold uppercase tracking-wider text-slate-500'>To</label>
                 <select
+                  id={fieldIds.toLocation}
                   value={form.toLocation}
                   onChange={(e) => setForm({...form, toLocation: e.target.value})}
                   className='w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all'
@@ -172,8 +192,9 @@ const [form, setForm] = useState({
                 </select>
               </div>
               <div className='col-span-2 space-y-2'>
-                <label className='block text-sm font-semibold uppercase tracking-wider text-slate-500'>Quantity</label>
+                <label htmlFor={fieldIds.transferQuantity} className='block text-sm font-semibold uppercase tracking-wider text-slate-500'>Quantity</label>
                 <input
+                  id={fieldIds.transferQuantity}
                   type='number'
                   value={form.quantity}
                   onChange={(e) => setForm({...form, quantity: parseInt(e.target.value) || 0})}
@@ -186,8 +207,9 @@ const [form, setForm] = useState({
           )}
 
           <div className='space-y-2'>
-            <label className='block text-sm font-semibold uppercase tracking-wider text-slate-500'>Minimum Stock Level</label>
+            <label htmlFor={fieldIds.minStock} className='block text-sm font-semibold uppercase tracking-wider text-slate-500'>Minimum Stock Level</label>
             <input
+              id={fieldIds.minStock}
               type='number'
               value={form.minStock}
               onChange={(e) => setForm({...form, minStock: parseInt(e.target.value) || 5})}
@@ -197,8 +219,9 @@ const [form, setForm] = useState({
           </div>
 
           <div className='space-y-2'>
-            <label className='block text-sm font-semibold uppercase tracking-wider text-slate-500'>Reason (Optional)</label>
+            <label htmlFor={fieldIds.reason} className='block text-sm font-semibold uppercase tracking-wider text-slate-500'>Reason (Optional)</label>
             <textarea
+              id={fieldIds.reason}
               value={form.reason}
               onChange={(e) => setForm({...form, reason: e.target.value})}
               className='w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all h-24'
@@ -215,7 +238,7 @@ const [form, setForm] = useState({
             >
               {loading ? (
                 <>
-                  <div className='animate-spin rounded-full h-5 w-5 border-b-2 border-white'></div>
+                  <div className='animate-spin rounded-full h-5 w-5 border-b-2 border-white' aria-hidden='true'></div>
                   Processing...
                 </>
               ) : (
@@ -237,7 +260,7 @@ const [form, setForm] = useState({
           </div>
 
 {success && (
-            <div className='mt-4 p-4 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-800 font-medium text-center animate-in fade-in-50 slide-in-from-top-2'>
+            <div role='status' className='mt-4 p-4 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-800 font-medium text-center animate-in fade-in-50 slide-in-from-top-2'>
               {form.action === 'return' && `Returned ${form.quantity} items successfully! Redirecting...`}
               {form.action === 'transfer' && `Transferred ${form.quantity} items successfully! Redirecting...`}
               {form.action === 'adjust' && `Stock adjusted successfully! Redirecting...`}

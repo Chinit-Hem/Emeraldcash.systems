@@ -91,7 +91,10 @@ export function VirtualTable({
         style={{ height }}
         onScroll={(event) => setScrollTop(event.currentTarget.scrollTop)}
       >
-        <div style={{ height: totalHeight, position: "relative" }}>
+        <div
+          className="relative"
+          style={{ height: totalHeight }}
+        >
           {visibleVehicles.map((vehicle, offset) => {
             const index = startIndex + offset;
             return (

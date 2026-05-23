@@ -279,6 +279,7 @@ const handleSaveAsset = async (data: Omit<SmsAsset, 'id'>): Promise<{ success: b
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
               <input
                 type="text"
+                title="Search assets"
                 placeholder="Search name, code, location..."
                 value={filters.search}
                 onChange={(e) => handleFilterChange('search', e.target.value)}
@@ -304,6 +305,7 @@ const handleSaveAsset = async (data: Omit<SmsAsset, 'id'>): Promise<{ success: b
               </div>
               <input
                 type="text"
+                title="Filter by assignee"
                 placeholder="Assigned to..."
                 value={filters.assignedTo}
                 onChange={(e) => handleFilterChange('assignedTo', e.target.value)}
@@ -326,6 +328,7 @@ const handleSaveAsset = async (data: Omit<SmsAsset, 'id'>): Promise<{ success: b
               <h3 className="text-xl font-bold text-slate-800 mb-2">Error</h3>
               <p className="text-slate-600 mb-6">{error}</p>
               <button
+                type="button"
                 onClick={() => fetchAssets(filters)}
                 className={smsPrimaryButtonClass}
               >
@@ -345,6 +348,7 @@ const handleSaveAsset = async (data: Omit<SmsAsset, 'id'>): Promise<{ success: b
                 }
               </p>
               <button
+                type="button"
                 onClick={() => setCreateModalOpen(true)}
                 className={`${smsPrimaryButtonClass} w-full sm:w-auto`}
               >
@@ -424,6 +428,7 @@ const handleSaveAsset = async (data: Omit<SmsAsset, 'id'>): Promise<{ success: b
                         View
                       </Link>
                       <button
+                        type="button"
                         onClick={() => setEditingAsset(asset)}
                         className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-md bg-emerald-50 px-3 text-sm font-semibold text-emerald-700 transition-colors hover:bg-emerald-100"
                       >
@@ -432,6 +437,7 @@ const handleSaveAsset = async (data: Omit<SmsAsset, 'id'>): Promise<{ success: b
                       </button>
                       {isAdmin && (
                         <button
+                          type="button"
                           onClick={() => handleDelete(asset.id)}
                           className="flex min-h-11 w-11 items-center justify-center rounded-md bg-red-50 text-red-600 transition-colors hover:bg-red-100"
                           aria-label={`Delete ${asset.name}`}
@@ -519,7 +525,9 @@ const handleSaveAsset = async (data: Omit<SmsAsset, 'id'>): Promise<{ success: b
                               <span className="sr-only">View</span>
                             </Link>
                             <button
+                              type="button"
                               onClick={() => setEditingAsset(asset)}
+                              aria-label={`Edit ${asset.name}`}
                               className="p-2 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-100 rounded-md transition-colors"
                               title="Edit"
                             >
@@ -527,7 +535,9 @@ const handleSaveAsset = async (data: Omit<SmsAsset, 'id'>): Promise<{ success: b
                             </button>
                             {isAdmin && (
                               <button
+                                type="button"
                                 onClick={() => handleDelete(asset.id)}
+                                aria-label={`Delete ${asset.name}`}
                                 className="p-2 text-red-600 hover:text-red-700 hover:bg-red-100 rounded-md transition-colors"
                                 title="Delete"
                               >

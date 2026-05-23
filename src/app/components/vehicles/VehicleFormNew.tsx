@@ -8,6 +8,7 @@ import { useTranslation } from "@/lib/i18n";
 import { useLanguage } from "@/lib/LanguageContext";
 import { derivePrices } from "@/lib/pricing";
 import type { Vehicle } from "@/lib/types";
+import { translateVehicleColor } from "@/lib/vehicleColors";
 import {
   COLOR_OPTIONS,
   PLATE_NUMBER_HINTS,
@@ -702,7 +703,7 @@ label: isKm ? (cat === "Cars" ? "រថយន្ត" : cat === "Motorcycles" ? "
             />
             <datalist id="colorsList">
               {COLOR_OPTIONS.map((color) => (
-                <option key={color.value} value={color.value} />
+                <option key={color.value} value={color.value} label={translateVehicleColor(color.value, language)} />
               ))}
             </datalist>
           </div>

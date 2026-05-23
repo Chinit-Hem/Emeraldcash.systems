@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useId, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useAuthUser } from "@/app/components/AuthContext";
 import { formatVehicleId, formatVehicleTime, formatCurrency } from "@/lib/format";
@@ -46,59 +46,112 @@ const getImageUrl = (imageUrl: unknown): string | null => {
 // Category options
 type CategoryOption = "Cars" | "Motorcycles" | "Tuk Tuk";
 
-const CATEGORY_OPTIONS: { value: CategoryOption; label: string; icon: React.ReactNode; color: string }[] = [
+const CATEGORY_OPTIONS: { value: CategoryOption; label: string; icon: React.ReactNode; color: string; bgClass?: string }[] = [
   {
     value: "Cars",
     label: "Cars",
     icon: <Car className="w-6 h-6" />,
     color: "#3b82f6",
+    bgClass: "bg-[#3b82f6]/15 text-[#3b82f6]",
   },
   {
     value: "Motorcycles",
     label: "Motorcycles",
     icon: <Bike className="w-6 h-6" />,
     color: "#8b5cf6",
+    bgClass: "bg-[#8b5cf6]/15 text-[#8b5cf6]",
   },
   {
     value: "Tuk Tuk",
     label: "TukTuks",
     icon: <TukTukIcon className="w-6 h-6" />,
     color: "#f97316",
+    bgClass: "bg-[#f97316]/15 text-[#f97316]",
   },
 ];
 
-// Color mapping
-const getColorHex = (colorName: string): string => {
-  const colorMap: Record<string, string> = {
-    "red": "#ef4444", "blue": "#3b82f6", "green": "#10b981", "yellow": "#f59e0b",
-    "orange": "#f97316", "purple": "#8b5cf6", "pink": "#ec4899", "black": "#1a1a2e",
-    "white": "#f8fafc", "gray": "#6b7280", "grey": "#6b7280", "silver": "#9ca3af",
-    "gold": "#fbbf24", "brown": "#92400e", "beige": "#d4c5b0", "navy": "#1e3a8a",
-    "teal": "#14b8a6", "cyan": "#06b6d4", "lime": "#84cc16", "maroon": "#991b1b",
-    "olive": "#65a30d", "coral": "#f87171", "ivory": "#fffff0", "khaki": "#c3b091",
-    "lavender": "#c4b5fd", "magenta": "#d946ef", "mint": "#6ee7b7", "peach": "#fdba74",
-    "plum": "#a855f7", "tan": "#d2b48c", "turquoise": "#40e0d0", "violet": "#8b5cf6",
-    "indigo": "#6366f1", "charcoal": "#374151", "cream": "#fffdd0", "burgundy": "#9f1239",
-    "champagne": "#f7e7ce", "bronze": "#cd7f32", "copper": "#b87333", "rose": "#fb7185",
-    "slate": "#475569", "emerald": "#10b981", "ruby": "#e11d48", "sapphire": "#1d4ed8",
-    "amber": "#f59e0b", "jade": "#00a86b", "pearl": "#f0e6d2", "graphite": "#4b5563",
-  };
-  
+const COLOR_SWATCH_CLASSES: Record<string, string> = {
+  red: "bg-red-500",
+  blue: "bg-blue-500",
+  green: "bg-emerald-500",
+  yellow: "bg-yellow-400",
+  orange: "bg-orange-500",
+  purple: "bg-purple-500",
+  pink: "bg-pink-500",
+  black: "bg-slate-950",
+  white: "bg-white",
+  gray: "bg-gray-500",
+  grey: "bg-gray-500",
+  silver: "bg-slate-300",
+  gold: "bg-yellow-500",
+  brown: "bg-amber-900",
+  beige: "bg-stone-300",
+  navy: "bg-blue-950",
+  teal: "bg-teal-500",
+  cyan: "bg-cyan-500",
+  lime: "bg-lime-500",
+  maroon: "bg-red-900",
+  olive: "bg-lime-700",
+  coral: "bg-red-400",
+  ivory: "bg-[#fffff0]",
+  khaki: "bg-stone-400",
+  lavender: "bg-violet-300",
+  magenta: "bg-fuchsia-500",
+  mint: "bg-emerald-300",
+  peach: "bg-orange-300",
+  plum: "bg-purple-700",
+  tan: "bg-amber-300",
+  turquoise: "bg-cyan-300",
+  violet: "bg-violet-500",
+  indigo: "bg-indigo-500",
+  charcoal: "bg-gray-700",
+  cream: "bg-[#fffdd0]",
+  burgundy: "bg-rose-900",
+  champagne: "bg-orange-100",
+  bronze: "bg-orange-700",
+  copper: "bg-orange-800",
+  rose: "bg-rose-400",
+  slate: "bg-slate-600",
+  emerald: "bg-emerald-500",
+  ruby: "bg-rose-600",
+  sapphire: "bg-blue-700",
+  amber: "bg-amber-500",
+  jade: "bg-emerald-600",
+  pearl: "bg-stone-100",
+  graphite: "bg-gray-600",
+};
+
+const LIGHT_COLOR_NAMES = ["white", "ivory", "cream", "pearl", "champagne"];
+
+const getColorSwatchClass = (colorName: string): string => {
   const normalizedColor = colorName.toLowerCase().trim();
-  if (colorMap[normalizedColor]) return colorMap[normalizedColor];
-  
-  for (const [name, hex] of Object.entries(colorMap)) {
+  if (!normalizedColor) return "bg-slate-300";
+  if (COLOR_SWATCH_CLASSES[normalizedColor]) return COLOR_SWATCH_CLASSES[normalizedColor];
+
+  for (const [name, className] of Object.entries(COLOR_SWATCH_CLASSES)) {
     if (normalizedColor.includes(name) || name.includes(normalizedColor)) {
-      return hex;
+      return className;
     }
   }
-  
-  let hash = 0;
-  for (let i = 0; i < colorName.length; i++) {
-    hash = colorName.charCodeAt(i) + ((hash << 5) - hash);
-  }
-  const hue = Math.abs(hash % 360);
-  return `hsl(${hue}, 70%, 50%)`;
+
+  return "bg-slate-400";
+};
+
+function ColorSwatch({ color, className }: { color: string; className?: string }) {
+  const normalizedColor = color.toLowerCase().trim();
+
+  return (
+    <span
+      aria-hidden="true"
+      title={color}
+      className={cn(
+        "inline-block h-5 w-5 shrink-0 rounded-full border border-slate-200 shadow-sm",
+        getColorSwatchClass(color),
+        LIGHT_COLOR_NAMES.some((name) => normalizedColor.includes(name)) && "ring-1 ring-slate-300",
+        className
+      )}
+    />
+  );
 };
 
 // Status Badge Component
@@ -161,6 +214,8 @@ function FloatingLabelInput({
 }) {
   const [isFocused, setIsFocused] = useState(false);
   const hasValue = value !== "" && value !== null && value !== undefined;
+  const id = useId();
+  const errorId = error ? `${id}-error` : undefined;
   
   return (
     <div className="relative">
@@ -178,22 +233,26 @@ function FloatingLabelInput({
           </div>
         )}
         <input
+          id={id}
           type={type}
           value={value}
           onChange={onChange}
           onFocus={() => setIsFocused(true)}
           onBlur={() => setIsFocused(false)}
           disabled={disabled}
-          placeholder=" "
+          placeholder={label}
+          title={label}
           min={min}
           max={max}
+          aria-invalid={!!error}
+          aria-describedby={errorId}
           className={cn(
             "w-full px-3 py-3 bg-transparent text-sm text-slate-800 outline-none rounded-xl",
             Icon && "pl-10",
             "placeholder:text-transparent"
           )}
         />
-        <label className={cn(
+        <label htmlFor={id} className={cn(
           "absolute left-3 transition-all duration-200 pointer-events-none",
           Icon && "left-10",
           (isFocused || hasValue)
@@ -205,7 +264,7 @@ function FloatingLabelInput({
           {required && <span className="text-rose-500 ml-0.5">*</span>}
         </label>
       </div>
-      {error && <p className="text-xs text-rose-500 mt-1.5 flex items-center gap-1"><AlertCircle className="w-3 h-3" />{error}</p>}
+      {error && <p id={errorId} className="text-xs text-rose-500 mt-1.5 flex items-center gap-1"><AlertCircle className="w-3 h-3" aria-hidden="true" />{error}</p>}
     </div>
   );
 }
@@ -244,16 +303,20 @@ function CategorySelector({
   error?: string;
   disabled?: boolean;
 }) {
+  const labelId = useId();
+
   return (
     <div className="space-y-1.5">
-      <label className="block text-sm font-medium text-slate-700">
+      <p id={labelId} className="block text-sm font-medium text-slate-700">
         Category <span className="text-rose-500">*</span>
-      </label>
-      <div className="grid grid-cols-3 gap-3">
+      </p>
+      <div className="grid grid-cols-3 gap-3" role="radiogroup" aria-labelledby={labelId}>
         {CATEGORY_OPTIONS.map((cat) => (
           <button
             key={cat.value}
             type="button"
+            role="radio"
+            aria-checked={value === cat.value}
             onClick={() => !disabled && onChange(cat.value)}
             disabled={disabled}
             className={cn(
@@ -264,16 +327,13 @@ function CategorySelector({
               disabled && "opacity-50 cursor-not-allowed"
             )}
           >
-            <div
-              className="w-12 h-12 rounded-xl flex items-center justify-center"
-              style={{ backgroundColor: `${cat.color}15`, color: cat.color }}
-            >
+            <div className={cn("w-12 h-12 rounded-xl flex items-center justify-center", cat.bgClass)}>
               {cat.icon}
             </div>
             <span className="text-sm font-medium text-slate-700">{cat.label}</span>
             {value === cat.value && (
               <div className="absolute top-2 right-2 w-5 h-5 rounded-full bg-emerald-500 flex items-center justify-center">
-                <CheckCircle2 className="w-3 h-3 text-white" />
+                <CheckCircle2 className="w-3 h-3 text-white" aria-hidden="true" />
               </div>
             )}
           </button>
@@ -287,7 +347,7 @@ function CategorySelector({
 // Loading Skeleton
 function LoadingSkeleton() {
   return (
-    <div className="min-h-screen bg-[#f8fafc] p-4 sm:p-6 lg:p-8">
+    <div className="ec-dark-scope min-h-screen bg-[#f8fafc] p-4 sm:p-6 lg:p-8 dark:bg-slate-950">
       <div className="max-w-7xl mx-auto">
         <div className="h-8 w-48 bg-slate-200 rounded-lg mb-6 animate-pulse" />
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
@@ -340,6 +400,7 @@ function ViewVehicleInner() {
   const [imageValues, setImageValues] = useState<string[]>([]);
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const descriptionInputId = useId();
 
   // Redirect to vehicles list if ID is a reserved word
   useEffect(() => {
@@ -636,7 +697,7 @@ function ViewVehicleInner() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-[#f8fafc] p-4 sm:p-6 lg:p-8">
+      <div className="ec-dark-scope min-h-screen bg-[#f8fafc] p-4 sm:p-6 lg:p-8 dark:bg-slate-950">
         <div className="max-w-3xl mx-auto">
           <div className="bg-white rounded-2xl shadow-lg p-8 text-center">
             <div className="w-20 h-20 mx-auto mb-6 rounded-2xl bg-rose-50 flex items-center justify-center">
@@ -666,7 +727,7 @@ function ViewVehicleInner() {
 
   if (!vehicle) {
     return (
-      <div className="min-h-screen bg-[#f8fafc] p-4 sm:p-6 lg:p-8">
+      <div className="ec-dark-scope min-h-screen bg-[#f8fafc] p-4 sm:p-6 lg:p-8 dark:bg-slate-950">
         <div className="max-w-3xl mx-auto">
           <div className="bg-white rounded-2xl shadow-lg p-8 text-center">
             <div className="w-20 h-20 mx-auto mb-6 rounded-2xl bg-slate-100 flex items-center justify-center">
@@ -695,7 +756,7 @@ function ViewVehicleInner() {
   const isTukTuk = currentVehicle.Category?.toLowerCase().includes("tuk");
 
   return (
-    <div className="min-h-screen bg-[#f8fafc]">
+    <div className="ec-dark-scope min-h-screen bg-[#f8fafc] dark:bg-slate-950">
       {/* Professional Header Action Bar */}
       <div className="sticky top-0 z-40 bg-white/80 backdrop-blur-xl border-b border-slate-200/80 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -704,9 +765,10 @@ function ViewVehicleInner() {
             <div className="flex items-center gap-3">
               <button
                 onClick={() => router.push("/vehicles")}
+                aria-label="Back to vehicle list"
                 className="inline-flex items-center gap-2 px-3 py-2 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-xl transition-all duration-200"
               >
-                <ArrowLeft className="w-4 h-4" />
+                <ArrowLeft className="w-4 h-4" aria-hidden="true" />
                 <span className="text-sm font-medium hidden sm:inline">Back to List</span>
               </button>
               <div className="h-4 w-px bg-slate-300" />
@@ -738,9 +800,10 @@ function ViewVehicleInner() {
                   {canEdit && (
                     <button
                       onClick={() => setIsEditMode(true)}
+                      aria-label="Edit vehicle"
                       className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-500 text-white rounded-xl font-medium hover:bg-emerald-600 transition-all duration-200 shadow-md hover:shadow-lg"
                     >
-                      <Edit3 className="w-4 h-4" />
+                      <Edit3 className="w-4 h-4" aria-hidden="true" />
                       <span className="hidden sm:inline">Edit</span>
                     </button>
                   )}
@@ -748,9 +811,10 @@ function ViewVehicleInner() {
                     <button
                       onClick={() => setIsDeleteModalOpen(true)}
                       disabled={isDeleting}
+                      aria-label="Delete vehicle"
                       className="inline-flex items-center gap-2 px-4 py-2 bg-rose-500 text-white rounded-xl font-medium hover:bg-rose-600 transition-all duration-200 shadow-md hover:shadow-lg disabled:opacity-50"
                     >
-                      <Trash2 className="w-4 h-4" />
+                      <Trash2 className="w-4 h-4" aria-hidden="true" />
                       <span className="hidden sm:inline">Delete</span>
                     </button>
                   )}
@@ -760,20 +824,23 @@ function ViewVehicleInner() {
                   <button
                     onClick={handleCancelEdit}
                     disabled={isSubmitting}
+                    aria-label="Cancel editing"
                     className="inline-flex items-center gap-2 px-4 py-2 bg-slate-100 text-slate-700 rounded-xl font-medium hover:bg-slate-200 transition-all duration-200"
                   >
-                    <X className="w-4 h-4" />
+                    <X className="w-4 h-4" aria-hidden="true" />
                     <span className="hidden sm:inline">Cancel</span>
                   </button>
                   <button
                     onClick={handleSubmit}
                     disabled={isSubmitting}
+                    aria-label={isSubmitting ? "Saving vehicle" : "Save vehicle"}
+                    aria-busy={isSubmitting}
                     className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-500 text-white rounded-xl font-medium hover:bg-emerald-600 transition-all duration-200 shadow-md hover:shadow-lg disabled:opacity-50"
                   >
                     {isSubmitting ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
                     ) : (
-                      <Save className="w-4 h-4" />
+                      <Save className="w-4 h-4" aria-hidden="true" />
                     )}
                     <span className="hidden sm:inline">Save</span>
                   </button>
@@ -894,10 +961,7 @@ function ViewVehicleInner() {
                   <div className="flex justify-between items-center py-2">
                     <span className="text-sm text-slate-500">Color</span>
                     <div className="flex items-center gap-2">
-                      <div 
-                        className="w-4 h-4 rounded-full border border-slate-200"
-                        style={{ backgroundColor: getColorHex(currentVehicle.Color) }}
-                      />
+                      <ColorSwatch color={currentVehicle.Color} />
                       <span className="text-sm text-slate-700">{currentVehicle.Color}</span>
                     </div>
                   </div>
@@ -1041,8 +1105,9 @@ function ViewVehicleInner() {
                 <div className="bg-white rounded-2xl shadow-lg p-6">
                   <FormSection title="Additional Information" icon={FileText}>
                     <div className="space-y-1.5">
-                      <label className="block text-sm font-medium text-slate-700">Description</label>
+                      <label htmlFor={descriptionInputId} className="block text-sm font-medium text-slate-700">Description</label>
                       <textarea
+                        id={descriptionInputId}
                         value={formData.Description || ""}
                         onChange={(e) => handleInputChange("Description", e.target.value)}
                         placeholder="Enter vehicle description..."
@@ -1107,10 +1172,7 @@ function ViewVehicleInner() {
                         <p className="text-xs text-slate-500 uppercase tracking-wider mb-1">Color</p>
                         <div className="flex items-center gap-2">
                           {currentVehicle.Color && (
-                            <div 
-                              className="w-5 h-5 rounded-full border border-slate-200"
-                              style={{ backgroundColor: getColorHex(currentVehicle.Color) }}
-                            />
+                            <ColorSwatch color={currentVehicle.Color} />
                           )}
                           <p className="font-semibold text-slate-800 text-lg">{currentVehicle.Color || "—"}</p>
                         </div>

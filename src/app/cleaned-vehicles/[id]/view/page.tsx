@@ -29,6 +29,37 @@ interface CleanedVehicleDetail {
   updated_at: string;
 }
 
+const CLEANED_COLOR_SWATCH_CLASSES: Record<string, string> = {
+  red: "bg-red-500",
+  blue: "bg-blue-500",
+  green: "bg-emerald-500",
+  yellow: "bg-yellow-400",
+  black: "bg-slate-950",
+  white: "bg-white",
+  silver: "bg-slate-300",
+  gray: "bg-gray-500",
+  grey: "bg-gray-500",
+};
+
+function getColorSwatchClass(colorName: string): string {
+  const normalized = colorName?.toLowerCase().trim() || "";
+  return CLEANED_COLOR_SWATCH_CLASSES[normalized] || "bg-slate-400";
+}
+
+function ColorSwatch({ color }: { color: string }) {
+  const normalized = color.toLowerCase().trim();
+
+  return (
+    <span
+      aria-hidden="true"
+      title={color}
+      className={`inline-block h-6 w-6 rounded-full border-4 border-white shadow-sm ring-2 ring-slate-200 ${getColorSwatchClass(color)} ${
+        normalized.includes("white") ? "ring-slate-300" : ""
+      }`}
+    />
+  );
+}
+
 export default function VehicleDetailView() {
   const user = useAuthUser();
   const router = useRouter();
@@ -106,22 +137,12 @@ export default function VehicleDetailView() {
   const price40 = vehicle.market_price * 0.4;
   const price70 = vehicle.market_price * 0.7;
 
-  // Color hex for indicator
-  const getColorHex = (colorName: string): string => {
-    const colorMap = {
-      "red": "#ef4444", "blue": "#3b82f6", "green": "#10b981", "yellow": "#f59e0b",
-      "black": "#1a1a2e", "white": "#f8fafc", "silver": "#9ca3af", "gray": "#6b7280",
-    };
-    const normalized = colorName?.toLowerCase().trim() || "";
-    return colorMap[normalized as keyof typeof colorMap] || "#6b7280";
-  };
-
   // TukTuk special icon
   const isTukTuk = vehicle.category.toLowerCase().includes("tuk");
   const categoryIcon = isTukTuk ? (
     <TukTukIcon className="w-12 h-12" strokeWidth={1.5} />
   ) : (
-    <svg className="w-12 h-12" stroke="currentColor" fill="none" viewBox="0 0 24 24">
+    <svg className="w-12 h-12" stroke="currentColor" fill="none" viewBox="0 0 24 24" aria-hidden="true">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
     </svg>
   );
@@ -148,13 +169,15 @@ export default function VehicleDetailView() {
             {/* Left Column: Image & Preview */}
             <div className="space-y-6">
               <div className="bg-white rounded-2xl shadow-xl p-6">
-                <div className="relative">
+                <div className="relative group">
                   <div className="absolute top-4 left-4 bg-emerald-500 text-white px-3 py-1 rounded-full text-sm font-bold">
                     #{vehicle.id}
                   </div>
                   {vehicle.image_id ? (
                     <button
+                      type="button"
                       onClick={() => setSelectedImage(getVehicleFullImageUrl(vehicle.image_id))}
+                      aria-label={`Open image for ${vehicle.brand} ${vehicle.model}`}
                       className="block w-full aspect-[4/3] rounded-xl overflow-hidden group hover:scale-105 transition-all duration-300 shadow-2xl"
                     >
                       <img
@@ -173,11 +196,19 @@ export default function VehicleDetailView() {
                       </svg>
                     </div>
                   )}
-                  <div className="absolute bottom-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-all">
-                    <button className="p-2 bg-white/80 hover:bg-white rounded-full shadow-lg">
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-                    </button>
-                  </div>
+                  {vehicle.image_id && (
+                    <div className="absolute bottom-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-all">
+                      <button
+                        type="button"
+                        onClick={() => setSelectedImage(getVehicleFullImageUrl(vehicle.image_id))}
+                        aria-label={`Open image for ${vehicle.brand} ${vehicle.model}`}
+                        title="Open image"
+                        className="p-2 bg-white/80 hover:bg-white rounded-full shadow-lg"
+                      >
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                      </button>
+                    </div>
+                  )}
                 </div>
                 <div className="flex items-center justify-center mt-6 gap-3">
                   {categoryIcon}
@@ -207,23 +238,23 @@ export default function VehicleDetailView() {
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1">Brand</label>
+                    <p className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1">Brand</p>
                     <p className="text-lg font-semibold text-slate-800">{vehicle.brand}</p>
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1">Model</label>
+                    <p className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1">Model</p>
                     <p className="text-lg font-semibold text-slate-800">{vehicle.model}</p>
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1">Year</label>
+                    <p className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1">Year</p>
                     <p className="text-lg font-semibold text-slate-800">{vehicle.year}</p>
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1">Plate</label>
+                    <p className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1">Plate</p>
                     <p className="text-lg font-semibold text-slate-800 font-mono">{vehicle.plate}</p>
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1">Condition</label>
+                    <p className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1">Condition</p>
                     <span className={`inline-flex px-3 py-1 rounded-full text-sm font-semibold ${
                       vehicle.condition === 'New' ? 'bg-emerald-100 text-emerald-800' :
                       vehicle.condition === 'Used' ? 'bg-blue-100 text-blue-800' : 'bg-slate-100 text-slate-800'
@@ -232,26 +263,22 @@ export default function VehicleDetailView() {
                     </span>
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1">Body Type</label>
+                    <p className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1">Body Type</p>
                     <p className="text-lg font-semibold text-slate-800">{vehicle.body_type || '—'}</p>
                   </div>
                   <div className="md:col-span-2">
-                    <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1">Color</label>
+                    <p className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1">Color</p>
                     <div className="flex items-center gap-3">
-                      <div 
-                        className="w-6 h-6 rounded-full border-4 border-white shadow-sm ring-2 ring-slate-200" 
-                        style={{ backgroundColor: getColorHex(vehicle.color || '') }}
-                        title={vehicle.color || 'No color'}
-                      />
+                      {vehicle.color && <ColorSwatch color={vehicle.color} />}
                       <p className="text-lg font-semibold text-slate-800 capitalize">{vehicle.color || 'Not specified'}</p>
                     </div>
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1">Tax Type</label>
+                    <p className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1">Tax Type</p>
                     <p className="text-lg font-semibold text-slate-800">{vehicle.tax_type || '—'}</p>
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1">Created</label>
+                    <p className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1">Created</p>
                     <p className="text-lg font-semibold text-slate-800">{new Date(vehicle.created_at).toLocaleDateString()}</p>
                   </div>
                 </div>
@@ -260,10 +287,10 @@ export default function VehicleDetailView() {
               {/* Action Buttons */}
               <div className="bg-white rounded-2xl shadow-xl p-6">
                 <div className="flex gap-3">
-                  <button className="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white font-semibold py-3 px-6 rounded-xl transition-all duration-200">
+                  <button type="button" onClick={() => router.push(`/cleaned-vehicles/${id}/edit`)} className="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white font-semibold py-3 px-6 rounded-xl transition-all duration-200">
                     Edit Vehicle
                   </button>
-                  <button className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold py-3 px-6 rounded-xl transition-all duration-200">
+                  <button type="button" className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold py-3 px-6 rounded-xl transition-all duration-200">
                     Delete Vehicle
                   </button>
                 </div>

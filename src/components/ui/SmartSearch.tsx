@@ -188,12 +188,12 @@ export default function SmartSearch({
               No vehicles found
             </div>
           ) : (
-            <ul className="py-1">
+            <ul className="py-1" role="presentation">
               {filteredVehicles.map((vehicle, index) => (
                 <li
                   key={vehicle.VehicleId}
                   role="option"
-                  aria-selected={index === highlightedIndex}
+                  aria-selected={index === highlightedIndex ? "true" : "false"}
                   onClick={() => handleSelect(vehicle)}
                   onMouseEnter={() => setHighlightedIndex(index)}
                   className={`px-4 py-2 cursor-pointer text-sm ${

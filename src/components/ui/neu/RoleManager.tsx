@@ -30,7 +30,7 @@ import {
   Users,
   X
 } from "lucide-react";
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useId, useState } from "react";
 
 // ============================================================================
 // Types & Interfaces
@@ -63,14 +63,14 @@ interface RoleFormData {
 // ============================================================================
 
 const ROLE_COLORS = [
-  { name: "Emerald", value: "#10b981", class: "text-emerald-600" },
-  { name: "Blue", value: "#3b82f6", class: "text-blue-600" },
-  { name: "Purple", value: "#8b5cf6", class: "text-purple-600" },
-  { name: "Orange", value: "#f97316", class: "text-orange-600" },
-  { name: "Pink", value: "#ec4899", class: "text-pink-600" },
-  { name: "Cyan", value: "#06b6d4", class: "text-cyan-600" },
-  { name: "Red", value: "#ef4444", class: "text-red-600" },
-  { name: "Amber", value: "#f59e0b", class: "text-amber-600" },
+  { name: "Emerald", value: "#10b981", class: "text-emerald-600", bgClass: "bg-emerald-500", softBgClass: "bg-emerald-500/15" },
+  { name: "Blue", value: "#3b82f6", class: "text-blue-600", bgClass: "bg-blue-500", softBgClass: "bg-blue-500/15" },
+  { name: "Purple", value: "#8b5cf6", class: "text-purple-600", bgClass: "bg-purple-500", softBgClass: "bg-purple-500/15" },
+  { name: "Orange", value: "#f97316", class: "text-orange-600", bgClass: "bg-orange-500", softBgClass: "bg-orange-500/15" },
+  { name: "Pink", value: "#ec4899", class: "text-pink-600", bgClass: "bg-pink-500", softBgClass: "bg-pink-500/15" },
+  { name: "Cyan", value: "#06b6d4", class: "text-cyan-600", bgClass: "bg-cyan-500", softBgClass: "bg-cyan-500/15" },
+  { name: "Red", value: "#ef4444", class: "text-red-600", bgClass: "bg-red-500", softBgClass: "bg-red-500/15" },
+  { name: "Amber", value: "#f59e0b", class: "text-amber-600", bgClass: "bg-amber-500", softBgClass: "bg-amber-500/15" },
 ];
 
 const CATEGORY_ICONS: Record<string, React.ReactNode> = {
@@ -105,6 +105,13 @@ export function RoleManager({
   });
   const [error, setError] = useState<string>("");
   const [success, setSuccess] = useState<string>("");
+  const formId = useId();
+  const fieldIds = {
+    name: `${formId}-role-name`,
+    description: `${formId}-role-description`,
+    color: `${formId}-role-color`,
+    permissions: `${formId}-role-permissions`,
+  };
 
   const isAdmin = currentUserRole === "Admin";
 
@@ -251,8 +258,9 @@ export function RoleManager({
     return color?.class || "text-gray-600";
   };
 
-  const getRoleColorBg = (colorValue: string) => {
-    return { backgroundColor: colorValue + "20" }; // 20 = 12% opacity in hex
+  const getRoleColorBgClass = (colorValue: string) => {
+    const color = ROLE_COLORS.find((c) => c.value === colorValue);
+    return color?.softBgClass || "bg-gray-500/15";
   };
 
   // ============================================================================
@@ -369,7 +377,7 @@ export function RoleManager({
         </div>
       )}
       {success && (
-        <div className="p-4 rounded-[16px] bg-white dark:bg-slate-900 shadow-sm text-emerald-600 text-sm">
+        <div role="status" className="p-4 rounded-[16px] bg-white dark:bg-slate-900 shadow-sm text-emerald-600 text-sm">
           {success}
         </div>
       )}
@@ -384,10 +392,11 @@ export function RoleManager({
           <div className="space-y-4">
             {/* Role Name */}
             <div>
-              <label className="block text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wide mb-2">
+              <label htmlFor={fieldIds.name} className="block text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wide mb-2">
                 Role Name *
               </label>
               <input
+                id={fieldIds.name}
                 type="text"
                 value={formData.name}
                 onChange={(e) => setFormData((prev) => ({ ...prev, name: e.target.value }))}
@@ -403,10 +412,11 @@ export function RoleManager({
 
             {/* Description */}
             <div>
-              <label className="block text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wide mb-2">
+              <label htmlFor={fieldIds.description} className="block text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wide mb-2">
                 Description
               </label>
               <input
+                id={fieldIds.description}
                 type="text"
                 value={formData.description}
                 onChange={(e) => setFormData((prev) => ({ ...prev, description: e.target.value }))}
@@ -422,10 +432,10 @@ export function RoleManager({
 
             {/* Color Selection */}
             <div>
-              <label className="block text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wide mb-2">
+              <p id={fieldIds.color} className="block text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wide mb-2">
                 Role Color
-              </label>
-              <div className="flex flex-wrap gap-3">
+              </p>
+              <div className="flex flex-wrap gap-3" role="group" aria-labelledby={fieldIds.color}>
                 {ROLE_COLORS.map((color) => (
                   <button
                     key={color.value}
@@ -436,9 +446,10 @@ export function RoleManager({
                       "shadow-sm",
                       formData.color === color.value
                         ? "shadow-sm ring-2 ring-offset-2 ring-offset-white dark:ring-offset-slate-900 ring-emerald-500"
-                        : "hover:bg-slate-50 dark:hover:bg-slate-800"
+                        : "hover:bg-slate-50 dark:hover:bg-slate-800",
+                      color.bgClass
                     )}
-                    style={{ backgroundColor: color.value }}
+                    aria-label={`Use ${color.name} role color`}
                     title={color.name}
                   />
                 ))}
@@ -447,10 +458,10 @@ export function RoleManager({
 
             {/* Permissions */}
             <div>
-              <label className="block text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wide mb-3">
+              <p id={fieldIds.permissions} className="block text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wide mb-3">
                 Permissions *
-              </label>
-              <div className="p-4 rounded-[16px] bg-white dark:bg-slate-900 shadow-sm">
+              </p>
+              <div className="p-4 rounded-[16px] bg-white dark:bg-slate-900 shadow-sm" role="group" aria-labelledby={fieldIds.permissions}>
                 {Object.entries(PERMISSION_CATEGORIES).map(([category, permissions]) =>
                   renderPermissionCategory(category, permissions)
                 )}
@@ -514,9 +525,9 @@ export function RoleManager({
                     <div
                       className={cn(
                         "w-12 h-12 rounded-xl flex items-center justify-center",
-                        "shadow-sm"
+                        "shadow-sm",
+                        getRoleColorBgClass(role.color)
                       )}
-                      style={getRoleColorBg(role.color)}
                     >
                       <Shield className={cn("w-6 h-6", getRoleColorClass(role.color))} />
                     </div>
@@ -554,9 +565,9 @@ export function RoleManager({
                     <div
                       className={cn(
                         "w-12 h-12 rounded-xl flex items-center justify-center",
-                        "shadow-sm"
+                        "shadow-sm",
+                        getRoleColorBgClass(role.color)
                       )}
-                      style={getRoleColorBg(role.color)}
                     >
                       <Shield className={cn("w-6 h-6", getRoleColorClass(role.color))} />
                     </div>
@@ -570,7 +581,9 @@ export function RoleManager({
                   </div>
                   <div className="flex gap-2">
                     <button
+                      type="button"
                       onClick={() => handleEditClick(role)}
+                      aria-label={`Edit ${role.name} role`}
                       className={cn(
                         "p-2 rounded-lg",
                         "bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400",
@@ -580,11 +593,13 @@ export function RoleManager({
                       )}
                       title="Edit role"
                     >
-                      <Edit2 className="w-4 h-4" />
+                      <Edit2 className="w-4 h-4" aria-hidden="true" />
                     </button>
                     <button
+                      type="button"
                       onClick={() => handleDelete(role.id)}
                       disabled={isDeleting === role.id}
+                      aria-label={`Delete ${role.name} role`}
                       className={cn(
                         "p-2 rounded-lg",
                         "bg-white dark:bg-slate-900 text-red-600 dark:text-red-400",
@@ -596,9 +611,9 @@ export function RoleManager({
                       title="Delete role"
                     >
                       {isDeleting === role.id ? (
-                        <div className="w-4 h-4 border-2 border-[#e74c3c] border-t-transparent rounded-full animate-spin" />
+                        <div className="w-4 h-4 border-2 border-[#e74c3c] border-t-transparent rounded-full animate-spin" aria-hidden="true" />
                       ) : (
-                        <Trash2 className="w-4 h-4" />
+                        <Trash2 className="w-4 h-4" aria-hidden="true" />
                       )}
                     </button>
                   </div>

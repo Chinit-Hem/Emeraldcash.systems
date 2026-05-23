@@ -865,7 +865,7 @@ export function ImageInput({
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         className={`
-          relative border-2 border-dashed rounded-lg p-6 transition-all duration-200 cursor-pointer
+          relative min-w-0 border-2 border-dashed rounded-lg p-4 sm:p-6 transition-all duration-200 cursor-pointer
           ${isDragging 
             ? "border-emerald-500 bg-emerald-50 dark:bg-emerald-900/20" 
             : "border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500"
@@ -901,7 +901,7 @@ export function ImageInput({
           </div>
         ) : multiple && previews.length > 0 ? (
           <div className="space-y-4" onClick={(e) => e.stopPropagation()}>
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+            <div className="grid grid-cols-1 gap-3 min-[380px]:grid-cols-2 sm:grid-cols-3">
               {previews.map((item, index) => (
                 <div
                   key={`${item.url}-${index}-${cacheKey}`}
@@ -910,12 +910,12 @@ export function ImageInput({
                   <img
                     src={item.url}
                     alt={index === 0 ? "Primary vehicle image" : `Vehicle image ${index + 1}`}
-                    className="h-28 w-full object-cover"
+                    className="h-32 w-full object-cover sm:h-28"
                     onError={() => {
                       setError("One image could not be loaded. Replace it or remove it.");
                     }}
                   />
-                  <div className="absolute left-2 top-2 rounded-full bg-black/60 px-2 py-0.5 text-[11px] font-semibold text-white">
+                  <div className="absolute left-2 top-2 rounded-full bg-black/60 px-2 py-1 text-sm font-semibold text-white">
                     {index === 0 ? "Primary" : index + 1}
                   </div>
                   <div className="absolute inset-x-2 bottom-2 flex gap-1 opacity-100 sm:opacity-0 sm:transition sm:group-hover:opacity-100">
@@ -927,7 +927,7 @@ export function ImageInput({
                         replaceInputRef.current?.click();
                       }}
                       disabled={disabled}
-                      className="flex-1 rounded-lg bg-white/95 px-2 py-1 text-xs font-semibold text-slate-800 shadow hover:bg-white disabled:opacity-50"
+                      className="flex min-h-11 flex-1 items-center justify-center rounded-lg bg-white/95 px-2 py-2 text-sm font-semibold text-slate-800 shadow hover:bg-white disabled:opacity-50"
                     >
                       Replace
                     </button>
@@ -938,7 +938,7 @@ export function ImageInput({
                         removeMultipleImage(index);
                       }}
                       disabled={disabled}
-                      className="rounded-lg bg-red-500 px-2 py-1 text-xs font-semibold text-white shadow hover:bg-red-600 disabled:opacity-50"
+                      className="flex min-h-11 items-center justify-center rounded-lg bg-red-500 px-2 py-2 text-sm font-semibold text-white shadow hover:bg-red-600 disabled:opacity-50"
                     >
                       Remove
                     </button>
@@ -953,7 +953,7 @@ export function ImageInput({
                     fileInputRef.current?.click();
                   }}
                   disabled={disabled}
-                  className="flex h-28 flex-col items-center justify-center rounded-xl border border-dashed border-gray-300 bg-gray-50 text-xs font-medium text-gray-500 transition hover:border-emerald-400 hover:bg-emerald-50 hover:text-emerald-700 disabled:opacity-50 dark:border-gray-700 dark:bg-gray-800"
+                  className="flex h-32 flex-col items-center justify-center rounded-xl border border-dashed border-gray-300 bg-gray-50 text-sm font-medium text-gray-500 transition hover:border-emerald-400 hover:bg-emerald-50 hover:text-emerald-700 disabled:opacity-50 dark:border-gray-700 dark:bg-gray-800 sm:h-28"
                 >
                   <svg className="mb-1 h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.7} d="M12 5v14m7-7H5" />
@@ -962,7 +962,7 @@ export function ImageInput({
                 </button>
               )}
             </div>
-            <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-gray-500 dark:text-gray-400">
+            <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-gray-500 dark:text-gray-400">
               <span>{previews.length} / {maxImages} photos</span>
               <button
                 type="button"
@@ -971,7 +971,7 @@ export function ImageInput({
                   clearMultipleImages();
                 }}
                 disabled={disabled}
-                className="font-semibold text-red-500 hover:text-red-600 disabled:opacity-50"
+                className="min-h-11 rounded-lg px-3 py-2 font-semibold text-red-500 hover:text-red-600 disabled:opacity-50"
               >
                 Replace all
               </button>
@@ -984,7 +984,7 @@ export function ImageInput({
               key={cacheKey} // Force re-render when image changes
               src={isUsingFallback ? "/placeholder-car.svg" : preview.url}
               alt="Preview"
-              className="max-h-48 mx-auto rounded-lg object-contain"
+              className="mx-auto max-h-48 max-w-full rounded-lg object-contain"
               onError={(e) => {
                 // Handle image load errors - clear preview and show error
                 // This allows user to try a different URL
@@ -1003,7 +1003,7 @@ export function ImageInput({
                 }
               }}
             />
-            <div className="absolute top-2 right-2 flex space-x-2">
+            <div className="absolute right-2 top-2 flex space-x-2">
               <button
                 type="button"
                 onClick={(e) => {
@@ -1011,16 +1011,16 @@ export function ImageInput({
                   handleRemove();
                 }}
                 disabled={disabled}
-                className="p-1.5 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors shadow-lg"
+                className="flex min-h-11 min-w-11 items-center justify-center rounded-full bg-red-500 text-white shadow-lg transition-colors hover:bg-red-600"
                 title="Remove image"
               >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
               </button>
             </div>
             {preview.name && (
-              <p className="mt-2 text-xs text-center text-gray-500 dark:text-gray-400 truncate">
+              <p className="mt-2 break-words text-center text-sm text-gray-500 dark:text-gray-400">
                 {preview.name}
                 {preview.size && ` • ${formatFileSize(preview.size)}`}
                 {preview.isUrl && " • External URL"}
@@ -1050,10 +1050,10 @@ export function ImageInput({
               <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
                 Click to upload or drag & drop
               </p>
-              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+              <p className="mt-1 break-words text-sm text-gray-500 dark:text-gray-400">
                 {helperText}
               </p>
-              <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+              <p className="mt-1 text-sm text-gray-400 dark:text-gray-500">
                 Max size: {maxSizeMB}MB
               </p>
             </div>
@@ -1064,7 +1064,7 @@ export function ImageInput({
       {/* URL Input Section */}
       {(!preview || multiple) && (
         <div className="space-y-2">
-          <div className="relative">
+          <div className="flex flex-col gap-2 sm:flex-row">
             <input
               ref={urlInputRef}
               type="text"
@@ -1074,7 +1074,7 @@ export function ImageInput({
               placeholder={urlPlaceholder}
               disabled={disabled || isLoading}
               className={`
-                w-full px-4 py-2 pr-20 text-sm
+                min-h-11 w-full min-w-0 px-4 py-3 text-base sm:text-sm
                 border rounded-lg 
                 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500
                 disabled:opacity-50 disabled:cursor-not-allowed
@@ -1092,7 +1092,7 @@ export function ImageInput({
               onClick={() => handleUrlSubmit(urlInput)}
               disabled={!urlInput.trim() || disabled || isLoading}
               className={`
-                absolute right-1.5 top-1.5 px-3 py-1 text-xs font-medium rounded-md
+                min-h-11 rounded-lg px-4 py-2 text-sm font-medium
                 transition-colors
                 ${urlInput.trim() && !disabled && !isLoading
                   ? "bg-emerald-600 text-white hover:bg-emerald-700"
@@ -1104,7 +1104,7 @@ export function ImageInput({
             </button>
           </div>
           
-          <p className="text-xs text-gray-500 dark:text-gray-400">
+          <p className="break-words text-sm text-gray-500 dark:text-gray-400">
             Tip: Press Ctrl+V to paste an image from clipboard or URL
           </p>
         </div>
@@ -1112,19 +1112,19 @@ export function ImageInput({
 
       {/* Error Message */}
       {error && (
-        <div className="flex items-center justify-between text-sm text-red-600 dark:text-red-400">
-          <div className="flex items-center space-x-2">
+        <div className="flex flex-col gap-2 text-sm text-red-600 dark:text-red-400 sm:flex-row sm:items-start sm:justify-between">
+          <div className="flex min-w-0 items-start gap-2">
             <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
-            <span>{error}</span>
+            <span className="break-words">{error}</span>
           </div>
           {isUsingFallback && failedUrl && (
             <button
               type="button"
               onClick={handleRetry}
               disabled={disabled}
-              className="ml-2 px-2 py-1 text-xs font-medium bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 rounded hover:bg-red-200 dark:hover:bg-red-900/50 transition-colors"
+              className="min-h-11 rounded bg-red-100 px-3 py-2 text-sm font-medium text-red-700 transition-colors hover:bg-red-200 disabled:opacity-50 dark:bg-red-900/30 dark:text-red-300 dark:hover:bg-red-900/50 sm:ml-2"
               title="Retry loading the original image"
             >
               Retry

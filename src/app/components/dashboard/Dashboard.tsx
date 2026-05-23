@@ -82,7 +82,7 @@ type DashboardProps = {
   initialVehicles: Vehicle[];
   initialMeta: DashboardMeta;
   initialError: string | null;
-  isIOSSafari?: boolean;
+  useMobileSafeCharts?: boolean;
 };
 
 type StatCardProps = {
@@ -227,7 +227,7 @@ function DashboardStatCard({
   const subtitleContent = subtitle && subtitleHref ? (
     <a 
       href={subtitleHref} 
-      className="text-xs text-red-500 mt-1 truncate hover:underline cursor-pointer inline-block relative z-10"
+      className="text-xs text-red-700 mt-1 truncate hover:text-red-800 hover:underline cursor-pointer inline-block relative z-10 dark:text-red-400 dark:hover:text-red-300"
       onClick={(e) => e.stopPropagation()}
     >
       {subtitle}
@@ -371,7 +371,7 @@ export default function Dashboard({
   initialVehicles,
   initialMeta,
   initialError,
-  isIOSSafari = false,
+  useMobileSafeCharts = false,
 }: DashboardProps) {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(initialError);
@@ -400,7 +400,7 @@ export default function Dashboard({
     async function fetchSearchResults() {
       setIsSearching(true);
       try {
-        const searchLimit = isIOSSafari ? 300 : 2000;
+        const searchLimit = useMobileSafeCharts ? 300 : 2000;
         const url = `/api/vehicles?searchTerm=${encodeURIComponent(debouncedSearch)}&limit=${searchLimit}`;
         const res = await fetch(url, { cache: "no-store" });
         if (!res.ok) throw new Error("Search failed");
@@ -419,7 +419,7 @@ export default function Dashboard({
     }
 
     fetchSearchResults();
-  }, [debouncedSearch, isIOSSafari]);
+  }, [debouncedSearch, useMobileSafeCharts]);
 
   const aggregatedStats = useMemo(() => {
     if (!vehicles.length) return null;
@@ -549,8 +549,6 @@ export default function Dashboard({
   const noImageCount = meta.noImageCount;
 
   const isLoading = isRefreshing;
-  const useMobileSafeCharts = isIOSSafari;
-
   return (
     <div className="p-4 sm:p-6 space-y-6 max-w-[1600px] mx-auto bg-slate-100 min-h-screen dark:bg-slate-950">
       {/* Header Section */}
@@ -574,7 +572,7 @@ export default function Dashboard({
           <button
             onClick={handleRefresh}
             disabled={isRefreshing}
-            className="px-6 py-3 bg-[#2ecc71] text-white font-semibold rounded-[16px] shadow-sm active:bg-slate-100 transition-all flex items-center gap-2 disabled:opacity-50 dark:active:bg-slate-800"
+            className="px-6 py-3 bg-emerald-700 text-white font-semibold rounded-[16px] shadow-sm transition-all hover:bg-emerald-800 active:bg-emerald-900 flex items-center gap-2 disabled:opacity-50 dark:bg-emerald-600 dark:hover:bg-emerald-500 dark:active:bg-emerald-700"
           >
             <span className={isRefreshing ? "animate-spin" : ""}>{Icons.refresh}</span>
             {isRefreshing ? "Refreshing..." : "Refresh Data"}
@@ -639,7 +637,7 @@ export default function Dashboard({
         </div>
         <input
           type="text"
-          placeholder="Search vehicles (Brand, Model, Category, Plate...)..."
+          placeholder="Search vehicles..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           className="w-full pl-12 pr-4 py-4 rounded-[20px] bg-slate-100 shadow-sm text-[#1a1a2e] placeholder-[#4a4a5a] focus:outline-none focus:ring-2 focus:ring-emerald-500/20 text-sm sm:text-base dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-500 dark:ring-1 dark:ring-slate-800"
@@ -667,7 +665,7 @@ export default function Dashboard({
           </span>
         )}
         {vehicles.length < meta.total && (
-          <span className="text-amber-600 ml-1">
+          <span className="text-amber-800 ml-1 dark:text-amber-300">
             (loaded {vehicles.length} of {meta.total.toLocaleString()} total)
           </span>
         )}
@@ -677,9 +675,9 @@ export default function Dashboard({
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Vehicles by Category */}
         <div className="bg-slate-100 rounded-[30px] shadow-sm p-6 sm:p-8 dark:bg-slate-900 dark:ring-1 dark:ring-slate-800">
-          <h3 className="text-base sm:text-lg font-semibold text-[#1a1a2e] mb-6 dark:text-slate-100">
+          <h2 className="text-base sm:text-lg font-semibold text-[#1a1a2e] mb-6 dark:text-slate-100">
             Vehicles by Category
-          </h3>
+          </h2>
           <div className="w-full h-[250px] sm:h-[300px]">
             {isLoading ? (
               <ChartSkeleton height={300} />
@@ -693,9 +691,9 @@ export default function Dashboard({
 
         {/* New vs Used */}
         <div className="bg-slate-100 rounded-[30px] shadow-sm p-6 sm:p-8 dark:bg-slate-900 dark:ring-1 dark:ring-slate-800">
-          <h3 className="text-base sm:text-lg font-semibold text-[#1a1a2e] mb-6 dark:text-slate-100">
+          <h2 className="text-base sm:text-lg font-semibold text-[#1a1a2e] mb-6 dark:text-slate-100">
             New vs Used
-          </h3>
+          </h2>
           <div className="w-full h-[250px] sm:h-[300px]">
             {isLoading ? (
               <ChartSkeleton height={300} />
@@ -709,9 +707,9 @@ export default function Dashboard({
 
         {/* Top Brands */}
         <div className="bg-slate-100 rounded-[30px] shadow-sm p-6 sm:p-8 dark:bg-slate-900 dark:ring-1 dark:ring-slate-800">
-          <h3 className="text-base sm:text-lg font-semibold text-[#1a1a2e] mb-6 dark:text-slate-100">
+          <h2 className="text-base sm:text-lg font-semibold text-[#1a1a2e] mb-6 dark:text-slate-100">
             Top Brands
-          </h3>
+          </h2>
           <div className="w-full h-[250px] sm:h-[300px]">
             {isLoading ? (
               <ChartSkeleton height={300} />
@@ -725,9 +723,9 @@ export default function Dashboard({
 
         {/* Monthly Added */}
         <div className="bg-slate-100 rounded-[30px] shadow-sm p-6 sm:p-8 dark:bg-slate-900 dark:ring-1 dark:ring-slate-800">
-          <h3 className="text-base sm:text-lg font-semibold text-[#1a1a2e] mb-6 dark:text-slate-100">
+          <h2 className="text-base sm:text-lg font-semibold text-[#1a1a2e] mb-6 dark:text-slate-100">
             Monthly Added
-          </h3>
+          </h2>
           <div className="w-full h-[250px] sm:h-[300px]">
             {isLoading ? (
               <ChartSkeleton height={300} />

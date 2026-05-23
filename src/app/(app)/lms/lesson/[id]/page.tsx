@@ -87,8 +87,10 @@ const LessonPlaylistItem: React.FC<{
 }> = ({ lesson, isActive, index, onClick }) => {
   return (
     <button
+      type="button"
       onClick={onClick}
       disabled={!lesson.is_unlocked}
+      title={lesson.title}
       className={`w-full text-left p-3 rounded-lg transition-all duration-200 flex items-start gap-3 ${
         isActive
           ? "bg-emerald-50 dark:bg-emerald-900/30 border-2 border-emerald-500"
@@ -522,7 +524,10 @@ export default function LessonPlayerPage() {
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex min-w-0 items-center gap-3 sm:gap-4">
               <button
+                type="button"
                 onClick={() => router.push("/lms")}
+                aria-label="Back to LMS"
+                title="Back to LMS"
                 className="flex-shrink-0 p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
               >
                 <ChevronLeft className="w-5 h-5 text-gray-600 dark:text-gray-400" />
@@ -581,7 +586,7 @@ export default function LessonPlayerPage() {
       </header>
       
       {/* Main Content */}
-      <main className="max-w-[1600px] mx-auto px-4 sm:px-6 py-6">
+      <div className="max-w-[1600px] mx-auto px-4 sm:px-6 py-6">
         {completionError && (
           <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-900/50 dark:bg-amber-900/20 dark:text-amber-200">
             {completionError}
@@ -708,7 +713,7 @@ export default function LessonPlayerPage() {
             </div>
           </div>
         </div>
-      </main>
+      </div>
     </div>
   );
 }

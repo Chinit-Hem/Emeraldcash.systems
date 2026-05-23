@@ -28,6 +28,10 @@ function isIOSSafariUserAgent(userAgent: string): boolean {
   return isIOS && isWebKit && !isNonSafariIOSBrowser;
 }
 
+function isMobileUserAgent(userAgent: string): boolean {
+  return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini|Mobile/i.test(userAgent);
+}
+
 /**
  * Dashboard Server Component
  * Fetches initial data server-side with caching for performance
@@ -36,7 +40,8 @@ export default async function DashboardPage() {
   const requestHeaders = await headers();
   const userAgent = requestHeaders.get("user-agent") || "";
   const isIOSSafari = isIOSSafariUserAgent(userAgent);
-  const dashboardVehicleLimit = isIOSSafari ? 300 : 2000;
+  const useMobileSafeCharts = isIOSSafari || isMobileUserAgent(userAgent);
+  const dashboardVehicleLimit = useMobileSafeCharts ? 300 : 2000;
 
   // Fetch vehicles and stats in parallel
   // Use cache for better performance - stats don't change frequently
@@ -80,7 +85,7 @@ export default async function DashboardPage() {
       initialVehicles={vehicles}
       initialMeta={meta}
       initialError={!vehiclesResult.success ? vehiclesResult.error || "Failed to load vehicles" : null}
-      isIOSSafari={isIOSSafari}
+      useMobileSafeCharts={useMobileSafeCharts}
     />
   );
 }

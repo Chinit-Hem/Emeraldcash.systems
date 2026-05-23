@@ -15,19 +15,6 @@ type AppShellProps = {
   children: ReactNode;
 };
 
-// Warm up database connection on mount - helps with 0ms loading feel
-function useConnectionWarmer() {
-  useEffect(() => {
-    // Ping serverless function to warm up connection in background
-    fetch('/api/ping', {
-      cache: 'no-store',
-      credentials: 'include',
-    }).catch(() => {
-      // Ignore errors - this is just for warming up, non-blocking
-    });
-  }, []);
-}
-
 function useDesktopSidebar() {
   const [isDesktop, setIsDesktop] = useState(false);
 
@@ -58,14 +45,16 @@ function AppShellContent({ children }: AppShellProps) {
   const [user, setUser] = useState<User | null>(() => getCachedUser());
   const [loading, setLoading] = useState(false); // Changed: default false for 0ms load feel
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [hasOpenedSidebar, setHasOpenedSidebar] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const hasRedirected = useRef(false);
   const authChecked = useRef(false);
-  const openSidebar = useCallback(() => setIsSidebarOpen(true), []);
+  const drawerId = "mobile-navigation-drawer";
+  const openSidebar = useCallback(() => {
+    setHasOpenedSidebar(true);
+    setIsSidebarOpen(true);
+  }, []);
   const closeSidebar = useCallback(() => setIsSidebarOpen(false), []);
-
-  // Warm up DB connection on mount
-  useConnectionWarmer();
 
   useEffect(() => {
     let isActive = true;
@@ -159,7 +148,7 @@ function AppShellContent({ children }: AppShellProps) {
     }
   }, [closeSidebar, pathname]);
 
-  // Persist/restore scroll position for the nested scroll container (<main />)
+  // Persist/restore scroll position for the nested scroll container.
   useEffect(() => {
     const el = mainRef.current;
     if (!el) return;
@@ -250,7 +239,7 @@ function AppShellContent({ children }: AppShellProps) {
           </div>
         )}
 
-        {/* Mobile drawer - mounted ahead of time so opening feels instant */}
+        {/* Mobile drawer */}
         <div
           className={`fixed inset-0 z-[60] lg:hidden ${isSidebarOpen ? "visible pointer-events-auto" : "invisible pointer-events-none"}`}
           onKeyDown={(e) => {
@@ -264,18 +253,21 @@ function AppShellContent({ children }: AppShellProps) {
             aria-hidden="true"
           />
           <div
+            id={drawerId}
             className={`absolute inset-y-0 left-0 h-full w-[280px] max-w-[85vw] overflow-hidden bg-neu-bg shadow-neu-flat-lg transition-transform duration-75 ease-out ${isSidebarOpen ? "translate-x-0" : "-translate-x-full"}`}
             role="dialog"
             aria-modal={isSidebarOpen ? "true" : undefined}
             aria-label="Navigation menu"
           >
             <Suspense fallback={null}>
-              <Sidebar
-                user={user}
-                onNavigate={closeSidebar}
-                isVisible={isSidebarOpen}
-                mode="drawer"
-              />
+              {hasOpenedSidebar ? (
+                <Sidebar
+                  user={user}
+                  onNavigate={closeSidebar}
+                  isVisible={isSidebarOpen}
+                  mode="drawer"
+                />
+              ) : null}
             </Suspense>
           </div>
         </div>
@@ -289,6 +281,8 @@ function AppShellContent({ children }: AppShellProps) {
                 onClick={openSidebar}
                 className="neu-icon-btn touch-target"
                 aria-label="Open navigation menu"
+                aria-controls={drawerId}
+                aria-expanded={isSidebarOpen}
                 type="button"
               >
                 <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -308,7 +302,7 @@ function AppShellContent({ children }: AppShellProps) {
                 </div>
                 <div className="flex flex-col min-w-0">
                   <span className="font-bold text-neu-text text-sm leading-tight truncate">Emerald Cash</span>
-                  <span className="text-[10px] text-neu-green font-bold">{systemsLabel}</span>
+                  <span className="text-sm font-bold leading-tight text-emerald-700 dark:text-emerald-300">{systemsLabel}</span>
                 </div>
               </div>
 

@@ -532,7 +532,10 @@ export default function StaffAdminPage() {
         <div className="flex items-center justify-between mb-8">
           <div className="flex items-center gap-4">
             <button
+              type="button"
               onClick={() => router.push("/lms")}
+              aria-label="Back to LMS"
+              title="Back to LMS"
               className="p-2.5 rounded-xl bg-white shadow-[4px_4px_8px_#e2e8f0,-4px_-4px_8px_#ffffff] text-slate-600 hover:shadow-[6px_6px_12px_#e2e8f0,-6px_-6px_12px_#ffffff] transition-all active:scale-95"
             >
               <ArrowLeft className="w-5 h-5" />
@@ -548,8 +551,10 @@ export default function StaffAdminPage() {
             </div>
           </div>
           <button
+            type="button"
             onClick={() => loadData()}
             disabled={isUsersLoading}
+            aria-label="Refresh staff data"
             className="p-2.5 rounded-xl bg-white shadow-[4px_4px_8px_#e2e8f0,-4px_-4px_8px_#ffffff] text-slate-600 hover:shadow-[6px_6px_12px_#e2e8f0,-6px_-6px_12px_#ffffff] transition-all active:scale-95 disabled:opacity-50"
             title="Refresh data"
           >
@@ -616,6 +621,7 @@ export default function StaffAdminPage() {
               <label className="block text-sm font-medium text-slate-700 mb-1">Username</label>
               <input
                 type="text"
+                title="Username"
                 value={newUsername}
                 onChange={(e) => setNewUsername(e.target.value)}
                 placeholder="e.g. employee01"
@@ -626,6 +632,7 @@ export default function StaffAdminPage() {
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Role</label>
               <select
+                title="User role"
                 value={newRole}
                 onChange={(e) => setNewRole(e.target.value as Role)}
                 className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500"
@@ -639,6 +646,7 @@ export default function StaffAdminPage() {
               <label className="block text-sm font-medium text-slate-700 mb-1">Password</label>
               <input
                 type="password"
+                title="Password"
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
                 placeholder="Minimum 4 characters"
@@ -650,6 +658,7 @@ export default function StaffAdminPage() {
               <label className="block text-sm font-medium text-slate-700 mb-1">Confirm Password</label>
               <input
                 type="password"
+                title="Confirm password"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 placeholder="Repeat password"
@@ -678,6 +687,7 @@ export default function StaffAdminPage() {
             </div>
             <input
               type="text"
+              title="Search users"
               placeholder="Search users by name, email, or phone..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
@@ -685,6 +695,7 @@ export default function StaffAdminPage() {
             />
           </div>
           <button
+            type="button"
             onClick={syncAllUsersToLMS}
             disabled={isSyncingAll || isUsersLoading}
             className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white font-medium rounded-xl shadow-lg shadow-emerald-500/30 hover:shadow-xl transition-all active:scale-95 disabled:opacity-50"
@@ -713,6 +724,7 @@ export default function StaffAdminPage() {
                 </p>
               </div>
               <button
+                type="button"
                 onClick={() => router.push("/settings")}
                 className="px-4 py-2 rounded-xl bg-amber-100 text-amber-700 font-medium hover:bg-amber-200 transition-colors"
               >
@@ -852,16 +864,20 @@ export default function StaffAdminPage() {
 
                   <div className="flex shrink-0 items-center gap-2 self-end lg:self-center">
                     <button
+                      type="button"
                       onClick={() => startEditUser(managedUser)}
                       disabled={editingUser !== null}
+                      aria-label={`Edit ${managedUser.full_name || managedUser.username}`}
                       className="p-2.5 rounded-xl bg-blue-50 text-blue-600 hover:bg-blue-100 transition-all active:scale-95 disabled:opacity-50"
                       title="Edit user"
                     >
                       <Edit2 className="w-5 h-5" />
                     </button>
                     <button
+                      type="button"
                       onClick={() => handleDeleteUser(managedUser.username)}
                       disabled={deletingUsername === managedUser.username || managedUser.username.toLowerCase() === (user?.username || "").toLowerCase() || editingUser !== null}
+                      aria-label={`Delete ${managedUser.full_name || managedUser.username}`}
                       className="p-2.5 rounded-xl bg-red-50 text-red-600 hover:bg-red-100 transition-all active:scale-95 disabled:opacity-50"
                       title={managedUser.username.toLowerCase() === (user?.username || "").toLowerCase() ? "You cannot delete your own account" : "Delete user"}
                     >
@@ -888,7 +904,10 @@ export default function StaffAdminPage() {
                   <p className="text-sm text-slate-500">{editingUser.username}</p>
                 </div>
                 <button
+                  type="button"
                   onClick={cancelEditUser}
+                  aria-label="Close edit profile"
+                  title="Close edit profile"
                   className="rounded-full p-2 text-slate-400 hover:bg-slate-100"
                 >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -921,6 +940,7 @@ export default function StaffAdminPage() {
                   )}
                 </div>
                 <button
+                  type="button"
                   onClick={() => fileInputRef.current?.click()}
                   disabled={isUploadingAvatar}
                   className="mt-3 inline-flex items-center gap-2 rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-200 transition-colors disabled:opacity-50"
@@ -930,6 +950,7 @@ export default function StaffAdminPage() {
                 <input
                   ref={fileInputRef}
                   type="file"
+                  title="Profile photo"
                   accept="image/jpeg,image/png,image/webp,image/gif"
                   onChange={handleAvatarUpload}
                   disabled={isUploadingAvatar}
@@ -953,6 +974,7 @@ export default function StaffAdminPage() {
                   <label className="mb-1.5 block text-sm font-medium text-slate-700">Full Name</label>
                   <input
                     type="text"
+                    title="Full name"
                     value={editFullName}
                     onChange={(e) => setEditFullName(e.target.value)}
                     placeholder="e.g. John Doe"
@@ -964,6 +986,7 @@ export default function StaffAdminPage() {
                   <label className="mb-1.5 block text-sm font-medium text-slate-700">Email</label>
                   <input
                     type="email"
+                    title="Email"
                     value={editEmail}
                     onChange={(e) => setEditEmail(e.target.value)}
                     placeholder="e.g. user@example.com"
@@ -975,6 +998,7 @@ export default function StaffAdminPage() {
                   <label className="mb-1.5 block text-sm font-medium text-slate-700">Phone</label>
                   <input
                     type="tel"
+                    title="Phone"
                     value={editPhone}
                     onChange={(e) => setEditPhone(e.target.value)}
                     placeholder="e.g. +1 234 567 890"

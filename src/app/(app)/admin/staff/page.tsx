@@ -281,7 +281,10 @@ export default function UnifiedStaffPage() {
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
           <div className="flex items-center gap-4">
             <button
+              type="button"
               onClick={() => router.push("/lms")}
+              aria-label="Back to LMS"
+              title="Back to LMS"
               className="p-2.5 rounded-xl bg-white shadow-[4px_4px_8px_#e2e8f0,-4px_-4px_8px_#ffffff] text-slate-600 hover:shadow-[6px_6px_12px_#e2e8f0,-6px_-6px_12px_#ffffff] transition-all active:scale-95"
             >
               <ArrowLeft className="w-5 h-5" />
@@ -299,6 +302,7 @@ export default function UnifiedStaffPage() {
           
           <div className="flex items-center gap-3">
             <button
+              type="button"
               onClick={syncAllToLMS}
               disabled={syncing || stats.unsynced === 0}
               className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white font-medium rounded-xl shadow-lg shadow-emerald-500/30 hover:shadow-xl transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -349,6 +353,7 @@ export default function UnifiedStaffPage() {
             { id: "unsynced", label: "Needs Sync", count: stats.unsynced },
           ].map((tab) => (
             <button
+              type="button"
               key={tab.id}
               onClick={() => setActiveTab(tab.id as typeof activeTab)}
               className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all ${
@@ -374,6 +379,7 @@ export default function UnifiedStaffPage() {
           </div>
           <input
             type="text"
+            title="Search staff"
             placeholder="Search by name, email, branch, or role..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
@@ -487,6 +493,7 @@ export default function UnifiedStaffPage() {
                 <div className="flex items-center gap-2">
                   {member.source === "settings" && !member.isSynced && (
                     <button
+                      type="button"
                       onClick={() => syncUserToLMS(member)}
                       disabled={syncing}
                       className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white text-sm font-medium rounded-xl shadow-lg shadow-emerald-500/30 hover:shadow-xl transition-all active:scale-95 disabled:opacity-50"

@@ -1,7 +1,7 @@
 "use client";
 
 import { useLanguage } from "@/lib/LanguageContext";
-import { useTranslation, type Translations } from "@/lib/i18n";
+import { useTranslation, type Language, type Translations } from "@/lib/i18n";
 import { useAuthUser } from "@/app/components/AuthContext";
 import AddVehicleModalOptimistic from "@/app/components/vehicles/AddVehicleModalOptimistic";
 
@@ -10,6 +10,7 @@ import { ConfirmDeleteModal } from "@/app/components/vehicles/ConfirmDeleteModal
 import { useDeleteVehicle } from "@/app/components/vehicles/useDeleteVehicle";
 import { useToast } from "@/components/ui/glass/GlassToast";
 import { getVehicleThumbnailUrl } from "@/lib/vehicle-helpers";
+import { getVehicleColorHex, translateVehicleColor } from "@/lib/vehicleColors";
 import type { Vehicle } from "@/lib/types";
 import { cn } from "@/lib/ui";
 import { useVehiclesNeon, useVehicleStats } from "@/lib/useVehiclesNeon";
@@ -310,6 +311,7 @@ function NeuButton({
 
   return (
     <button
+      type="button"
       onClick={onClick}
       disabled={disabled || loading}
       className={cn(
@@ -348,6 +350,7 @@ function NeuInput({
       {Icon && <Icon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 dark:text-slate-500" />}
       <input
         type={type}
+        title={placeholder}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
@@ -536,7 +539,10 @@ function ViewToggle({
   return (
     <div className="flex items-center gap-1 rounded-xl bg-slate-100/80 p-1 shadow-[inset_2px_2px_4px_#cbd5e1,inset_-2px_-2px_4px_#ffffff] dark:bg-slate-800/80 dark:shadow-[inset_2px_2px_6px_rgba(2,6,23,0.65),inset_-2px_-2px_6px_rgba(51,65,85,0.22)]">
       <button
+        type="button"
         onClick={() => onChange("grid")}
+        aria-label={t.grid}
+        title={t.grid}
         className={cn(
           "flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200",
           view === "grid"
@@ -548,7 +554,10 @@ function ViewToggle({
         <span className="hidden sm:inline">{t.grid}</span>
       </button>
       <button
+        type="button"
         onClick={() => onChange("list")}
+        aria-label={t.list}
+        title={t.list}
         className={cn(
           "flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200",
           view === "list"
@@ -580,7 +589,11 @@ function TotalsToggle({
         All-time
       </span>
       <button
+        type="button"
         onClick={() => onChange(mode === "all" ? "filtered" : "all")}
+        aria-label="Toggle totals mode"
+        aria-pressed={mode === "filtered" ? "true" : "false"}
+        title="Toggle totals mode"
         className={cn(
 "relative w-12 h-6 rounded-full transition-colors duration-150 shadow-[inset_2px_2px_4px_#cbd5e1,inset_-2px_-2px_4px_#ffffff]",
           mode === "filtered" ? "bg-emerald-500" : "bg-slate-200 dark:bg-slate-800"
@@ -618,7 +631,10 @@ function FilterTag({
       <span className="text-emerald-500 dark:text-emerald-300">{label}:</span>
       <span className="font-semibold">{value}</span>
       <button
+        type="button"
         onClick={onRemove}
+        aria-label={`Remove ${label} filter`}
+        title={`Remove ${label} filter`}
         className="ml-1 rounded-full p-0.5 text-emerald-600 transition-colors hover:bg-emerald-200 hover:text-emerald-800 dark:text-emerald-300 dark:hover:bg-emerald-500/20 dark:hover:text-emerald-100"
       >
         <X className="w-3 h-3" />
@@ -682,7 +698,8 @@ function VehicleCard({
   onEdit,
   onDelete,
   getImageUrl,
-  t
+  t,
+  language
 }: {
   vehicle: Vehicle;
   isAdmin: boolean;
@@ -691,6 +708,7 @@ function VehicleCard({
   onDelete: (vehicle: Vehicle) => void;
   getImageUrl: (imageValue: unknown) => string | null;
   t: Translations;
+  language: Language;
 }) {
   const getCategoryColor = (category: string) => {
     const cat = category?.toLowerCase() || "";
@@ -707,6 +725,7 @@ function VehicleCard({
   };
 
   const imageUrl = getImageUrl(vehicle.Image);
+  const colorLabel = translateVehicleColor(vehicle.Color, language);
 
 return (
     <div className="group overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-[0_4px_20px_rgba(0,0,0,0.08)] transition-all duration-150 hover:border-emerald-200 hover:shadow-[0_8px_30px_rgba(0,0,0,0.12)] dark:border-slate-700/80 dark:bg-slate-900 dark:shadow-[0_16px_32px_rgba(2,6,23,0.45)] dark:hover:border-emerald-500/35 dark:hover:shadow-[0_20px_42px_rgba(2,6,23,0.62)]">
@@ -780,9 +799,10 @@ return (
               <span className="text-slate-400 dark:text-slate-500">{t.color}:</span>
               <span
                 className="h-4 w-4 rounded-full border border-slate-200 dark:border-slate-600"
-                style={{ backgroundColor: vehicle.Color.toLowerCase() }}
+                style={{ backgroundColor: getVehicleColorHex(vehicle.Color) }}
+                title={colorLabel}
               />
-              <span className="font-medium">{vehicle.Color}</span>
+              <span className="font-medium">{colorLabel}</span>
             </div>
           )}
           {vehicle.TaxType && (
@@ -1227,8 +1247,9 @@ const isTukTukCategory = useCallback((cat: string | undefined): boolean => {
         case "color": return "Unknown Color";
       }
     }
+    if (groupBy === "color") return translateVehicleColor(key, language);
     return key;
-  }, []);
+  }, [language]);
 
   const groupVehicles = useCallback((vehicles: Vehicle[], groupBy: GroupByOption): GroupedVehicles[] => {
     if (groupBy === "none") {
@@ -1812,8 +1833,11 @@ const getVehicleImageUrl = useCallback((imageValue: unknown): string | null => {
               {/* Columns Dropdown */}
               <div className="relative" ref={columnMenuRef}>
                 <button
+                  type="button"
                   ref={columnsButtonRef}
                   onClick={() => setShowColumnMenu(!showColumnMenu)}
+                  aria-expanded={showColumnMenu ? "true" : "false"}
+                  aria-haspopup="menu"
                   className={cn(
                     "flex items-center gap-2 px-4 py-2.5 rounded-xl font-medium text-sm",
                     "bg-gradient-to-br from-[#f8fafc] to-[#f1f5f9] text-slate-600 dark:from-slate-900 dark:to-slate-800 dark:text-slate-200",
@@ -1836,7 +1860,10 @@ const getVehicleImageUrl = useCallback((imageValue: unknown): string | null => {
                       <div className="flex items-center justify-between border-b border-slate-200 pb-2 dark:border-slate-700">
                         <span className="font-semibold text-slate-700 dark:text-slate-100">{t.visibleColumns}</span>
                         <button
+                          type="button"
                           onClick={() => setShowColumnMenu(false)}
+                          aria-label="Close columns menu"
+                          title="Close columns menu"
                           className="text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-100"
                         >
                           <X className="w-4 h-4" />
@@ -1862,12 +1889,14 @@ const getVehicleImageUrl = useCallback((imageValue: unknown): string | null => {
 
                       <div className="flex gap-2 border-t border-slate-200 pt-2 dark:border-slate-700">
                         <button
+                          type="button"
                           onClick={() => setVisibleColumns(COLUMNS.map(c => c.key))}
                           className="flex-1 rounded-lg bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-600 transition-colors hover:bg-emerald-100 dark:bg-emerald-500/15 dark:text-emerald-300 dark:hover:bg-emerald-500/25"
                         >
                           Select All
                         </button>
                         <button
+                          type="button"
                           onClick={() => setVisibleColumns(["image", "brand", "model", "actions"])}
                           className="flex-1 rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
                         >
@@ -1890,7 +1919,10 @@ const getVehicleImageUrl = useCallback((imageValue: unknown): string | null => {
                   Advanced Filters
                 </h4>
                 <button
+                  type="button"
                   onClick={() => setShowFilters(false)}
+                  aria-label="Close advanced filters"
+                  title="Close advanced filters"
                   className="text-slate-400 hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-200"
                 >
                   <X className="w-4 h-4" />
@@ -2205,6 +2237,7 @@ const getVehicleImageUrl = useCallback((imageValue: unknown): string | null => {
                       onDelete={handleDelete}
                       getImageUrl={getVehicleImageUrl}
                       t={t}
+                      language={language}
                     />
                   ))}
                 </div>
@@ -2372,10 +2405,13 @@ const getVehicleImageUrl = useCallback((imageValue: unknown): string | null => {
                                   {vehicle.Color && (
                                     <span
                                       className="h-4 w-4 rounded-full border border-slate-200 shadow-sm dark:border-slate-600"
-                                      style={{ backgroundColor: vehicle.Color.toLowerCase() }}
+                                      style={{ backgroundColor: getVehicleColorHex(vehicle.Color) }}
+                                      title={translateVehicleColor(vehicle.Color, language)}
                                     />
                                   )}
-                                  <span className="text-sm text-slate-700 dark:text-slate-300">{vehicle.Color || "-"}</span>
+                                  <span className="text-sm text-slate-700 dark:text-slate-300">
+                                    {translateVehicleColor(vehicle.Color, language)}
+                                  </span>
                                 </div>
                               </td>
                             )}
@@ -2532,8 +2568,11 @@ const getVehicleImageUrl = useCallback((imageValue: unknown): string | null => {
 
                     return (
                       <button
+                        type="button"
                         key={pageNum}
                         onClick={() => setCurrentPage(pageNum)}
+                        aria-label={`Go to page ${pageNum}`}
+                        aria-current={currentPage === pageNum ? "page" : undefined}
                         className={cn(
                           "h-10 w-10 rounded-lg text-sm font-medium transition-colors",
                           currentPage === pageNum

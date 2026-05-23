@@ -356,9 +356,12 @@ export default function CourseOverviewPage() {
       </div>
       
       {/* Lessons Grid */}
-      <main className="max-w-[1400px] mx-auto px-4 sm:px-6 py-8 sm:py-12">
+      <section
+        className="max-w-[1400px] mx-auto px-4 sm:px-6 py-8 sm:py-12"
+        aria-labelledby="course-content-heading"
+      >
         <div className="flex flex-col gap-3 mb-6 sm:flex-row sm:items-center sm:justify-between">
-          <h2 className="text-xl font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+          <h2 id="course-content-heading" className="text-xl font-semibold text-gray-900 dark:text-white flex items-center gap-2">
             <BarChart3 className="w-5 h-5 text-emerald-500" />
             Course Content
           </h2>
@@ -414,7 +417,7 @@ export default function CourseOverviewPage() {
             ))}
           </div>
         )}
-      </main>
+      </section>
     </div>
   );
 }

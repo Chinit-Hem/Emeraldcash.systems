@@ -87,7 +87,7 @@
 body {
   background-color: var(--bg-primary);
   color: var(--text-primary);
-  font-family: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
+  font-family: var(--font-inter), "Segoe UI", system-ui, -apple-system, sans-serif;
   min-height: 100%;
   margin: 0;
 }
@@ -143,14 +143,18 @@ body {
 
 .dark .ec-dark-scope .hover\:bg-slate-50:hover,
 .dark .ec-dark-scope .hover\:bg-slate-100:hover,
+.dark .ec-dark-scope .hover\:bg-slate-200:hover,
 .dark .ec-dark-scope .hover\:bg-gray-50:hover,
 .dark .ec-dark-scope .hover\:bg-gray-100:hover,
+.dark .ec-dark-scope .hover\:bg-gray-200:hover,
 .dark .ec-dark-scope .active\:bg-slate-100:active,
 .dark .ec-dark-scope .active\:bg-gray-100:active,
 [data-theme="dark"] .ec-dark-scope .hover\:bg-slate-50:hover,
 [data-theme="dark"] .ec-dark-scope .hover\:bg-slate-100:hover,
+[data-theme="dark"] .ec-dark-scope .hover\:bg-slate-200:hover,
 [data-theme="dark"] .ec-dark-scope .hover\:bg-gray-50:hover,
 [data-theme="dark"] .ec-dark-scope .hover\:bg-gray-100:hover,
+[data-theme="dark"] .ec-dark-scope .hover\:bg-gray-200:hover,
 [data-theme="dark"] .ec-dark-scope .active\:bg-slate-100:active,
 [data-theme="dark"] .ec-dark-scope .active\:bg-gray-100:active {
   background-color: rgb(30, 41, 59) !important;
@@ -158,15 +162,19 @@ body {
 
 .dark .ec-dark-scope .bg-emerald-50,
 .dark .ec-dark-scope .bg-emerald-100,
+.dark .ec-dark-scope .bg-emerald-50\/50,
 [data-theme="dark"] .ec-dark-scope .bg-emerald-50,
-[data-theme="dark"] .ec-dark-scope .bg-emerald-100 {
+[data-theme="dark"] .ec-dark-scope .bg-emerald-100,
+[data-theme="dark"] .ec-dark-scope .bg-emerald-50\/50 {
   background-color: rgba(16, 185, 129, 0.16) !important;
 }
 
 .dark .ec-dark-scope .bg-blue-50,
 .dark .ec-dark-scope .bg-blue-100,
+.dark .ec-dark-scope .bg-blue-50\/50,
 [data-theme="dark"] .ec-dark-scope .bg-blue-50,
-[data-theme="dark"] .ec-dark-scope .bg-blue-100 {
+[data-theme="dark"] .ec-dark-scope .bg-blue-100,
+[data-theme="dark"] .ec-dark-scope .bg-blue-50\/50 {
   background-color: rgba(59, 130, 246, 0.16) !important;
 }
 
@@ -193,9 +201,24 @@ body {
 
 .dark .ec-dark-scope .bg-red-50,
 .dark .ec-dark-scope .bg-red-100,
+.dark .ec-dark-scope .bg-red-50\/50,
+.dark .ec-dark-scope .bg-red-50\/70,
+.dark .ec-dark-scope .bg-red-50\/90,
 [data-theme="dark"] .ec-dark-scope .bg-red-50,
-[data-theme="dark"] .ec-dark-scope .bg-red-100 {
+[data-theme="dark"] .ec-dark-scope .bg-red-100,
+[data-theme="dark"] .ec-dark-scope .bg-red-50\/50,
+[data-theme="dark"] .ec-dark-scope .bg-red-50\/70,
+[data-theme="dark"] .ec-dark-scope .bg-red-50\/90 {
   background-color: rgba(239, 68, 68, 0.16) !important;
+}
+
+.dark .ec-dark-scope .bg-rose-50,
+.dark .ec-dark-scope .bg-rose-100,
+.dark .ec-dark-scope .bg-rose-50\/50,
+[data-theme="dark"] .ec-dark-scope .bg-rose-50,
+[data-theme="dark"] .ec-dark-scope .bg-rose-100,
+[data-theme="dark"] .ec-dark-scope .bg-rose-50\/50 {
+  background-color: rgba(244, 63, 94, 0.16) !important;
 }
 
 .dark .ec-dark-scope [class~="text-[#1a1a2e]"],
@@ -249,6 +272,34 @@ body {
 [data-theme="dark"] .ec-dark-scope .border-gray-200,
 [data-theme="dark"] .ec-dark-scope .border-gray-300 {
   border-color: rgb(51, 65, 85) !important;
+}
+
+.dark .ec-dark-scope .border-emerald-100,
+.dark .ec-dark-scope .border-emerald-200,
+[data-theme="dark"] .ec-dark-scope .border-emerald-100,
+[data-theme="dark"] .ec-dark-scope .border-emerald-200 {
+  border-color: rgba(16, 185, 129, 0.28) !important;
+}
+
+.dark .ec-dark-scope .border-blue-100,
+.dark .ec-dark-scope .border-blue-200,
+[data-theme="dark"] .ec-dark-scope .border-blue-100,
+[data-theme="dark"] .ec-dark-scope .border-blue-200 {
+  border-color: rgba(59, 130, 246, 0.28) !important;
+}
+
+.dark .ec-dark-scope .border-rose-100,
+.dark .ec-dark-scope .border-rose-200,
+[data-theme="dark"] .ec-dark-scope .border-rose-100,
+[data-theme="dark"] .ec-dark-scope .border-rose-200 {
+  border-color: rgba(244, 63, 94, 0.28) !important;
+}
+
+.dark .ec-dark-scope .hover\:border-slate-300:hover,
+.dark .ec-dark-scope .hover\:border-gray-300:hover,
+[data-theme="dark"] .ec-dark-scope .hover\:border-slate-300:hover,
+[data-theme="dark"] .ec-dark-scope .hover\:border-gray-300:hover {
+  border-color: rgb(71, 85, 105) !important;
 }
 
 .dark .ec-dark-scope .ring-slate-100,
@@ -826,9 +877,9 @@ textarea::placeholder {
 
 /* ================= KHMER FONT: KANTUMRUY PRO ================= */
 
-/* Base font stack includes Kantumruy Pro as fallback */
+/* Base Latin stack; Khmer switches on through html[lang="km"] below. */
 body {
-  font-family: "Inter", "Kantumruy Pro", "Segoe UI", system-ui, -apple-system, sans-serif;
+  font-family: var(--font-inter), "Segoe UI", system-ui, -apple-system, sans-serif;
 }
 
 /* When language is set to Khmer, apply Kantumruy Pro to ALL elements */
@@ -836,7 +887,7 @@ html[lang="km"],
 html[lang="km"] *,
 html[lang="km"] *::before,
 html[lang="km"] *::after {
-  font-family: "Kantumruy Pro", "Inter", system-ui, sans-serif !important;
+  font-family: var(--font-kantumruy-pro), var(--font-inter), system-ui, sans-serif !important;
 }
 
 /* Titles and bold text use Kantumruy Pro Bold (weight 700) */
@@ -853,7 +904,7 @@ html[lang="km"] .text-3xl,
 html[lang="km"] .text-4xl,
 html[lang="km"] .text-5xl,
 html[lang="km"] .text-xl {
-  font-family: "Kantumruy Pro", "Inter", system-ui, sans-serif !important;
+  font-family: var(--font-kantumruy-pro), var(--font-inter), system-ui, sans-serif !important;
   font-weight: 700 !important;
 }
 

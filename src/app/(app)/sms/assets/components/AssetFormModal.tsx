@@ -295,7 +295,9 @@ const handleSubmit = async (e: React.FormEvent) => {
               </div>
             </div>
             <button
+              type="button"
               onClick={onClose}
+              aria-label="Close asset form"
               className="rounded-lg p-2 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900 dark:hover:bg-gray-800 dark:hover:text-white"
               disabled={loading}
               title="Close modal"
@@ -322,6 +324,7 @@ const handleSubmit = async (e: React.FormEvent) => {
               </label>
               <input
                 type="text"
+                title="Asset name"
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                 className={smsInputClass}
@@ -340,6 +343,7 @@ const handleSubmit = async (e: React.FormEvent) => {
               <label className={smsLabelClass}>Item Code</label>
               <input
                 type="text"
+                title="Item code"
                 value={formData.itemCode || ''}
                 onChange={(e) => setFormData({ ...formData, itemCode: e.target.value })}
                 className={smsInputClass}
@@ -356,6 +360,7 @@ const handleSubmit = async (e: React.FormEvent) => {
               <input
                 list="asset-types"
                 type="text"
+                title="Asset type"
                 value={formData.type}
                 onChange={(e) => setFormData({ ...formData, type: e.target.value })}
                 className={smsInputClass}
@@ -382,6 +387,7 @@ const handleSubmit = async (e: React.FormEvent) => {
               <label className={smsLabelClass}>Category</label>
               <input
                 type="text"
+                title="Asset category"
                 value={formData.category || ''}
                 onChange={(e) => setFormData({ ...formData, category: e.target.value })}
                 className={smsInputClass}
@@ -396,6 +402,7 @@ const handleSubmit = async (e: React.FormEvent) => {
               <label className={smsLabelClass}>Quantity</label>
               <input
                 type="number"
+                title="Quantity"
                 min="1"
                 max="999"
                 value={formData.quantity || 1}
@@ -415,6 +422,7 @@ const handleSubmit = async (e: React.FormEvent) => {
               <label className={smsLabelClass}>Location</label>
               <input
                 type="text"
+                title="Location"
                 value={formData.location || ''}
                 onChange={(e) => setFormData({ ...formData, location: e.target.value })}
                 className={smsInputClass}
@@ -426,6 +434,7 @@ const handleSubmit = async (e: React.FormEvent) => {
               <label className={smsLabelClass}>Assigned To</label>
               <input
                 type="text"
+                title="Assigned to"
                 value={formData.assignedTo || ''}
                 onChange={(e) => setFormData({ ...formData, assignedTo: e.target.value })}
                 className={smsInputClass}
@@ -471,6 +480,7 @@ const handleSubmit = async (e: React.FormEvent) => {
               <input
                 id="image-upload"
                 type="file"
+                title="Upload asset image"
                 accept="image/*"
                 onChange={handleImageUpload}
                 disabled={loading}
@@ -532,6 +542,7 @@ const handleSubmit = async (e: React.FormEvent) => {
             <div>
               <label className={smsLabelClass}>Description</label>
               <textarea
+                title="Description"
                 rows={4}
                 value={formData.description || ''}
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
@@ -543,6 +554,7 @@ const handleSubmit = async (e: React.FormEvent) => {
               <label className={smsLabelClass}>Reference ID</label>
               <input
                 type="text"
+                title="Reference ID"
                 value={formData.refId || ''}
                 onChange={(e) => setFormData({ ...formData, refId: e.target.value })}
                 className={smsInputClass}

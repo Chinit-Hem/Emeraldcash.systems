@@ -493,6 +493,7 @@ export default function SettingsContent() {
                     </label>
                     <input
                       type="text"
+                      title={t.username}
                       value={newUsername}
                       onChange={(e) => setNewUsername(e.target.value)}
                       placeholder={t.enterUsername}
@@ -504,6 +505,7 @@ export default function SettingsContent() {
                       {t.role}
                     </label>
                     <select
+                      title={t.role}
                       value={newRole}
                       onChange={(e) => setNewRole(e.target.value as Role)}
                       className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 shadow-sm hover:shadow-md dark:shadow-slate-900/20 dark:hover:shadow-slate-900/40 transition-all"
@@ -519,6 +521,7 @@ export default function SettingsContent() {
                     </label>
                     <input
                       type="password"
+                      title={t.password}
                       value={newPassword}
                       onChange={(e) => setNewPassword(e.target.value)}
                       placeholder={t.enterPassword}
@@ -531,6 +534,7 @@ export default function SettingsContent() {
                     </label>
                     <input
                       type="password"
+                      title={t.confirmPassword}
                       value={confirmPassword}
                       onChange={(e) => setConfirmPassword(e.target.value)}
                       placeholder={t.confirmPassword}
@@ -627,6 +631,7 @@ export default function SettingsContent() {
                     )}
                     <div className="flex items-center justify-center gap-2">
                       <button
+                        type="button"
                         onClick={() => loadUsers()}
                         className="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-sm font-medium hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
                       >
@@ -634,6 +639,7 @@ export default function SettingsContent() {
                       </button>
                       {usersError.includes("Access denied") && (
                         <button
+                          type="button"
                           onClick={handleLogout}
                           className="px-4 py-2 rounded-xl bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 text-sm font-medium hover:bg-amber-200 dark:hover:bg-amber-900/60 transition-colors"
                         >
@@ -690,15 +696,21 @@ export default function SettingsContent() {
 
                         <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                           <button
+                            type="button"
                             onClick={() => startEditUser(managedUser)}
                             disabled={editingUser !== null}
+                            aria-label={`${t.edit} ${managedUser.full_name || managedUser.username}`}
+                            title={`${t.edit} ${managedUser.full_name || managedUser.username}`}
                             className="p-2 rounded-xl bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400 hover:bg-blue-200 dark:hover:bg-blue-900/60 transition-colors"
                           >
                             <Edit3 className="w-4 h-4" />
                           </button>
                           <button
+                            type="button"
                             onClick={() => handleDeleteUser(managedUser.username)}
                             disabled={deletingUser === managedUser.username || managedUser.username === user.username || editingUser !== null}
+                            aria-label={`${t.delete} ${managedUser.full_name || managedUser.username}`}
+                            title={`${t.delete} ${managedUser.full_name || managedUser.username}`}
                             className="p-2 rounded-xl bg-red-100 dark:bg-red-900/40 text-red-600 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-900/60 transition-colors disabled:opacity-50"
                           >
                             {deletingUser === managedUser.username ? (
@@ -840,7 +852,10 @@ export default function SettingsContent() {
                   </div>
                 </div>
                 <button
+                  type="button"
                   onClick={cancelEdit}
+                  aria-label={t.cancel}
+                  title={t.cancel}
                   className="p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
                 >
                   <X className="w-5 h-5 text-slate-500" />
@@ -884,6 +899,7 @@ export default function SettingsContent() {
                 <input
                   ref={fileInputRef}
                   type="file"
+                  title={t.change}
                   accept="image/*"
                   onChange={handleAvatarUpload}
                   className="hidden"
@@ -908,6 +924,7 @@ export default function SettingsContent() {
                   </label>
                   <input
                     type="text"
+                    title={t.fullName}
                     value={editFullName}
                     onChange={(e) => setEditFullName(e.target.value)}
                     placeholder={t.enterFullName}
@@ -922,6 +939,7 @@ export default function SettingsContent() {
                     <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
                     <input
                       type="email"
+                      title={t.email}
                       value={editEmail}
                       onChange={(e) => setEditEmail(e.target.value)}
                       placeholder={t.enterEmail}
@@ -937,6 +955,7 @@ export default function SettingsContent() {
                     <Phone className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
                     <input
                       type="tel"
+                      title={t.phone}
                       value={editPhone}
                       onChange={(e) => setEditPhone(e.target.value)}
                       placeholder={t.enterPhone}

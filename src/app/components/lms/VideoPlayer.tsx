@@ -1182,7 +1182,7 @@ const handleSeekCommit = (event: React.PointerEvent<HTMLInputElement>) => {
           )}
         </header>
 
-        <main className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
           <section className="space-y-4 lg:col-span-2">
             <div
               ref={containerRef}
@@ -1507,7 +1507,7 @@ const handleSeekCommit = (event: React.PointerEvent<HTMLInputElement>) => {
               </GlassCard>
             </aside>
           )}
-        </main>
+        </div>
 
         {!isCompleted && (
           <GlassCard className="rounded-2xl border-emerald-200 bg-gradient-to-r from-emerald-50 to-teal-50 p-6 dark:border-emerald-800 dark:from-emerald-900/20 dark:to-teal-900/20">

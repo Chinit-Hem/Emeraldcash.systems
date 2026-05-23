@@ -1,10 +1,30 @@
 import type { Metadata, Viewport } from "next";
+import { Inter, Kantumruy_Pro } from "next/font/google";
 import { Suspense } from "react";
 import "../styles/globals.css";
 import { ThemeProvider } from "@/lib/theme-provider";
 import { LanguageProvider } from "@/lib/LanguageContext";
 import { InstantNavigationProvider } from "@/app/components/InstantNavigationProvider";
 import { NeuDashboardSkeleton } from "@/app/components/skeletons/NeuDashboardSkeleton";
+
+const inter = Inter({
+  subsets: ["latin"],
+  display: "optional",
+  variable: "--font-inter",
+});
+
+const kantumruyPro = Kantumruy_Pro({
+  subsets: ["khmer", "latin"],
+  weight: ["300", "400", "700"],
+  display: "swap",
+  preload: false,
+  variable: "--font-kantumruy-pro",
+});
+
+const appUrl =
+  process.env.NEXT_PUBLIC_APP_URL ||
+  process.env.NEXT_PUBLIC_APP_ORIGIN ||
+  "http://localhost:3000";
 
 const themeInitScript = `
   (function () {
@@ -74,10 +94,49 @@ const languageInitScript = `
 `;
 
 export const metadata: Metadata = {
-  title: "Emerald Cash Systems",
-  description: "Vehicle Management System by Emerald Cash",
+  metadataBase: new URL(appUrl),
+  applicationName: "Emerald Cash Systems",
+  title: {
+    default: "Emerald Cash Systems",
+    template: "%s | Emerald Cash Systems",
+  },
+  description:
+    "Vehicle inventory, stock management, and staff training tools for Emerald Cash operations.",
+  manifest: "/manifest.webmanifest",
+  appleWebApp: {
+    capable: true,
+    title: "Emerald Cash",
+    statusBarStyle: "default",
+  },
+  openGraph: {
+    type: "website",
+    siteName: "Emerald Cash Systems",
+    title: "Emerald Cash Systems",
+    description:
+      "Vehicle inventory, stock management, and staff training tools for Emerald Cash operations.",
+    images: [
+      {
+        url: "/logo.png",
+        width: 512,
+        height: 512,
+        alt: "Emerald Cash logo",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary",
+    title: "Emerald Cash Systems",
+    description:
+      "Vehicle inventory, stock management, and staff training tools for Emerald Cash operations.",
+    images: ["/logo.png"],
+  },
+  robots: {
+    index: true,
+    follow: true,
+  },
   icons: {
     icon: "/favicon.ico",
+    apple: "/apple-touch-icon.png",
   },
 };
 
@@ -85,8 +144,6 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  maximumScale: 1,
-  userScalable: false,
   viewportFit: "cover",
   themeColor: "#ecfdf5",
 };
@@ -97,23 +154,13 @@ export default async function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" dir="ltr" suppressHydrationWarning>
+    <html
+      lang="en"
+      dir="ltr"
+      className={`${inter.variable} ${kantumruyPro.variable}`}
+      suppressHydrationWarning
+    >
       <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link
-          rel="preload"
-          as="style"
-          href="https://fonts.googleapis.com/css2?family=Kantumruy+Pro:wght@300;400;700&display=swap"
-        />
-        <link
-          id="kantumruy-font"
-          href="https://fonts.googleapis.com/css2?family=Kantumruy+Pro:wght@300;400;700&display=swap"
-          rel="stylesheet"
-        />
-        <noscript>
-          <link href="https://fonts.googleapis.com/css2?family=Kantumruy+Pro:wght@300;400;700&display=swap" rel="stylesheet" />
-        </noscript>
         <script id="ios-safari-guard" dangerouslySetInnerHTML={{ __html: iosSafariGuardScript }} />
         <script id="language-init" dangerouslySetInnerHTML={{ __html: languageInitScript }} />
         <script id="theme-init" dangerouslySetInnerHTML={{ __html: themeInitScript }} />
