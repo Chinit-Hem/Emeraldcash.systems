@@ -248,13 +248,13 @@ function AppShellContent({ children }: AppShellProps) {
           aria-hidden={!isSidebarOpen}
         >
           <div
-            className={`absolute inset-0 bg-slate-900/30 backdrop-blur-sm transition-opacity duration-75 ${isSidebarOpen ? "opacity-100" : "opacity-0"}`}
+            className={`absolute inset-0 bg-slate-900/30 backdrop-blur-sm transition-opacity duration-200 motion-reduce:transition-none ${isSidebarOpen ? "opacity-100" : "opacity-0"}`}
             onClick={closeSidebar}
             aria-hidden="true"
           />
           <div
             id={drawerId}
-            className={`absolute inset-y-0 left-0 h-full w-[280px] max-w-[85vw] overflow-hidden bg-neu-bg shadow-neu-flat-lg transition-transform duration-75 ease-out ${isSidebarOpen ? "translate-x-0" : "-translate-x-full"}`}
+            className={`absolute inset-y-0 left-0 h-full w-[280px] max-w-[85vw] overflow-hidden bg-neu-bg shadow-neu-flat-lg transition-transform duration-200 ease-out will-change-transform motion-reduce:transition-none ${isSidebarOpen ? "translate-x-0" : "-translate-x-full"}`}
             role="dialog"
             aria-modal={isSidebarOpen ? "true" : undefined}
             aria-label="Navigation menu"
@@ -277,9 +277,8 @@ function AppShellContent({ children }: AppShellProps) {
           <header className={mobileHeaderClass}>
             <div className="h-14 px-4 flex items-center justify-between max-w-[100vw]">
               <button
-                onPointerDown={openSidebar}
                 onClick={openSidebar}
-                className="neu-icon-btn touch-target"
+                className="neu-icon-btn touch-target touch-manipulation"
                 aria-label="Open navigation menu"
                 aria-controls={drawerId}
                 aria-expanded={isSidebarOpen}
@@ -311,7 +310,7 @@ function AppShellContent({ children }: AppShellProps) {
           </header>
 
           {/* Main content - Add padding-top to account for fixed header on mobile */}
-          <main ref={mainRef} className="flex-1 overflow-auto pt-4 lg:pt-0">
+          <main ref={mainRef} className="flex-1 overflow-y-auto overflow-x-hidden pt-4 lg:pt-0">
             {children}
           </main>
         </div>

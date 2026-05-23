@@ -746,32 +746,32 @@ export default function SettingsContent() {
                 </div>
               </div>
               
-              <div className="p-6 space-y-4">
+              <div className="p-4 space-y-4 sm:p-6">
                 {/* Dark Mode Toggle */}
-                <div className="flex items-center justify-between p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200/50 dark:border-slate-700/50">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-xl bg-indigo-100 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400">
+                <div className="flex flex-col gap-4 p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200/50 dark:border-slate-700/50 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex min-w-0 items-center gap-3">
+                    <div className="shrink-0 p-2 rounded-xl bg-indigo-100 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400">
                       {language === 'km' ? (
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" /></svg>
                       ) : (
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
                       )}
                     </div>
-                    <div>
+                    <div className="min-w-0">
                       <p className="font-medium text-slate-800 dark:text-white">{language === 'km' ? 'របៀបងងឹត' : 'Dark Mode'}</p>
                       <p className="text-sm text-slate-500 dark:text-slate-400">{language === 'km' ? 'ជ្រើសរើសរូបរាងកម្មវិធី' : 'Choose the app theme'}</p>
                     </div>
                   </div>
-                  <ThemeToggle />
+                  <ThemeToggle className="w-full sm:w-auto" />
                 </div>
 
                 {/* Language Selector */}
-                <div className="flex items-center justify-between p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200/50 dark:border-slate-700/50">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-xl bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600 dark:text-emerald-400">
+                <div className="flex flex-col gap-4 p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200/50 dark:border-slate-700/50 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex min-w-0 items-center gap-3">
+                    <div className="shrink-0 p-2 rounded-xl bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600 dark:text-emerald-400">
                       <Globe className="w-5 h-5" />
                     </div>
-                    <div>
+                    <div className="min-w-0">
                       <p className="font-medium text-slate-800 dark:text-white">{t.language}</p>
 <p className="text-sm text-slate-500 dark:text-slate-400">
   Current: {language === 'km' ? t.khmer : t.english}
@@ -780,7 +780,7 @@ export default function SettingsContent() {
                   </div>
                   <button
                     onClick={toggleLanguage}
-                    className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 text-white font-medium shadow-lg shadow-emerald-500/25 hover:shadow-emerald-500/40 hover:scale-105 active:scale-95 transition-all duration-300"
+                    className="flex w-full items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 text-white font-medium shadow-lg shadow-emerald-500/25 hover:shadow-emerald-500/40 hover:scale-105 active:scale-95 transition-all duration-300 sm:w-auto"
                   >
                     {language === 'en' ? (
                       <>

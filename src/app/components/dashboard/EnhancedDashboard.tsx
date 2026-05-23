@@ -228,14 +228,14 @@ function MobileSafeChartSummary({
   }
 
   return (
-    <div className="h-full min-h-[240px] rounded-2xl bg-slate-50 p-5 flex flex-col justify-center gap-4">
+    <div className="h-full min-h-[240px] min-w-0 rounded-2xl bg-slate-50 p-5 flex flex-col justify-center gap-4">
       {visibleData.map((item) => {
         const width = Math.max((item.value / maxValue) * 100, 6);
 
         return (
           <div key={item.name} className="space-y-2">
-            <div className="flex items-center justify-between gap-3 text-sm">
-              <span className="font-medium text-slate-800 truncate">{item.name}</span>
+            <div className="flex min-w-0 items-center justify-between gap-3 text-sm">
+              <span className="min-w-0 truncate font-medium text-slate-800">{item.name}</span>
               <span className="font-semibold text-slate-800 tabular-nums">{item.value.toLocaleString()}</span>
             </div>
             <div className="h-2.5 rounded-full bg-slate-200 overflow-hidden">
@@ -566,21 +566,21 @@ export default function EnhancedDashboard({
   const useMobileSafeCharts = isIOSSafari;
 
   return (
-    <div className="ec-dark-scope min-h-screen bg-gradient-to-br from-slate-50 via-slate-100 to-slate-200 dark:from-slate-950 dark:via-slate-950 dark:to-slate-900">
+    <div className="ec-dark-scope min-h-screen w-full overflow-x-hidden bg-gradient-to-br from-slate-50 via-slate-100 to-slate-200 dark:from-slate-950 dark:via-slate-950 dark:to-slate-900">
       {/* Top Navigation Bar */}
       <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-xl border-b border-slate-200/50 dark:border-slate-800 dark:bg-slate-950/85">
-        <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-3">
+        <div className="mx-auto flex h-16 max-w-[1600px] min-w-0 items-center justify-between gap-3 px-4 sm:px-6 lg:px-8">
+          <div className="flex min-w-0 items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-600 shadow-lg shadow-emerald-500/30 flex items-center justify-center">
               <Car className="w-5 h-5 text-white" />
             </div>
-            <div>
-              <h1 className="text-xl font-bold text-slate-800 dark:text-slate-100">{t.dashboard}</h1>
-              <p className="text-xs text-slate-500 dark:text-slate-400">{language === 'km' ? 'វិភាគស្តុកយានយន្តពេលវេលាពិត' : 'Real-time inventory analytics'}</p>
+            <div className="min-w-0">
+              <h1 className="truncate text-xl font-bold text-slate-800 dark:text-slate-100">{t.dashboard}</h1>
+              <p className="truncate text-xs text-slate-500 dark:text-slate-400">{language === 'km' ? 'វិភាគស្តុកយានយន្តពេលវេលាពិត' : 'Real-time inventory analytics'}</p>
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex flex-shrink-0 items-center gap-2 sm:gap-3">
             <button
               onClick={handleRefresh}
               disabled={isRefreshing}
@@ -595,36 +595,40 @@ export default function EnhancedDashboard({
               {language === 'km' ? 'ទាញយក' : 'Export'}
             </button>
 
-            <button className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-600 text-white font-medium shadow-lg shadow-emerald-500/30 hover:shadow-xl hover:shadow-emerald-500/40 transition-all active:scale-95">
+            <button
+              className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-600 px-3 py-2.5 font-medium text-white shadow-lg shadow-emerald-500/30 transition-all hover:shadow-xl hover:shadow-emerald-500/40 active:scale-95 sm:px-4"
+              aria-label={t.filter}
+              title={t.filter}
+            >
               <Filter className="w-4 h-4" />
-              {t.filter}
+              <span className="hidden sm:inline">{t.filter}</span>
             </button>
           </div>
         </div>
       </header>
 
-      <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="mx-auto w-full max-w-[1600px] min-w-0 px-3 py-8 sm:px-6 lg:px-8">
         <div className="space-y-8 animate-fade-in">
           {/* Quick Filters - Beautiful Vehicle Category Cards */}
           <div className="space-y-6">
             {/* Section Header */}
-            <div className="flex items-center justify-between">
-              <div>
+            <div className="flex flex-wrap items-end justify-between gap-3">
+              <div className="min-w-0">
                 <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-100">Quick Filters</h2>
                 <p className="text-sm text-slate-500 mt-1 dark:text-slate-400">Filter vehicles by category</p>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-shrink-0 items-center gap-2">
                 <span className="text-sm text-slate-400 dark:text-slate-500">Total Inventory</span>
                 <span className="text-2xl font-bold text-slate-800 dark:text-slate-100">{totalVehicles.toLocaleString()}</span>
               </div>
             </div>
 
             {/* Vehicle Category Cards Grid */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+            <div className="grid min-w-0 grid-cols-2 gap-3 sm:gap-6 lg:grid-cols-4">
               {/* All Vehicles Card */}
               <Link
                 href="/vehicles"
-                className="group relative overflow-hidden rounded-3xl p-6 bg-gradient-to-br from-white to-slate-50 shadow-sm hover:bg-slate-50 transition-all duration-500 hover:-translate-y-1 dark:from-slate-900 dark:to-slate-800 dark:ring-1 dark:ring-slate-800 dark:hover:bg-slate-800"
+                className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-white to-slate-50 p-4 shadow-sm transition-all duration-500 hover:-translate-y-1 hover:bg-slate-50 dark:from-slate-900 dark:to-slate-800 dark:ring-1 dark:ring-slate-800 dark:hover:bg-slate-800 sm:rounded-3xl sm:p-6"
               >
                 {/* Animated Background Gradient */}
                 <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/5 via-teal-500/5 to-cyan-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
@@ -632,12 +636,12 @@ export default function EnhancedDashboard({
                 {/* Content */}
                 <div className="relative">
                   {/* Icon & Count Row */}
-                  <div className="flex items-start justify-between mb-4">
-                    <div className="p-3 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 shadow-lg shadow-emerald-500/30 group-hover:shadow-emerald-500/40 group-hover:scale-110 transition-all duration-300">
-                      <Package className="w-7 h-7 text-white" />
+                  <div className="mb-4 flex items-start justify-between gap-3">
+                    <div className="rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 p-2.5 shadow-lg shadow-emerald-500/30 transition-all duration-300 group-hover:scale-110 group-hover:shadow-emerald-500/40 sm:p-3">
+                      <Package className="h-6 w-6 text-white sm:h-7 sm:w-7" />
                     </div>
-                    <div className="text-right">
-                      <span className="text-4xl font-bold text-slate-800 group-hover:text-emerald-600 transition-colors duration-300 dark:text-slate-100 dark:group-hover:text-emerald-300">
+                    <div className="min-w-0 text-right">
+                      <span className="text-3xl font-bold text-slate-800 transition-colors duration-300 group-hover:text-emerald-600 dark:text-slate-100 dark:group-hover:text-emerald-300 sm:text-4xl">
                         {totalVehicles.toLocaleString()}
                       </span>
                     </div>
@@ -645,8 +649,8 @@ export default function EnhancedDashboard({
 
                   {/* Label & Action */}
                   <div>
-                    <h3 className="text-lg font-bold text-slate-800 mb-1 dark:text-slate-100">All Vehicles</h3>
-                    <p className="text-sm text-slate-500 mb-3 dark:text-slate-400">View complete inventory</p>
+                    <h3 className="mb-1 text-base font-bold text-slate-800 dark:text-slate-100 sm:text-lg">All Vehicles</h3>
+                    <p className="mb-3 text-xs text-slate-500 dark:text-slate-400 sm:text-sm">View complete inventory</p>
 
                     {/* Progress Bar */}
                     <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden dark:bg-slate-800">
@@ -664,25 +668,25 @@ export default function EnhancedDashboard({
               {/* Cars Card */}
               <Link
                 href="/vehicles?category=Cars"
-                className="group relative overflow-hidden rounded-3xl p-6 bg-gradient-to-br from-white to-blue-50/30 shadow-sm hover:bg-slate-50 transition-all duration-500 hover:-translate-y-1 dark:from-slate-900 dark:to-slate-800 dark:ring-1 dark:ring-slate-800 dark:hover:bg-slate-800"
+                className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-white to-blue-50/30 p-4 shadow-sm transition-all duration-500 hover:-translate-y-1 hover:bg-slate-50 dark:from-slate-900 dark:to-slate-800 dark:ring-1 dark:ring-slate-800 dark:hover:bg-slate-800 sm:rounded-3xl sm:p-6"
               >
                 <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 via-indigo-500/5 to-violet-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
 
                 <div className="relative">
-                  <div className="flex items-start justify-between mb-4">
-                    <div className="p-3 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 shadow-lg shadow-blue-500/30 group-hover:shadow-blue-500/40 group-hover:scale-110 transition-all duration-300">
-                      <Car className="w-7 h-7 text-white" />
+                  <div className="mb-4 flex items-start justify-between gap-3">
+                    <div className="rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 p-2.5 shadow-lg shadow-blue-500/30 transition-all duration-300 group-hover:scale-110 group-hover:shadow-blue-500/40 sm:p-3">
+                      <Car className="h-6 w-6 text-white sm:h-7 sm:w-7" />
                     </div>
-                    <div className="text-right">
-                      <span className="text-4xl font-bold text-slate-800 group-hover:text-blue-600 transition-colors duration-300 dark:text-slate-100 dark:group-hover:text-blue-300">
+                    <div className="min-w-0 text-right">
+                      <span className="text-3xl font-bold text-slate-800 transition-colors duration-300 group-hover:text-blue-600 dark:text-slate-100 dark:group-hover:text-blue-300 sm:text-4xl">
                         {carsCount.toLocaleString()}
                       </span>
                     </div>
                   </div>
 
                   <div>
-                    <h3 className="text-lg font-bold text-slate-800 mb-1 dark:text-slate-100">Cars</h3>
-                    <p className="text-sm text-slate-500 mb-3 dark:text-slate-400">Sedans, SUVs, Trucks</p>
+                    <h3 className="mb-1 text-base font-bold text-slate-800 dark:text-slate-100 sm:text-lg">Cars</h3>
+                    <p className="mb-3 text-xs text-slate-500 dark:text-slate-400 sm:text-sm">Sedans, SUVs, Trucks</p>
 
                     <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden dark:bg-slate-800">
                       <div
@@ -701,25 +705,25 @@ export default function EnhancedDashboard({
               {/* Motorcycles Card */}
               <Link
                 href="/vehicles?category=Motorcycles"
-                className="group relative overflow-hidden rounded-3xl p-6 bg-gradient-to-br from-white to-violet-50/30 shadow-sm hover:bg-slate-50 transition-all duration-500 hover:-translate-y-1 dark:from-slate-900 dark:to-slate-800 dark:ring-1 dark:ring-slate-800 dark:hover:bg-slate-800"
+                className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-white to-violet-50/30 p-4 shadow-sm transition-all duration-500 hover:-translate-y-1 hover:bg-slate-50 dark:from-slate-900 dark:to-slate-800 dark:ring-1 dark:ring-slate-800 dark:hover:bg-slate-800 sm:rounded-3xl sm:p-6"
               >
                 <div className="absolute inset-0 bg-gradient-to-br from-violet-500/5 via-purple-500/5 to-fuchsia-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
 
                 <div className="relative">
-                  <div className="flex items-start justify-between mb-4">
-                    <div className="p-3 rounded-2xl bg-gradient-to-br from-violet-500 to-purple-600 shadow-lg shadow-violet-500/30 group-hover:shadow-violet-500/40 group-hover:scale-110 transition-all duration-300">
-                      <Bike className="w-7 h-7 text-white" />
+                  <div className="mb-4 flex items-start justify-between gap-3">
+                    <div className="rounded-2xl bg-gradient-to-br from-violet-500 to-purple-600 p-2.5 shadow-lg shadow-violet-500/30 transition-all duration-300 group-hover:scale-110 group-hover:shadow-violet-500/40 sm:p-3">
+                      <Bike className="h-6 w-6 text-white sm:h-7 sm:w-7" />
                     </div>
-                    <div className="text-right">
-                      <span className="text-4xl font-bold text-slate-800 group-hover:text-violet-600 transition-colors duration-300 dark:text-slate-100 dark:group-hover:text-violet-300">
+                    <div className="min-w-0 text-right">
+                      <span className="text-3xl font-bold text-slate-800 transition-colors duration-300 group-hover:text-violet-600 dark:text-slate-100 dark:group-hover:text-violet-300 sm:text-4xl">
                         {motorcyclesCount.toLocaleString()}
                       </span>
                     </div>
                   </div>
 
                   <div>
-                    <h3 className="text-lg font-bold text-slate-800 mb-1 dark:text-slate-100">Motorcycles</h3>
-                    <p className="text-sm text-slate-500 mb-3 dark:text-slate-400">Scooters, Bikes</p>
+                    <h3 className="mb-1 text-base font-bold text-slate-800 dark:text-slate-100 sm:text-lg">Motorcycles</h3>
+                    <p className="mb-3 text-xs text-slate-500 dark:text-slate-400 sm:text-sm">Scooters, Bikes</p>
 
                     <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden dark:bg-slate-800">
                       <div
@@ -738,25 +742,25 @@ export default function EnhancedDashboard({
               {/* Tuk Tuks Card */}
               <Link
                 href="/vehicles?category=Tuk+Tuk"
-                className="group relative overflow-hidden rounded-3xl p-6 bg-gradient-to-br from-white to-amber-50/30 shadow-sm hover:bg-slate-50 transition-all duration-500 hover:-translate-y-1 dark:from-slate-900 dark:to-slate-800 dark:ring-1 dark:ring-slate-800 dark:hover:bg-slate-800"
+                className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-white to-amber-50/30 p-4 shadow-sm transition-all duration-500 hover:-translate-y-1 hover:bg-slate-50 dark:from-slate-900 dark:to-slate-800 dark:ring-1 dark:ring-slate-800 dark:hover:bg-slate-800 sm:rounded-3xl sm:p-6"
               >
                 <div className="absolute inset-0 bg-gradient-to-br from-amber-500/5 via-orange-500/5 to-red-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
 
                 <div className="relative">
-                  <div className="flex items-start justify-between mb-4">
-                    <div className="p-3 rounded-2xl bg-gradient-to-br from-amber-500 to-orange-600 shadow-lg shadow-amber-500/30 group-hover:shadow-amber-500/40 group-hover:scale-110 transition-all duration-300">
-                      <TukTukIcon className="w-7 h-7 text-white" />
+                  <div className="mb-4 flex items-start justify-between gap-3">
+                    <div className="rounded-2xl bg-gradient-to-br from-amber-500 to-orange-600 p-2.5 shadow-lg shadow-amber-500/30 transition-all duration-300 group-hover:scale-110 group-hover:shadow-amber-500/40 sm:p-3">
+                      <TukTukIcon className="h-6 w-6 text-white sm:h-7 sm:w-7" />
                     </div>
-                    <div className="text-right">
-                      <span className="text-4xl font-bold text-slate-800 group-hover:text-amber-600 transition-colors duration-300 dark:text-slate-100 dark:group-hover:text-amber-300">
+                    <div className="min-w-0 text-right">
+                      <span className="text-3xl font-bold text-slate-800 transition-colors duration-300 group-hover:text-amber-600 dark:text-slate-100 dark:group-hover:text-amber-300 sm:text-4xl">
                         {tukTuksCount.toLocaleString()}
                       </span>
                     </div>
                   </div>
 
                   <div>
-                    <h3 className="text-lg font-bold text-slate-800 mb-1 dark:text-slate-100">Tuk Tuks</h3>
-                    <p className="text-sm text-slate-500 mb-3 dark:text-slate-400">Three-wheelers</p>
+                    <h3 className="mb-1 text-base font-bold text-slate-800 dark:text-slate-100 sm:text-lg">Tuk Tuks</h3>
+                    <p className="mb-3 text-xs text-slate-500 dark:text-slate-400 sm:text-sm">Three-wheelers</p>
 
                     <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden dark:bg-slate-800">
                       <div
@@ -776,20 +780,20 @@ export default function EnhancedDashboard({
             {/* Missing Images Alert Card */}
             {noImageCount > 0 && (
               <Link
-href="/vehicles?withoutImage=true"
-                className="flex items-center gap-4 p-4 rounded-2xl bg-gradient-to-r from-red-50 to-rose-50 border border-red-100 shadow-sm hover:shadow-md transition-all duration-300 group dark:from-red-500/15 dark:to-rose-500/10 dark:border-red-500/25"
+                href="/vehicles?withoutImage=true"
+                className="group flex min-w-0 items-center gap-4 rounded-2xl border border-red-100 bg-gradient-to-r from-red-50 to-rose-50 p-4 shadow-sm transition-all duration-300 hover:shadow-md dark:border-red-500/25 dark:from-red-500/15 dark:to-rose-500/10"
               >
-                <div className="p-3 rounded-xl bg-red-100 text-red-600 group-hover:bg-red-200 transition-colors">
+                <div className="flex-shrink-0 rounded-xl bg-red-100 p-3 text-red-600 transition-colors group-hover:bg-red-200">
                   <ImageOff className="w-6 h-6" />
                 </div>
-                <div className="flex-1">
-                  <div className="flex items-center gap-2">
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
                     <span className="text-lg font-bold text-red-700">{noImageCount.toLocaleString()}</span>
                     <span className="text-sm font-medium text-red-600">vehicles missing images</span>
                   </div>
-                  <p className="text-sm text-red-500">Click to view and upload images</p>
+                  <p className="truncate text-sm text-red-500">Click to view and upload images</p>
                 </div>
-                <ChevronRight className="w-5 h-5 text-red-400 group-hover:text-red-600 group-hover:translate-x-1 transition-all" />
+                <ChevronRight className="h-5 w-5 flex-shrink-0 text-red-400 transition-all group-hover:translate-x-1 group-hover:text-red-600" />
               </Link>
             )}
           </div>
@@ -814,8 +818,8 @@ href="/vehicles?withoutImage=true"
           </div>
 
           {/* Results Summary */}
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
+          <div className="flex min-w-0 flex-wrap items-center justify-between gap-4">
+            <div className="flex min-w-0 flex-wrap items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
               <span className="font-medium text-slate-700 dark:text-slate-100">
                 {filteredVehicles.length.toLocaleString()}
               </span>
@@ -831,13 +835,13 @@ href="/vehicles?withoutImage=true"
               )}
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex max-w-full flex-wrap items-center gap-2">
               {['Cars', 'Motorcycles', 'TukTuks', 'New', 'Used'].map((filter) => (
                 <button
                   key={filter}
                   onClick={() => handleFilterClick(filter)}
                   className={`
-                    px-3 py-1.5 rounded-lg text-sm font-medium transition-all
+                    shrink-0 px-3 py-1.5 rounded-lg text-sm font-medium transition-all
                     ${activeFilter === filter
                       ? 'bg-emerald-100 text-emerald-700 shadow-inner dark:bg-emerald-500/15 dark:text-emerald-300'
                       : 'bg-white text-slate-600 hover:bg-slate-50 shadow-sm dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800'}
@@ -850,15 +854,15 @@ href="/vehicles?withoutImage=true"
           </div>
 
           {/* Charts Grid */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="grid min-w-0 grid-cols-1 gap-6 lg:grid-cols-2">
             {/* Vehicles by Category */}
-            <div className="bg-white rounded-3xl shadow-sm p-6 sm:p-8 dark:bg-slate-900 dark:ring-1 dark:ring-slate-800">
-              <div className="flex items-center justify-between mb-6">
-                <div>
+            <div className="min-w-0 overflow-hidden rounded-2xl bg-white p-4 shadow-sm dark:bg-slate-900 dark:ring-1 dark:ring-slate-800 sm:rounded-3xl sm:p-8">
+              <div className="mb-6 flex min-w-0 items-center justify-between gap-3">
+                <div className="min-w-0">
                   <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100">Vehicles by Category</h3>
                   <p className="text-sm text-slate-500 dark:text-slate-400">Distribution across vehicle types</p>
                 </div>
-                <button className="p-2 rounded-xl hover:bg-slate-100 text-slate-400 transition-colors dark:text-slate-500 dark:hover:bg-slate-800">
+                <button className="flex-shrink-0 p-2 rounded-xl hover:bg-slate-100 text-slate-400 transition-colors dark:text-slate-500 dark:hover:bg-slate-800">
                   <MoreHorizontal className="w-5 h-5" />
                 </button>
               </div>
@@ -876,13 +880,13 @@ href="/vehicles?withoutImage=true"
             </div>
 
             {/* New vs Used */}
-            <div className="bg-white rounded-3xl shadow-sm p-6 sm:p-8 dark:bg-slate-900 dark:ring-1 dark:ring-slate-800">
-              <div className="flex items-center justify-between mb-6">
-                <div>
+            <div className="min-w-0 overflow-hidden rounded-2xl bg-white p-4 shadow-sm dark:bg-slate-900 dark:ring-1 dark:ring-slate-800 sm:rounded-3xl sm:p-8">
+              <div className="mb-6 flex min-w-0 items-center justify-between gap-3">
+                <div className="min-w-0">
                   <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100">Condition Distribution</h3>
                   <p className="text-sm text-slate-500 dark:text-slate-400">New vs used vehicles</p>
                 </div>
-                <button className="p-2 rounded-xl hover:bg-slate-100 text-slate-400 transition-colors dark:text-slate-500 dark:hover:bg-slate-800">
+                <button className="flex-shrink-0 p-2 rounded-xl hover:bg-slate-100 text-slate-400 transition-colors dark:text-slate-500 dark:hover:bg-slate-800">
                   <MoreHorizontal className="w-5 h-5" />
                 </button>
               </div>
@@ -900,13 +904,13 @@ href="/vehicles?withoutImage=true"
             </div>
 
             {/* Top Brands */}
-            <div className="bg-white rounded-3xl shadow-sm p-6 sm:p-8 dark:bg-slate-900 dark:ring-1 dark:ring-slate-800">
-              <div className="flex items-center justify-between mb-6">
-                <div>
+            <div className="min-w-0 overflow-hidden rounded-2xl bg-white p-4 shadow-sm dark:bg-slate-900 dark:ring-1 dark:ring-slate-800 sm:rounded-3xl sm:p-8">
+              <div className="mb-6 flex min-w-0 items-center justify-between gap-3">
+                <div className="min-w-0">
                   <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100">Top Brands</h3>
                   <p className="text-sm text-slate-500 dark:text-slate-400">Most popular manufacturers</p>
                 </div>
-                <button className="p-2 rounded-xl hover:bg-slate-100 text-slate-400 transition-colors dark:text-slate-500 dark:hover:bg-slate-800">
+                <button className="flex-shrink-0 p-2 rounded-xl hover:bg-slate-100 text-slate-400 transition-colors dark:text-slate-500 dark:hover:bg-slate-800">
                   <MoreHorizontal className="w-5 h-5" />
                 </button>
               </div>
@@ -924,13 +928,13 @@ href="/vehicles?withoutImage=true"
             </div>
 
             {/* Monthly Added */}
-            <div className="bg-white rounded-3xl shadow-sm p-6 sm:p-8 dark:bg-slate-900 dark:ring-1 dark:ring-slate-800">
-              <div className="flex items-center justify-between mb-6">
-                <div>
+            <div className="min-w-0 overflow-hidden rounded-2xl bg-white p-4 shadow-sm dark:bg-slate-900 dark:ring-1 dark:ring-slate-800 sm:rounded-3xl sm:p-8">
+              <div className="mb-6 flex min-w-0 items-center justify-between gap-3">
+                <div className="min-w-0">
                   <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100">Monthly Trends</h3>
                   <p className="text-sm text-slate-500 dark:text-slate-400">Vehicles added over time</p>
                 </div>
-                <button className="p-2 rounded-xl hover:bg-slate-100 text-slate-400 transition-colors dark:text-slate-500 dark:hover:bg-slate-800">
+                <button className="flex-shrink-0 p-2 rounded-xl hover:bg-slate-100 text-slate-400 transition-colors dark:text-slate-500 dark:hover:bg-slate-800">
                   <MoreHorizontal className="w-5 h-5" />
                 </button>
               </div>
@@ -949,7 +953,7 @@ href="/vehicles?withoutImage=true"
           </div>
 
           {/* Quick Stats Footer */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 sm:gap-6">
+          <div className="grid min-w-0 grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-6">
             {[
               {
                 label: "With Images",
@@ -982,14 +986,14 @@ href="/vehicles?withoutImage=true"
             ].map((stat, index) => (
               <div
                 key={stat.label}
-                className="bg-white rounded-2xl shadow-sm p-5 text-center hover:bg-slate-50 transition-shadow dark:bg-slate-900 dark:ring-1 dark:ring-slate-800 dark:hover:bg-slate-800"
+                className="min-w-0 rounded-2xl bg-white p-4 text-center shadow-sm transition-shadow hover:bg-slate-50 dark:bg-slate-900 dark:ring-1 dark:ring-slate-800 dark:hover:bg-slate-800 sm:p-5"
                 style={{ animationDelay: `${index * 100}ms` }}
               >
                 <div className={`w-12 h-12 mx-auto mb-3 rounded-xl ${stat.bgColor} flex items-center justify-center`}>
                   <stat.icon className={`w-6 h-6 ${stat.color}`} />
                 </div>
-                <p className="text-2xl font-bold text-slate-800 dark:text-slate-100">{stat.value}</p>
-                <p className="text-sm text-slate-500 dark:text-slate-400">{stat.label}</p>
+                <p className="truncate text-xl font-bold text-slate-800 dark:text-slate-100 sm:text-2xl">{stat.value}</p>
+                <p className="truncate text-sm text-slate-500 dark:text-slate-400">{stat.label}</p>
               </div>
             ))}
           </div>

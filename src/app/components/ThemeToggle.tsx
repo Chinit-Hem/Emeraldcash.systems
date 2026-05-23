@@ -21,7 +21,7 @@ export default function ThemeToggle({ className = "" }: { className?: string }) 
   return (
     <div
       className={cn(
-        "inline-flex rounded-xl border border-[var(--glass-border)] bg-[var(--bg-muted)] p-1 shadow-[var(--shadow-soft)]",
+        "inline-flex max-w-full rounded-xl border border-[var(--glass-border)] bg-[var(--bg-muted)] p-1 shadow-[var(--shadow-soft)]",
         className
       )}
       role="radiogroup"
@@ -38,7 +38,7 @@ export default function ThemeToggle({ className = "" }: { className?: string }) 
             aria-checked={selected}
             onClick={() => setThemeMode(value)}
             className={cn(
-              "inline-flex h-9 min-w-20 items-center justify-center gap-2 rounded-lg px-3 text-sm font-semibold transition-all duration-200",
+              "inline-flex h-9 min-w-20 flex-1 items-center justify-center gap-2 rounded-lg px-3 text-sm font-semibold transition-all duration-200 sm:flex-none",
               "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-green)]",
               selected
                 ? "bg-[var(--bg-elevated)] text-[var(--accent-green)] shadow-[var(--shadow-soft)]"
