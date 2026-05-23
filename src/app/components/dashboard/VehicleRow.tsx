@@ -1,65 +1,14 @@
 "use client";
 
 import { useLanguage } from "@/lib/LanguageContext";
-import { useTranslation } from "@/lib/i18n";
 import { derivePrices } from "@/lib/pricing";
 import type { Vehicle } from "@/lib/types";
 import { cn } from "@/lib/ui";
 import type { AppRouterInstance } from "next/dist/shared/lib/app-router-context.shared-runtime";
 import { useState, useCallback, useEffect, type CSSProperties, type Dispatch, type SetStateAction } from "react";
 import { formatPrice, getVehicleThumbnailUrl } from "@/lib/vehicle-helpers";
+import { getVehicleColorHex, translateVehicleColor } from "@/lib/vehicleColors";
 import { OptimizedImage } from "@/components/OptimizedImage";
-
-// Color name to hex mapping for visual indicators
-const getColorHex = (colorName: string): string => {
-  const colorMap: Record<string, string> = {
-    "red": "#ef4444",
-    "blue": "#3b82f6",
-    "green": "#10b981",
-    "yellow": "#f59e0b",
-    "orange": "#f97316",
-    "purple": "#8b5cf6",
-    "pink": "#ec4899",
-    "black": "#1a1a2e",
-    "white": "#f8fafc",
-    "gray": "#6b7280",
-    "grey": "#6b7280",
-    "silver": "#9ca3af",
-    "gold": "#fbbf24",
-    "brown": "#92400e",
-    "beige": "#d4c5b0",
-    "navy": "#1e3a8a",
-    "teal": "#14b8a6",
-    "cyan": "#06b6d4",
-    "lime": "#84cc16",
-    "maroon": "#991b1b",
-    "olive": "#65a30d",
-    "coral": "#f87171",
-    "ivory": "#fffff0",
-    "khaki": "#c3b091",
-    "lavender": "#c4b5fd",
-    "magenta": "#d946ef",
-    "mint": "#6ee7b7",
-    "peach": "#fdba74",
-    "plum": "#a855f7",
-    "tan": "#d2b48c",
-    "turquoise": "#40e0d0",
-    "violet": "#8b5cf6",
-    "indigo": "#6366f1",
-    "emerald": "#10b981",
-  };
-
-  const normalizedColor = colorName.toLowerCase().trim();
-  if (colorMap[normalizedColor]) return colorMap[normalizedColor];
-
-  // Fallback hash color
-  let hash = 0;
-  for (let i = 0; i < colorName.length; i++) {
-    hash = colorName.charCodeAt(i) + ((hash << 5) - hash);
-  }
-  const hue = Math.abs(hash % 360);
-  return `hsl(${hue}, 70%, 50%)`;
-};
 
 interface VehicleRowProps {
   vehicle: Vehicle;
@@ -97,9 +46,9 @@ export default function VehicleRow({
   router,
 }: VehicleRowProps) {
   const { language } = useLanguage();
-  const { t } = useTranslation(language);
   const [imageError, setImageError] = useState(false);
   const vehicleId = vehicle.VehicleId;
+  const colorLabel = translateVehicleColor(vehicle.Color, language);
 
   useEffect(() => {
     setImageError(false);
@@ -254,12 +203,12 @@ export default function VehicleRow({
                 <div
                   className="w-4 h-4 rounded-full shadow-sm border-2 border-slate-200"
                   style={{
-                    backgroundColor: getColorHex(vehicle.Color),
+                    backgroundColor: getVehicleColorHex(vehicle.Color),
                   }}
-                  title={vehicle.Color}
+                  title={colorLabel}
                 />
                 <span className="text-sm text-[#4a4a5a] font-medium">
-                  {vehicle.Color}
+                  {colorLabel}
                 </span>
               </>
             ) : (

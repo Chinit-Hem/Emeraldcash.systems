@@ -9,6 +9,7 @@ import { cn } from "@/lib/ui";
 import { useRouter } from "next/navigation";
 import { useState, useRef, useEffect, useCallback } from "react";
 import { formatPrice, getVehicleThumbnailUrl } from "@/lib/vehicle-helpers";
+import { getVehicleColorHex, translateVehicleColor } from "@/lib/vehicleColors";
 import { useOptimisticVehicles } from "@/lib/useOptimisticVehicles";
 import { OptimizedImage } from "@/components/OptimizedImage";
 
@@ -806,13 +807,13 @@ export default function VehicleTable({
                           <div 
                             className="w-4 h-4 rounded-full shadow-sm border-2 border-slate-200"
                             style={{ 
-                              backgroundColor: getColorHex(vehicle.Color),
+                              backgroundColor: getVehicleColorHex(vehicle.Color),
                               boxShadow: "0 1px 2px rgba(15, 23, 42, 0.12)"
                             }}
-                            title={vehicle.Color}
+                            title={translateVehicleColor(vehicle.Color, language)}
                           />
                           <span className="text-sm text-[#4a4a5a] font-medium">
-                            {vehicle.Color}
+                            {translateVehicleColor(vehicle.Color, language)}
                           </span>
                         </>
                       ) : (
