@@ -1,6 +1,8 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 
-const serverUrl = process.env.CAPACITOR_SERVER_URL?.trim();
+const serverUrl =
+  process.env.CAPACITOR_SERVER_URL?.trim() ||
+  'https://emeraldcash-systems.vercel.app';
 
 const config: CapacitorConfig = {
   appId: 'com.emeraldcash.vms',
