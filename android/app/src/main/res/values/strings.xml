@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Emerald Cash Systems</string>
+    <string name="title_activity_main">Emerald Cash Systems</string>
+    <string name="package_name">com.emeraldcash.vms</string>
+    <string name="custom_url_scheme">com.emeraldcash.vms</string>
+</resources>
