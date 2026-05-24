@@ -325,7 +325,6 @@ npm run verify:ci
 
 The CI workflow runs:
 
-- Structure check: `npm run structure:check`
 - Lint: `npm run lint`
 - TypeScript: `npm run typecheck`
 - Production build: `npm run build`

@@ -112,10 +112,10 @@ src/
 - TODOs and work notes belong in `docs/todo`; old logs and generated summaries belong in `docs/archive`.
 - Deploy scripts belong in `scripts/deploy`; database migrations belong in `scripts/migrations`.
 
-Run the structure guard before larger cleanups:
+Validate the project before larger cleanups:
 
 ```bash
-npm run structure:check
+npm run verify:ci
 ```
 
-The guard is intentionally practical: it fails on root clutter and missing core folders, while warning about legacy app component locations that should be cleaned up gradually.
+Use this guide for structure decisions while the CI suite covers linting, type safety, production builds, and dependency audit checks.
