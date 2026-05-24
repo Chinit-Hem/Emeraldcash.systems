@@ -26,7 +26,7 @@ console.log("  - Should upload image to Cloudinary first");
 console.log("  - Should send PUT to /api/vehicles/{id} with image_id field");
 console.log("  - Payload should contain: { image_id: 'https://res.cloudinary.com/...' }");
 
-const useUpdatePath = path.join(__dirname, '../src/app/components/vehicles/useUpdateVehicleOptimistic.ts');
+const useUpdatePath = path.join(__dirname, '../src/systems/vms/components/vehicles/useUpdateVehicleOptimistic.ts');
 if (fs.existsSync(useUpdatePath)) {
   const content = fs.readFileSync(useUpdatePath, 'utf8');
   
@@ -75,13 +75,13 @@ if (fs.existsSync(apiRoutePath)) {
   console.log("  ❌ File not found!");
 }
 
-// Check 3: Verify db-schema updateVehicle handles image_id
-console.log("\n🔍 CHECK 3: Database Schema (db-schema.ts)");
+// Check 3: Verify VehicleService entity mapping handles image_id
+console.log("\n🔍 CHECK 3: VehicleService Entity Mapping");
 console.log("Expected behavior:");
 console.log("  - updateVehicle should accept image_id in vehicle parameter");
 console.log("  - Should pass through to vehicleService.updateVehicle");
 
-const dbSchemaPath = path.join(__dirname, '../src/lib/db-schema.ts');
+const dbSchemaPath = path.join(__dirname, '../src/systems/vms/services/VehicleService.ts');
 if (fs.existsSync(dbSchemaPath)) {
   const content = fs.readFileSync(dbSchemaPath, 'utf8');
   
@@ -102,7 +102,7 @@ console.log("Expected behavior:");
 console.log("  - Should accept image_id in update data");
 console.log("  - Should pass to BaseService.update which builds SQL");
 
-const vehicleServicePath = path.join(__dirname, '../src/services/VehicleService.ts');
+const vehicleServicePath = path.join(__dirname, '../src/systems/vms/services/VehicleService.ts');
 if (fs.existsSync(vehicleServicePath)) {
   const content = fs.readFileSync(vehicleServicePath, 'utf8');
   
@@ -123,7 +123,7 @@ console.log("Expected behavior:");
 console.log("  - Should dynamically build UPDATE SQL with all provided fields");
 console.log("  - Should include image_id in SET clause if provided");
 
-const baseServicePath = path.join(__dirname, '../src/services/BaseService.ts');
+const baseServicePath = path.join(__dirname, '../src/shared/utils/services/BaseService.ts');
 if (fs.existsSync(baseServicePath)) {
   const content = fs.readFileSync(baseServicePath, 'utf8');
   
@@ -148,7 +148,7 @@ console.log("Expected behavior:");
 console.log("  - Should use handleSubmitVehicle for both add and edit");
 console.log("  - handleSubmitVehicle should route to updateVehicle when editing");
 
-const vehiclesClientPath = path.join(__dirname, '../src/features/vehicles/components/VehiclesClient.tsx');
+const vehiclesClientPath = path.join(__dirname, '../src/systems/vms/views/VehiclesClient.tsx');
 if (fs.existsSync(vehiclesClientPath)) {
   const content = fs.readFileSync(vehiclesClientPath, 'utf8');
   

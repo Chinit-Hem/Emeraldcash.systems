@@ -3,9 +3,9 @@ import {
   isDuplicateError,
   isNotFoundError,
   isValidationError,
-} from "./errors";
-import { log } from "./logger";
-import type { Role } from "./types";
+} from "@/lib/errors";
+import { log } from "@/lib/logger";
+import type { Role } from "@/shared/types/types";
 import {
   
   createUserInDB,
@@ -16,7 +16,7 @@ import {
   updateUserInDB,
   type Role as DBRole,
   type UserDB,
-} from "./user-db";
+} from "@/lib/user-db";
 
 export type StoredUser = {
   username: string;

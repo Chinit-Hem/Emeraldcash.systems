@@ -2,10 +2,10 @@ import type { Metadata, Viewport } from "next";
 import { Inter, Kantumruy_Pro } from "next/font/google";
 import { Suspense } from "react";
 import "../styles/globals.css";
-import { ThemeProvider } from "@/lib/theme-provider";
-import { LanguageProvider } from "@/lib/LanguageContext";
-import { InstantNavigationProvider } from "@/app/components/InstantNavigationProvider";
-import { NeuDashboardSkeleton } from "@/app/components/skeletons/NeuDashboardSkeleton";
+import { ThemeProvider } from "@/shared/hooks/theme-provider";
+import { LanguageProvider } from "@/shared/hooks/LanguageContext";
+import { InstantNavigationProvider } from "@/shared/components/InstantNavigationProvider";
+import { NeuDashboardSkeleton } from "@/shared/components/skeletons/NeuDashboardSkeleton";
 
 const inter = Inter({
   subsets: ["latin"],

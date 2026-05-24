@@ -3,7 +3,7 @@
  * Tests the clientImageCompression utility with various scenarios
  */
 
-import { compressImage, processImageForUpload, shouldCompressImage } from '../src/lib/clientImageCompression.ts';
+import { compressImage, processImageForUpload, shouldCompressImage } from '../src/shared/utils/clientImageCompression.ts';
 
 // Mock File class for Node.js environment
 class MockFile {
@@ -149,7 +149,7 @@ logSection('Test 5: Integration Verification');
 logTest(
   'VehicleForm imports processImageForUpload correctly',
   'PASS',
-  { message: 'Import statement verified: import { processImageForUpload } from "@/lib/clientImageCompression"' }
+  { message: 'Import statement verified: import { processImageForUpload } from "@/shared/utils/clientImageCompression"' }
 );
 
 logTest(

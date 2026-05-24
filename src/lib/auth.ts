@@ -1,7 +1,7 @@
 import crypto from "crypto";
-import type { Role } from "./types";
-import { globalLogger } from "./logger";
-import { getClientIp, getClientUserAgent } from "./network";
+import type { Role } from "@/shared/types/types";
+import { globalLogger } from "@/lib/logger";
+import { getClientIp, getClientUserAgent } from "@/lib/network";
 
 // Session configuration
 const SESSION_MAX_AGE_MS = 8 * 60 * 60 * 1000; // 8 hours
@@ -283,7 +283,7 @@ function timingSafeEqual_(a: string, b: string): boolean {
 }
 
 // Re-export network utilities for backwards compatibility
-export { getClientIp, getClientUserAgent } from "./network";
+export { getClientIp, getClientUserAgent } from "@/lib/network";
 
 // ============ Role-Based Permissions ============
 

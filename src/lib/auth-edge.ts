@@ -1,4 +1,4 @@
-import type { Role } from "./types";
+import type { Role } from "@/shared/types/types";
 
 // Session configuration
 const SESSION_MAX_AGE_MS = 8 * 60 * 60 * 1000;
@@ -100,4 +100,4 @@ export async function getSessionFromRequestEdge(
 }
 
 // Re-export network utilities for backwards compatibility
-export { getClientIp, getClientUserAgent } from "./network";
+export { getClientIp, getClientUserAgent } from "@/lib/network";

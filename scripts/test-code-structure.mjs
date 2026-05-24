@@ -22,7 +22,7 @@ function testFrontendCode() {
   console.log('-'.repeat(60));
   
   try {
-    const filePath = join(rootDir, 'src/app/components/vehicles/useUpdateVehicleOptimistic.ts');
+    const filePath = join(rootDir, 'src/systems/vms/components/vehicles/useUpdateVehicleOptimistic.ts');
     const code = readFileSync(filePath, 'utf-8');
     
     const checks = [
@@ -180,7 +180,7 @@ function testFlowLogic() {
   console.log('-'.repeat(60));
   
   try {
-    const filePath = join(rootDir, 'src/app/components/vehicles/useUpdateVehicleOptimistic.ts');
+    const filePath = join(rootDir, 'src/systems/vms/components/vehicles/useUpdateVehicleOptimistic.ts');
     const code = readFileSync(filePath, 'utf-8');
     
     console.log('  Checking execution order...');
@@ -222,7 +222,7 @@ function testEdgeCases() {
   console.log('-'.repeat(60));
   
   try {
-    const filePath = join(rootDir, 'src/app/components/vehicles/useUpdateVehicleOptimistic.ts');
+    const filePath = join(rootDir, 'src/systems/vms/components/vehicles/useUpdateVehicleOptimistic.ts');
     const code = readFileSync(filePath, 'utf-8');
     
     const checks = [

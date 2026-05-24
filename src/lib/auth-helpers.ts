@@ -5,9 +5,9 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { requireSession, type SessionPayload } from "./auth";
+import { requireSession, type SessionPayload } from "@/lib/auth";
 
-import { DEFAULT_ROLE_PERMISSIONS, type Permission, type Role } from "./types";
+import { DEFAULT_ROLE_PERMISSIONS, type Permission, type Role } from "@/shared/types/types";
 
 /**
  * Auth result type

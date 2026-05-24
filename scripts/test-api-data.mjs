@@ -12,7 +12,7 @@ if (!DATABASE_URL) {
 
 const sql = neon(DATABASE_URL);
 
-// Pricing calculation functions (copied from src/lib/pricing.ts)
+// Pricing calculation functions (copied from src/systems/vms/utils/pricing.ts)
 function roundTo(value, decimals = 2) {
   const safeDecimals = Math.max(0, Math.min(6, Math.trunc(decimals)));
   const factor = 10 ** safeDecimals;

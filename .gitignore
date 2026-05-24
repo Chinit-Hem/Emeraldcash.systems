@@ -37,6 +37,7 @@ yarn-error.log*
 
 # typescript
 *.tsbuildinfo
+tsconfig.tsbuildinfo
 next-env.d.ts
 
 # IDE
@@ -93,3 +94,7 @@ build.log
 
 # Codex logs
 .codex/
+.codex-logs/
+
+# Local AI tool settings
+blackbox_mcp_settings.json

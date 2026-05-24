@@ -99,7 +99,7 @@ function testFrontendCode() {
   console.log('-'.repeat(40));
   
   try {
-    const filePath = join(rootDir, 'src/app/components/vehicles/useUpdateVehicleOptimistic.ts');
+    const filePath = join(rootDir, 'src/systems/vms/components/vehicles/useUpdateVehicleOptimistic.ts');
     const code = readFileSync(filePath, 'utf-8');
     
     const checks = [

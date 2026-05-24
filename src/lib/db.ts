@@ -29,11 +29,11 @@ export type {
   VehicleFilters, 
   VehicleStats, 
   PaginatedResult 
-} from "@/services/VehicleService";
+} from "@/systems/vms/services/VehicleService";
 
 export type {
   ServiceResult
-} from "@/services/BaseService";
+} from "@/shared/utils/services/BaseService";
 
 // ============================================================================
 // Legacy Compatibility Exports

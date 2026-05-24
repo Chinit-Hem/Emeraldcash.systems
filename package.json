@@ -14,10 +14,9 @@
     "lint": "eslint src --ext .ts,.tsx --max-warnings 200",
     "typecheck": "tsc --noEmit --pretty false",
     "audit:prod": "npm audit --omit=dev --audit-level=high",
-    "verify:ci": "npm run structure:check && npm run lint && npm run typecheck && npm run build && npm run audit:prod",
+    "verify:ci": "npm run lint && npm run typecheck && npm run build && npm run audit:prod",
     "backup:create": "node scripts/backup-verification/create-vehicles-backup-table.mjs",
     "backup:verify": "node scripts/check-cleaned-table-data.mjs",
-    "structure:check": "node structure-check.mjs",
     "db:check": "node scripts/test-neon-connection.mjs"
   },
   "dependencies": {

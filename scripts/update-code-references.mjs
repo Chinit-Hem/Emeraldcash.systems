@@ -10,9 +10,9 @@ const OLD_NAME = "cleaned_vehicles_for_google_sheets";
 const NEW_NAME = "vehicles";
 
 const FILES_TO_UPDATE = [
-  "src/services/VehicleService.ts",
+  "src/systems/vms/services/VehicleService.ts",
   "src/app/api/upload/route.ts",
-  "src/lib/db-schema.ts",
+  "src/lib/db.ts",
 ];
 
 console.log("=".repeat(60));

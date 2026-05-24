@@ -2,14 +2,14 @@
  * Database operations for users table using Neon PostgreSQL
  */
 
-import { sql, queryWithRetry } from "./db-singleton";
+import { sql, queryWithRetry } from "@/lib/db-singleton";
 import {
   DatabaseError,
   NotFoundError,
   DuplicateError,
   ValidationError,
-} from "./errors";
-import { log } from "./logger";
+} from "@/lib/errors";
+import { log } from "@/lib/logger";
 
 export type Role = "Admin" | "Staff" | "Accounting" | "Transfer";
 

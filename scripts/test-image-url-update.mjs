@@ -71,7 +71,7 @@ async function testImageUrlUpdate() {
   console.log("  Checking if VehicleList handles image URLs correctly...");
   
   try {
-    const vehicleListPath = path.join(process.cwd(), "src/app/components/VehicleList.tsx");
+    const vehicleListPath = path.join(process.cwd(), "src/systems/vms/components/VehicleList.tsx");
     const content = fs.readFileSync(vehicleListPath, "utf-8");
     
     // Check for Cloudinary URL handling
@@ -94,7 +94,7 @@ async function testImageUrlUpdate() {
   console.log("  The VehicleList component will display the image correctly.");
   console.log("\n  Files modified:");
   console.log("  - src/app/api/vehicles/[id]/route.ts (API route)");
-  console.log("  - src/app/components/VehicleList.tsx (Image display)");
+  console.log("  - src/systems/vms/components/VehicleList.tsx (Image display)");
 }
 
 testImageUrlUpdate().catch(console.error);

@@ -22,8 +22,8 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { Logger, createRequestLogger } from "./logger";
-import { buildCorsHeaders } from "./cors";
+import { Logger, createRequestLogger } from "@/lib/logger";
+import { buildCorsHeaders } from "@/lib/cors";
 
 // Interface for handler context
 export interface HandlerContext {

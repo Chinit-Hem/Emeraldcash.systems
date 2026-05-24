@@ -49,7 +49,7 @@ testCases.forEach(test => {
 console.log('Test 3: Verify code changes in useUpdateVehicleOptimistic.ts');
 
 const updateVehicleFile = fs.readFileSync(
-  path.join(__dirname, '../src/app/components/vehicles/useUpdateVehicleOptimistic.ts'),
+  path.join(__dirname, '../src/systems/vms/components/vehicles/useUpdateVehicleOptimistic.ts'),
   'utf-8'
 );
 
@@ -71,7 +71,7 @@ console.log('');
 console.log('Test 4: Verify code changes in useAddVehicleOptimistic.ts');
 
 const addVehicleFile = fs.readFileSync(
-  path.join(__dirname, '../src/app/components/vehicles/useAddVehicleOptimistic.ts'),
+  path.join(__dirname, '../src/systems/vms/components/vehicles/useAddVehicleOptimistic.ts'),
   'utf-8'
 );
 

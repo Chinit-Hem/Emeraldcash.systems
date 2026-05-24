@@ -4,7 +4,7 @@ let cloudinaryInstance: typeof import("cloudinary").v2 | null = null;
 import type { UploadApiResponse } from "cloudinary";
 
 // Import folder utilities
-import { getCloudinaryFolder } from "./cloudinary-folders";
+import { getCloudinaryFolder } from "@/lib/cloudinary-folders";
 
 // Import crypto at top level for signature generation
 import crypto from "node:crypto";

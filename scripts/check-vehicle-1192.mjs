@@ -1,15 +1,15 @@
-import { getVehicleById, toVehicle } from "../src/lib/db-schema.ts";
+import { vehicleService } from "../src/systems/vms/services/VehicleService.ts";
 
-const vehicle = await getVehicleById(1192);
-if (vehicle) {
-  console.log("Database record:");
-  console.log("  id:", vehicle.id);
-  console.log("  brand:", vehicle.brand);
-  console.log("  model:", vehicle.model);
-  console.log("  image_id:", vehicle.image_id);
-  console.log("  image_id type:", typeof vehicle.image_id);
+const result = await vehicleService.getById(1192);
+if (result.success && result.data) {
+  console.log("Vehicle entity:");
+  console.log("  id:", result.data.id);
+  console.log("  brand:", result.data.brand);
+  console.log("  model:", result.data.model);
+  console.log("  imageUrl:", result.data.imageUrl);
+  console.log("  imageUrl type:", typeof result.data.imageUrl);
   console.log("");
-  const apiVehicle = toVehicle(vehicle);
+  const apiVehicle = vehicleService.toVehicle(result.data);
   console.log("API response (toVehicle):");
   console.log("  VehicleId:", apiVehicle.VehicleId);
   console.log("  Image:", apiVehicle.Image);
