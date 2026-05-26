@@ -38,6 +38,7 @@ const nextConfig: NextConfig = {
   serverExternalPackages: ['@neondatabase/serverless'],
   generateEtags: true,
   poweredByHeader: false,
+  devIndicators: false,
 
   // Build optimizations
   productionBrowserSourceMaps: false,

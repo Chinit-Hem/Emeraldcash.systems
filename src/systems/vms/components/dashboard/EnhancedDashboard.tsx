@@ -30,6 +30,7 @@ import {
   Filter,
   Image as ImageIcon,
   ImageOff,
+  Languages,
   LucideIcon,
   MoreHorizontal,
   Package,
@@ -406,7 +407,7 @@ export default function EnhancedDashboard({
   const [searchResults, setSearchResults] = useState<Vehicle[]>([]);
   const [isSearching, setIsSearching] = useState(false);
 
-  const { language } = useLanguage();
+  const { language, toggleLanguage } = useLanguage();
   const { t } = useTranslation(language);
 
   const debouncedSearch = useDebouncedValue(searchQuery, 300);
@@ -593,6 +594,17 @@ export default function EnhancedDashboard({
             <button className="hidden sm:flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 font-medium transition-all active:scale-95 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800">
               <Download className="w-4 h-4" />
               {language === 'km' ? 'ទាញយក' : 'Export'}
+            </button>
+
+            <button
+              type="button"
+              onClick={toggleLanguage}
+              className="flex items-center gap-2 rounded-xl bg-slate-100 px-3 py-2.5 font-medium text-slate-600 transition-all hover:bg-slate-200 active:scale-95 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 sm:px-4"
+              aria-label={language === 'km' ? 'Switch to English' : 'ប្ដូរទៅខ្មែរ'}
+              title={language === 'km' ? 'Switch to English' : 'ប្ដូរទៅខ្មែរ'}
+            >
+              <Languages className="w-4 h-4" />
+              <span className="hidden sm:inline">{language === 'km' ? 'English' : 'ខ្មែរ'}</span>
             </button>
 
             <button

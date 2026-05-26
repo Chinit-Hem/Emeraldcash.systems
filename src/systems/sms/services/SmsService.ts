@@ -1142,7 +1142,8 @@ if (status === 'accepted') {
     returnedBy: string,
     location?: string,
     remark?: string,
-    imageUrl?: string
+    imageUrl?: string,
+    requestedBy = returnedBy
   ): Promise<ServiceResult<SmsTransferEntity>> {
     const startTime = Date.now();
     try {
@@ -1181,10 +1182,10 @@ if (status === 'accepted') {
         await this.ensureTransferImagesTable();
       }
 
-      // Create a pending transfer request for admin approval
-      // sender = whoever currently has the asset (assigned_to)
+      // Create a pending transfer request for admin approval.
+      // sender = the selected returning person.
       // receiver = 'stock' indicates this is a return-to-stock request
-      const senderId = asset.assigned_to || returnedBy;
+      const senderId = returnedBy.trim() || asset.assigned_to || requestedBy;
       const returnLocation = location || asset.location || 'Stock';
       const returnRemark = remark || 'Return to stock pending admin approval';
 
@@ -1226,22 +1227,28 @@ if (status === 'accepted') {
         );
       }
 
-      await this.logAudit(returnedBy, 'request_return', {
+      await this.logAudit(requestedBy, 'request_return', {
         assetId,
         transferId: transferEntity.id,
+        returnedBy: senderId,
         imageUrl: imageUrl || null,
       });
 
       // Notify each real admin account about the return request.
       const adminRecipients = await this.getAdminNotificationRecipients();
+      const requestMessage =
+        requestedBy && requestedBy !== senderId
+          ? `${requestedBy} requests to return ${asset.name} to stock for ${senderId}. Awaiting admin approval.`
+          : `${senderId} requests to return ${asset.name} to stock. Awaiting admin approval.`;
+
       await Promise.all(
         adminRecipients.map((recipientId) =>
           this.createNotification({
             type: "return_request",
             title: "Return to stock requested",
-            message: `${returnedBy} requests to return ${asset.name} to stock. Awaiting admin approval.`,
+            message: requestMessage,
             recipientId,
-            actorId: returnedBy,
+            actorId: requestedBy,
             assetId,
             transferId: transferEntity.id,
           })

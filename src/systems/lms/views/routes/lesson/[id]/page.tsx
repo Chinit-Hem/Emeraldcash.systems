@@ -447,8 +447,10 @@ export default function LessonPlayerPage() {
   
   // Get current lesson index
   const currentIndex = categoryLessons.findIndex(l => l.id === currentLesson?.id);
-  const hasNext = currentIndex < categoryLessons.length - 1;
+  const hasCurrentLessonInCategory = currentIndex >= 0;
+  const hasNext = hasCurrentLessonInCategory && currentIndex < categoryLessons.length - 1;
   const hasPrev = currentIndex > 0;
+  const canGoNext = hasNext && Boolean(categoryLessons[currentIndex + 1]?.is_unlocked);
   
   // Navigate to next/prev (only if unlocked)
   const goToNext = () => {
@@ -609,6 +611,10 @@ export default function LessonPlayerPage() {
               isCompleted={currentLesson.is_completed}
               onComplete={handleMarkComplete}
               onBack={() => router.push("/lms")}
+              onPrevious={goToPrev}
+              onNext={goToNext}
+              canGoPrevious={hasPrev}
+              canGoNext={canGoNext}
               onProgressChange={handleProgressChange}
             />
             
@@ -657,8 +663,8 @@ export default function LessonPlayerPage() {
                 <GlassButton
                   variant="secondary"
                   onClick={goToNext}
-                  disabled={!hasNext || !categoryLessons[currentIndex + 1]?.is_unlocked}
-                  className={!hasNext || !categoryLessons[currentIndex + 1]?.is_unlocked ? "opacity-50 cursor-not-allowed" : ""}
+                  disabled={!canGoNext}
+                  className={!canGoNext ? "opacity-50 cursor-not-allowed" : ""}
                 >
                   Next
                   <ChevronRight className="w-4 h-4 ml-1" />

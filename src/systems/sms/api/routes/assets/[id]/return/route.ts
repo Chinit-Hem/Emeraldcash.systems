@@ -19,12 +19,26 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     }
 
     const body = await req.json().catch(() => ({}));
+    const canChooseReturner = auth.session.role === 'Admin' || auth.session.role === 'Transfer';
+    const returnedBy =
+      canChooseReturner && typeof body.returnedBy === 'string' && body.returnedBy.trim()
+        ? body.returnedBy.trim()
+        : auth.session.username;
+
+    if (returnedBy.length > 128) {
+      return NextResponse.json(
+        { success: false, error: 'Returning person is too long' },
+        { status: 400 }
+      );
+    }
+
     const result = await smsService.returnAsset(
       assetId,
-      auth.session.username,
+      returnedBy,
       typeof body.location === 'string' ? body.location : undefined,
       typeof body.remark === 'string' ? body.remark : undefined,
-      typeof body.imageUrl === 'string' ? body.imageUrl : undefined
+      typeof body.imageUrl === 'string' ? body.imageUrl : undefined,
+      auth.session.username
     );
 
     if (!result.success) {

@@ -209,12 +209,12 @@ const handleSaveAsset = async (data: Omit<SmsAsset, 'id'>): Promise<{ success: b
   };
 
   const statusColor = (status: string) => ({
-    'Available': 'bg-emerald-100 text-emerald-800 ring-emerald-200',
-    'In Use': 'bg-amber-100 text-amber-800 ring-amber-200',
-    'Borrowed': 'bg-red-100 text-red-800 ring-red-200',
-    'Out': 'bg-red-100 text-red-800 ring-red-200',
-    'Not Returned': 'bg-slate-100 text-slate-800 ring-slate-200'
-  }[status] || 'bg-slate-100 text-slate-800 ring-slate-200');
+    'Available': 'bg-emerald-100 text-emerald-800 ring-emerald-200 dark:bg-emerald-500/15 dark:text-emerald-200 dark:ring-emerald-300/60',
+    'In Use': 'bg-amber-100 text-amber-800 ring-amber-200 dark:bg-amber-500/15 dark:text-amber-200 dark:ring-amber-300/60',
+    'Borrowed': 'bg-red-100 text-red-800 ring-red-200 dark:bg-red-500/15 dark:text-red-200 dark:ring-red-300/60',
+    'Out': 'bg-red-100 text-red-800 ring-red-200 dark:bg-red-500/15 dark:text-red-200 dark:ring-red-300/60',
+    'Not Returned': 'bg-slate-100 text-slate-800 ring-slate-200 dark:bg-slate-700/70 dark:text-slate-100 dark:ring-slate-500'
+  }[status] || 'bg-slate-100 text-slate-800 ring-slate-200 dark:bg-slate-700/70 dark:text-slate-100 dark:ring-slate-500');
 
   const statCards = useMemo(() => {
     if (!stats) return [];
@@ -316,7 +316,7 @@ const handleSaveAsset = async (data: Omit<SmsAsset, 'id'>): Promise<{ success: b
         </div>
 
         {/* Assets */}
-        <div className={`${smsPanelClass} overflow-hidden`}>
+        <div className={`${smsPanelClass} min-w-0 overflow-hidden`}>
           {loading ? (
             <div className="p-8 text-center sm:p-12">
               <Loader2 className="mx-auto mb-4 h-10 w-10 animate-spin text-emerald-600 sm:h-12 sm:w-12" />
@@ -358,71 +358,72 @@ const handleSaveAsset = async (data: Omit<SmsAsset, 'id'>): Promise<{ success: b
             </div>
           ) : (
             <>
-              <div className="grid gap-3 p-3 md:hidden">
+              <div className="grid min-w-0 gap-3 p-2.5 md:hidden">
                 {assets.map((asset) => (
                   <article
                     key={asset.id}
-                    className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm"
+                    className="min-w-0 overflow-hidden rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700/80 dark:bg-slate-900/80"
                   >
-                    <div className="mb-4 flex items-start gap-3">
+                    <div className="flex min-w-0 items-start gap-3">
                       {asset.imageUrl && !imageErrors.has(asset.id) ? (
                         <button
                           type="button"
                           onClick={() => setViewImage({ src: asset.imageUrl!, alt: asset.name })}
-                          className="relative h-12 w-12 flex-shrink-0 overflow-hidden rounded-lg bg-slate-100 shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                          className="relative h-14 w-14 flex-shrink-0 overflow-hidden rounded-lg bg-slate-100 shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:bg-slate-800"
                           aria-label={`View ${asset.name} larger`}
                         >
                           <Image
                             src={asset.imageUrl!}
                             alt={asset.name}
                             fill
-                            sizes="48px"
+                            sizes="56px"
                             className="object-cover"
                             onError={() => handleImageError(asset.id)}
                             loading="lazy"
                           />
                         </button>
                       ) : (
-                        <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-lg bg-slate-100 shadow-sm">
-                          <ImageIcon className="h-6 w-6 text-slate-500" />
+                        <div className="flex h-14 w-14 flex-shrink-0 items-center justify-center rounded-lg bg-slate-100 shadow-sm dark:bg-slate-800">
+                          <ImageIcon className="h-6 w-6 text-slate-500 dark:text-slate-400" />
                         </div>
                       )}
 
-                      <div className="min-w-0 flex-1">
-                        <h3 className="truncate text-base font-bold text-slate-900">{asset.name}</h3>
+                      <div className="min-w-0 flex-1 pt-0.5">
+                        <div className="flex min-w-0 flex-wrap items-start gap-x-2 gap-y-1">
+                          <h3 className="min-w-0 flex-1 break-words text-base font-bold leading-6 text-slate-900 dark:text-white">
+                            {asset.name}
+                          </h3>
+                          <span className={`inline-flex max-w-full shrink-0 rounded-full px-2.5 py-1 text-xs font-bold ring-1 ring-inset ${statusColor(asset.status)}`}>
+                            {asset.status}
+                          </span>
+                        </div>
                         {asset.itemCode && (
-                          <p className="truncate font-mono text-sm text-slate-500">{asset.itemCode}</p>
+                          <p className="mt-1 break-all font-mono text-sm text-slate-500 dark:text-slate-400">{asset.itemCode}</p>
                         )}
                       </div>
-
-                      <span className={`flex-shrink-0 rounded-full px-2.5 py-1 text-xs font-bold ring-1 ring-inset ${statusColor(asset.status)}`}>
-                        {asset.status}
-                      </span>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-2 text-sm">
-                      <div className="rounded-lg bg-slate-50 px-3 py-2">
-                        <div className="text-[11px] font-semibold text-slate-500">Type</div>
-                        <div className="truncate font-semibold text-slate-800">{asset.type}</div>
-                      </div>
-                      <div className="rounded-lg bg-slate-50 px-3 py-2">
-                        <div className="text-[11px] font-semibold text-slate-500">Qty</div>
-                        <div className="truncate font-semibold text-slate-800">{asset.quantity ?? '-'}</div>
-                      </div>
-                      <div className="rounded-lg bg-slate-50 px-3 py-2">
-                        <div className="text-[11px] font-semibold text-slate-500">Location</div>
-                        <div className="truncate font-semibold text-slate-800">{asset.location || '-'}</div>
-                      </div>
-                      <div className="rounded-lg bg-slate-50 px-3 py-2">
-                        <div className="text-[11px] font-semibold text-slate-500">Assigned</div>
-                        <div className="truncate font-semibold text-slate-800">{asset.assignedTo || 'Unassigned'}</div>
-                      </div>
-                    </div>
+                    <dl className="mt-4 grid min-w-0 grid-cols-2 overflow-hidden rounded-xl border border-slate-200 bg-slate-50/80 text-sm dark:border-slate-800 dark:bg-slate-950/35">
+                      {[
+                        { label: 'Type', value: asset.type },
+                        { label: 'Qty', value: asset.quantity ?? '-' },
+                        { label: 'Location', value: asset.location || '-' },
+                        { label: 'Assigned', value: asset.assignedTo || 'Unassigned' },
+                      ].map((item, index) => (
+                        <div
+                          key={item.label}
+                          className={`min-w-0 px-3 py-3 ${index % 2 === 1 ? 'border-l border-slate-200 dark:border-slate-800' : ''} ${index > 1 ? 'border-t border-slate-200 dark:border-slate-800' : ''}`}
+                        >
+                          <dt className="text-xs font-semibold leading-5 text-slate-500 dark:text-slate-400">{item.label}</dt>
+                          <dd className="mt-0.5 min-h-5 break-words font-semibold leading-5 text-slate-900 dark:text-slate-100">{item.value}</dd>
+                        </div>
+                      ))}
+                    </dl>
 
-                    <div className="mt-4 flex gap-2">
+                    <div className={`mt-4 grid min-w-0 gap-2 ${isAdmin ? 'grid-cols-[minmax(0,1fr)_minmax(0,1fr)_2.75rem]' : 'grid-cols-2'}`}>
                       <Link
                         href={`/sms/assets/${asset.id}`}
-                        className={`${smsSecondaryButtonClass} flex-1 px-3`}
+                        className="inline-flex min-h-11 min-w-0 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
                       >
                         <Eye className="h-4 w-4" />
                         View
@@ -430,7 +431,7 @@ const handleSaveAsset = async (data: Omit<SmsAsset, 'id'>): Promise<{ success: b
                       <button
                         type="button"
                         onClick={() => setEditingAsset(asset)}
-                        className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-md bg-emerald-50 px-3 text-sm font-semibold text-emerald-700 transition-colors hover:bg-emerald-100"
+                        className="inline-flex min-h-11 min-w-0 items-center justify-center gap-2 rounded-lg bg-emerald-600 px-3 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 dark:bg-emerald-500/20 dark:text-emerald-100 dark:ring-1 dark:ring-emerald-400/30 dark:hover:bg-emerald-500/30"
                       >
                         <Edit3 className="h-4 w-4" />
                         Edit
@@ -439,7 +440,7 @@ const handleSaveAsset = async (data: Omit<SmsAsset, 'id'>): Promise<{ success: b
                         <button
                           type="button"
                           onClick={() => handleDelete(asset.id)}
-                          className="flex min-h-11 w-11 items-center justify-center rounded-md bg-red-50 text-red-600 transition-colors hover:bg-red-100"
+                          className="flex min-h-11 min-w-0 items-center justify-center rounded-lg bg-red-50 text-red-600 transition-colors hover:bg-red-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 dark:bg-red-500/15 dark:text-red-200 dark:ring-1 dark:ring-red-400/20 dark:hover:bg-red-500/25"
                           aria-label={`Delete ${asset.name}`}
                           title="Delete"
                         >

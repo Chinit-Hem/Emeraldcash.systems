@@ -556,7 +556,7 @@ export default function Dashboard({
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
             <h1 className="text-2xl sm:text-3xl font-bold text-[#1a1a2e] dark:text-slate-100">
-              Dashboard
+              Vehicle Valuation
             </h1>
             <p className="text-sm text-[#4a4a5a] mt-2 dark:text-slate-400">
               {isLoading ? (

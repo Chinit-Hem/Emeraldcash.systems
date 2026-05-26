@@ -231,16 +231,15 @@ function NeuCard({
   className,
   hover = true,
   active = false,
-  onClick
-}: {
-  children: React.ReactNode;
-  className?: string;
+  onClick,
+  ...props
+}: React.HTMLAttributes<HTMLDivElement> & {
   hover?: boolean;
   active?: boolean;
-  onClick?: () => void;
 }) {
   return (
     <div
+      {...props}
       onClick={onClick}
       className={cn(
         "rounded-2xl border border-slate-200/70 bg-gradient-to-br from-[#f8fafc] to-[#f1f5f9] transition-all duration-150 dark:border-slate-700/70 dark:from-slate-900 dark:to-slate-800",
@@ -999,12 +998,13 @@ export default function VehiclesClientEnhanced() {
   const { success, error: showError } = useToast();
   const isAdmin = user?.role === "Admin";
   const [isMobileSafeMode, setIsMobileSafeMode] = useState(detectMobileSafariLike);
+  const userSelectedViewModeRef = useRef(false);
 
   // ==========================================================================
   // State Management
   // ==========================================================================
 
-  const [viewMode, setViewMode] = useState<ViewMode>("list");
+  const [viewMode, setViewMode] = useState<ViewMode>("grid");
   const [totalsMode, setTotalsMode] = useState<TotalsMode>("all");
   const [currentPage, setCurrentPage] = useState(1);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -1105,6 +1105,20 @@ export default function VehiclesClientEnhanced() {
     setIsMobileSafeMode(detectMobileSafariLike());
   }, []);
 
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const mediaQuery = window.matchMedia("(max-width: 767px)");
+    const applyDefaultView = () => {
+      if (userSelectedViewModeRef.current) return;
+      setViewMode(mediaQuery.matches ? "grid" : "list");
+    };
+
+    applyDefaultView();
+    mediaQuery.addEventListener("change", applyDefaultView);
+    return () => mediaQuery.removeEventListener("change", applyDefaultView);
+  }, []);
+
   // ==========================================================================
   // Data Fetching
   // ==========================================================================
@@ -1203,7 +1217,7 @@ export default function VehiclesClientEnhanced() {
 
   // Click outside to close menus
   useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
+    function handlePointerOutside(event: MouseEvent) {
       const target = event.target as Node;
       // Close column menu if click is outside both the menu and the button
       if (
@@ -1216,8 +1230,19 @@ export default function VehiclesClientEnhanced() {
         setShowColumnMenu(false);
       }
     }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+
+    function handleEscape(event: KeyboardEvent) {
+      if (showColumnMenu && event.key === "Escape") {
+        setShowColumnMenu(false);
+      }
+    }
+
+    document.addEventListener("mousedown", handlePointerOutside);
+    document.addEventListener("keydown", handleEscape);
+    return () => {
+      document.removeEventListener("mousedown", handlePointerOutside);
+      document.removeEventListener("keydown", handleEscape);
+    };
   }, [showColumnMenu]);
 
   // ==========================================================================
@@ -1507,6 +1532,11 @@ const isTukTukCategory = useCallback((cat: string | undefined): boolean => {
     }
   }, [sortField]);
 
+  const handleViewModeChange = useCallback((nextViewMode: ViewMode) => {
+    userSelectedViewModeRef.current = true;
+    setViewMode(nextViewMode);
+  }, []);
+
   const toggleColumn = (key: ColumnKey) => {
     setVisibleColumns(prev =>
       prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]
@@ -1684,7 +1714,7 @@ const getVehicleImageUrl = useCallback((imageValue: unknown): string | null => {
       <div className="max-w-[1600px] mx-auto space-y-6">
 
         {/* Header Section */}
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+        <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-center">
           <div>
             <h1 className="flex items-center gap-3 text-3xl font-bold text-slate-800 dark:text-slate-100">
               <span className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-600 flex items-center justify-center shadow-lg shadow-emerald-500/30">
@@ -1740,7 +1770,7 @@ const getVehicleImageUrl = useCallback((imageValue: unknown): string | null => {
         </div>
 
         {/* Quick Filter Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <QuickFilterCard
             active={quickFilter === null}
             onClick={() => {
@@ -1884,7 +1914,7 @@ const getVehicleImageUrl = useCallback((imageValue: unknown): string | null => {
                 <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 dark:text-slate-500" />
               </div>
 
-              <ViewToggle view={viewMode} onChange={setViewMode} t={t} />
+              <ViewToggle view={viewMode} onChange={handleViewModeChange} t={t} />
 
               {/* Columns Dropdown */}
               <div className="relative" ref={columnMenuRef}>
@@ -1893,7 +1923,7 @@ const getVehicleImageUrl = useCallback((imageValue: unknown): string | null => {
                   ref={columnsButtonRef}
                   onClick={() => setShowColumnMenu(!showColumnMenu)}
                   aria-expanded={showColumnMenu ? "true" : "false"}
-                  aria-haspopup="menu"
+                  aria-haspopup="dialog"
                   className={cn(
                     "flex items-center gap-2 px-4 py-2.5 rounded-xl font-medium text-sm",
                     "bg-gradient-to-br from-[#f8fafc] to-[#f1f5f9] text-slate-600 dark:from-slate-900 dark:to-slate-800 dark:text-slate-200",
@@ -1911,56 +1941,72 @@ const getVehicleImageUrl = useCallback((imageValue: unknown): string | null => {
                 </button>
 
                 {showColumnMenu && (
-                  <NeuCard className="absolute right-0 top-full mt-2 p-4 w-64 z-50" hover={false}>
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between border-b border-slate-200 pb-2 dark:border-slate-700">
-                        <span className="font-semibold text-slate-700 dark:text-slate-100">{t.visibleColumns}</span>
-                        <button
-                          type="button"
-                          onClick={() => setShowColumnMenu(false)}
-                          aria-label="Close columns menu"
-                          title="Close columns menu"
-                          className="text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-100"
-                        >
-                          <X className="w-4 h-4" />
-                        </button>
-                      </div>
-
-                      <div className="space-y-2 max-h-64 overflow-y-auto">
-                        {COLUMNS.filter(col => col.key !== "actions").map((col) => (
-                          <label
-                            key={col.key}
-                            className="flex cursor-pointer items-center gap-3 rounded-lg p-2 transition-colors hover:bg-slate-50 dark:hover:bg-slate-800"
+                  <>
+                    <button
+                      type="button"
+                      aria-label="Close columns menu"
+                      className="fixed inset-0 z-[900] bg-slate-950/35 backdrop-blur-[1px] sm:hidden"
+                      onClick={() => setShowColumnMenu(false)}
+                    />
+                    <NeuCard
+                      className="fixed inset-x-3 bottom-[calc(env(safe-area-inset-bottom)+5.5rem)] z-[910] flex max-h-[calc(100dvh-env(safe-area-inset-bottom)-10.5rem)] flex-col overflow-hidden rounded-2xl p-4 sm:absolute sm:inset-x-auto sm:bottom-auto sm:right-0 sm:top-full sm:z-50 sm:mt-2 sm:w-72 sm:max-h-[34rem] sm:p-4"
+                      hover={false}
+                      role="dialog"
+                      aria-labelledby="vehicle-columns-menu-title"
+                    >
+                      <div className="flex min-h-0 flex-1 flex-col gap-3">
+                        <div className="flex shrink-0 items-center justify-between gap-3 border-b border-slate-200 pb-3 dark:border-slate-700">
+                          <span id="vehicle-columns-menu-title" className="font-semibold text-slate-700 dark:text-slate-100">{t.visibleColumns}</span>
+                          <span className="ml-auto rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-500 dark:bg-slate-800 dark:text-slate-300">
+                            {visibleColumns.filter(key => key !== "actions").length}/{COLUMNS.length - 1}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => setShowColumnMenu(false)}
+                            aria-label="Close columns menu"
+                            title="Close columns menu"
+                            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700 active:bg-slate-200 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100 dark:active:bg-slate-700"
                           >
-                            <input
-                              type="checkbox"
-                              checked={visibleColumns.includes(col.key)}
-                              onChange={() => toggleColumn(col.key)}
-                              className="h-4 w-4 rounded border-slate-300 text-emerald-500 focus:ring-emerald-500 dark:border-slate-600"
-                            />
-                            <span className="text-sm text-slate-600 dark:text-slate-300">{col.label}</span>
-                          </label>
-                        ))}
-                      </div>
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
 
-                      <div className="flex gap-2 border-t border-slate-200 pt-2 dark:border-slate-700">
-                        <button
-                          type="button"
-                          onClick={() => setVisibleColumns(COLUMNS.map(c => c.key))}
-                          className="flex-1 rounded-lg bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-600 transition-colors hover:bg-emerald-100 dark:bg-emerald-500/15 dark:text-emerald-300 dark:hover:bg-emerald-500/25"
-                        >
-                          Select All
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setVisibleColumns(["image", "brand", "model", "actions"])}
-                          className="flex-1 rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
-                        >
-                          Minimal
-                        </button>
+                        <div className="min-h-0 flex-1 space-y-1 overflow-y-auto overscroll-contain pr-1 sm:max-h-64 sm:flex-none">
+                          {COLUMNS.filter(col => col.key !== "actions").map((col) => (
+                            <label
+                              key={col.key}
+                              className="flex min-h-11 cursor-pointer items-center gap-3 rounded-lg px-2.5 py-2 transition-colors hover:bg-slate-50 active:bg-slate-100 dark:hover:bg-slate-800 dark:active:bg-slate-700/70"
+                            >
+                              <input
+                                type="checkbox"
+                                checked={visibleColumns.includes(col.key)}
+                                onChange={() => toggleColumn(col.key)}
+                                className="h-5 w-5 shrink-0 rounded border-slate-300 text-emerald-500 focus:ring-emerald-500 dark:border-slate-600"
+                              />
+                              <span className="min-w-0 text-sm font-medium text-slate-600 dark:text-slate-300">{col.label}</span>
+                            </label>
+                          ))}
+                        </div>
+
+                        <div className="grid shrink-0 grid-cols-2 gap-2 border-t border-slate-200 pt-3 dark:border-slate-700">
+                          <button
+                            type="button"
+                            onClick={() => setVisibleColumns(COLUMNS.map(c => c.key))}
+                            className="min-h-11 rounded-lg bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-600 transition-colors hover:bg-emerald-100 active:bg-emerald-200 dark:bg-emerald-500/15 dark:text-emerald-300 dark:hover:bg-emerald-500/25 dark:active:bg-emerald-500/35 sm:min-h-0 sm:py-1.5 sm:text-xs"
+                          >
+                            Select All
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setVisibleColumns(["image", "brand", "model", "actions"])}
+                            className="min-h-11 rounded-lg bg-slate-100 px-3 py-2 text-sm font-semibold text-slate-600 transition-colors hover:bg-slate-200 active:bg-slate-300 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700 dark:active:bg-slate-600 sm:min-h-0 sm:py-1.5 sm:text-xs"
+                          >
+                            Minimal
+                          </button>
+                        </div>
                       </div>
-                    </div>
-                  </NeuCard>
+                    </NeuCard>
+                  </>
                 )}
               </div>
             </div>

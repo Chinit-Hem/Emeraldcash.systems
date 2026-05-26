@@ -1,6 +1,6 @@
 "use client";
 
-import { BookOpen, Boxes, Car, LayoutDashboard, Settings } from "lucide-react";
+import { BookOpen, Boxes, Calculator, Car, Settings } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { useMemo } from "react";
 import type { LucideIcon } from "lucide-react";
@@ -17,7 +17,7 @@ type NavItem = {
 };
 
 const navItems: NavItem[] = [
-  { label: "Dashboard", labelKm: "ផ្ទាំងគ្រប់គ្រង", href: "/", icon: LayoutDashboard },
+  { label: "Vehicle Valuation", labelKm: "វាយតម្លៃយានយន្ត", href: "/", icon: Calculator },
   { label: "LMS", labelKm: "ការបណ្តុះបណ្តាល", href: "/lms", icon: BookOpen },
   { label: "SMS", labelKm: "គ្រប់គ្រងស្តុក", href: "/sms", icon: Boxes },
   { label: "Vehicles", labelKm: "យានយន្ត", href: "/vehicles", icon: Car },

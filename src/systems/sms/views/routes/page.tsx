@@ -14,9 +14,7 @@ import {
   CheckCheck,
   CheckCircle2,
   Clock,
-  History,
   Package,
-  RotateCcw,
   TrendingUp,
   Users,
   type LucideIcon,
@@ -35,47 +33,53 @@ interface SmsNotification {
 
 type CardTone = 'emerald' | 'amber' | 'slate' | 'blue' | 'purple' | 'red';
 
-const actionToneStyles: Record<CardTone, { text: string; iconBg: string; arrowBg: string; ring: string; focus: string }> = {
+const actionToneStyles: Record<CardTone, { accent: string; iconBg: string; iconText: string; glow: string; ring: string; focus: string }> = {
   emerald: {
-    text: 'text-emerald-700 dark:text-emerald-300',
-    iconBg: 'bg-emerald-50 dark:bg-emerald-500/15',
-    arrowBg: 'bg-emerald-50 dark:bg-emerald-500/15',
-    ring: 'ring-emerald-100 dark:ring-emerald-500/20',
+    accent: 'bg-emerald-500',
+    iconBg: 'bg-emerald-500/15 dark:bg-emerald-500/15',
+    iconText: 'text-emerald-600 dark:text-emerald-300',
+    glow: 'shadow-emerald-500/25',
+    ring: 'ring-emerald-100 dark:ring-slate-700/80',
     focus: 'focus-visible:ring-emerald-500/40',
   },
   amber: {
-    text: 'text-amber-700 dark:text-amber-300',
-    iconBg: 'bg-amber-50 dark:bg-amber-500/15',
-    arrowBg: 'bg-amber-50 dark:bg-amber-500/15',
-    ring: 'ring-amber-100 dark:ring-amber-500/20',
+    accent: 'bg-amber-400',
+    iconBg: 'bg-amber-500/15 dark:bg-amber-500/15',
+    iconText: 'text-amber-600 dark:text-amber-300',
+    glow: 'shadow-amber-500/25',
+    ring: 'ring-amber-100 dark:ring-slate-700/80',
     focus: 'focus-visible:ring-amber-500/40',
   },
   slate: {
-    text: 'text-slate-700 dark:text-slate-300',
-    iconBg: 'bg-slate-100 dark:bg-slate-800',
-    arrowBg: 'bg-slate-100 dark:bg-slate-800',
-    ring: 'ring-slate-200 dark:ring-slate-700',
+    accent: 'bg-slate-400',
+    iconBg: 'bg-slate-200/80 dark:bg-slate-700/70',
+    iconText: 'text-slate-600 dark:text-slate-300',
+    glow: 'shadow-slate-500/20',
+    ring: 'ring-slate-200 dark:ring-slate-700/80',
     focus: 'focus-visible:ring-slate-500/40',
   },
   blue: {
-    text: 'text-blue-700 dark:text-blue-300',
-    iconBg: 'bg-blue-50 dark:bg-blue-500/15',
-    arrowBg: 'bg-blue-50 dark:bg-blue-500/15',
-    ring: 'ring-blue-100 dark:ring-blue-500/20',
+    accent: 'bg-blue-500',
+    iconBg: 'bg-blue-500/15 dark:bg-blue-500/15',
+    iconText: 'text-blue-600 dark:text-blue-300',
+    glow: 'shadow-blue-500/25',
+    ring: 'ring-blue-100 dark:ring-slate-700/80',
     focus: 'focus-visible:ring-blue-500/40',
   },
   purple: {
-    text: 'text-purple-700 dark:text-purple-300',
-    iconBg: 'bg-purple-50 dark:bg-purple-500/15',
-    arrowBg: 'bg-purple-50 dark:bg-purple-500/15',
-    ring: 'ring-purple-100 dark:ring-purple-500/20',
+    accent: 'bg-purple-500',
+    iconBg: 'bg-purple-500/15 dark:bg-purple-500/15',
+    iconText: 'text-purple-600 dark:text-purple-300',
+    glow: 'shadow-purple-500/25',
+    ring: 'ring-purple-100 dark:ring-slate-700/80',
     focus: 'focus-visible:ring-purple-500/40',
   },
   red: {
-    text: 'text-red-700 dark:text-red-300',
-    iconBg: 'bg-red-50 dark:bg-red-500/15',
-    arrowBg: 'bg-red-50 dark:bg-red-500/15',
-    ring: 'ring-red-100 dark:ring-red-500/20',
+    accent: 'bg-red-500',
+    iconBg: 'bg-red-500/15 dark:bg-red-500/15',
+    iconText: 'text-red-600 dark:text-red-300',
+    glow: 'shadow-red-500/25',
+    ring: 'ring-red-100 dark:ring-slate-700/80',
     focus: 'focus-visible:ring-red-500/40',
   },
 };
@@ -118,37 +122,50 @@ interface ActionCardProps {
   title: string;
   description: string;
   value?: number;
+  progress?: number;
   icon: LucideIcon;
   tone: CardTone;
 }
 
-function ActionCard({ href, title, description, value, icon: Icon, tone }: ActionCardProps) {
+function ActionCard({ href, title, description, value, progress = 100, icon: Icon, tone }: ActionCardProps) {
   const styles = actionToneStyles[tone];
+  const progressWidth = Math.max(5, Math.min(100, progress));
 
   return (
     <Link
       href={href}
-      className={`group flex min-h-[156px] flex-col justify-between rounded-lg bg-white p-5 shadow-sm ring-1 ${styles.ring} transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 dark:bg-slate-900 ${styles.focus}`}
+      className={`group relative flex min-h-[176px] flex-col justify-between overflow-hidden rounded-[1.35rem] bg-gradient-to-br from-white to-slate-50 p-6 shadow-sm ring-1 ${styles.ring} transition-all duration-300 hover:-translate-y-1 hover:bg-slate-50 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 dark:from-slate-900 dark:to-slate-800 dark:hover:from-slate-900 dark:hover:to-slate-800 ${styles.focus}`}
     >
-      <div className="flex items-start justify-between gap-4">
-        <div className="min-w-0">
-          <h3 className={`break-words text-lg font-semibold leading-6 ${styles.text}`}>{title}</h3>
-          {value !== undefined && (
-            <div className={`mt-3 text-2xl font-semibold leading-none ${styles.text}`}>
+      <div className={`pointer-events-none absolute -right-12 -top-12 h-32 w-32 rounded-full ${styles.accent} opacity-0 blur-3xl transition-opacity duration-300 group-hover:opacity-15`} />
+
+      <div className="relative flex items-start justify-between gap-4">
+        <span className={`flex h-14 w-14 flex-shrink-0 items-center justify-center rounded-2xl ${styles.iconBg} ${styles.iconText} shadow-lg ${styles.glow} transition-transform duration-300 group-hover:scale-105`}>
+          <Icon className="h-7 w-7" strokeWidth={2.1} />
+        </span>
+
+        <div className="min-w-0 text-right">
+          {value !== undefined ? (
+            <div className="truncate text-4xl font-bold leading-none tracking-tight text-slate-900 tabular-nums dark:text-slate-100 sm:text-[2.75rem]">
               {value.toLocaleString()}
             </div>
+          ) : (
+            <span className={`inline-flex h-11 w-11 items-center justify-center rounded-2xl ${styles.iconBg} ${styles.iconText} transition-transform duration-300 group-hover:translate-x-1`}>
+              <ArrowRight className="h-5 w-5" />
+            </span>
           )}
         </div>
-        <span className={`flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-md ${styles.iconBg} ${styles.text}`}>
-          <Icon className="h-5 w-5" strokeWidth={2.1} />
-        </span>
       </div>
 
-      <div className="mt-5 flex items-end justify-between gap-3">
-        <p className="min-w-0 text-sm leading-5 text-slate-500 dark:text-slate-400">{description}</p>
-        <span className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md ${styles.arrowBg} ${styles.text} transition-transform duration-200 group-hover:translate-x-0.5`}>
-          <ArrowRight className="h-4 w-4" />
-        </span>
+      <div className="relative mt-8">
+        <h3 className="break-words text-xl font-bold leading-6 text-slate-900 dark:text-slate-100">{title}</h3>
+        <p className="mt-3 min-w-0 text-sm leading-5 text-slate-500 dark:text-slate-400">{description}</p>
+
+        <div className="mt-5 h-2 w-full overflow-hidden rounded-full bg-slate-200/80 dark:bg-slate-950/40">
+          <div
+            className={`h-full rounded-full ${styles.accent} transition-all duration-500 group-hover:w-full`}
+            style={{ width: `${progressWidth}%` }}
+          />
+        </div>
       </div>
     </Link>
   );
@@ -166,7 +183,7 @@ function MetricCard({ label, value, helper, icon: Icon, tone }: MetricCardProps)
   const styles = metricToneStyles[tone];
 
   return (
-    <div className="rounded-lg bg-white p-5 shadow-sm ring-1 ring-slate-200 transition-shadow duration-200 hover:shadow-md dark:bg-slate-900 dark:ring-slate-700">
+    <div className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200 transition-shadow duration-200 hover:shadow-md dark:bg-slate-900 dark:ring-slate-700">
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
           <p className="text-sm font-medium leading-5 text-slate-500 dark:text-slate-400">{label}</p>
@@ -174,11 +191,11 @@ function MetricCard({ label, value, helper, icon: Icon, tone }: MetricCardProps)
             {value.toLocaleString()}
           </div>
         </div>
-        <span className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-md ${styles.iconBg} ${styles.text}`}>
+        <span className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl ${styles.iconBg} ${styles.text}`}>
           <Icon className="h-5 w-5" strokeWidth={2.1} />
         </span>
       </div>
-      <div className={`mt-5 inline-flex min-h-7 items-center rounded-md px-2.5 py-1 text-sm font-semibold ${styles.helperBg} ${styles.text}`}>
+      <div className={`mt-5 inline-flex min-h-7 items-center rounded-lg px-2.5 py-1 text-sm font-semibold ${styles.helperBg} ${styles.text}`}>
         {helper}
       </div>
     </div>
@@ -282,6 +299,7 @@ export default function SmsDashboard() {
       href: '/sms/assets',
       title: t.assets,
       value: totalAssets,
+      progress: 100,
       description: t.manageInventory,
       icon: Package,
       tone: 'emerald',
@@ -290,6 +308,7 @@ export default function SmsDashboard() {
       href: '/sms/transfer',
       title: t.transfers,
       description: t.sendReceive,
+      progress: 62,
       icon: ArrowLeftRight,
       tone: 'amber',
     },
@@ -297,23 +316,10 @@ export default function SmsDashboard() {
       href: '/sms/pending',
       title: t.pending,
       value: pending,
+      progress: pending > 0 ? Math.max(8, calculatePercentage(pending, Math.max(totalAssets, pending))) : 5,
       description: t.reviewRequests,
       icon: Clock,
       tone: 'slate',
-    },
-    {
-      href: '/sms/return',
-      title: tr('Return to Stock'),
-      description: tr('Upload photo and note'),
-      icon: RotateCcw,
-      tone: 'blue',
-    },
-    {
-      href: '/sms/history',
-      title: t.history,
-      description: t.auditTrail,
-      icon: History,
-      tone: 'purple',
     },
   ];
 
@@ -384,7 +390,7 @@ export default function SmsDashboard() {
           </div>
 
           <div className='flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:items-center'>
-            <div className='inline-flex min-h-10 items-center gap-2 rounded-lg bg-white px-3 py-2 text-sm font-medium text-slate-600 shadow-sm ring-1 ring-slate-200 dark:bg-slate-900 dark:text-slate-300 dark:ring-slate-700'>
+            <div className='inline-flex min-h-10 items-center gap-2 rounded-xl bg-white px-3 py-2 text-sm font-medium text-slate-600 shadow-sm ring-1 ring-slate-200 dark:bg-slate-900 dark:text-slate-300 dark:ring-slate-700'>
               <Bell className='h-4 w-4 text-blue-600' />
               <span>{translatePhrase(`${unreadCount} unread notification${unreadCount === 1 ? '' : 's'}`, language)}</span>
             </div>
@@ -397,17 +403,17 @@ export default function SmsDashboard() {
           </div>
         )}
 
-        <div className='mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5'>
+        <div className='mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3'>
           {actionCards.map((card) => (
             <ActionCard key={card.href} {...card} />
           ))}
         </div>
 
         {notifications.length > 0 && (
-          <div className='mb-6 rounded-lg bg-white p-5 shadow-sm ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-700'>
+          <div className='mb-6 rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-700'>
             <div className='mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between'>
               <div className='flex items-center gap-3'>
-                <div className='flex h-10 w-10 items-center justify-center rounded-md bg-blue-50 text-blue-600 dark:bg-blue-500/15 dark:text-blue-300'>
+                <div className='flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-blue-600 dark:bg-blue-500/15 dark:text-blue-300'>
                   <Bell className='h-5 w-5' />
                 </div>
                 <div>
@@ -421,7 +427,7 @@ export default function SmsDashboard() {
                 type='button'
                 onClick={() => void markNotificationsRead()}
                 disabled={markingNotificationsRead}
-                className='inline-flex items-center justify-center gap-2 rounded-md bg-white px-3 py-2 text-sm font-semibold text-slate-600 shadow-sm ring-1 ring-slate-200 transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/30 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-slate-900 dark:text-slate-300 dark:ring-slate-700 dark:hover:bg-slate-800'
+                className='inline-flex items-center justify-center gap-2 rounded-xl bg-white px-3 py-2 text-sm font-semibold text-slate-600 shadow-sm ring-1 ring-slate-200 transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/30 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-slate-900 dark:text-slate-300 dark:ring-slate-700 dark:hover:bg-slate-800'
               >
                 <CheckCheck className='h-4 w-4' />
                 {markingNotificationsRead ? tr('Marking...') : tr('Mark read')}
@@ -435,7 +441,7 @@ export default function SmsDashboard() {
                 <Link
                   key={notification.id}
                   href={getNotificationHref(notification)}
-                  className={`rounded-lg p-4 shadow-sm ring-1 transition hover:bg-slate-50 dark:hover:bg-slate-800 ${
+                  className={`rounded-xl p-4 shadow-sm ring-1 transition hover:bg-slate-50 dark:hover:bg-slate-800 ${
                     notification.readAt ? 'bg-white ring-slate-200 dark:bg-slate-900 dark:ring-slate-700' : 'bg-blue-50 ring-blue-100 dark:bg-blue-500/15 dark:ring-blue-500/20'
                   }`}
                 >

@@ -8,7 +8,7 @@ import { useTranslation } from "@/shared/utils/i18n";
 import { OptimizedLink } from "@/shared/components/OptimizedLink";
 import { useVehicleStats } from "@/systems/vms/hooks/useVehiclesNeon";
 import { TukTukIcon } from "@/shared/components/icons/TukTukIcon";
-import { Bike, Boxes, Car, Package } from "lucide-react";
+import { Bike, Boxes, Calculator, Car, Package } from "lucide-react";
 import { startTransition, useCallback, useEffect, useMemo, useState } from "react";
 
 function normalizeCategory(value: unknown) {
@@ -22,15 +22,8 @@ function isTukTukCategory(value: unknown): boolean {
 }
 
 // Icon Components
-function IconDashboard() {
-  return (
-    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="3" y="3" width="7" height="7" rx="1" />
-      <rect x="14" y="3" width="7" height="7" rx="1" />
-      <rect x="14" y="14" width="7" height="7" rx="1" />
-      <rect x="3" y="14" width="7" height="7" rx="1" />
-    </svg>
-  );
+function IconDashboard({ className }: { className?: string }) {
+  return <Calculator className={className || "w-5 h-5"} />;
 }
 
 function IconLms() {

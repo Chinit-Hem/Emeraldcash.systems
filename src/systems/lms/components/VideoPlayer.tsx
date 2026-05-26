@@ -18,6 +18,8 @@ import {
   Play,
   RotateCcw,
   ShieldCheck,
+  SkipBack,
+  SkipForward,
 } from "lucide-react";
 import { GlassButton } from "@/shared/components/ui/glass/GlassButton";
 import { GlassCard } from "@/shared/components/ui/glass/GlassCard";
@@ -36,6 +38,10 @@ interface VideoPlayerProps {
   completionThreshold?: number;
   onComplete: (progress?: VideoProgressSnapshot) => void | Promise<boolean | void>;
   onBack: () => void;
+  onPrevious?: () => void;
+  onNext?: () => void;
+  canGoPrevious?: boolean;
+  canGoNext?: boolean;
   onProgressChange?: (progress: VideoProgressSnapshot) => void;
 }
 
@@ -129,7 +135,9 @@ type ProgressResponse = {
 const YOUTUBE_IFRAME_API_SRC = "https://www.youtube.com/iframe_api";
 const PROGRESS_SAVE_INTERVAL_MS = 10_000;
 const PROGRESS_POLL_INTERVAL_MS = 1_000;
+const SMOOTH_PROGRESS_FRAME_MS = 90;
 const VIDEO_CONTROLS_HIDE_DELAY_MS = 2_200;
+const TOUCH_CLICK_SUPPRESS_MS = 600;
 const MAX_PLAYBACK_RATE = 1.25;
 const SEEK_GRACE_SECONDS = 2;
 const COMPLETE_END_TOLERANCE_SECONDS = 5;
@@ -410,10 +418,15 @@ export function VideoPlayer({
   completionThreshold = 95,
   onComplete,
   onBack,
+  onPrevious,
+  onNext,
+  canGoPrevious = false,
+  canGoNext = false,
   onProgressChange,
 }: VideoPlayerProps) {
   const [currentStep, setCurrentStep] = useState(0);
   const [currentTime, setCurrentTime] = useState(0);
+  const [smoothCurrentTime, setSmoothCurrentTime] = useState(0);
   const [maxWatchedSeconds, setMaxWatchedSeconds] = useState(0);
   const [videoDuration, setVideoDuration] = useState(0);
   const [watchPercentage, setWatchPercentage] = useState(0);
@@ -437,6 +450,9 @@ export function VideoPlayer({
   const progressIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const saveIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const controlsHideTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const smoothProgressFrameRef = useRef<number | null>(null);
+  const lastSmoothProgressFrameAtRef = useRef(0);
+  const areControlsVisibleRef = useRef(true);
   const resumeTimeRef = useRef(0);
   const currentTimeRef = useRef(0);
   const maxWatchedRef = useRef(0);
@@ -444,8 +460,7 @@ export function VideoPlayer({
   const isCompletedRef = useRef(initialCompleted);
   const playbackUnlockedRef = useRef(initialCompleted);
   const isScrubbingRef = useRef(false);
-  const lastTapRef = useRef<{ x: number; y: number; time: number } | null>(null);
-  const doubleTapTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastTouchInteractionRef = useRef(0);
   const onProgressChangeRef = useRef(onProgressChange);
 
   const instructionSteps = useMemo(
@@ -456,18 +471,19 @@ export function VideoPlayer({
   const completionAllowed = isCompleted || watchPercentage >= completionThreshold;
   const playbackUnlocked = completionAllowed;
   const currentProgressPercent =
-    videoDuration > 0 ? clamp((currentTime / videoDuration) * 100, 0, 100) : 0;
+    videoDuration > 0 ? clamp((smoothCurrentTime / videoDuration) * 100, 0, 100) : 0;
   const progressPercent = seekPreviewPercent ?? currentProgressPercent;
   const displayTime =
     seekPreviewPercent !== null && videoDuration > 0
       ? (seekPreviewPercent / 100) * videoDuration
-      : currentTime;
+      : smoothCurrentTime;
   const maxSeekPercent =
     playbackUnlocked
       ? 100
       : videoDuration > 0
-        ? clamp((maxWatchedSeconds / videoDuration) * 100, 0, 100)
+        ? clamp((Math.max(maxWatchedSeconds, smoothCurrentTime) / videoDuration) * 100, 0, 100)
         : 0;
+  const watchedRailPercent = Math.max(maxSeekPercent, progressPercent);
   const durationLabel =
     videoDuration > 0
       ? formatTime(videoDuration)
@@ -477,7 +493,8 @@ export function VideoPlayer({
   const playbackStatusLabel = playbackUnlocked
     ? "Replay: seek and speed unlocked"
     : "First watch: seek and speed protected";
-  const shouldShowVideoControls = !isReady || !isPlaying || !!warning || areControlsVisible;
+  const shouldShowVideoControls = !isReady || !!warning || areControlsVisible;
+  const shouldShowCenterControls = isReady && !warning && areControlsVisible;
   const lessonProgress =
     instructionSteps.length > 0
       ? ((currentStep + 1) / instructionSteps.length) * 100
@@ -495,17 +512,51 @@ export function VideoPlayer({
     }
   }, []);
 
+  const clearSmoothProgressFrame = useCallback(() => {
+    if (smoothProgressFrameRef.current !== null) {
+      window.cancelAnimationFrame(smoothProgressFrameRef.current);
+      smoothProgressFrameRef.current = null;
+    }
+  }, []);
+
   const revealVideoControls = useCallback(() => {
+    areControlsVisibleRef.current = true;
     setAreControlsVisible(true);
     clearControlsHideTimeout();
 
     if (isPlaying && isReady) {
       controlsHideTimeoutRef.current = setTimeout(() => {
+        areControlsVisibleRef.current = false;
         setAreControlsVisible(false);
         controlsHideTimeoutRef.current = null;
       }, VIDEO_CONTROLS_HIDE_DELAY_MS);
     }
   }, [clearControlsHideTimeout, isPlaying, isReady]);
+
+  const hideVideoControls = useCallback(() => {
+    clearControlsHideTimeout();
+    areControlsVisibleRef.current = false;
+    setAreControlsVisible(false);
+  }, [clearControlsHideTimeout]);
+
+  const toggleVideoControls = useCallback(() => {
+    if (!isReady || warning) {
+      revealVideoControls();
+      return;
+    }
+
+    if (areControlsVisibleRef.current) {
+      hideVideoControls();
+      return;
+    }
+
+    revealVideoControls();
+  }, [
+    hideVideoControls,
+    isReady,
+    revealVideoControls,
+    warning,
+  ]);
 
   const syncFullscreenVideoLayout = useCallback(() => {
     window.requestAnimationFrame(() => {
@@ -535,8 +586,36 @@ export function VideoPlayer({
   }, [playbackUnlocked]);
 
   useEffect(() => {
-    if (!isPlaying || !isReady || warning) {
+    if (!isPlaying || !isReady) {
+      clearSmoothProgressFrame();
+      return;
+    }
+
+    const animateProgress = (timestamp: number) => {
+      if (timestamp - lastSmoothProgressFrameAtRef.current >= SMOOTH_PROGRESS_FRAME_MS) {
+        lastSmoothProgressFrameAtRef.current = timestamp;
+
+        const player = playerRef.current;
+        if (player && !isScrubbingRef.current) {
+          const duration = player.getDuration() || durationRef.current;
+          const nextCurrent = player.getCurrentTime();
+          setSmoothCurrentTime(duration > 0 ? clamp(nextCurrent, 0, duration) : Math.max(0, nextCurrent));
+        }
+      }
+
+      smoothProgressFrameRef.current = window.requestAnimationFrame(animateProgress);
+    };
+
+    lastSmoothProgressFrameAtRef.current = performance.now();
+    smoothProgressFrameRef.current = window.requestAnimationFrame(animateProgress);
+
+    return clearSmoothProgressFrame;
+  }, [clearSmoothProgressFrame, isPlaying, isReady]);
+
+  useEffect(() => {
+    if (!isReady || warning) {
       clearControlsHideTimeout();
+      areControlsVisibleRef.current = true;
       setAreControlsVisible(true);
       return;
     }
@@ -590,6 +669,7 @@ export function VideoPlayer({
       playbackUnlockedRef.current = nextCanComplete;
 
       setCurrentTime(safeCurrent);
+      setSmoothCurrentTime(safeCurrent);
       setMaxWatchedSeconds(safeMax);
       setVideoDuration(safeDuration);
       setWatchPercentage(nextPercentage);
@@ -772,6 +852,14 @@ playerRef.current = new yt.Player(playerMountRef.current, {
                 return;
               }
 
+              if (!isNowPlaying) {
+                const nextCurrent = event.target.getCurrentTime();
+                const duration = event.target.getDuration() || durationRef.current || 1;
+                updateWatchState(nextCurrent, Math.max(maxWatchedRef.current, nextCurrent), duration);
+                void saveProgress();
+                return;
+              }
+
               if (isNowPlaying) {
                 progressIntervalRef.current = setInterval(() => {
                   const player = playerRef.current;
@@ -905,6 +993,52 @@ useEffect(() => {
     }
   }, [isPlaying, isReady, revealVideoControls, saveProgress]);
 
+  const handleVideoSurfaceClick = useCallback(
+    (event: React.MouseEvent<HTMLButtonElement>) => {
+      if (Date.now() - lastTouchInteractionRef.current < TOUCH_CLICK_SUPPRESS_MS) {
+        event.preventDefault();
+        return;
+      }
+
+      toggleVideoControls();
+    },
+    [toggleVideoControls]
+  );
+
+  const handlePreviousLesson = useCallback(() => {
+    if (!canGoPrevious || !onPrevious) {
+      return;
+    }
+
+    revealVideoControls();
+    void saveProgress();
+    onPrevious();
+  }, [canGoPrevious, onPrevious, revealVideoControls, saveProgress]);
+
+  const handleNextLesson = useCallback(() => {
+    if (!canGoNext || !onNext) {
+      return;
+    }
+
+    revealVideoControls();
+    void saveProgress();
+    onNext();
+  }, [canGoNext, onNext, revealVideoControls, saveProgress]);
+
+  const setSmoothTimeFromProgress = useCallback((requestedProgress: number) => {
+    const safeDuration = durationRef.current;
+    if (safeDuration <= 0) {
+      setSmoothCurrentTime(0);
+      return 0;
+    }
+
+    const requestedTime = (clamp(requestedProgress, 0, 100) / 100) * safeDuration;
+    const safeTime = clamp(requestedTime, 0, safeDuration);
+    setSmoothCurrentTime(safeTime);
+    lastSmoothProgressFrameAtRef.current = performance.now();
+    return safeTime;
+  }, []);
+
   const commitSeek = useCallback(
     (requestedProgress: number) => {
       const safeDuration = durationRef.current;
@@ -925,12 +1059,16 @@ useEffect(() => {
       setSeekPreviewPercent(null);
 
       if (!isUnlockedForReplay && requestedTime > maxAllowedTime) {
+        setSmoothCurrentTime(maxWatchedRef.current);
+        lastSmoothProgressFrameAtRef.current = performance.now();
         playerRef.current.seekTo(maxWatchedRef.current, true);
         updateWatchState(maxWatchedRef.current, maxWatchedRef.current, safeDuration);
         showWarning("Seeking forward is locked until you watch that part of the lesson.");
         return;
       }
 
+      setSmoothCurrentTime(requestedTime);
+      lastSmoothProgressFrameAtRef.current = performance.now();
       playerRef.current.seekTo(requestedTime, true);
       updateWatchState(
         requestedTime,
@@ -948,6 +1086,7 @@ useEffect(() => {
     revealVideoControls();
     const requestedProgress = clamp(Number(event.target.value), 0, 100);
     setSeekPreviewPercent(requestedProgress);
+    setSmoothTimeFromProgress(requestedProgress);
 
     if (!isScrubbingRef.current) {
       commitSeek(requestedProgress);
@@ -968,66 +1107,22 @@ const handleSeekCommit = (event: React.PointerEvent<HTMLInputElement>) => {
     commitSeek(seekPreviewPercent ?? Number(event.currentTarget.value));
   };
 
-// Mobile touch gesture handler - double tap sides to seek, center to play/pause
+// Mobile touch gesture handler - every screen tap clears/shows controls immediately.
   const handleTouchGesture = useCallback((e: React.TouchEvent<HTMLDivElement>) => {
     if (!isReady || !playerRef.current) return;
+
+    if (e.target instanceof Element && e.target.closest("[data-lms-video-controls]")) {
+      return;
+    }
     
     // Use changedTouches for touchend event (touches is empty on touchend)
     const touch = e.touches[0] || e.changedTouches[0];
     if (!touch) return;
+
+    lastTouchInteractionRef.current = Date.now();
     
-    const rect = e.currentTarget.getBoundingClientRect();
-    const x = (touch.clientX - rect.left) / rect.width;
-    const now = Date.now();
-    
-    // Check for double tap (within 300ms and close location)
-    if (
-      lastTapRef.current &&
-      now - lastTapRef.current.time < 300 &&
-      Math.abs(touch.clientX - lastTapRef.current.x) < 50 &&
-      Math.abs(touch.clientY - lastTapRef.current.y) < 50
-    ) {
-      // Double tap detected - seek left (25%) or right (75%)
-      if (x < 0.35) {
-        // Left side - seek back 10 seconds
-        const newTime = Math.max(0, currentTimeRef.current - 10);
-        playerRef.current.seekTo(newTime, true);
-        updateWatchState(newTime, Math.max(maxWatchedRef.current, newTime), durationRef.current);
-      } else if (x > 0.65) {
-        // Right side - seek forward 10 seconds
-        const newTime = Math.min(durationRef.current, currentTimeRef.current + 10);
-        playerRef.current.seekTo(newTime, true);
-        updateWatchState(newTime, Math.max(maxWatchedRef.current, newTime), durationRef.current);
-      }
-      // Clear timeout
-      if (doubleTapTimeoutRef.current) {
-        clearTimeout(doubleTapTimeoutRef.current);
-        doubleTapTimeoutRef.current = null;
-      }
-      lastTapRef.current = null;
-    } else {
-      // Single tap - store for double tap detection
-      lastTapRef.current = { x: touch.clientX, y: touch.clientY, time: now };
-      // Clear any pending timeout
-      if (doubleTapTimeoutRef.current) {
-        clearTimeout(doubleTapTimeoutRef.current);
-      }
-      // Toggle play/pause after short delay if no double tap
-      doubleTapTimeoutRef.current = setTimeout(() => {
-        if (lastTapRef.current) {
-          // Toggle play/pause on single tap
-          if (isPlaying) {
-            playerRef.current?.pauseVideo();
-          } else {
-            playerRef.current?.playVideo();
-          }
-          lastTapRef.current = null;
-        }
-      }, 200);
-    }
-    
-    revealVideoControls();
-  }, [isReady, isPlaying, commitSeek, updateWatchState]);
+    toggleVideoControls();
+  }, [isReady, toggleVideoControls]);
 
   const handlePlaybackRateChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
     revealVideoControls();
@@ -1055,6 +1150,8 @@ const handleSeekCommit = (event: React.PointerEvent<HTMLInputElement>) => {
     const safeDuration = durationRef.current;
     playerRef.current?.seekTo(0, true);
     playerRef.current?.playVideo();
+    setSmoothCurrentTime(0);
+    lastSmoothProgressFrameAtRef.current = performance.now();
     // Fix: Use durationRef.current instead of videoDuration (which can be stale state)
     updateWatchState(0, maxWatchedRef.current, safeDuration);
   };
@@ -1204,8 +1301,6 @@ const handleSeekCommit = (event: React.PointerEvent<HTMLInputElement>) => {
                       : "aspect-video"
                   }`}
                   onMouseMove={revealVideoControls}
-                  onTouchStart={revealVideoControls}
-                  onPointerDown={revealVideoControls}
                   onFocusCapture={revealVideoControls}
                   onTouchEnd={handleTouchGesture}
                 >
@@ -1226,15 +1321,15 @@ const handleSeekCommit = (event: React.PointerEvent<HTMLInputElement>) => {
 
                       <button
                         type="button"
-                        onClick={togglePlay}
+                        onClick={handleVideoSurfaceClick}
                         disabled={!isReady}
                         className="absolute inset-0 z-10 cursor-pointer bg-transparent disabled:cursor-wait"
-                        aria-label={isPlaying ? "Pause video" : "Play video"}
+                        aria-label={areControlsVisible ? "Hide video controls" : "Show video controls"}
                       />
 
                       <div
                         aria-hidden="true"
-                        className="absolute left-0 right-0 top-0 z-20 h-16 bg-transparent sm:h-20"
+                        className="pointer-events-none absolute left-0 right-0 top-0 z-20 h-16 bg-transparent sm:h-20"
                       />
 
                       <div className="pointer-events-none absolute inset-0 z-20 overflow-hidden">
@@ -1260,7 +1355,63 @@ const handleSeekCommit = (event: React.PointerEvent<HTMLInputElement>) => {
                       )}
 
                       <div
-                        className={`absolute bottom-0 left-0 right-0 z-30 bg-gradient-to-t from-black/90 via-black/60 to-transparent px-4 pb-4 pt-10 transition-all duration-300 ${
+                        aria-hidden="true"
+                        className={`pointer-events-none absolute inset-0 z-20 bg-black/20 transition-opacity duration-300 ${
+                          shouldShowCenterControls ? "opacity-100" : "opacity-0"
+                        }`}
+                      />
+
+                      <div
+                        data-lms-video-controls
+                        className={`pointer-events-none absolute inset-0 z-30 flex items-center justify-center transition-all duration-300 ${
+                          shouldShowCenterControls
+                            ? "scale-100 opacity-100"
+                            : "scale-95 opacity-0"
+                        }`}
+                      >
+                        <div className="pointer-events-auto flex items-center gap-5 rounded-full bg-black/35 px-4 py-3 shadow-2xl backdrop-blur-md sm:gap-7 sm:px-5">
+                          <button
+                            type="button"
+                            onClick={handlePreviousLesson}
+                            disabled={!canGoPrevious || !onPrevious}
+                            className="inline-flex h-12 w-12 items-center justify-center rounded-full text-white transition hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-35 sm:h-14 sm:w-14"
+                            aria-label="Previous lesson"
+                            title="Previous lesson"
+                          >
+                            <SkipBack className="h-6 w-6 fill-current sm:h-7 sm:w-7" />
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={togglePlay}
+                            disabled={!isReady}
+                            className="inline-flex h-16 w-16 items-center justify-center rounded-full bg-white text-gray-950 shadow-xl transition hover:scale-105 hover:bg-emerald-50 disabled:cursor-wait disabled:opacity-60 sm:h-20 sm:w-20"
+                            aria-label={isPlaying ? "Pause video" : "Play video"}
+                            title={isPlaying ? "Pause video" : "Play video"}
+                          >
+                            {isPlaying ? (
+                              <Pause className="h-8 w-8 fill-current sm:h-10 sm:w-10" />
+                            ) : (
+                              <Play className="ml-1 h-8 w-8 fill-current sm:h-10 sm:w-10" />
+                            )}
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={handleNextLesson}
+                            disabled={!canGoNext || !onNext}
+                            className="inline-flex h-12 w-12 items-center justify-center rounded-full text-white transition hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-35 sm:h-14 sm:w-14"
+                            aria-label="Next lesson"
+                            title="Next lesson"
+                          >
+                            <SkipForward className="h-6 w-6 fill-current sm:h-7 sm:w-7" />
+                          </button>
+                        </div>
+                      </div>
+
+                      <div
+                        data-lms-video-controls
+                        className={`lms-video-bottom-controls absolute bottom-0 left-0 right-0 z-30 bg-gradient-to-t from-black/90 via-black/60 to-transparent px-4 pb-4 pt-10 transition-all duration-300 ${
                           shouldShowVideoControls
                             ? "translate-y-0 opacity-100"
                             : "pointer-events-none translate-y-4 opacity-0"
@@ -1293,9 +1444,9 @@ const handleSeekCommit = (event: React.PointerEvent<HTMLInputElement>) => {
                             onPointerUp={handleSeekCommit}
                             onPointerCancel={handleSeekCommit}
                             disabled={!isReady}
-                            className="h-1 flex-1 cursor-pointer appearance-none rounded-full bg-white/25 accent-emerald-500 disabled:cursor-wait"
+                            className="lms-video-progress-range h-5 flex-1 cursor-pointer appearance-none rounded-full bg-transparent disabled:cursor-wait"
                             style={{
-                              background: `linear-gradient(to right, rgb(16 185 129) 0%, rgb(16 185 129) ${progressPercent}%, rgba(255,255,255,0.45) ${progressPercent}%, rgba(255,255,255,0.45) ${maxSeekPercent}%, rgba(255,255,255,0.25) ${maxSeekPercent}%, rgba(255,255,255,0.25) 100%)`,
+                              background: `linear-gradient(to right, rgb(255 0 51) 0%, rgb(255 0 51) ${progressPercent}%, rgba(255,255,255,0.55) ${progressPercent}%, rgba(255,255,255,0.55) ${watchedRailPercent}%, rgba(255,255,255,0.26) ${watchedRailPercent}%, rgba(255,255,255,0.26) 100%)`,
                             }}
                             aria-label="Video progress"
                           />
@@ -1306,20 +1457,6 @@ const handleSeekCommit = (event: React.PointerEvent<HTMLInputElement>) => {
 
                         <div className="mt-3 flex items-center justify-between gap-2">
                           <div className="flex min-w-0 items-center gap-2">
-                            <button
-                              type="button"
-                              onClick={togglePlay}
-                              disabled={!isReady}
-                              className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-white text-gray-950 shadow-lg transition hover:bg-emerald-50 disabled:cursor-wait disabled:opacity-60"
-                              aria-label={isPlaying ? "Pause video" : "Play video"}
-                            >
-                              {isPlaying ? (
-                                <Pause className="h-5 w-5 fill-current" />
-                              ) : (
-                                <Play className="h-5 w-5 fill-current" />
-                              )}
-                            </button>
-
                             <button
                               type="button"
                               onClick={restartVideo}

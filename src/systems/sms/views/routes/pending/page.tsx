@@ -47,6 +47,14 @@ interface LocalPendingTransfer {
 }
 
 const UserAvatar = ({ userId, users }: { userId: string; users: LocalUser[] }) => {
+  if (userId === 'stock') {
+    return (
+      <div className="flex h-10 w-10 items-center justify-center rounded-md border border-emerald-200 bg-emerald-50 text-emerald-700 shadow-sm">
+        <Package className="h-5 w-5" />
+      </div>
+    );
+  }
+
   const user = users.find(u => u.username === userId);
   const initial = user ? (user.full_name || user.username || 'U').charAt(0).toUpperCase() : '?';
 
@@ -68,6 +76,10 @@ const UserAvatar = ({ userId, users }: { userId: string; users: LocalUser[] }) =
 function formatRelativeTime(value: string) {
   const date = toDateInstant(value);
   return date ? formatDistanceToNow(date, { addSuffix: true }) : '—';
+}
+
+function isReturnRequest(transfer: Pick<LocalPendingTransfer, 'receiverId'>) {
+  return transfer.receiverId === 'stock';
 }
 
 export default function PendingPage() {
@@ -95,6 +107,8 @@ export default function PendingPage() {
   }, []);
 
   const getUserDisplay = useCallback((userId: string) => {
+    if (userId === 'stock') return 'Stock';
+
     const user = users.find(u => u.username === userId);
     return user ? (user.full_name || user.username || userId) : userId;
   }, [users]);
@@ -138,6 +152,10 @@ export default function PendingPage() {
   };
 
   const canManageTransfer = useCallback((transfer: LocalPendingTransfer) => {
+    if (isReturnRequest(transfer)) {
+      return currentUser.role === 'Admin';
+    }
+
     return currentUser.role === 'Admin' || transfer.receiverId === currentUser.username;
   }, [currentUser.role, currentUser.username]);
 
@@ -163,7 +181,10 @@ export default function PendingPage() {
       });
 
       if (res.ok) {
-        toastSuccess(`Transfer #${transferId.slice(-8)} ${action === 'accept' ? 'accepted' : 'rejected'}`);
+        const transfer = pending.find((item) => item.id === transferId);
+        const requestLabel = transfer && isReturnRequest(transfer) ? 'Return request' : 'Transfer';
+        const actionLabel = action === 'accept' ? 'accepted' : transfer && isReturnRequest(transfer) ? 'sent back' : 'rejected';
+        toastSuccess(`${requestLabel} #${transferId.slice(-8)} ${actionLabel}`);
         await fetchPending();
         if (action === 'reject') {
           setRejectRemarks(prev => {
@@ -336,7 +357,7 @@ export default function PendingPage() {
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex-1">
                       <CardTitle id={`transfer-title-${transfer.id}`} className="font-bold text-xl mb-1">
-                        Transfer #{transfer.id.slice(-8).toUpperCase()}
+                        {isReturnRequest(transfer) ? 'Return' : 'Transfer'} #{transfer.id.slice(-8).toUpperCase()}
                       </CardTitle>
                       <div className="flex items-center gap-2">
                         {transfer.asset ? (
@@ -355,7 +376,7 @@ export default function PendingPage() {
                       variant="secondary" 
                       className="bg-slate-100 text-slate-800"
                     >
-                      Pending Review
+                      {isReturnRequest(transfer) ? 'Return Review' : 'Pending Review'}
                     </Badge>
                   </div>
                 </CardHeader>
@@ -364,19 +385,19 @@ export default function PendingPage() {
                     <div className="flex items-center gap-3 rounded-lg bg-slate-50 p-4 ring-1 ring-slate-200">
                       <UserAvatar userId={transfer.senderId} users={users} />
                       <div>
-                        <div className="font-medium text-slate-900">From</div>
+                        <div className="font-medium text-slate-900">{isReturnRequest(transfer) ? 'Returning Person' : 'From'}</div>
                         <div className="text-slate-800 font-semibold">{getUserDisplay(transfer.senderId)}</div>
                       </div>
                     </div>
                     <div className="flex items-center gap-3 rounded-lg bg-emerald-50 p-4 ring-1 ring-emerald-100">
                       <UserAvatar userId={transfer.receiverId} users={users} />
                       <div>
-                        <div className="font-medium text-slate-900">To</div>
+                        <div className="font-medium text-slate-900">{isReturnRequest(transfer) ? 'Destination' : 'To'}</div>
                         <div className="text-slate-800 font-semibold">{getUserDisplay(transfer.receiverId)}</div>
                       </div>
                     </div>
                     <div className="grid gap-2 rounded-lg bg-blue-50 p-4 ring-1 ring-blue-100">
-                      <div className="font-medium text-slate-900">Location</div>
+                      <div className="font-medium text-slate-900">{isReturnRequest(transfer) ? 'Return Location' : 'Location'}</div>
                       <div className="text-lg font-bold text-blue-900">{transfer.location}</div>
                     </div>
                     <div className="grid gap-2 rounded-lg bg-amber-50 p-4 ring-1 ring-amber-100">
@@ -389,7 +410,9 @@ export default function PendingPage() {
                   </div>
                   {transfer.remark && (
                     <div className="mt-5 rounded-lg bg-blue-50 p-4 ring-1 ring-blue-100">
-                      <div className="mb-1 text-sm font-semibold text-blue-950">Message from sender</div>
+                      <div className="mb-1 text-sm font-semibold text-blue-950">
+                        {isReturnRequest(transfer) ? 'Return Note' : 'Message from sender'}
+                      </div>
                       <p className="text-sm leading-6 text-blue-900">{transfer.remark}</p>
                     </div>
                   )}
@@ -400,15 +423,15 @@ export default function PendingPage() {
                       onClick={() =>
                         setViewImage({
                           src: transfer.imageUrl!,
-                          alt: `Transfer proof - Transfer #${transfer.id.slice(-8)}`,
+                          alt: `${isReturnRequest(transfer) ? 'Return' : 'Transfer'} proof - #${transfer.id.slice(-8)}`,
                         })
                       }
                       className="relative mt-5 h-40 w-full cursor-zoom-in overflow-hidden rounded-lg bg-slate-100 ring-1 ring-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 sm:w-64"
-                      aria-label="View transfer proof larger"
+                      aria-label={`View ${isReturnRequest(transfer) ? 'return' : 'transfer'} proof larger`}
                     >
                       <Image
                         src={transfer.imageUrl!}
-                        alt="Transfer proof"
+                        alt={`${isReturnRequest(transfer) ? 'Return' : 'Transfer'} proof`}
                         fill
                         sizes="256px"
                         className="object-cover"
@@ -431,7 +454,7 @@ export default function PendingPage() {
                               Processing...
                             </>
                           ) : (
-                            'Accept Transfer'
+                            isReturnRequest(transfer) ? 'Accept Return' : 'Accept Transfer'
                           )}
                         </Button>
                       </AlertDialogTrigger>
@@ -439,12 +462,22 @@ export default function PendingPage() {
                         <AlertDialogHeader>
                           <AlertDialogTitle className="flex items-center gap-2">
                             <CheckCircle2 className="w-5 h-5 text-emerald-600" />
-                            Accept Transfer
+                            {isReturnRequest(transfer) ? 'Accept Return' : 'Accept Transfer'}
                           </AlertDialogTitle>
                           <AlertDialogDescription>
-                            Confirm accepting transfer #{transfer.id.slice(-8)} from{' '}
-                            <span className="font-semibold">{getUserDisplay(transfer.senderId)}</span>{' '}
-                            to <span className="font-semibold">{getUserDisplay(transfer.receiverId)}</span>?
+                            {isReturnRequest(transfer) ? (
+                              <>
+                                Confirm returning #{transfer.id.slice(-8)} from{' '}
+                                <span className="font-semibold">{getUserDisplay(transfer.senderId)}</span>{' '}
+                                back to stock?
+                              </>
+                            ) : (
+                              <>
+                                Confirm accepting transfer #{transfer.id.slice(-8)} from{' '}
+                                <span className="font-semibold">{getUserDisplay(transfer.senderId)}</span>{' '}
+                                to <span className="font-semibold">{getUserDisplay(transfer.receiverId)}</span>?
+                              </>
+                            )}
                           </AlertDialogDescription>
                         </AlertDialogHeader>
                         <AlertDialogFooter>
@@ -453,7 +486,7 @@ export default function PendingPage() {
                             onClick={() => handleAction(transfer.id, 'accept')}
                             disabled={actionLoading[transfer.id]}
                           >
-                            Accept
+                            {isReturnRequest(transfer) ? 'Accept Return' : 'Accept'}
                           </AlertDialogAction>
                         </AlertDialogFooter>
                       </AlertDialogContent>
@@ -480,7 +513,7 @@ export default function PendingPage() {
                               Processing...
                             </>
                           ) : (
-                            'Reject Transfer'
+                            isReturnRequest(transfer) ? 'Send Back' : 'Reject Transfer'
                           )}
                         </Button>
                       </AlertDialogTrigger>
@@ -488,10 +521,19 @@ export default function PendingPage() {
                         <AlertDialogHeader>
                           <AlertDialogTitle className="flex items-center gap-2">
                             <XCircle className="w-5 h-5 text-red-600" />
-                            Reject Transfer
+                            {isReturnRequest(transfer) ? 'Send Return Back' : 'Reject Transfer'}
                           </AlertDialogTitle>
                           <AlertDialogDescription>
-                            Reject transfer from <span className="font-semibold">{getUserDisplay(transfer.senderId)}</span>?
+                            {isReturnRequest(transfer) ? (
+                              <>
+                                Send this return request back to{' '}
+                                <span className="font-semibold">{getUserDisplay(transfer.senderId)}</span>? The asset will stay assigned.
+                              </>
+                            ) : (
+                              <>
+                                Reject transfer from <span className="font-semibold">{getUserDisplay(transfer.senderId)}</span>?
+                              </>
+                            )}
                           </AlertDialogDescription>
                           <div className="space-y-2 mt-4">
                             <div className="rounded-lg bg-slate-50 p-3 ring-1 ring-slate-200">
@@ -533,7 +575,7 @@ export default function PendingPage() {
                             onClick={() => handleAction(transfer.id, 'reject', rejectRemarks[transfer.id])}
                             disabled={actionLoading[transfer.id] || !!rejectErrors[`remark-${transfer.id}`]}
                           >
-                            Reject
+                            {isReturnRequest(transfer) ? 'Send Back' : 'Reject'}
                           </AlertDialogAction>
 
                         </AlertDialogFooter>
@@ -542,7 +584,9 @@ export default function PendingPage() {
                   </div>
                   ) : (
                     <div className="rounded-lg bg-white px-4 py-3 text-sm font-medium text-slate-600 ring-1 ring-slate-200">
-                      Waiting for {getUserDisplay(transfer.receiverId)} or an admin to review this transfer.
+                      {isReturnRequest(transfer)
+                        ? 'Waiting for an admin to review this return request.'
+                        : `Waiting for ${getUserDisplay(transfer.receiverId)} or an admin to review this transfer.`}
                     </div>
                   )}
                 </div>

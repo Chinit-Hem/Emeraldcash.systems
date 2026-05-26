@@ -2,12 +2,12 @@
 
 import {
   Car,
+  Calculator,
   Check,
   ChevronRight,
   Edit3,
   Globe,
   GraduationCap,
-  LayoutDashboard,
   LogOut,
   Mail,
   Phone,
@@ -167,7 +167,7 @@ export default function SettingsContent() {
 
   const quickLinks = useMemo(() => {
     const links: { href: string; icon: LucideIcon; label: string; color: string }[] = [
-      { href: "/", icon: LayoutDashboard, label: t.dashboard, color: "from-emerald-500 to-teal-600" },
+      { href: "/", icon: Calculator, label: t.dashboard, color: "from-emerald-500 to-teal-600" },
       { href: "/vehicles", icon: Car, label: t.vehicles, color: "from-blue-500 to-indigo-600" },
       { href: "/lms", icon: GraduationCap, label: t.training, color: "from-violet-500 to-purple-600" },
     ];
@@ -382,7 +382,7 @@ export default function SettingsContent() {
       </div>
 
       {/* Main Content */}
-      <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8 py-8">
+      <div className="mx-auto max-w-6xl px-4 pb-[calc(8rem+env(safe-area-inset-bottom))] pt-8 sm:px-6 lg:px-8 lg:pb-8">
         {/* Tab Navigation */}
         <div className="flex flex-wrap gap-2 mb-8 p-1.5 bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm rounded-2xl border border-slate-200/70 dark:border-slate-700 shadow-sm">
           <button
@@ -579,28 +579,33 @@ export default function SettingsContent() {
 
             {/* Users List */}
             <div className="rounded-3xl bg-white dark:bg-slate-900 border border-slate-200/70 dark:border-slate-700 shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.2)] overflow-hidden">
-              <div className="p-6 border-b border-slate-200/70 dark:border-slate-700 flex items-center justify-between bg-gradient-to-r from-slate-50 to-white dark:from-slate-800/50 dark:to-slate-900">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-xl bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400">
+              <div className="flex flex-col gap-4 border-b border-slate-200/70 bg-gradient-to-r from-slate-50 to-white p-4 dark:border-slate-700 dark:from-slate-800/50 dark:to-slate-900 sm:flex-row sm:items-center sm:justify-between sm:p-6">
+                <div className="flex min-w-0 items-center gap-3">
+                  <div className="shrink-0 p-2 rounded-xl bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400">
                     <Users className="w-5 h-5" />
                   </div>
-                  <div>
+                  <div className="min-w-0">
                     <h3 className="text-lg font-bold text-slate-800 dark:text-white">{t.teamMembers}</h3>
                     <p className="text-sm text-slate-500 dark:text-slate-400">{users.length} {t.teamMembersDescription}</p>
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex w-full items-center gap-2 sm:w-auto">
                   <Link
                     href="/lms/admin/staff"
-                    className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-200 dark:hover:bg-emerald-900/60 transition-colors text-sm font-medium"
+                    className="flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl bg-emerald-100 px-3 py-2.5 text-center text-sm font-medium text-emerald-700 transition-colors hover:bg-emerald-200 dark:bg-emerald-900/40 dark:text-emerald-300 dark:hover:bg-emerald-900/60 sm:flex-none sm:px-4"
                   >
                     <GraduationCap className="w-4 h-4" />
-                    {language === 'km' ? 'គ្រប់គ្រងបុគ្គលិក LMS' : 'Manage LMS Staff'}
+                    <span className="sm:hidden">
+                      {language === 'km' ? 'បុគ្គលិក LMS' : 'LMS Staff'}
+                    </span>
+                    <span className="hidden sm:inline">
+                      {language === 'km' ? 'គ្រប់គ្រងបុគ្គលិក LMS' : 'Manage LMS Staff'}
+                    </span>
                   </Link>
                   <button
                     onClick={() => loadUsers()}
                     disabled={isLoading}
-                    className="p-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+                    className="flex min-h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-600 transition-colors hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
                     title={t.refresh}
                   >
                     <RefreshCw className={`w-5 h-5 ${isLoading ? "animate-spin" : ""}`} />
@@ -608,7 +613,7 @@ export default function SettingsContent() {
                 </div>
               </div>
 
-              <div className="p-6">
+              <div className="p-4 sm:p-6">
                 {isLoading ? (
                   <div className="flex items-center justify-center py-12">
                     <RefreshCw className="w-8 h-8 text-slate-400 animate-spin" />
@@ -663,11 +668,11 @@ export default function SettingsContent() {
                     </p>
                   </div>
                 ) : (
-                  <div className="grid gap-4">
+                  <div className="grid gap-4 pb-2">
                     {users.map((managedUser) => (
                       <div
                         key={managedUser.username}
-                        className="group flex items-center gap-4 p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200/50 dark:border-slate-700/50 hover:bg-white dark:hover:bg-slate-800 hover:shadow-md transition-all duration-300"
+                        className="group flex min-w-0 items-center gap-3 rounded-2xl border border-slate-200/50 bg-slate-50 p-4 transition-all duration-300 hover:bg-white hover:shadow-md dark:border-slate-700/50 dark:bg-slate-800/50 dark:hover:bg-slate-800 sm:gap-4"
                       >
                         <UserAvatar 
                           user={managedUser} 
@@ -675,11 +680,11 @@ export default function SettingsContent() {
                         />
                         
                         <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <h4 className="font-semibold text-slate-800 dark:text-white truncate">
+                          <div className="flex min-w-0 items-center gap-2">
+                            <h4 className="min-w-0 truncate font-semibold text-slate-800 dark:text-white">
                               {managedUser.full_name || managedUser.username}
                             </h4>
-                            <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                            <span className={`shrink-0 px-2 py-0.5 rounded-full text-xs font-medium ${
                               managedUser.role === "Admin"
                                 ? "bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300"
                                 : managedUser.role === "Accounting"
