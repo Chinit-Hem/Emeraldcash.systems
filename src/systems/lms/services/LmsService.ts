@@ -311,11 +311,13 @@ export class LmsService extends BaseService<LmsCategoryEntity, LmsCategoryDB> {
     }
   }
 
-  public async getAllLessons(): Promise<ServiceResult<LmsLessonEntity[]>> {
+  public async getAllLessons(options: { includeInactive?: boolean } = {}): Promise<ServiceResult<LmsLessonEntity[]>> {
     const startTime = Date.now();
 
     try {
-      const lessons = await this.lessonRepo.getAllActive();
+      const lessons = options.includeInactive
+        ? await this.lessonRepo.getAllForAdmin()
+        : await this.lessonRepo.getAllActive();
 
       return {
         success: true,

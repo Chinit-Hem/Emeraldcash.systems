@@ -4,7 +4,6 @@ import { Suspense } from "react";
 import "../styles/globals.css";
 import { ThemeProvider } from "@/shared/hooks/theme-provider";
 import { LanguageProvider } from "@/shared/hooks/LanguageContext";
-import { InstantNavigationProvider } from "@/shared/components/InstantNavigationProvider";
 import { NeuDashboardSkeleton } from "@/shared/components/skeletons/NeuDashboardSkeleton";
 
 const inter = Inter({
@@ -168,11 +167,9 @@ export default async function RootLayout({
       <body className="antialiased" suppressHydrationWarning>
         <ThemeProvider>
           <LanguageProvider>
-            <InstantNavigationProvider>
-              <Suspense fallback={<NeuDashboardSkeleton />}>
-                {children}
-              </Suspense>
-            </InstantNavigationProvider>
+            <Suspense fallback={<NeuDashboardSkeleton />}>
+              {children}
+            </Suspense>
           </LanguageProvider>
         </ThemeProvider>
       </body>

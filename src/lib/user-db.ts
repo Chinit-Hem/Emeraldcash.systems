@@ -302,6 +302,117 @@ export function clearAdminUserCache(): void {
   cacheLastRefresh = 0;
 }
 
+function isOptionalReferenceTableError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase();
+  return (
+    message.includes("does not exist") ||
+    message.includes("relation") ||
+    message.includes("column")
+  );
+}
+
+async function updateUsernameReferences(
+  currentUsername: string,
+  nextUsername: string,
+  nextFullName?: string | null
+): Promise<void> {
+  if (currentUsername === nextUsername) return;
+
+  const nextStaffName = nextFullName?.trim() || nextUsername;
+  const optionalUpdates: Array<{
+    label: string;
+    run: () => Promise<unknown>;
+  }> = [
+    {
+      label: "users.created_by",
+      run: () => sql`
+        UPDATE users
+        SET created_by = ${nextUsername}
+        WHERE LOWER(created_by) = ${currentUsername}
+      `,
+    },
+    {
+      label: "audit_logs.actor_username",
+      run: () => sql`
+        UPDATE audit_logs
+        SET actor_username = ${nextUsername}
+        WHERE LOWER(actor_username) = ${currentUsername}
+      `,
+    },
+    {
+      label: "sms_assets.assigned_to",
+      run: () => sql`
+        UPDATE sms_assets
+        SET assigned_to = ${nextUsername}
+        WHERE LOWER(assigned_to) = ${currentUsername}
+      `,
+    },
+    {
+      label: "sms_transfers.sender_id",
+      run: () => sql`
+        UPDATE sms_transfers
+        SET sender_id = ${nextUsername}
+        WHERE LOWER(sender_id) = ${currentUsername}
+      `,
+    },
+    {
+      label: "sms_transfers.receiver_id",
+      run: () => sql`
+        UPDATE sms_transfers
+        SET receiver_id = ${nextUsername}
+        WHERE LOWER(receiver_id) = ${currentUsername}
+      `,
+    },
+    {
+      label: "sms_notifications.recipient_id",
+      run: () => sql`
+        UPDATE sms_notifications
+        SET recipient_id = ${nextUsername}
+        WHERE LOWER(recipient_id) = ${currentUsername}
+      `,
+    },
+    {
+      label: "sms_notifications.actor_id",
+      run: () => sql`
+        UPDATE sms_notifications
+        SET actor_id = ${nextUsername}
+        WHERE LOWER(actor_id) = ${currentUsername}
+      `,
+    },
+    {
+      label: "lms_staff.full_name",
+      run: () => sql`
+        UPDATE lms_staff
+        SET full_name = ${nextStaffName}
+        WHERE LOWER(full_name) = ${currentUsername}
+      `,
+    },
+  ];
+
+  for (const update of optionalUpdates) {
+    try {
+      await queryWithRetry(update.run, `updateUsernameReferences:${update.label}`);
+    } catch (error) {
+      if (isOptionalReferenceTableError(error)) {
+        log("WARN", "Skipped optional username reference update", {
+          label: update.label,
+          currentUsername,
+          nextUsername,
+          error: error instanceof Error ? error.message : String(error),
+        });
+        continue;
+      }
+
+      log("ERROR", "Failed to update username reference", {
+        label: update.label,
+        currentUsername,
+        nextUsername,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+}
+
 // List all users
 export async function listUsersFromDB(): Promise<UserDB[]> {
   log("INFO", "Listing all users from database");
@@ -361,6 +472,7 @@ export async function updateUserInDB(params: {
       throw new DatabaseError("Failed to update user - no rows affected");
     }
 
+    clearAdminUserCache();
     log("INFO", "User updated successfully", { username: normalizedUsername });
     return result[0] as UserDB;
   } catch (error) {
@@ -376,6 +488,117 @@ export async function updateUserInDB(params: {
       error: error instanceof Error ? error.message : String(error)
     });
     throw new DatabaseError("Failed to update user in database");
+  }
+}
+
+// Update account identity/profile fields in one operation.
+export async function updateUserAccountInDB(params: {
+  currentUsername: string;
+  username?: string;
+  passwordHash?: string;
+  full_name?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  bio?: string | null;
+  profile_picture?: string | null;
+}): Promise<UserDB> {
+  log("INFO", "Updating user account", {
+    currentUsername: params.currentUsername,
+    newUsername: params.username,
+    hasPassword: Boolean(params.passwordHash),
+  });
+
+  try {
+    validateUsername(params.currentUsername);
+    if (params.username !== undefined) {
+      validateUsername(params.username);
+    }
+    if (params.passwordHash !== undefined) {
+      validatePasswordHash(params.passwordHash);
+    }
+  } catch (error) {
+    log("ERROR", "Input validation failed for account update", {
+      currentUsername: params.currentUsername,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    throw error;
+  }
+
+  const currentUsername = params.currentUsername.trim().toLowerCase();
+  const nextUsername = (params.username ?? params.currentUsername).trim().toLowerCase();
+
+  try {
+    const currentUser = await getUserByUsername(currentUsername);
+    if (!currentUser) {
+      throw new NotFoundError("User");
+    }
+
+    if (nextUsername !== currentUsername) {
+      const existingUser = await getUserByUsername(nextUsername);
+      if (existingUser) {
+        throw new DuplicateError("User");
+      }
+    }
+
+    const full_name = params.full_name !== undefined ? params.full_name : currentUser.full_name;
+    const email = params.email !== undefined ? params.email : currentUser.email;
+    const phone = params.phone !== undefined ? params.phone : currentUser.phone;
+    const bio = params.bio !== undefined ? params.bio : currentUser.bio;
+    const profile_picture = params.profile_picture !== undefined ? params.profile_picture : currentUser.profile_picture;
+    const password_hash = params.passwordHash ?? currentUser.password_hash;
+
+    const result = await queryWithRetry(
+      async () => sql`
+        UPDATE users
+        SET
+          username = ${nextUsername},
+          password_hash = ${password_hash},
+          full_name = ${full_name || null},
+          email = ${email || null},
+          phone = ${phone || null},
+          bio = ${bio || null},
+          profile_picture = ${profile_picture || null},
+          updated_at = CURRENT_TIMESTAMP
+        WHERE username = ${currentUsername}
+        RETURNING *
+      `,
+      "updateUserAccountInDB"
+    );
+
+    if (!result || result.length === 0) {
+      log("ERROR", "Account update returned no rows", { username: currentUsername });
+      throw new NotFoundError("User");
+    }
+
+    await updateUsernameReferences(currentUsername, nextUsername, full_name);
+    clearAdminUserCache();
+    log("INFO", "User account updated successfully", {
+      currentUsername,
+      username: nextUsername,
+    });
+
+    return result[0] as UserDB;
+  } catch (error) {
+    if (error instanceof NotFoundError ||
+        error instanceof DuplicateError ||
+        error instanceof ValidationError ||
+        error instanceof DatabaseError) {
+      throw error;
+    }
+
+    if (error instanceof Error) {
+      if (error.message.includes("duplicate key") ||
+          error.message.includes("unique constraint")) {
+        throw new DuplicateError("User");
+      }
+    }
+
+    log("ERROR", "Error updating user account", {
+      currentUsername,
+      username: nextUsername,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    throw new DatabaseError("Failed to update user account in database");
   }
 }
 
@@ -422,6 +645,7 @@ export async function deleteUserFromDB(username: string): Promise<boolean> {
       throw new DatabaseError("Failed to delete user - no rows affected");
     }
 
+    clearAdminUserCache();
     log("INFO", "User deleted successfully", { username: normalizedUsername });
     return true;
   } catch (error) {
@@ -580,6 +804,7 @@ export async function updateUserProfileInDB(params: {
       throw new DatabaseError("Failed to update user profile - no rows affected");
     }
 
+    clearAdminUserCache();
     log("INFO", "User profile updated successfully", { username: normalizedUsername });
     return result[0] as UserDB;
   } catch (error) {

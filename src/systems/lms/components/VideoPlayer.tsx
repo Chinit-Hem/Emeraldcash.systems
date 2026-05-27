@@ -8,8 +8,12 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertTriangle,
+  Captions,
+  Cast,
   CheckCircle2,
+  ChevronDown,
   ChevronLeft,
+  ChevronRight,
   Clock,
   FileText,
   Maximize2,
@@ -17,9 +21,12 @@ import {
   Pause,
   Play,
   RotateCcw,
+  Search,
+  Settings,
   ShieldCheck,
   SkipBack,
   SkipForward,
+  X,
 } from "lucide-react";
 import { GlassButton } from "@/shared/components/ui/glass/GlassButton";
 import { GlassCard } from "@/shared/components/ui/glass/GlassCard";
@@ -138,6 +145,8 @@ const PROGRESS_POLL_INTERVAL_MS = 1_000;
 const SMOOTH_PROGRESS_FRAME_MS = 90;
 const VIDEO_CONTROLS_HIDE_DELAY_MS = 2_200;
 const TOUCH_CLICK_SUPPRESS_MS = 600;
+const SEEK_SETTLE_LOCK_MS = 8_000;
+const SEEK_SETTLE_TOLERANCE_SECONDS = 0.75;
 const MAX_PLAYBACK_RATE = 1.25;
 const SEEK_GRACE_SECONDS = 2;
 const COMPLETE_END_TOLERANCE_SECONDS = 5;
@@ -346,19 +355,34 @@ function isIOSMobileBrowser() {
 function InstructionsPanel({
   steps,
   currentStep,
+  isGeneratingTranscript,
+  transcriptError,
   onStepClick,
 }: {
   steps: string[];
   currentStep: number;
+  isGeneratingTranscript?: boolean;
+  transcriptError?: string | null;
   onStepClick: (step: number) => void;
 }) {
   if (steps.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-10 text-center">
-        <FileText className="mb-3 h-12 w-12 text-gray-300 dark:text-gray-600" />
+        {isGeneratingTranscript ? (
+          <div className="mb-3 h-10 w-10 animate-spin rounded-full border-2 border-gray-300 border-t-emerald-500" />
+        ) : (
+          <FileText className="mb-3 h-12 w-12 text-gray-300 dark:text-gray-600" />
+        )}
         <p className="text-sm text-gray-500 dark:text-gray-400">
-          No instructions available for this lesson
+          {isGeneratingTranscript
+            ? "Generating transcript from video..."
+            : "No transcript available for this lesson"}
         </p>
+        {transcriptError && (
+          <p className="mt-2 max-w-xs text-xs text-gray-400 dark:text-gray-500">
+            {transcriptError}
+          </p>
+        )}
       </div>
     );
   }
@@ -404,6 +428,239 @@ function InstructionsPanel({
   );
 }
 
+function getTranscriptTimeSeconds(index: number, totalSteps: number, duration: number) {
+  if (index <= 0 || duration <= 0 || totalSteps <= 1) {
+    return index === 0 ? 1 : 0;
+  }
+
+  return clamp((index / Math.max(1, totalSteps)) * duration, 1, duration);
+}
+
+function getFallbackTimelineItems(duration: number) {
+  if (duration <= 0) {
+    return [
+      {
+        timeSeconds: 0,
+        label: "Timeline will appear after the video loads",
+      },
+    ];
+  }
+
+  const itemCount = duration >= 900 ? 5 : duration >= 300 ? 4 : 3;
+  const labels = ["Start of video", "Early section", "Middle section", "Later section", "End of video"];
+
+  return Array.from({ length: itemCount }, (_, index) => {
+    const isLast = index === itemCount - 1;
+    const timeSeconds = isLast ? duration : (duration / Math.max(1, itemCount - 1)) * index;
+
+    return {
+      timeSeconds,
+      label: labels[index] ?? `Section ${index + 1}`,
+    };
+  });
+}
+
+function MobileTranscriptSheet({
+  steps,
+  currentStep,
+  duration,
+  title,
+  staffName,
+  thumbnailUrl,
+  isGeneratingTranscript,
+  transcriptError,
+  searchValue,
+  onSearchChange,
+  onClose,
+  onStepClick,
+  onTimelineClick,
+}: {
+  steps: string[];
+  currentStep: number;
+  duration: number;
+  title: string;
+  staffName?: string;
+  thumbnailUrl?: string | null;
+  isGeneratingTranscript: boolean;
+  transcriptError: string | null;
+  searchValue: string;
+  onSearchChange: (value: string) => void;
+  onClose: () => void;
+  onStepClick: (step: number) => void;
+  onTimelineClick: (seconds: number) => void;
+}) {
+  const transcriptSource = steps;
+  const fallbackTimelineItems = getFallbackTimelineItems(duration);
+  const normalizedSearch = searchValue.trim().toLowerCase();
+  const transcriptItems = transcriptSource
+    .map((step, index) => ({
+      index,
+      step,
+      timeSeconds: getTranscriptTimeSeconds(index, transcriptSource.length, duration),
+    }))
+    .filter((item) => {
+      if (!normalizedSearch) {
+        return true;
+      }
+
+      return (
+        item.step.toLowerCase().includes(normalizedSearch) ||
+        formatTime(item.timeSeconds).includes(normalizedSearch)
+      );
+    });
+
+  return (
+    <div
+      data-lms-video-controls
+      className="lms-mobile-transcript-layer fixed inset-0 z-[70] flex items-end lg:hidden"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Transcript"
+    >
+      <div className="lms-mobile-transcript-sheet flex w-full flex-col overflow-hidden bg-white text-slate-950 shadow-2xl">
+        <div className="flex justify-center px-4 pt-2">
+          <div className="h-1 w-12 rounded-full bg-slate-200" />
+        </div>
+
+        <div className="flex items-center justify-between border-b border-slate-200 px-4 py-2.5">
+          <h2 className="text-lg font-bold tracking-normal">Transcript</h2>
+          <div className="flex items-center">
+            <button
+              type="button"
+              onClick={onClose}
+              className="inline-flex h-9 w-9 items-center justify-center rounded-full text-slate-950 transition active:scale-95"
+              aria-label="Close transcript"
+              title="Close transcript"
+            >
+              <X className="h-5 w-5 stroke-[2.5]" />
+            </button>
+          </div>
+        </div>
+
+        <div className="lms-mobile-transcript-scroll flex-1 overflow-y-auto px-4 py-3">
+          <label className="lms-mobile-transcript-search flex h-10 items-center gap-2 rounded-full px-3.5 text-slate-500">
+            <Search className="h-4 w-4 flex-shrink-0" />
+            <input
+              value={searchValue}
+              onChange={(event) => onSearchChange(event.target.value)}
+              placeholder="Search transcript"
+              className="min-w-0 flex-1 bg-transparent text-base font-medium text-slate-700 outline-none placeholder:text-slate-500"
+              aria-label="Search transcript"
+            />
+          </label>
+
+          <div className="mt-3 flex min-w-0 items-center gap-3 rounded-xl bg-sky-100 p-2.5">
+            {thumbnailUrl ? (
+              <img
+                src={thumbnailUrl}
+                alt=""
+                className="h-12 w-16 flex-shrink-0 rounded-lg object-cover"
+              />
+            ) : (
+              <div className="flex h-12 w-16 flex-shrink-0 items-center justify-center rounded-lg bg-slate-900 text-white">
+                <MonitorPlay className="h-5 w-5" />
+              </div>
+            )}
+            <div className="min-w-0">
+              <p className="lms-mobile-transcript-card-title text-sm font-bold leading-snug">
+                {title}
+              </p>
+              <p className="mt-0.5 truncate text-xs font-medium text-slate-600">
+                {staffName ? `${staffName} • ${title}` : "Lesson video"}
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-4 space-y-2">
+            {transcriptItems.length > 0 ? (
+              transcriptItems.map((item) => {
+                const isActive = currentStep === item.index;
+
+                return (
+                  <button
+                    key={`${item.index}-${item.step}`}
+                    type="button"
+                    onClick={() => onStepClick(item.index)}
+                    className={`flex w-full items-start gap-2.5 rounded-xl px-1 py-1 text-left transition-colors ${
+                      isActive ? "bg-slate-50" : "active:bg-slate-50"
+                    }`}
+                  >
+                    <span
+                      className={`mt-0.5 rounded-full px-1.5 py-0.5 text-xs font-bold leading-none ${
+                        isActive
+                          ? "bg-sky-100 text-blue-700"
+                          : "bg-slate-100 text-slate-600"
+                      }`}
+                    >
+                      {formatTime(item.timeSeconds)}
+                    </span>
+                    <span
+                      className={`min-w-0 flex-1 break-words text-sm font-semibold leading-snug ${
+                        isActive ? "text-slate-950" : "text-slate-600"
+                      }`}
+                    >
+                      {item.step}
+                    </span>
+                  </button>
+                );
+              })
+            ) : (
+              <div className="rounded-xl bg-slate-50 px-4 py-8 text-center">
+                {isGeneratingTranscript ? (
+                  <>
+                    <div className="mx-auto mb-3 h-6 w-6 animate-spin rounded-full border-2 border-slate-300 border-t-blue-600" />
+                    <p className="text-sm font-semibold text-slate-700">
+                      Generating transcript from video...
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-sm font-semibold text-slate-700">
+                      No transcript available yet
+                    </p>
+                    {transcriptError && (
+                      <p className="mt-2 text-xs font-medium leading-relaxed text-slate-500">
+                        {transcriptError}
+                      </p>
+                    )}
+                  </>
+                )}
+              </div>
+            )}
+
+            {transcriptItems.length === 0 && !isGeneratingTranscript && (
+              <div className="mt-4 rounded-xl border border-slate-200 bg-white p-3">
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <p className="text-sm font-bold text-slate-800">Timeline</p>
+                  <p className="text-xs font-semibold text-slate-400">Script unavailable</p>
+                </div>
+                <div className="space-y-2">
+                  {fallbackTimelineItems.map((item) => (
+                    <button
+                      key={`${item.timeSeconds}-${item.label}`}
+                      type="button"
+                      onClick={() => onTimelineClick(item.timeSeconds)}
+                      disabled={duration <= 0}
+                      className="flex w-full items-center gap-3 rounded-lg bg-slate-50 px-3 py-2 text-left transition active:bg-slate-100 disabled:cursor-wait disabled:opacity-70"
+                    >
+                      <span className="rounded-full bg-sky-100 px-2 py-1 text-xs font-bold text-blue-700">
+                        {formatTime(item.timeSeconds)}
+                      </span>
+                      <span className="min-w-0 flex-1 text-sm font-semibold text-slate-700">
+                        {item.label}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function VideoPlayer({
   lessonId,
   title,
@@ -431,7 +688,7 @@ export function VideoPlayer({
   const [videoDuration, setVideoDuration] = useState(0);
   const [watchPercentage, setWatchPercentage] = useState(0);
   const [isCompleted, setIsCompleted] = useState(initialCompleted);
-  const [showInstructions, setShowInstructions] = useState(true);
+  const [showInstructions, setShowInstructions] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [hasRequestedLandscapeFullscreen, setHasRequestedLandscapeFullscreen] = useState(false);
   const [isLandscapeFullscreen, setIsLandscapeFullscreen] = useState(false);
@@ -443,6 +700,11 @@ export function VideoPlayer({
   const [watermarkName, setWatermarkName] = useState(staffName ?? "Staff");
   const [areControlsVisible, setAreControlsVisible] = useState(true);
   const [seekPreviewPercent, setSeekPreviewPercent] = useState<number | null>(null);
+  const [transcriptSearch, setTranscriptSearch] = useState("");
+  const [generatedTranscript, setGeneratedTranscript] = useState<string | null>(null);
+  const [isGeneratingTranscript, setIsGeneratingTranscript] = useState(false);
+  const [transcriptError, setTranscriptError] = useState<string | null>(null);
+  const [showPlaybackSettings, setShowPlaybackSettings] = useState(false);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const playerMountRef = useRef<HTMLDivElement>(null);
@@ -460,13 +722,24 @@ export function VideoPlayer({
   const isCompletedRef = useRef(initialCompleted);
   const playbackUnlockedRef = useRef(initialCompleted);
   const isScrubbingRef = useRef(false);
+  const pendingSeekTimeRef = useRef<number | null>(null);
+  const pendingSeekUntilRef = useRef(0);
+  const seekPreviewPercentRef = useRef<number | null>(null);
   const lastTouchInteractionRef = useRef(0);
   const onProgressChangeRef = useRef(onProgressChange);
 
+  const effectiveInstructions = generatedTranscript ?? stepByStepInstructions;
   const instructionSteps = useMemo(
-    () => parseInstructionSteps(stepByStepInstructions),
-    [stepByStepInstructions]
+    () => parseInstructionSteps(effectiveInstructions),
+    [effectiveInstructions]
   );
+
+  useEffect(() => {
+    setGeneratedTranscript(null);
+    setIsGeneratingTranscript(false);
+    setTranscriptError(null);
+    setTranscriptSearch("");
+  }, [lessonId, stepByStepInstructions]);
 
   const completionAllowed = isCompleted || watchPercentage >= completionThreshold;
   const playbackUnlocked = completionAllowed;
@@ -493,7 +766,7 @@ export function VideoPlayer({
   const playbackStatusLabel = playbackUnlocked
     ? "Replay: seek and speed unlocked"
     : "First watch: seek and speed protected";
-  const shouldShowVideoControls = !isReady || !!warning || areControlsVisible;
+  const shouldShowVideoControls = !isReady || areControlsVisible;
   const shouldShowCenterControls = isReady && !warning && areControlsVisible;
   const lessonProgress =
     instructionSteps.length > 0
@@ -519,6 +792,46 @@ export function VideoPlayer({
     }
   }, []);
 
+  const lockSeekDisplay = useCallback((seconds: number, duration: number) => {
+    const safeSeekTime =
+      duration > 0 ? clamp(seconds, 0, duration) : Math.max(0, seconds);
+
+    pendingSeekTimeRef.current = safeSeekTime;
+    pendingSeekUntilRef.current = performance.now() + SEEK_SETTLE_LOCK_MS;
+  }, []);
+
+  const getSeekHoldTime = useCallback((playerTime: number, duration: number) => {
+    const pendingSeekTime = pendingSeekTimeRef.current;
+
+    if (pendingSeekTime === null) {
+      return null;
+    }
+
+    const safePendingTime =
+      duration > 0 ? clamp(pendingSeekTime, 0, duration) : Math.max(0, pendingSeekTime);
+    const hasPlayerCaughtUp =
+      Math.abs(playerTime - safePendingTime) <= SEEK_SETTLE_TOLERANCE_SECONDS;
+    const hasLockExpired = performance.now() >= pendingSeekUntilRef.current;
+
+    if (hasPlayerCaughtUp || hasLockExpired) {
+      pendingSeekTimeRef.current = null;
+      pendingSeekUntilRef.current = 0;
+      return null;
+    }
+
+    return safePendingTime;
+  }, []);
+
+  const getPendingSeekDisplayTime = useCallback((duration: number) => {
+    const pendingSeekTime = pendingSeekTimeRef.current;
+
+    if (pendingSeekTime === null || performance.now() >= pendingSeekUntilRef.current) {
+      return null;
+    }
+
+    return duration > 0 ? clamp(pendingSeekTime, 0, duration) : Math.max(0, pendingSeekTime);
+  }, []);
+
   const revealVideoControls = useCallback(() => {
     areControlsVisibleRef.current = true;
     setAreControlsVisible(true);
@@ -537,10 +850,11 @@ export function VideoPlayer({
     clearControlsHideTimeout();
     areControlsVisibleRef.current = false;
     setAreControlsVisible(false);
+    setShowPlaybackSettings(false);
   }, [clearControlsHideTimeout]);
 
   const toggleVideoControls = useCallback(() => {
-    if (!isReady || warning) {
+    if (!isReady) {
       revealVideoControls();
       return;
     }
@@ -555,7 +869,6 @@ export function VideoPlayer({
     hideVideoControls,
     isReady,
     revealVideoControls,
-    warning,
   ]);
 
   const syncFullscreenVideoLayout = useCallback(() => {
@@ -599,7 +912,15 @@ export function VideoPlayer({
         if (player && !isScrubbingRef.current) {
           const duration = player.getDuration() || durationRef.current;
           const nextCurrent = player.getCurrentTime();
-          setSmoothCurrentTime(duration > 0 ? clamp(nextCurrent, 0, duration) : Math.max(0, nextCurrent));
+          const heldSeekTime = getSeekHoldTime(nextCurrent, duration);
+
+          if (heldSeekTime !== null) {
+            setSmoothCurrentTime(heldSeekTime);
+          } else {
+            setSmoothCurrentTime(
+              duration > 0 ? clamp(nextCurrent, 0, duration) : Math.max(0, nextCurrent)
+            );
+          }
         }
       }
 
@@ -610,7 +931,7 @@ export function VideoPlayer({
     smoothProgressFrameRef.current = window.requestAnimationFrame(animateProgress);
 
     return clearSmoothProgressFrame;
-  }, [clearSmoothProgressFrame, isPlaying, isReady]);
+  }, [clearSmoothProgressFrame, getSeekHoldTime, isPlaying, isReady]);
 
   useEffect(() => {
     if (!isReady || warning) {
@@ -638,6 +959,24 @@ export function VideoPlayer({
     };
   }, [isFullscreen, syncFullscreenVideoLayout]);
 
+  useEffect(() => {
+    document.body.classList.toggle("lms-mobile-transcript-open", showInstructions);
+
+    if (!showInstructions) {
+      document.documentElement.style.removeProperty("--lms-mobile-transcript-top");
+    }
+
+    return () => {
+      document.body.classList.remove("lms-mobile-transcript-open");
+    };
+  }, [showInstructions]);
+
+  useEffect(() => {
+    return () => {
+      document.documentElement.style.removeProperty("--lms-mobile-transcript-top");
+    };
+  }, []);
+
   const updateWatchState = useCallback(
     (
       nextCurrentTime: number,
@@ -648,6 +987,8 @@ export function VideoPlayer({
       const safeCurrent = Math.max(0, nextCurrentTime);
       const safeMax = Math.max(0, nextMaxWatched);
       const safeDuration = Math.max(0, nextDuration);
+      const heldSeekTime = getPendingSeekDisplayTime(safeDuration);
+      const displayCurrent = heldSeekTime ?? safeCurrent;
       const nextPercentage =
         safeDuration > 0
           ? clamp(Number(((safeMax / safeDuration) * 100).toFixed(2)), 0, 100)
@@ -657,7 +998,7 @@ export function VideoPlayer({
         safeMax >= Math.max(0, safeDuration - COMPLETE_END_TOLERANCE_SECONDS);
       const nextIsCompleted = Boolean(completion?.isCompleted ?? isCompletedRef.current);
 
-      currentTimeRef.current = safeCurrent;
+      currentTimeRef.current = displayCurrent;
       maxWatchedRef.current = safeMax;
       durationRef.current = safeDuration;
       const nextCanComplete =
@@ -668,8 +1009,8 @@ export function VideoPlayer({
       }
       playbackUnlockedRef.current = nextCanComplete;
 
-      setCurrentTime(safeCurrent);
-      setSmoothCurrentTime(safeCurrent);
+      setCurrentTime(displayCurrent);
+      setSmoothCurrentTime(displayCurrent);
       setMaxWatchedSeconds(safeMax);
       setVideoDuration(safeDuration);
       setWatchPercentage(nextPercentage);
@@ -677,13 +1018,13 @@ export function VideoPlayer({
       onProgressChangeRef.current?.({
         watchPercentage: nextPercentage,
         canComplete: nextCanComplete,
-        currentTimeSeconds: safeCurrent,
+        currentTimeSeconds: displayCurrent,
         maxWatchedSeconds: safeMax,
         isCompleted: nextIsCompleted,
         completedAt: completion?.completedAt ?? null,
       });
     },
-    [completionThreshold]
+    [completionThreshold, getPendingSeekDisplayTime]
   );
 
   const saveProgress = useCallback(
@@ -769,6 +1110,10 @@ export function VideoPlayer({
     setIsReady(false);
     setIsPlaying(false);
     setWarning(null);
+    setShowInstructions(false);
+    setTranscriptSearch("");
+    pendingSeekTimeRef.current = null;
+    pendingSeekUntilRef.current = 0;
     updateWatchState(0, 0, 0);
     clearProgressInterval();
     clearSaveInterval();
@@ -855,6 +1200,12 @@ playerRef.current = new yt.Player(playerMountRef.current, {
               if (!isNowPlaying) {
                 const nextCurrent = event.target.getCurrentTime();
                 const duration = event.target.getDuration() || durationRef.current || 1;
+                const heldSeekTime = getSeekHoldTime(nextCurrent, duration);
+
+                if (heldSeekTime !== null) {
+                  return;
+                }
+
                 updateWatchState(nextCurrent, Math.max(maxWatchedRef.current, nextCurrent), duration);
                 void saveProgress();
                 return;
@@ -873,6 +1224,12 @@ playerRef.current = new yt.Player(playerMountRef.current, {
 
                   const nextCurrent = player.getCurrentTime();
                   const duration = player.getDuration() || durationRef.current || 1;
+                  const heldSeekTime = getSeekHoldTime(nextCurrent, duration);
+
+                  if (heldSeekTime !== null) {
+                    return;
+                  }
+
                   const nextMax = Math.max(maxWatchedRef.current, nextCurrent);
                   updateWatchState(nextCurrent, nextMax, duration);
                 }, PROGRESS_POLL_INTERVAL_MS);
@@ -918,6 +1275,7 @@ playerRef.current = new yt.Player(playerMountRef.current, {
     saveProgress,
     showWarning,
     staffName,
+    getSeekHoldTime,
     updateWatchState,
     youtubeVideoId,
   ]);
@@ -1043,6 +1401,7 @@ useEffect(() => {
     (requestedProgress: number) => {
       const safeDuration = durationRef.current;
       if (!playerRef.current || safeDuration <= 0) {
+        seekPreviewPercentRef.current = null;
         setSeekPreviewPercent(null);
         return;
       }
@@ -1056,9 +1415,11 @@ useEffect(() => {
           ((maxWatchedRef.current / safeDuration) * 100 >= completionThreshold ||
             maxWatchedRef.current >= Math.max(0, safeDuration - COMPLETE_END_TOLERANCE_SECONDS)));
 
+      seekPreviewPercentRef.current = null;
       setSeekPreviewPercent(null);
 
       if (!isUnlockedForReplay && requestedTime > maxAllowedTime) {
+        lockSeekDisplay(maxWatchedRef.current, safeDuration);
         setSmoothCurrentTime(maxWatchedRef.current);
         lastSmoothProgressFrameAtRef.current = performance.now();
         playerRef.current.seekTo(maxWatchedRef.current, true);
@@ -1067,6 +1428,7 @@ useEffect(() => {
         return;
       }
 
+      lockSeekDisplay(requestedTime, safeDuration);
       setSmoothCurrentTime(requestedTime);
       lastSmoothProgressFrameAtRef.current = performance.now();
       playerRef.current.seekTo(requestedTime, true);
@@ -1079,38 +1441,190 @@ useEffect(() => {
       );
       saveProgress();
     },
-    [completionThreshold, saveProgress, showWarning, updateWatchState]
+    [completionThreshold, lockSeekDisplay, saveProgress, showWarning, updateWatchState]
+  );
+
+  const previewSeekProgress = useCallback(
+    (requestedProgress: number) => {
+      const safeProgress = clamp(requestedProgress, 0, 100);
+      seekPreviewPercentRef.current = safeProgress;
+      setSeekPreviewPercent(safeProgress);
+      setSmoothTimeFromProgress(safeProgress);
+      return safeProgress;
+    },
+    [setSmoothTimeFromProgress]
+  );
+
+  const getSeekProgressFromPointer = useCallback(
+    (event: React.PointerEvent<HTMLInputElement>) => {
+      const rect = event.currentTarget.getBoundingClientRect();
+
+      if (rect.width <= 0 || rect.height <= 0) {
+        return null;
+      }
+
+      if (
+        isLandscapeFullscreen &&
+        !event.currentTarget.classList.contains("lms-video-landscape-progress-range")
+      ) {
+        return clamp(((event.clientY - rect.top) / rect.height) * 100, 0, 100);
+      }
+
+      return clamp(((event.clientX - rect.left) / rect.width) * 100, 0, 100);
+    },
+    [isLandscapeFullscreen]
   );
 
   const handleSeekChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    revealVideoControls();
-    const requestedProgress = clamp(Number(event.target.value), 0, 100);
-    setSeekPreviewPercent(requestedProgress);
-    setSmoothTimeFromProgress(requestedProgress);
+    const requestedProgress = previewSeekProgress(Number(event.target.value));
 
     if (!isScrubbingRef.current) {
       commitSeek(requestedProgress);
     }
   };
 
-  const handleSeekStart = () => {
+  const handleSeekStart = (event: React.PointerEvent<HTMLInputElement>) => {
+    const requestedProgress = getSeekProgressFromPointer(event);
+
+    if (requestedProgress === null) {
+      return;
+    }
+
+    event.preventDefault();
+    event.currentTarget.setPointerCapture?.(event.pointerId);
     isScrubbingRef.current = true;
-    revealVideoControls();
+    previewSeekProgress(requestedProgress);
   };
 
-const handleSeekCommit = (event: React.PointerEvent<HTMLInputElement>) => {
+  const handleSeekMove = (event: React.PointerEvent<HTMLInputElement>) => {
     if (!isScrubbingRef.current) {
       return;
     }
 
-    isScrubbingRef.current = false;
-    commitSeek(seekPreviewPercent ?? Number(event.currentTarget.value));
+    const requestedProgress = getSeekProgressFromPointer(event);
+
+    if (requestedProgress === null) {
+      return;
+    }
+
+    event.preventDefault();
+    previewSeekProgress(requestedProgress);
   };
 
-// Mobile touch gesture handler - every screen tap clears/shows controls immediately.
-  const handleTouchGesture = useCallback((e: React.TouchEvent<HTMLDivElement>) => {
-    if (!isReady || !playerRef.current) return;
+  const handleSeekCommit = (event: React.PointerEvent<HTMLInputElement>) => {
+    if (!isScrubbingRef.current) {
+      return;
+    }
 
+    const requestedProgress =
+      getSeekProgressFromPointer(event) ??
+      seekPreviewPercentRef.current ??
+      Number(event.currentTarget.value);
+
+    event.preventDefault();
+    event.currentTarget.releasePointerCapture?.(event.pointerId);
+    isScrubbingRef.current = false;
+    commitSeek(requestedProgress);
+  };
+
+  const handleTranscriptTimelineClick = useCallback(
+    (seconds: number) => {
+      const duration = durationRef.current || videoDuration;
+
+      revealVideoControls();
+
+      if (duration <= 0) {
+        return;
+      }
+
+      commitSeek((clamp(seconds, 0, duration) / duration) * 100);
+    },
+    [commitSeek, revealVideoControls, videoDuration]
+  );
+
+  const handleTranscriptStepClick = useCallback(
+    (step: number) => {
+      setCurrentStep(step);
+      revealVideoControls();
+    },
+    [revealVideoControls]
+  );
+
+  const requestTranscriptGeneration = useCallback(async () => {
+    if (instructionSteps.length > 0 || isGeneratingTranscript) {
+      return;
+    }
+
+    setIsGeneratingTranscript(true);
+    setTranscriptError(null);
+
+    try {
+      const response = await fetch(`/api/lms/transcript?lessonId=${lessonId}`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ language: "auto" }),
+      });
+      const payload = (await response.json().catch(() => null)) as
+        | { success?: boolean; data?: { transcript?: string }; error?: string }
+        | null;
+
+      if (!response.ok || !payload?.success) {
+        throw new Error(payload?.error ?? "Unable to generate transcript");
+      }
+
+      const transcript = payload.data?.transcript?.trim();
+
+      if (!transcript) {
+        throw new Error("No transcript was returned for this video");
+      }
+
+      setGeneratedTranscript(transcript);
+    } catch (error) {
+      setTranscriptError(
+        error instanceof Error
+          ? error.message
+          : "Unable to generate transcript from this video"
+      );
+    } finally {
+      setIsGeneratingTranscript(false);
+    }
+  }, [instructionSteps.length, isGeneratingTranscript, lessonId]);
+
+  const openTranscriptSheet = useCallback(() => {
+    revealVideoControls();
+    void requestTranscriptGeneration();
+
+    if (isMobileViewport()) {
+      containerRef.current?.scrollIntoView({
+        block: "start",
+        behavior: "auto",
+      });
+
+      window.requestAnimationFrame(() => {
+        const videoStage = containerRef.current?.querySelector<HTMLElement>(".lms-video-stage");
+        const videoBottom = videoStage?.getBoundingClientRect().bottom;
+        const sheetTop = clamp(
+          videoBottom ?? window.innerHeight * 0.35,
+          window.innerHeight * 0.22,
+          window.innerHeight * 0.45
+        );
+
+        document.documentElement.style.setProperty(
+          "--lms-mobile-transcript-top",
+          `${sheetTop}px`
+        );
+        setShowInstructions(true);
+      });
+      return;
+    }
+
+    setShowInstructions(true);
+  }, [requestTranscriptGeneration, revealVideoControls]);
+
+// Mobile tap gesture handler: tapping the video surface hides/shows every overlay control.
+  const handleTouchGesture = useCallback((e: React.TouchEvent<HTMLDivElement>) => {
     if (e.target instanceof Element && e.target.closest("[data-lms-video-controls]")) {
       return;
     }
@@ -1122,7 +1636,7 @@ const handleSeekCommit = (event: React.PointerEvent<HTMLInputElement>) => {
     lastTouchInteractionRef.current = Date.now();
     
     toggleVideoControls();
-  }, [isReady, toggleVideoControls]);
+  }, [toggleVideoControls]);
 
   const handlePlaybackRateChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
     revealVideoControls();
@@ -1232,24 +1746,24 @@ const handleSeekCommit = (event: React.PointerEvent<HTMLInputElement>) => {
 
   return (
     <div className="bg-gray-50 p-0 dark:bg-gray-900 sm:p-0 lms-lesson-page">
-      <div className="mx-auto max-w-[1600px] space-y-6">
-        <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex min-w-0 items-start gap-4">
+      <div className="mx-auto max-w-[1600px] space-y-4 sm:space-y-6">
+        <header className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex min-w-0 items-start gap-3 sm:gap-4">
             <button
               type="button"
               onClick={onBack}
-              className="rounded-lg p-2 transition-colors hover:bg-gray-200 dark:hover:bg-gray-800"
+              className="rounded-lg p-1.5 transition-colors hover:bg-gray-200 dark:hover:bg-gray-800 sm:p-2"
               aria-label="Back to course"
             >
-              <ChevronLeft className="h-6 w-6 text-gray-600 dark:text-gray-400" />
+              <ChevronLeft className="h-5 w-5 text-gray-600 dark:text-gray-400 sm:h-6 sm:w-6" />
             </button>
 
             <div className="min-w-0">
-              <h1 className="text-xl font-bold text-gray-900 dark:text-white sm:text-2xl">
+              <h1 className="break-words text-base font-bold leading-snug text-gray-900 dark:text-white sm:text-2xl">
                 {title}
               </h1>
               {description && (
-                <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400 sm:text-sm">
                   {description}
                 </p>
               )}
@@ -1257,8 +1771,8 @@ const handleSeekCommit = (event: React.PointerEvent<HTMLInputElement>) => {
           </div>
 
           {isCompleted ? (
-            <div className="inline-flex items-center gap-2 self-start rounded-lg bg-emerald-100 px-4 py-2 font-medium text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 sm:self-auto">
-              <CheckCircle2 className="h-5 w-5" />
+            <div className="inline-flex items-center gap-1.5 self-start rounded-lg bg-emerald-100 px-3 py-1.5 text-sm font-medium text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 sm:self-auto sm:gap-2 sm:px-4 sm:py-2 sm:text-base">
+              <CheckCircle2 className="h-4 w-4 sm:h-5 sm:w-5" />
               Completed
             </div>
           ) : (
@@ -1300,7 +1814,6 @@ const handleSeekCommit = (event: React.PointerEvent<HTMLInputElement>) => {
                         }`
                       : "aspect-video"
                   }`}
-                  onMouseMove={revealVideoControls}
                   onFocusCapture={revealVideoControls}
                   onTouchEnd={handleTouchGesture}
                 >
@@ -1322,15 +1835,68 @@ const handleSeekCommit = (event: React.PointerEvent<HTMLInputElement>) => {
                       <button
                         type="button"
                         onClick={handleVideoSurfaceClick}
-                        disabled={!isReady}
-                        className="absolute inset-0 z-10 cursor-pointer bg-transparent disabled:cursor-wait"
+                        aria-disabled={!isReady}
+                        className="absolute inset-0 z-10 cursor-pointer bg-transparent"
                         aria-label={areControlsVisible ? "Hide video controls" : "Show video controls"}
                       />
 
                       <div
-                        aria-hidden="true"
-                        className="pointer-events-none absolute left-0 right-0 top-0 z-20 h-16 bg-transparent sm:h-20"
-                      />
+                        data-lms-video-controls
+                        className={`lms-video-top-controls pointer-events-none absolute left-0 right-0 top-0 z-40 flex items-start justify-between bg-gradient-to-b from-black/65 via-black/20 to-transparent transition-all duration-300 ${
+                          shouldShowVideoControls
+                            ? "translate-y-0 opacity-100"
+                            : "pointer-events-none -translate-y-3 opacity-0"
+                        }`}
+                      >
+                        <button
+                          type="button"
+                          onClick={onBack}
+                          className="lms-video-top-button lms-video-top-ghost-button pointer-events-auto inline-flex items-center justify-center rounded-full text-white transition hover:scale-105 active:scale-95"
+                          aria-label="Back"
+                          title="Back"
+                        >
+                          <ChevronDown className="lms-video-top-icon stroke-[3]" />
+                        </button>
+
+                        <div className="lms-video-top-action-row pointer-events-auto flex items-center">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              revealVideoControls();
+                              showWarning("Casting is not available in this secure player.");
+                            }}
+                            className="lms-video-top-button lms-video-top-ghost-button inline-flex items-center justify-center rounded-xl text-white transition hover:scale-105 active:scale-95"
+                            aria-label="Cast"
+                            title="Cast"
+                          >
+                            <Cast className="lms-video-top-icon stroke-[2.7]" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              revealVideoControls();
+                              showWarning("Captions are controlled by the YouTube lesson video.");
+                            }}
+                            className="lms-video-top-button lms-video-cc-button inline-flex items-center justify-center rounded-xl bg-white text-slate-950 shadow-2xl transition hover:scale-105 active:scale-95"
+                            aria-label="Captions"
+                            title="Captions"
+                          >
+                            <Captions className="lms-video-top-icon stroke-[2.7]" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              revealVideoControls();
+                              setShowPlaybackSettings((value) => !value);
+                            }}
+                            className="lms-video-top-button lms-video-top-ghost-button inline-flex items-center justify-center rounded-full text-white transition hover:scale-105 active:scale-95"
+                            aria-label="Playback settings"
+                            title="Playback settings"
+                          >
+                            <Settings className="lms-video-top-icon stroke-[2.5]" />
+                          </button>
+                        </div>
+                      </div>
 
                       <div className="pointer-events-none absolute inset-0 z-20 overflow-hidden">
                         <div className="lms-video-watermark absolute top-8 rounded-md bg-black/30 px-3 py-1 text-xs font-semibold text-white/70 shadow-sm">
@@ -1339,9 +1905,52 @@ const handleSeekCommit = (event: React.PointerEvent<HTMLInputElement>) => {
                       </div>
 
                       {warning && (
-                        <div className="absolute left-4 right-4 top-4 z-40 flex items-center gap-2 rounded-lg border border-amber-400/40 bg-amber-500/90 px-4 py-3 text-sm font-medium text-white shadow-lg">
+                        <div className="absolute left-4 right-4 top-4 z-50 flex items-center gap-2 rounded-lg border border-amber-400/40 bg-amber-500/90 px-4 py-3 text-sm font-medium text-white shadow-lg">
                           <AlertTriangle className="h-5 w-5 flex-shrink-0" />
                           <span>{warning}</span>
+                        </div>
+                      )}
+
+                      {showPlaybackSettings && shouldShowVideoControls && (
+                        <div
+                          data-lms-video-controls
+                          className="lms-video-settings-panel absolute z-50 w-48 rounded-2xl bg-slate-950/80 p-3 text-white shadow-2xl ring-1 ring-white/10 backdrop-blur-md"
+                        >
+                          <button
+                            type="button"
+                            onClick={() => {
+                              restartVideo();
+                              setShowPlaybackSettings(false);
+                            }}
+                            disabled={!isReady}
+                            className="mb-2 flex h-11 w-full items-center gap-3 rounded-xl px-3 text-sm font-semibold transition hover:bg-white/10 disabled:cursor-wait disabled:opacity-60"
+                          >
+                            <RotateCcw className="h-5 w-5" />
+                            Restart
+                          </button>
+
+                          <select
+                            value={playbackRate}
+                            onChange={handlePlaybackRateChange}
+                            disabled={!isReady}
+                            className="h-11 w-full rounded-xl border border-white/15 bg-white/10 px-3 text-sm font-semibold text-white outline-none transition hover:bg-white/15 disabled:cursor-wait disabled:opacity-60"
+                            aria-label="Playback speed"
+                            title={
+                              playbackUnlocked
+                                ? "Playback speed"
+                                : "Speeds above 1.25x unlock after completing"
+                            }
+                          >
+                            {PLAYBACK_RATES.map((rate) => (
+                              <option
+                                key={rate}
+                                value={rate}
+                                disabled={!playbackUnlocked && rate > MAX_PLAYBACK_RATE}
+                              >
+                                {rate}x
+                              </option>
+                            ))}
+                          </select>
                         </div>
                       )}
 
@@ -1363,36 +1972,36 @@ const handleSeekCommit = (event: React.PointerEvent<HTMLInputElement>) => {
 
                       <div
                         data-lms-video-controls
-                        className={`pointer-events-none absolute inset-0 z-30 flex items-center justify-center transition-all duration-300 ${
+                        className={`lms-video-center-layer pointer-events-none absolute left-0 right-0 z-40 flex items-center justify-center transition-all duration-300 ${
                           shouldShowCenterControls
                             ? "scale-100 opacity-100"
                             : "scale-95 opacity-0"
                         }`}
                       >
-                        <div className="pointer-events-auto flex items-center gap-5 rounded-full bg-black/35 px-4 py-3 shadow-2xl backdrop-blur-md sm:gap-7 sm:px-5">
+                        <div className="lms-video-center-controls pointer-events-auto flex items-center">
                           <button
                             type="button"
                             onClick={handlePreviousLesson}
                             disabled={!canGoPrevious || !onPrevious}
-                            className="inline-flex h-12 w-12 items-center justify-center rounded-full text-white transition hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-35 sm:h-14 sm:w-14"
+                            className="lms-video-side-media-button lms-video-media-button-surface inline-flex items-center justify-center rounded-full text-white transition hover:scale-105 disabled:cursor-not-allowed disabled:opacity-35"
                             aria-label="Previous lesson"
                             title="Previous lesson"
                           >
-                            <SkipBack className="h-6 w-6 fill-current sm:h-7 sm:w-7" />
+                            <SkipBack className="lms-video-side-media-icon fill-current" />
                           </button>
 
                           <button
                             type="button"
                             onClick={togglePlay}
                             disabled={!isReady}
-                            className="inline-flex h-16 w-16 items-center justify-center rounded-full bg-white text-gray-950 shadow-xl transition hover:scale-105 hover:bg-emerald-50 disabled:cursor-wait disabled:opacity-60 sm:h-20 sm:w-20"
+                            className="lms-video-main-media-button lms-video-media-button-surface inline-flex items-center justify-center rounded-full text-white transition hover:scale-105 disabled:cursor-wait disabled:opacity-60"
                             aria-label={isPlaying ? "Pause video" : "Play video"}
                             title={isPlaying ? "Pause video" : "Play video"}
                           >
                             {isPlaying ? (
-                              <Pause className="h-8 w-8 fill-current sm:h-10 sm:w-10" />
+                              <Pause className="lms-video-main-media-icon fill-current" />
                             ) : (
-                              <Play className="ml-1 h-8 w-8 fill-current sm:h-10 sm:w-10" />
+                              <Play className="lms-video-main-media-icon lms-video-play-icon fill-current" />
                             )}
                           </button>
 
@@ -1400,101 +2009,59 @@ const handleSeekCommit = (event: React.PointerEvent<HTMLInputElement>) => {
                             type="button"
                             onClick={handleNextLesson}
                             disabled={!canGoNext || !onNext}
-                            className="inline-flex h-12 w-12 items-center justify-center rounded-full text-white transition hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-35 sm:h-14 sm:w-14"
+                            className="lms-video-side-media-button lms-video-media-button-surface inline-flex items-center justify-center rounded-full text-white transition hover:scale-105 disabled:cursor-not-allowed disabled:opacity-35"
                             aria-label="Next lesson"
                             title="Next lesson"
                           >
-                            <SkipForward className="h-6 w-6 fill-current sm:h-7 sm:w-7" />
+                            <SkipForward className="lms-video-side-media-icon fill-current" />
                           </button>
                         </div>
                       </div>
 
                       <div
                         data-lms-video-controls
-                        className={`lms-video-bottom-controls absolute bottom-0 left-0 right-0 z-30 bg-gradient-to-t from-black/90 via-black/60 to-transparent px-4 pb-4 pt-10 transition-all duration-300 ${
+                        className={`lms-video-bottom-controls lms-video-bottom-overlay pointer-events-none absolute bottom-0 left-0 right-0 z-40 transition-all duration-300 ${
                           shouldShowVideoControls
-                            ? "translate-y-0 opacity-100"
-                            : "pointer-events-none translate-y-4 opacity-0"
+                            ? "lms-video-controls-visible bg-gradient-to-t from-black/75 via-black/25 to-transparent"
+                            : "lms-video-controls-hidden"
                         }`}
                       >
-                        <div className="mb-3 flex flex-col gap-1 text-xs text-white/80 min-[420px]:flex-row min-[420px]:items-center min-[420px]:justify-between">
-                          <span className="inline-flex items-center gap-1">
-                            <ShieldCheck className="h-4 w-4 text-emerald-300" />
-                            Watched {watchPercentage.toFixed(0)}%
-                          </span>
-                          <span>
-                            {playbackUnlocked
-                              ? "Replay unlocked"
-                              : `Complete unlocks at ${completionThreshold}%`}
-                          </span>
-                        </div>
+                        <div
+                          className={`lms-video-bottom-row pointer-events-auto flex items-end justify-between transition-all duration-300 ${
+                            shouldShowVideoControls
+                              ? "translate-y-0 opacity-100"
+                              : "pointer-events-none translate-y-3 opacity-0"
+                          }`}
+                        >
+                          <div className="lms-video-bottom-pill-group flex min-w-0 items-center">
+                            <span className="lms-video-time-pill lms-video-bottom-control-surface inline-flex items-center rounded-full font-extrabold leading-none tracking-normal text-white">
+                              {formatTime(displayTime)} / {formatTime(videoDuration)}
+                            </span>
 
-                        <div className="flex items-center gap-3">
-                          <span className="w-11 text-xs font-medium tabular-nums text-white/80">
-                            {formatTime(displayTime)}
-                          </span>
-                          <input
-                            type="range"
-                            min="0"
-                            max="100"
-                            step="0.1"
-                            value={progressPercent}
-                            onChange={handleSeekChange}
-                            onPointerDown={handleSeekStart}
-                            onPointerUp={handleSeekCommit}
-                            onPointerCancel={handleSeekCommit}
-                            disabled={!isReady}
-                            className="lms-video-progress-range h-5 flex-1 cursor-pointer appearance-none rounded-full bg-transparent disabled:cursor-wait"
-                            style={{
-                              background: `linear-gradient(to right, rgb(255 0 51) 0%, rgb(255 0 51) ${progressPercent}%, rgba(255,255,255,0.55) ${progressPercent}%, rgba(255,255,255,0.55) ${watchedRailPercent}%, rgba(255,255,255,0.26) ${watchedRailPercent}%, rgba(255,255,255,0.26) 100%)`,
-                            }}
-                            aria-label="Video progress"
-                          />
-                          <span className="w-11 text-right text-xs font-medium tabular-nums text-white/80">
-                            {formatTime(videoDuration)}
-                          </span>
-                        </div>
-
-                        <div className="mt-3 flex items-center justify-between gap-2">
-                          <div className="flex min-w-0 items-center gap-2">
                             <button
                               type="button"
-                              onClick={restartVideo}
-                              disabled={!isReady}
-                              className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white transition hover:bg-white/20 disabled:cursor-wait disabled:opacity-60"
-                              aria-label="Restart video"
-                            >
-                              <RotateCcw className="h-5 w-5" />
-                            </button>
-
-                            <select
-                              value={playbackRate}
-                              onChange={handlePlaybackRateChange}
-                              disabled={!isReady}
-                              className="h-10 max-w-[74px] rounded-full border border-white/20 bg-white/10 px-2 text-xs font-semibold text-white outline-none transition hover:bg-white/20 disabled:cursor-wait disabled:opacity-60 sm:max-w-none sm:px-3"
-                              aria-label="Playback speed"
+                              onClick={openTranscriptSheet}
+                              className="lms-video-context-pill lms-video-bottom-control-surface inline-flex min-w-0 items-center rounded-full font-extrabold leading-none text-white transition hover:scale-[1.02] active:scale-95"
+                              aria-label={
+                                showInstructions ? "Hide in this video" : "Show in this video"
+                              }
                               title={
-                                playbackUnlocked
-                                  ? "Playback speed"
-                                  : "Speeds above 1.25x unlock after completing"
+                                showInstructions ? "Hide in this video" : "Show in this video"
                               }
                             >
-                              {PLAYBACK_RATES.map((rate) => (
-                                <option
-                                  key={rate}
-                                  value={rate}
-                                  disabled={!playbackUnlocked && rate > MAX_PLAYBACK_RATE}
-                                >
-                                  {rate}x
-                                </option>
-                              ))}
-                            </select>
+                              <span className="truncate">In this video</span>
+                              <ChevronRight className="lms-video-context-chevron flex-shrink-0" />
+                            </button>
+
+                            <span className="lms-video-bottom-title truncate font-bold text-white">
+                              {title}
+                            </span>
                           </div>
 
                           <button
                             type="button"
                             onClick={toggleFullscreen}
-                            className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white transition hover:bg-white/20"
+                            className="lms-video-fullscreen-button lms-video-media-button-surface inline-flex flex-shrink-0 items-center justify-center rounded-full text-white transition hover:scale-105 active:scale-95"
                             aria-label={
                               isFullscreen
                                 ? hasRequestedLandscapeFullscreen
@@ -1502,10 +2069,36 @@ const handleSeekCommit = (event: React.PointerEvent<HTMLInputElement>) => {
                                   : "Rotate fullscreen to landscape"
                                 : "Enter fullscreen"
                             }
+                            title={
+                              isFullscreen
+                                ? hasRequestedLandscapeFullscreen
+                                  ? "Exit fullscreen"
+                                  : "Rotate fullscreen to landscape"
+                                : "Enter fullscreen"
+                            }
                           >
-                            <Maximize2 className="h-5 w-5" />
+                            <Maximize2 className="lms-video-fullscreen-icon" />
                           </button>
                         </div>
+
+                        <input
+                          type="range"
+                          min="0"
+                          max="100"
+                          step="0.1"
+                          value={progressPercent}
+                          onChange={handleSeekChange}
+                          onPointerDown={handleSeekStart}
+                          onPointerMove={handleSeekMove}
+                          onPointerUp={handleSeekCommit}
+                          onPointerCancel={handleSeekCommit}
+                          disabled={!isReady}
+                          className="lms-video-progress-range lms-video-progress-range-edge pointer-events-auto absolute bottom-0 left-0 right-0 h-8 w-full cursor-pointer appearance-none rounded-none bg-transparent disabled:cursor-wait"
+                          style={{
+                            background: `linear-gradient(to right, rgb(255 0 51) 0%, rgb(255 0 51) ${progressPercent}%, rgba(255,255,255,0.85) ${progressPercent}%, rgba(255,255,255,0.85) ${watchedRailPercent}%, rgba(255,255,255,0.5) ${watchedRailPercent}%, rgba(255,255,255,0.5) 100%)`,
+                          }}
+                          aria-label="Video progress"
+                        />
                       </div>
                     </>
                   ) : (
@@ -1530,22 +2123,29 @@ const handleSeekCommit = (event: React.PointerEvent<HTMLInputElement>) => {
                   )}
                 </div>
 
-                <div className="flex flex-col gap-3 border-t border-gray-200 p-4 dark:border-gray-700 sm:flex-row sm:items-center sm:justify-between">
-                  <div className="flex flex-wrap items-center gap-4 text-sm text-gray-500 dark:text-gray-400">
+                <div className="flex flex-col gap-2 border-t border-gray-200 p-3 dark:border-gray-700 sm:flex-row sm:items-center sm:justify-between sm:gap-3 sm:p-4">
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-xs text-gray-500 dark:text-gray-400 sm:text-sm">
                     <div className="flex items-center gap-1">
-                      <Clock className="h-4 w-4" />
+                      <Clock className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                       <span>{durationLabel}</span>
                     </div>
                     <div className="flex items-center gap-1">
-                      <ShieldCheck className="h-4 w-4" />
+                      <ShieldCheck className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                       <span>{playbackStatusLabel}</span>
                     </div>
                   </div>
 
                   <button
                     type="button"
-                    onClick={() => setShowInstructions((value) => !value)}
-                    className={`self-start rounded-lg p-2 transition-colors sm:self-auto ${
+                    onClick={() => {
+                      if (showInstructions) {
+                        setShowInstructions(false);
+                        return;
+                      }
+
+                      openTranscriptSheet();
+                    }}
+                    className={`self-start rounded-lg p-1.5 transition-colors sm:self-auto sm:p-2 ${
                       showInstructions
                         ? "bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400"
                         : "text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800"
@@ -1557,6 +2157,7 @@ const handleSeekCommit = (event: React.PointerEvent<HTMLInputElement>) => {
                   </button>
                 </div>
               </GlassCard>
+
             </div>
 
             <GlassCard className="rounded-2xl p-4">
@@ -1597,7 +2198,7 @@ const handleSeekCommit = (event: React.PointerEvent<HTMLInputElement>) => {
           </section>
 
           {showInstructions && (
-            <aside className="lg:col-span-1">
+            <aside className="hidden lg:col-span-1 lg:block">
               <GlassCard className="h-full rounded-2xl p-0">
                 <div className="border-b border-gray-200 p-4 dark:border-gray-700">
                   <h3 className="flex items-center gap-2 font-semibold text-gray-900 dark:text-white">
@@ -1613,7 +2214,9 @@ const handleSeekCommit = (event: React.PointerEvent<HTMLInputElement>) => {
                   <InstructionsPanel
                     steps={instructionSteps}
                     currentStep={currentStep}
-                    onStepClick={setCurrentStep}
+                    isGeneratingTranscript={isGeneratingTranscript}
+                    transcriptError={transcriptError}
+                    onStepClick={handleTranscriptStepClick}
                   />
                 </div>
 
@@ -1645,6 +2248,24 @@ const handleSeekCommit = (event: React.PointerEvent<HTMLInputElement>) => {
             </aside>
           )}
         </div>
+
+        {showInstructions && (
+          <MobileTranscriptSheet
+            steps={instructionSteps}
+            currentStep={currentStep}
+            duration={videoDuration}
+            title={title}
+            staffName={staffName}
+            thumbnailUrl={thumbnailUrl}
+            isGeneratingTranscript={isGeneratingTranscript}
+            transcriptError={transcriptError}
+            searchValue={transcriptSearch}
+            onSearchChange={setTranscriptSearch}
+            onClose={() => setShowInstructions(false)}
+            onStepClick={handleTranscriptStepClick}
+            onTimelineClick={handleTranscriptTimelineClick}
+          />
+        )}
 
         {!isCompleted && (
           <GlassCard className="rounded-2xl border-emerald-200 bg-gradient-to-r from-emerald-50 to-teal-50 p-6 dark:border-emerald-800 dark:from-emerald-900/20 dark:to-teal-900/20">

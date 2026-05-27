@@ -170,7 +170,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const result = await lmsService.getAllLessons();
+    const result = await lmsService.getAllLessons({ includeInactive: true });
 
     if (!result.success) {
       return NextResponse.json(

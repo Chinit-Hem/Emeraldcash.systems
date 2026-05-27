@@ -63,6 +63,7 @@ export interface LessonWithStatus {
   youtube_video_id: string;
   duration_minutes: number | null;
   order_index: number;
+  is_active?: boolean;
   is_completed: boolean;
   is_unlocked: boolean;
   completed_at: string | null;

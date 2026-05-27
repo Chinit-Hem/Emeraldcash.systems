@@ -109,7 +109,7 @@ function redirectToLogin(request: NextRequest): NextResponse {
   return response;
 }
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const startTime = Date.now();
   const { pathname } = request.nextUrl;
   const requestId = getRequestId(request);

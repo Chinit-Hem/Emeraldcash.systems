@@ -487,18 +487,17 @@ export async function deleteUser(params: {
       return { ok: false, error: "You cannot delete your own account", code: "self_delete_forbidden" };
     }
 
+    const deletedUser = await getUserByUsername(targetUsername);
+    if (!deletedUser) {
+      log("INFO", "deleteUser() - user not found before deletion", { username: targetUsername });
+      return { ok: false, error: "User not found", code: "not_found" };
+    }
+
     const deleted = await deleteUserFromDB(targetUsername); // This now handles the last admin check
 
     if (!deleted) {
       log("INFO", "deleteUser() - user not found or not deleted (handled by DB)", { username: targetUsername });
       return { ok: false, error: "User not found or could not be deleted", code: "not_found" };
-    }
-
-    // Fetch the user again to return the PublicUser representation
-    const deletedUser = await getUserByUsername(targetUsername); // Fetch again to get full user data
-    if (!deletedUser) {
-      log("INFO", "deleteUser() - deleted user not found after deletion (unexpected)", { username: targetUsername });
-      return { ok: false, error: "User deleted but could not retrieve details", code: "database_error" };
     }
 
     log("INFO", "deleteUser() - SUCCESS", { username: targetUsername });

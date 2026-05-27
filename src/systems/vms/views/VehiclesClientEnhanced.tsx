@@ -3,7 +3,6 @@
 import { useLanguage } from "@/shared/hooks/LanguageContext";
 import { useTranslation, type Language, type Translations } from "@/shared/utils/i18n";
 import { useAuthUser } from "@/shared/hooks/AuthContext";
-import AddVehicleModalOptimistic from "@/systems/vms/components/vehicles/AddVehicleModalOptimistic";
 
 import { ConfirmDeleteModal } from "@/systems/vms/components/vehicles/ConfirmDeleteModal";
 
@@ -51,9 +50,18 @@ import {
   Trash2,
   X
 } from "lucide-react";
+import dynamic from "next/dynamic";
 import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
+
+const AddVehicleModalOptimistic = dynamic(
+  () => import("@/systems/vms/components/vehicles/AddVehicleModalOptimistic"),
+  {
+    ssr: false,
+    loading: () => null,
+  }
+);
 
 // ============================================================================
 // Types & Interfaces
@@ -2704,16 +2712,17 @@ const getVehicleImageUrl = useCallback((imageValue: unknown): string | null => {
         )}
 
         {/* Add Vehicle Modal */}
-<AddVehicleModalOptimistic
-          isOpen={showAddModal}
-
-          onClose={() => setShowAddModal(false)}
-          onSuccess={() => {
-            refresh();
-            setCurrentPage(1);
-            setLastSync(new Date());
-          }}
-        />
+        {showAddModal && (
+          <AddVehicleModalOptimistic
+            isOpen={showAddModal}
+            onClose={() => setShowAddModal(false)}
+            onSuccess={() => {
+              refresh();
+              setCurrentPage(1);
+              setLastSync(new Date());
+            }}
+          />
+        )}
 
         {/* Confirm Delete Modal */}
         {vehicleToDelete && (

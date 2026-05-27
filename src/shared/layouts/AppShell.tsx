@@ -3,7 +3,7 @@
 import type { User } from "@/shared/types/types";
 import Image from "next/image";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Suspense, type ReactNode, useCallback, useEffect, useRef, useState } from "react";
+import { Suspense, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import Sidebar from "@/shared/components/Sidebar";
 import { AuthUserProvider } from "@/shared/hooks/AuthContext";
@@ -134,10 +134,10 @@ function AppShellContent({ children }: AppShellProps) {
 
   const mainRef = useRef<HTMLElement | null>(null);
 
-  const getScrollKey = (path: string) => {
+  const scrollKey = useMemo(() => {
     const sp = searchParams?.toString?.() || "";
-    return `vms_scroll:${path}:${sp}`;
-  };
+    return `vms_scroll:${pathname}:${sp}`;
+  }, [pathname, searchParams]);
 
   // Close sidebar when pathname changes - use flushSync for immediate effect
   const prevPathnameRef = useRef(pathname);
@@ -153,14 +153,22 @@ function AppShellContent({ children }: AppShellProps) {
     const el = mainRef.current;
     if (!el) return;
 
-    const key = getScrollKey(pathname);
+    let pendingFrame: number | null = null;
 
-    const onScroll = () => {
+    const saveScrollPosition = () => {
       try {
-        sessionStorage.setItem(key, String(el.scrollTop));
+        sessionStorage.setItem(scrollKey, String(el.scrollTop));
       } catch {
         // ignore quota/session errors
       }
+    };
+
+    const onScroll = () => {
+      if (pendingFrame !== null) return;
+      pendingFrame = window.requestAnimationFrame(() => {
+        pendingFrame = null;
+        saveScrollPosition();
+      });
     };
 
     el.addEventListener("scroll", onScroll, { passive: true });
@@ -169,7 +177,7 @@ function AppShellContent({ children }: AppShellProps) {
     // Do it after paint so layout has settled.
     const restoreTimer = window.setTimeout(() => {
       try {
-        const saved = sessionStorage.getItem(key);
+        const saved = sessionStorage.getItem(scrollKey);
         if (saved != null) el.scrollTop = Number(saved) || 0;
       } catch {
         // ignore
@@ -178,10 +186,13 @@ function AppShellContent({ children }: AppShellProps) {
 
     return () => {
       window.clearTimeout(restoreTimer);
+      if (pendingFrame !== null) {
+        window.cancelAnimationFrame(pendingFrame);
+      }
       el.removeEventListener("scroll", onScroll);
     };
-     
-  }, [pathname]);
+
+  }, [scrollKey]);
 
   // Neumorphism loading card
   const loadingCardClass = "neu-card max-w-md w-full";

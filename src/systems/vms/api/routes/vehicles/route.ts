@@ -125,7 +125,6 @@ const getHandler = withErrorHandling(async (req, { logger, requestId, startTime 
 
   // Parse query parameters with validation
   const { searchParams } = new URL(req.url);
-  const hasExplicitLimit = searchParams.has("limit");
   const requestedLimit = parseInt(searchParams.get("limit") || "50", 10);
   const maxLimit = 2000;
   const limit = Number.isFinite(requestedLimit)
@@ -240,15 +239,6 @@ const getHandler = withErrorHandling(async (req, { logger, requestId, startTime 
   const withoutImage = searchParams.get("withoutImage");
   if (withoutImage === "1" || withoutImage === "true") {
     filters.withoutImage = true;
-  }
-
-  // When any filter is active, increase the limit to ensure all matching records are returned
-  const hasActiveFilters = category || brand || model || condition ||
-                         yearMin || yearMax || priceMin || priceMax ||
-                         color || bodyType || taxType || searchTerm || filters.withoutImage;
-
-  if (hasActiveFilters && !hasExplicitLimit) {
-    filters.limit = 10000; // Get all matching records
   }
 
   logger.debug("Checking LRU cache", { filters });

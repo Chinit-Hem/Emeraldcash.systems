@@ -136,6 +136,19 @@ export class LmsLessonRepository extends BaseRepository<LmsLessonDB> {
   }
 
   /**
+   * Get all lessons, including inactive records for admin management.
+   */
+  public async getAllForAdmin(): Promise<LmsLessonDB[]> {
+    const query = `
+      SELECT * FROM ${this.tableName}
+      ORDER BY category_id, order_index, id
+    `;
+
+    const result = await this.executeQuery<LmsLessonDB>(query);
+    return result.data;
+  }
+
+  /**
    * Count lessons by category
    */
   public async countByCategory(categoryId: number): Promise<number> {

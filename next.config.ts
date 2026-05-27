@@ -29,7 +29,7 @@ const securityHeaders = [
 ];
 
 const authSensitivePageHeaders = [
-  { key: "Cache-Control", value: "public, s-maxage=30, stale-while-revalidate=60, private" },
+  { key: "Cache-Control", value: "private, no-store, no-cache, must-revalidate" },
   { key: "Pragma", value: "no-cache" },
   { key: "Vary", value: "Cookie, User-Agent" },
 ];

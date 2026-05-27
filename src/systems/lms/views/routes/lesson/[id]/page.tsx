@@ -588,16 +588,16 @@ export default function LessonPlayerPage() {
       </header>
       
       {/* Main Content */}
-      <div className="max-w-[1600px] mx-auto px-4 sm:px-6 py-6">
+      <div className="max-w-[1600px] mx-auto px-3 py-4 sm:px-6 sm:py-6">
         {completionError && (
           <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-900/50 dark:bg-amber-900/20 dark:text-amber-200">
             {completionError}
           </div>
         )}
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 gap-4 sm:gap-6 lg:grid-cols-3">
           {/* Left Column - Video Player */}
-          <div className="lg:col-span-2 space-y-6">
+          <div className="space-y-4 sm:space-y-6 lg:col-span-2">
             {/* Video Player */}
             <VideoPlayer 
               lessonId={currentLesson.id}
@@ -619,15 +619,15 @@ export default function LessonPlayerPage() {
             />
             
             {/* Video Info */}
-            <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
-              <div className="flex items-start justify-between mb-4">
-                <div>
-                  <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
+            <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800 sm:p-6">
+              <div className="mb-4 flex items-start justify-between">
+                <div className="min-w-0">
+                  <h2 className="mb-2 break-words text-lg font-bold leading-snug text-gray-900 dark:text-white sm:text-xl">
                     {currentLesson.title}
                   </h2>
-                  <div className="flex items-center gap-4 text-sm text-gray-500 dark:text-gray-400">
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-500 dark:text-gray-400 sm:text-sm">
                     <span className="flex items-center gap-1">
-                      <Clock className="w-4 h-4" />
+                      <Clock className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                       {`${currentLesson.duration_minutes || 0} minutes`}
                     </span>
                     <span>•</span>
@@ -643,13 +643,13 @@ export default function LessonPlayerPage() {
               </div>
               
               {currentLesson.description && (
-                <p className="text-gray-600 dark:text-gray-300 mb-4">
+                <p className="mb-4 break-words text-sm text-gray-600 dark:text-gray-300">
                   {currentLesson.description}
                 </p>
               )}
               
               {/* Navigation Buttons */}
-              <div className="flex items-center justify-between pt-4 border-t border-gray-200 dark:border-gray-700">
+              <div className="flex items-center justify-between gap-3 border-t border-gray-200 pt-4 dark:border-gray-700">
                 <GlassButton
                   variant="secondary"
                   onClick={goToPrev}

@@ -1,12 +1,17 @@
 import { getSession, hasAppPermission, requirePermission } from "@/lib/auth-helpers";
 import {
+  createSessionCookie,
+  getClientIp,
+  getClientUserAgent,
+} from "@/lib/auth";
+import {
   isDuplicateError,
   isNotFoundError,
   isValidationError,
 } from "@/lib/errors";
 import { generateRequestId, log } from "@/lib/logger";
 import type { Role } from "@/shared/types/types";
-import { createUser, deleteUser, listUsers } from "@/lib/userStore";
+import { createUser, deleteUser, hashPassword, invalidateUsersCache, listUsers } from "@/lib/userStore";
 import { NextRequest, NextResponse } from "next/server";
 
 // Validation constants
@@ -106,6 +111,20 @@ function createSuccessResponse(data: Record<string, unknown>, status: number = 2
       headers: { ...securityHeaders, ...noCacheHeaders }
     }
   );
+}
+
+function getSessionCookieOptions(req: NextRequest) {
+  const forwardedProto = req.headers.get("x-forwarded-proto")?.split(",")[0]?.trim().toLowerCase();
+  const isActuallyHttps = forwardedProto === "https" || req.nextUrl.protocol === "https:";
+  const forceInsecureCookies = process.env.ALLOW_HTTP_COOKIES === "true";
+
+  return {
+    httpOnly: true,
+    sameSite: "lax" as const,
+    secure: isActuallyHttps && !forceInsecureCookies,
+    path: "/",
+    maxAge: 60 * 60 * 8,
+  };
 }
 
 
@@ -236,6 +255,8 @@ export async function POST(req: NextRequest) {
       return createErrorResponse(errorMessage, code, status);
     }
 
+    invalidateUsersCache();
+
     log("INFO", "POST /api/auth/users - User created successfully", { 
       requestId,
       username: result.user.username,
@@ -292,10 +313,41 @@ export async function PUT(req: NextRequest) {
       return createErrorResponse("Invalid JSON in request body", "invalid_json", 400);
     }
 
-    const targetUsername = (body.username as string) || session.username;
+    const sessionUsername = session.username.trim().toLowerCase();
+    const targetUsernameValidation = validateUsername(body.username || session.username);
+    if (targetUsernameValidation.valid === false) {
+      return createErrorResponse(targetUsernameValidation.error, "invalid_username", 400);
+    }
+    const targetUsername = targetUsernameValidation.value.toLowerCase();
+
+    let nextUsername = targetUsername;
+    const rawNextUsername = body.newUsername ?? body.new_username;
+    if (rawNextUsername !== undefined) {
+      const nextUsernameValidation = validateUsername(rawNextUsername);
+      if (nextUsernameValidation.valid === false) {
+        return createErrorResponse(nextUsernameValidation.error, "invalid_username", 400);
+      }
+      nextUsername = nextUsernameValidation.value.toLowerCase();
+    }
+
+    const rawPassword = body.password ?? body.newPassword ?? body.new_password;
+    const hasPasswordUpdate = rawPassword !== undefined && rawPassword !== "";
+    if (hasPasswordUpdate) {
+      const passwordValidation = validatePassword(rawPassword);
+      if (passwordValidation.valid === false) {
+        return createErrorResponse(passwordValidation.error, "invalid_password", 400);
+      }
+
+      const rawConfirmPassword = body.confirmPassword ?? body.confirm_password;
+      if (rawConfirmPassword !== undefined && rawConfirmPassword !== passwordValidation.value) {
+        return createErrorResponse("Passwords do not match", "password_mismatch", 400);
+      }
+    }
+
+    const hasAccountUpdate = nextUsername !== targetUsername || hasPasswordUpdate;
     
     // Users can only update their own profile unless their role can edit users.
-    if (session.username !== targetUsername && !hasAppPermission(session.role, "users:edit")) {
+    if (sessionUsername !== targetUsername && !hasAppPermission(session.role, "users:edit")) {
       log("WARN", "PUT /api/auth/users - Forbidden: can only update own profile", { 
         requestId,
         username: session.username,
@@ -304,22 +356,39 @@ export async function PUT(req: NextRequest) {
       return createErrorResponse("Can only update your own profile", "forbidden", 403);
     }
 
+    if (hasAccountUpdate && !hasAppPermission(session.role, "users:edit")) {
+      log("WARN", "PUT /api/auth/users - Forbidden: account update requires users:edit", {
+        requestId,
+        username: session.username,
+        targetUsername,
+      });
+      return createErrorResponse("Only admins can update usernames or passwords here", "forbidden", 403);
+    }
+
     log("DEBUG", "PUT /api/auth/users - Ensuring table migrated", { requestId });
     
     // Ensure table has profile columns
     const { migrateUsersTable } = await import("@/lib/user-db");
     await migrateUsersTable();
 
-    log("DEBUG", "PUT /api/auth/users - Updating profile", { 
+    log("DEBUG", "PUT /api/auth/users - Updating account", {
       requestId,
       targetUsername,
+      nextUsername,
+      hasPasswordUpdate,
       requestedBy: session.username
     });
 
-    // Update user profile
-    const { updateUserProfileInDB } = await import("@/lib/user-db");
-    const updatedUser = await updateUserProfileInDB({
-      username: targetUsername,
+    const passwordHash = hasPasswordUpdate && typeof rawPassword === "string"
+      ? await hashPassword(rawPassword)
+      : undefined;
+
+    // Update user profile/account details.
+    const { updateUserAccountInDB } = await import("@/lib/user-db");
+    const updatedUser = await updateUserAccountInDB({
+      currentUsername: targetUsername,
+      username: nextUsername,
+      passwordHash,
       full_name: body.full_name as string | undefined,
       email: body.email as string | undefined,
       phone: body.phone as string | undefined,
@@ -327,12 +396,14 @@ export async function PUT(req: NextRequest) {
       profile_picture: body.profile_picture as string | undefined,
     });
 
-    log("INFO", "PUT /api/auth/users - Profile updated successfully", { 
+    invalidateUsersCache();
+
+    log("INFO", "PUT /api/auth/users - Account updated successfully", {
       requestId,
       username: updatedUser.username
     });
 
-    return createSuccessResponse({ 
+    const response = createSuccessResponse({
       user: {
         username: updatedUser.username,
         role: updatedUser.role,
@@ -343,6 +414,24 @@ export async function PUT(req: NextRequest) {
         profile_picture: updatedUser.profile_picture,
       }
     });
+
+    if (sessionUsername === targetUsername && updatedUser.username !== sessionUsername) {
+      const userAgent = getClientUserAgent(req.headers);
+      const ip = getClientIp(req.headers);
+      const sessionCookie = createSessionCookie(
+        {
+          username: updatedUser.username,
+          role: updatedUser.role,
+          ...(session.staffId ? { staffId: session.staffId } : {}),
+          ...(session.userId ? { userId: session.userId } : {}),
+        },
+        userAgent,
+        ip
+      );
+      response.cookies.set("session", sessionCookie, getSessionCookieOptions(req));
+    }
+
+    return response;
   } catch (error) {
     log("ERROR", "PUT /api/auth/users - Unexpected error", { 
       requestId,
@@ -352,6 +441,10 @@ export async function PUT(req: NextRequest) {
     
     if (isNotFoundError(error)) {
       return createErrorResponse("User not found", "not_found", 404);
+    }
+
+    if (isDuplicateError(error)) {
+      return createErrorResponse("Username already exists", "already_exists", 409);
     }
     
     if (isValidationError(error)) {
@@ -368,8 +461,6 @@ export async function PUT(req: NextRequest) {
 
 // Simplified mutations with cache invalidation
 export async function DELETE(req: NextRequest) {
-  import("@/lib/userStore").then(m => m.invalidateUsersCache());
-  
   const auth = requirePermission(req, "users:delete");
   if (auth.response) {
     log("WARN", "DELETE /api/auth/users - Insufficient permission", {
@@ -407,6 +498,8 @@ export async function DELETE(req: NextRequest) {
     const status = statusMap[result.code || ''] || 400;
     return createErrorResponse(result.error, result.code, status);
   }
+
+  invalidateUsersCache();
 
   return createSuccessResponse({ user: result.user });
 }

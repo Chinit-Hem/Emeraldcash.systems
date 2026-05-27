@@ -147,8 +147,11 @@ export default function SettingsContent() {
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [newRole, setNewRole] = useState<Role>("Staff");
-  
+
   const [editingUser, setEditingUser] = useState<ManagedUser | null>(null);
+  const [editUsername, setEditUsername] = useState("");
+  const [editPassword, setEditPassword] = useState("");
+  const [editConfirmPassword, setEditConfirmPassword] = useState("");
   const [editFullName, setEditFullName] = useState("");
   const [editEmail, setEditEmail] = useState("");
   const [editPhone, setEditPhone] = useState("");
@@ -285,6 +288,9 @@ export default function SettingsContent() {
 
   const startEditUser = useCallback((user: ManagedUser) => {
     setEditingUser(user);
+    setEditUsername(user.username);
+    setEditPassword("");
+    setEditConfirmPassword("");
     setEditFullName(user.full_name || "");
     setEditEmail(user.email || "");
     setEditPhone(user.phone || "");
@@ -295,6 +301,9 @@ export default function SettingsContent() {
 
   const cancelEdit = useCallback(() => {
     setEditingUser(null);
+    setEditUsername("");
+    setEditPassword("");
+    setEditConfirmPassword("");
     setEditFullName("");
     setEditEmail("");
     setEditPhone("");
@@ -329,6 +338,16 @@ export default function SettingsContent() {
     e.preventDefault();
     if (!editingUser) return;
 
+    const nextUsername = editUsername.trim().toLowerCase();
+    if (!nextUsername) {
+      setError(t.required);
+      return;
+    }
+    if ((editPassword || editConfirmPassword) && editPassword !== editConfirmPassword) {
+      setError(t.passwordMismatch);
+      return;
+    }
+
     setIsUpdating(true);
     setError("");
     try {
@@ -337,6 +356,8 @@ export default function SettingsContent() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           username: editingUser.username,
+          newUsername: nextUsername,
+          ...(editPassword ? { password: editPassword, confirmPassword: editConfirmPassword } : {}),
           full_name: editFullName.trim() || null,
           email: editEmail.trim() || null,
           phone: editPhone.trim() || null,
@@ -349,12 +370,16 @@ export default function SettingsContent() {
       setSuccess(t.updateSuccess);
       cancelEdit();
       loadUsers();
+      if (editingUser.username === user.username && nextUsername !== user.username) {
+        clearCachedUser();
+        router.refresh();
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : t.saveError);
     } finally {
       setIsUpdating(false);
     }
-  }, [editingUser, editFullName, editEmail, editPhone, editProfilePicture, t, cancelEdit, loadUsers]);
+  }, [editingUser, editUsername, editPassword, editConfirmPassword, editFullName, editEmail, editPhone, editProfilePicture, t, cancelEdit, loadUsers, user.username, router]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-emerald-50/30 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 pb-24">
@@ -699,7 +724,7 @@ export default function SettingsContent() {
                           </p>
                         </div>
 
-                        <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <div className="flex shrink-0 items-center gap-2">
                           <button
                             type="button"
                             onClick={() => startEditUser(managedUser)}
@@ -844,7 +869,7 @@ export default function SettingsContent() {
       {/* Edit User Modal */}
       {editingUser && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className="w-full max-w-md rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 shadow-2xl overflow-hidden">
+          <div className="w-full max-w-md max-h-[calc(100dvh-2rem)] overflow-y-auto rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 shadow-2xl">
             <div className="p-6 border-b border-slate-200 dark:border-slate-700 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-slate-800 dark:to-slate-800">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
@@ -923,6 +948,48 @@ export default function SettingsContent() {
               )}
 
               <form onSubmit={handleUpdateUser} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                    {t.username}
+                  </label>
+                  <input
+                    type="text"
+                    title={t.username}
+                    value={editUsername}
+                    onChange={(e) => setEditUsername(e.target.value)}
+                    placeholder={t.enterUsername}
+                    autoComplete="username"
+                    className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                    {t.password}
+                  </label>
+                  <input
+                    type="password"
+                    title={t.password}
+                    value={editPassword}
+                    onChange={(e) => setEditPassword(e.target.value)}
+                    placeholder={language === "km" ? "ទុកទទេ ប្រសិនបើមិនប្តូរ" : "Leave blank to keep current password"}
+                    autoComplete="new-password"
+                    className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                    {t.confirmPassword}
+                  </label>
+                  <input
+                    type="password"
+                    title={t.confirmPassword}
+                    value={editConfirmPassword}
+                    onChange={(e) => setEditConfirmPassword(e.target.value)}
+                    placeholder={language === "km" ? "បញ្ជាក់ពាក្យសម្ងាត់ថ្មី" : "Confirm new password"}
+                    autoComplete="new-password"
+                    className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
+                  />
+                </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                     {t.fullName}

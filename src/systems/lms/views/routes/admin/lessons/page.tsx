@@ -1,12 +1,15 @@
 "use client";
 
 import { useAuthUser } from "@/shared/hooks/AuthContext";
+import { extractYoutubeVideoId } from "@/systems/lms/types/lms-schema";
 import type { LessonWithStatus, LmsCategory } from "@/systems/lms/types/lms-types";
 import {
+  AlertCircle,
   ArrowLeft,
   BookOpen,
   ChevronDown,
   ChevronUp,
+  Clock,
   Edit2,
   Loader2,
   PlayCircle,
@@ -24,14 +27,32 @@ interface LessonFormData {
   description: string;
   category_id: number;
   youtube_url: string;
-  duration_minutes: number;
+  duration_minutes: number | null;
   order_index: number;
   is_active: boolean;
   allowed_roles: string[];
 }
 
+type DurationLookupState = {
+  status: "idle" | "loading" | "ready" | "error";
+  message: string;
+  videoId?: string;
+};
+
+type DurationLookupResponse = {
+  success?: boolean;
+  data?: {
+    durationSeconds?: number;
+    durationMinutes?: number;
+    durationLabel?: string;
+    videoId?: string;
+  };
+  error?: string;
+};
+
 const LESSON_AUDIENCE_ROLES = ["Staff", "Accounting"] as const;
 const DEFAULT_LESSON_AUDIENCE = [...LESSON_AUDIENCE_ROLES];
+const DURATION_IDLE_MESSAGE = "Waiting for YouTube URL.";
 const CATEGORY_COLOR_CLASSES: Record<string, string> = {
   emerald: "bg-emerald-500",
   blue: "bg-blue-500",
@@ -92,10 +113,14 @@ export default function LessonsAdminPage() {
     description: "",
     category_id: 0,
     youtube_url: "",
-    duration_minutes: 10,
+    duration_minutes: null,
     order_index: 0,
     is_active: true,
     allowed_roles: [...DEFAULT_LESSON_AUDIENCE],
+  });
+  const [durationLookup, setDurationLookup] = useState<DurationLookupState>({
+    status: "idle",
+    message: DURATION_IDLE_MESSAGE,
   });
 
   const fetchData = useCallback(async () => {
@@ -109,10 +134,13 @@ export default function LessonsAdminPage() {
       const lessonsData = await lessonsRes.json();
       
       if (catData.success) {
-        setCategories(catData.data);
-        if (catData.data.length > 0 && formData.category_id === 0) {
-          setFormData(prev => ({ ...prev, category_id: catData.data[0].id }));
-        }
+        const nextCategories = Array.isArray(catData.data) ? catData.data : [];
+        setCategories(nextCategories);
+        setFormData(prev =>
+          nextCategories.length > 0 && prev.category_id === 0
+            ? { ...prev, category_id: nextCategories[0].id }
+            : prev
+        );
       }
       
       if (lessonsData.success) {
@@ -123,7 +151,7 @@ export default function LessonsAdminPage() {
     } finally {
       setLoading(false);
     }
-  }, [formData.category_id]);
+  }, []);
 
   useEffect(() => {
     if (!isAdmin) {
@@ -133,6 +161,111 @@ export default function LessonsAdminPage() {
     fetchData();
   }, [isAdmin, router, fetchData]);
 
+  useEffect(() => {
+    if (!showAddForm) {
+      setDurationLookup({
+        status: "idle",
+        message: DURATION_IDLE_MESSAGE,
+      });
+      return;
+    }
+
+    const url = formData.youtube_url.trim();
+    const videoId = extractYoutubeVideoId(url);
+
+    if (!url) {
+      setDurationLookup({
+        status: "idle",
+        message: DURATION_IDLE_MESSAGE,
+      });
+      setFormData((prev) =>
+        prev.duration_minutes === null ? prev : { ...prev, duration_minutes: null }
+      );
+      return;
+    }
+
+    if (!videoId) {
+      setDurationLookup({
+        status: "error",
+        message: "Enter a valid YouTube URL to detect duration.",
+      });
+      setFormData((prev) =>
+        prev.duration_minutes === null ? prev : { ...prev, duration_minutes: null }
+      );
+      return;
+    }
+
+    let cancelled = false;
+    const controller = new AbortController();
+
+    setDurationLookup({
+      status: "loading",
+      message: "Reading duration from YouTube...",
+      videoId,
+    });
+
+    fetch("/api/lms/youtube-duration", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ youtubeUrl: url }),
+      signal: controller.signal,
+    })
+      .then(async (response) => {
+        const payload = (await response.json().catch(() => null)) as
+          | DurationLookupResponse
+          | null;
+
+        if (!response.ok || !payload?.success) {
+          throw new Error(payload?.error ?? "Could not read this video's duration.");
+        }
+
+        const durationMinutes = payload.data?.durationMinutes;
+        const durationLabel = payload.data?.durationLabel;
+
+        if (!durationMinutes || durationMinutes < 1) {
+          throw new Error("Could not read this video's duration.");
+        }
+
+        if (cancelled) {
+          return;
+        }
+
+        setFormData((prev) =>
+          prev.youtube_url.trim() === url
+            ? { ...prev, duration_minutes: durationMinutes }
+            : prev
+        );
+        setDurationLookup({
+          status: "ready",
+          message: `Detected ${durationLabel ?? `${durationMinutes} min`} from YouTube.`,
+          videoId,
+        });
+      })
+      .catch((error) => {
+        if (error instanceof DOMException && error.name === "AbortError") {
+          return;
+        }
+
+        if (!cancelled) {
+          setDurationLookup({
+            status: "error",
+            message:
+              error instanceof Error
+                ? error.message
+                : "Could not load YouTube metadata. Check your connection and try again.",
+            videoId,
+          });
+        }
+      });
+
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
+  }, [formData.youtube_url, showAddForm]);
+
   const handleSave = async () => {
     if (!formData.title.trim()) {
       setError("Lesson title is required");
@@ -140,6 +273,22 @@ export default function LessonsAdminPage() {
     }
     if (!formData.category_id) {
       setError("Please select a category");
+      return;
+    }
+    if (!formData.youtube_url.trim()) {
+      setError("YouTube URL is required");
+      return;
+    }
+    if (!extractYoutubeVideoId(formData.youtube_url)) {
+      setError("Please enter a valid YouTube URL");
+      return;
+    }
+    if (durationLookup.status === "loading") {
+      setError("Please wait for the video duration to load");
+      return;
+    }
+    if (!formData.duration_minutes || formData.duration_minutes < 1) {
+      setError("Video duration must load automatically before saving");
       return;
     }
     if (formData.allowed_roles.length === 0) {
@@ -160,6 +309,7 @@ export default function LessonsAdminPage() {
       youtube_video_id: "", // Will be set by server
       duration_minutes: formData.duration_minutes,
       order_index: formData.order_index,
+      is_active: formData.is_active,
       is_completed: false,
       is_unlocked: true,
       completed_at: null,
@@ -250,9 +400,9 @@ export default function LessonsAdminPage() {
       description: lesson.description || "",
       category_id: lesson.category_id,
       youtube_url: lesson.youtube_url || "",
-      duration_minutes: lesson.duration_minutes || 10,
+      duration_minutes: lesson.duration_minutes ?? null,
       order_index: lesson.order_index,
-      is_active: true, // Default to active, API doesn't return this
+      is_active: lesson.is_active ?? true,
       allowed_roles: normalizeLessonAudience(lesson.allowed_roles),
     });
     setShowAddForm(true);
@@ -265,10 +415,14 @@ export default function LessonsAdminPage() {
       description: "",
       category_id: categories[0]?.id || 0,
       youtube_url: "",
-      duration_minutes: 10,
+      duration_minutes: null,
       order_index: lessons.filter(l => l.category_id === categories[0]?.id).length,
       is_active: true,
       allowed_roles: [...DEFAULT_LESSON_AUDIENCE],
+    });
+    setDurationLookup({
+      status: "idle",
+      message: DURATION_IDLE_MESSAGE,
     });
     setShowAddForm(false);
     setError("");
@@ -297,6 +451,14 @@ export default function LessonsAdminPage() {
         allowed_roles: nextRoles,
       };
     });
+  };
+
+  const handleYoutubeUrlChange = (url: string) => {
+    setFormData((prev) => ({
+      ...prev,
+      youtube_url: url,
+      duration_minutes: prev.youtube_url === url ? prev.duration_minutes : null,
+    }));
   };
 
   // MEMOIZED: Filter lessons to avoid recomputation on every render
@@ -436,16 +598,35 @@ export default function LessonsAdminPage() {
                 </div>
                 
                 <div>
-                  <label htmlFor={fieldIds.duration} className="block text-sm font-medium text-slate-700 mb-1">Duration (minutes)</label>
-                  <input
-                    id={fieldIds.duration}
-                    type="number"
-                    title="Lesson duration in minutes"
-                    value={formData.duration_minutes}
-                    onChange={(e) => setFormData({ ...formData, duration_minutes: parseInt(e.target.value) || 0 })}
-                    min={1}
-                    className="min-h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-base focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 sm:text-sm"
-                  />
+                  <p id={fieldIds.duration} className="block text-sm font-medium text-slate-700 mb-1">Duration (minutes)</p>
+                  <div
+                    role="status"
+                    aria-live="polite"
+                    aria-labelledby={fieldIds.duration}
+                    className={`flex min-h-11 w-full items-center gap-3 rounded-xl border px-4 py-3 text-base sm:text-sm ${
+                      durationLookup.status === "error"
+                        ? "border-red-200 bg-red-50 text-red-700"
+                        : durationLookup.status === "ready"
+                          ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                          : "border-slate-200 bg-slate-50 text-slate-700"
+                    }`}
+                  >
+                    {durationLookup.status === "loading" ? (
+                      <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
+                    ) : durationLookup.status === "error" ? (
+                      <AlertCircle className="h-4 w-4 shrink-0" />
+                    ) : (
+                      <Clock className="h-4 w-4 shrink-0" />
+                    )}
+                    <span className="min-w-0 break-words font-medium">
+                      {formData.duration_minutes && formData.duration_minutes > 0
+                        ? `${formData.duration_minutes} min`
+                        : "Auto from video"}
+                    </span>
+                  </div>
+                  <p className="mt-1 break-words text-xs text-slate-500">
+                    {durationLookup.message}
+                  </p>
                 </div>
               </div>
 
@@ -483,7 +664,7 @@ export default function LessonsAdminPage() {
                   type="url"
                   title="YouTube URL"
                   value={formData.youtube_url}
-                  onChange={(e) => setFormData({ ...formData, youtube_url: e.target.value })}
+                  onChange={(e) => handleYoutubeUrlChange(e.target.value)}
                   placeholder="https://youtube.com/watch?v=..."
                   className="min-h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-base focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 sm:text-sm"
                 />
