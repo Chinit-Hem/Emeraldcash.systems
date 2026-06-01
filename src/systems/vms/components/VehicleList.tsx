@@ -12,6 +12,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useAuthUser } from "@/shared/hooks/AuthContext";
 import { getFuzzySuggestions } from "@/systems/vms/utils/fuzzySearch";
 import SearchSuggestions from "@/shared/components/SearchSuggestions";
+import { getVehicleEditHref, getVehicleViewHref } from "@/systems/vms/utils/vehicleListState";
 
 type VehicleListProps = {
   category?: string;
@@ -152,7 +153,7 @@ function VehicleRow({ vehicle, isAdmin, onDelete, onClick }: {
       {/* Actions */}
       <div className="flex items-center gap-2 shrink-0" onClick={(e) => e.stopPropagation()}>
         <button
-          onClick={() => router.push(`/vehicles/${vehicle.VehicleId}/view`)}
+          onClick={() => router.push(getVehicleViewHref(vehicle.VehicleId))}
           className="p-2 bg-white text-[#2d3748] rounded-xl shadow-sm active:bg-slate-100 font-semibold transition-all flex items-center gap-2 text-sm"
         >
           {Icons.view}
@@ -161,7 +162,7 @@ function VehicleRow({ vehicle, isAdmin, onDelete, onClick }: {
         {isAdmin && (
           <>
             <button
-              onClick={() => router.push(`/vehicles/${vehicle.VehicleId}/edit`)}
+              onClick={() => router.push(getVehicleEditHref(vehicle.VehicleId))}
               className="p-2 bg-[#2ecc71] text-white rounded-xl shadow-sm active:bg-slate-100 font-semibold transition-all flex items-center gap-2 text-sm"
             >
               {Icons.edit}
@@ -470,7 +471,7 @@ export default function VehicleList({ category }: VehicleListProps) {
                   <VehicleRow 
                     key={vehicle.VehicleId} 
                     vehicle={vehicle} 
-                    onClick={() => router.push(`/vehicles/${vehicle.VehicleId}/view`)}
+                    onClick={() => router.push(getVehicleViewHref(vehicle.VehicleId))}
                     isAdmin={isAdmin}
                     onDelete={handleDelete}
                   />

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { useAuthUser } from "@/shared/hooks/AuthContext";
 import { useToast } from "@/shared/components/ui/glass/GlassToast";
 import { GlassCard } from "@/shared/components/ui/glass/GlassCard";
@@ -14,9 +14,9 @@ import { useVehicle } from "@/systems/vms/components/vehicles/useVehicle";
 import { useUpdateVehicleOptimistic } from "@/systems/vms/components/vehicles/useUpdateVehicleOptimistic";
 import { useDeleteVehicle } from "@/systems/vms/components/vehicles/useDeleteVehicle";
 import { useVehicles } from "@/systems/vms/hooks/useVehicles";
+import { useVehicleListBackLink } from "@/systems/vms/hooks/useVehicleListBackLink";
 import {
   getVehicleGroupKey,
-  getVehicleListHrefWithFallback,
   parseVehicleGroupByParam,
   withVehicleListQueryFallback
 } from "@/systems/vms/utils/vehicleListState";
@@ -38,9 +38,8 @@ const RESERVED_IDS = ['edit', 'add', 'view', 'new', 'create', 'delete'];
 
 function EditVehicleInner() {
   const router = useRouter();
-  const searchParams = useSearchParams();
+  const { href: listHref, label: backToListLabel, searchParams } = useVehicleListBackLink();
   const groupBy = parseVehicleGroupByParam(searchParams.get("groupBy"));
-  const listHref = useMemo(() => getVehicleListHrefWithFallback(searchParams), [searchParams]);
   const params = useParams<{ id: string }>();
   const rawId = typeof params?.id === "string" ? params.id : "";
 
@@ -53,6 +52,10 @@ function EditVehicleInner() {
 
   const isAdmin = user?.role === "Admin";
   const userRole = user?.role || "Viewer";
+
+  const handleBackToList = useCallback(() => {
+    router.push(listHref);
+  }, [listHref, router]);
 
   // Redirect to vehicles list if ID is a reserved word
   useEffect(() => {
@@ -217,8 +220,8 @@ function EditVehicleInner() {
               <GlassButton onClick={() => refetch()} variant="primary">
                 Retry
               </GlassButton>
-              <GlassButton onClick={() => router.push(listHref)} variant="secondary">
-                Back to List
+              <GlassButton onClick={handleBackToList} variant="secondary">
+                {backToListLabel}
               </GlassButton>
             </div>
           </GlassCard>
@@ -257,8 +260,8 @@ function EditVehicleInner() {
             <p className="text-gray-600 dark:text-gray-400 mb-6">
               The vehicle you&apos;re looking for doesn&apos;t exist or has been removed.
             </p>
-            <GlassButton onClick={() => router.push(listHref)} variant="primary">
-              Back to Vehicles
+            <GlassButton onClick={handleBackToList} variant="primary">
+              {backToListLabel}
             </GlassButton>
           </GlassCard>
         </div>
@@ -294,8 +297,8 @@ function EditVehicleInner() {
               Only Admin can edit vehicles.
             </p>
             <div className="flex gap-3 justify-center">
-              <GlassButton onClick={() => router.push(listHref)} variant="secondary">
-                Back to List
+              <GlassButton onClick={handleBackToList} variant="secondary">
+                {backToListLabel}
               </GlassButton>
               <GlassButton
                 onClick={() => vehicle && router.push(getViewHref(vehicle.VehicleId))}

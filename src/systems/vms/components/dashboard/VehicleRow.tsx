@@ -8,6 +8,7 @@ import type { AppRouterInstance } from "next/dist/shared/lib/app-router-context.
 import { useState, useCallback, useEffect, type CSSProperties, type Dispatch, type SetStateAction } from "react";
 import { formatPrice, getVehicleThumbnailUrl } from "@/systems/vms/utils/vehicle-helpers";
 import { getVehicleColorHex, translateVehicleColor } from "@/systems/vms/utils/vehicleColors";
+import { getVehicleViewHref } from "@/systems/vms/utils/vehicleListState";
 import { OptimizedImage } from "@/shared/components/OptimizedImage";
 
 interface VehicleRowProps {
@@ -80,7 +81,7 @@ export default function VehicleRow({
         index % 2 === 0 ? "bg-white" : "bg-slate-50"
       )}
       style={style}
-      onClick={() => router.push(`/vehicles/${encodeURIComponent(vehicleId)}/view`)}
+      onClick={() => router.push(getVehicleViewHref(vehicleId))}
     >
       {visibleColumns.includes('id') && (
         <div className="px-4 py-3 whitespace-nowrap text-sm font-mono text-[#4a4a5a] w-20 flex-shrink-0">
@@ -224,7 +225,7 @@ export default function VehicleRow({
             <button
               onClick={(e) => {
                 e.stopPropagation();
-                router.push(`/vehicles/${encodeURIComponent(vehicleId)}/view`);
+                router.push(getVehicleViewHref(vehicleId));
               }}
               className="rounded-lg p-1.5 text-[#4a4a5a] hover:bg-slate-100 transition-colors"
               title="View"

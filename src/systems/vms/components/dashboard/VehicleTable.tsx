@@ -12,6 +12,7 @@ import { formatPrice, getVehicleThumbnailUrl } from "@/systems/vms/utils/vehicle
 import { getVehicleColorHex, translateVehicleColor } from "@/systems/vms/utils/vehicleColors";
 import { useOptimisticVehicles } from "@/systems/vms/hooks/useOptimisticVehicles";
 import { OptimizedImage } from "@/shared/components/OptimizedImage";
+import { getVehicleEditHref, getVehicleViewHref } from "@/systems/vms/utils/vehicleListState";
 
 // Color name to hex mapping for visual indicators
 const getColorHex = (colorName: string): string => {
@@ -680,7 +681,7 @@ export default function VehicleTable({
               return (
               <tr
                 key={vehicleId || `row-${index}`}
-                onClick={() => router.push(`/vehicles/${encodeURIComponent(vehicleId)}/view`)}
+                onClick={() => router.push(getVehicleViewHref(vehicleId))}
                 className={cn(
                   "transition-all duration-150 cursor-pointer hover:bg-slate-50",
                   index % 2 !== 0 && "bg-slate-100/50"
@@ -829,7 +830,7 @@ export default function VehicleTable({
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          router.push(`/vehicles/${encodeURIComponent(vehicleId)}/view`);
+                          router.push(getVehicleViewHref(vehicleId));
                         }}
                         className="rounded-lg p-2 text-[#4a4a5a] transition-all duration-200 hover:bg-slate-50 hover:text-[#1a1a2e]"
                         title="View"
@@ -854,7 +855,7 @@ export default function VehicleTable({
                               if (onEdit) {
                                 onEdit(vehicle);
                               } else {
-                                router.push(`/vehicles/${encodeURIComponent(vehicleId)}/edit`);
+                                router.push(getVehicleEditHref(vehicleId));
                               }
                             }}
                             className="rounded-lg p-2 text-[#10b981] transition-all duration-200 hover:bg-slate-50"

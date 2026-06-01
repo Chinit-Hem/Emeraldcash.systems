@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useEffect, useId, useMemo, useState } from "react";
-import { useParams, useRouter, useSearchParams } from "next/navigation";
+import React, { useCallback, useEffect, useId, useMemo, useState } from "react";
+import { useParams, useRouter } from "next/navigation";
 import { useAuthUser } from "@/shared/hooks/AuthContext";
 import { formatVehicleId, formatVehicleTime, formatCurrency } from "@/shared/utils/format";
 import { onVehicleCacheUpdate } from "@/systems/vms/utils/vehicleCache";
@@ -10,7 +10,7 @@ import type { Vehicle } from "@/shared/types/types";
 import { TAX_TYPE_METADATA } from "@/shared/types/types";
 import { useMounted } from "@/shared/hooks/useMounted";
 import { getVehicleImageUrls, getVehiclePrimaryImageUrl, mergeVehicleImages } from "@/systems/vms/utils/vehicle-helpers";
-import { getVehicleListHrefWithFallback } from "@/systems/vms/utils/vehicleListState";
+import { useVehicleListBackLink } from "@/systems/vms/hooks/useVehicleListBackLink";
 import { 
   ArrowLeft, 
   Car,
@@ -399,8 +399,7 @@ export default function ViewVehiclePage() {
 
 function ViewVehicleInner() {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const listHref = useMemo(() => getVehicleListHrefWithFallback(searchParams), [searchParams]);
+  const { href: listHref, label: backToListLabel, searchParams } = useVehicleListBackLink();
   const params = useParams<{ id: string }>();
   const rawId = typeof params?.id === "string" ? params.id : "";
   
@@ -430,6 +429,10 @@ function ViewVehicleInner() {
   const [failedImageUrls, setFailedImageUrls] = useState<Set<string>>(() => new Set());
   const [errors, setErrors] = useState<Record<string, string>>({});
   const descriptionInputId = useId();
+
+  const handleBackToList = useCallback(() => {
+    router.push(listHref);
+  }, [listHref, router]);
 
   // Redirect to vehicles list if ID is a reserved word
   useEffect(() => {
@@ -723,10 +726,10 @@ function ViewVehicleInner() {
                 Retry
               </button>
               <button
-                onClick={() => router.push(listHref)}
+                onClick={handleBackToList}
                 className="px-6 py-2.5 bg-slate-100 text-slate-700 rounded-xl font-medium hover:bg-slate-200 transition-colors"
               >
-                Back to List
+                {backToListLabel}
               </button>
             </div>
           </div>
@@ -746,10 +749,10 @@ function ViewVehicleInner() {
             <h2 className="text-2xl font-bold text-slate-800 mb-3">Vehicle Not Found</h2>
             <p className="text-slate-500 mb-8">The vehicle you&apos;re looking for doesn&apos;t exist or has been removed.</p>
             <button
-              onClick={() => router.push(listHref)}
+              onClick={handleBackToList}
               className="px-6 py-2.5 bg-emerald-500 text-white rounded-xl font-medium hover:bg-emerald-600 transition-colors shadow-md"
             >
-              Back to Vehicles
+              {backToListLabel}
             </button>
           </div>
         </div>
@@ -782,12 +785,12 @@ function ViewVehicleInner() {
             {/* Left: Back Button */}
             <div className="flex items-center gap-3">
               <button
-                onClick={() => router.push(listHref)}
+                onClick={handleBackToList}
                 aria-label="Back to vehicle list"
                 className="inline-flex items-center gap-2 px-3 py-2 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-xl transition-all duration-200"
               >
                 <ArrowLeft className="w-4 h-4" aria-hidden="true" />
-                <span className="text-sm font-medium hidden sm:inline">Back to List</span>
+                <span className="hidden text-sm font-medium sm:inline">{backToListLabel}</span>
               </button>
               <div className="h-4 w-px bg-slate-300" />
               <div className="flex items-center gap-2 text-sm text-slate-500">

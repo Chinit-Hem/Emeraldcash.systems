@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, useMemo } from "react";
-import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { useAuthUser } from "@/shared/hooks/AuthContext";
 import { VehicleDetailsCard } from "@/systems/vms/components/vehicles/VehicleDetailsCard";
 import { VehicleForm } from "@/systems/vms/components/vehicles/VehicleForm";
@@ -12,10 +12,8 @@ import { extractDriveFileId } from "@/shared/utils/drive";
 import { refreshVehicleCache, writeVehicleCache } from "@/systems/vms/utils/vehicleCache";
 import type { Vehicle } from "@/shared/types/types";
 import { derivePrices } from "@/systems/vms/utils/pricing";
-import {
-  getVehicleListHrefWithFallback,
-  withVehicleListQueryFallback,
-} from "@/systems/vms/utils/vehicleListState";
+import { withVehicleListQueryFallback } from "@/systems/vms/utils/vehicleListState";
+import { useVehicleListBackLink } from "@/systems/vms/hooks/useVehicleListBackLink";
 import { useMounted } from "@/shared/hooks/useMounted";
 import ErrorBoundary from "@/shared/components/ErrorBoundary";
 
@@ -29,8 +27,7 @@ export default function VehicleDetailPage() {
 
 function VehicleDetailInner() {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const listHref = useMemo(() => getVehicleListHrefWithFallback(searchParams), [searchParams]);
+  const { href: listHref, label: backToListLabel, searchParams } = useVehicleListBackLink();
   const params = useParams<{ id: string }>();
   const id = typeof params?.id === "string" ? params.id : "";
   const user = useAuthUser();
@@ -46,6 +43,10 @@ function VehicleDetailInner() {
 
   // Determine user role
   const userRole = user?.role || "Viewer";
+
+  const handleBackToList = useCallback(() => {
+    router.push(listHref);
+  }, [listHref, router]);
 
   // Load vehicle data (client-side only)
   useEffect(() => {
@@ -345,10 +346,10 @@ function VehicleDetailInner() {
                 Retry
               </button>
               <button
-                onClick={() => router.push(listHref)}
+                onClick={handleBackToList}
                 className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors font-medium"
               >
-                Back to List
+                {backToListLabel}
               </button>
             </div>
           </GlassCard>
@@ -387,10 +388,10 @@ function VehicleDetailInner() {
               The vehicle you&apos;re looking for doesn&apos;t exist or has been removed.
             </p>
             <button
-              onClick={() => router.push(listHref)}
+              onClick={handleBackToList}
               className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors font-medium"
             >
-              Back to Vehicles
+              {backToListLabel}
             </button>
           </GlassCard>
         </div>

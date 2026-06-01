@@ -5,6 +5,7 @@ import type { Vehicle } from "@/shared/types/types";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { formatPrice, getVehicleThumbnailUrl } from "@/systems/vms/utils/vehicle-helpers";
+import { getVehicleEditHref, getVehicleViewHref } from "@/systems/vms/utils/vehicleListState";
 
 interface VehicleCardMobileProps {
   vehicle: Vehicle;
@@ -173,7 +174,7 @@ export default function VehicleCardMobile({
           {/* Actions */}
           <div className="mt-4 flex gap-2">
             <button
-              onClick={() => router.push(`/vehicles/${encodeURIComponent(vehicleId)}/view`)}
+              onClick={() => router.push(getVehicleViewHref(vehicleId))}
               className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-slate-100 text-[#10b981] rounded-xl font-medium shadow-sm active:bg-slate-100 transition-all duration-200"
             >
               <svg
@@ -192,7 +193,7 @@ export default function VehicleCardMobile({
             {isAdmin && (
               <>
                 <button
-                  onClick={() => onEdit ? onEdit(vehicle) : router.push(`/vehicles/${encodeURIComponent(vehicleId)}/edit`)}
+                  onClick={() => onEdit ? onEdit(vehicle) : router.push(getVehicleEditHref(vehicleId))}
                   className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-slate-100 text-[#3b82f6] rounded-xl font-medium shadow-sm active:bg-slate-100 transition-all duration-200"
                 >
 

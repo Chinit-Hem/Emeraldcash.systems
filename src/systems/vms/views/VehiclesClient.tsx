@@ -31,6 +31,7 @@ import { safeParseDate } from "@/shared/utils/safeDate";
 import { VirtualTable } from "@/systems/vms/utils/virtualized-table";
 import {
   getVehicleListSearchParams,
+  getVehicleViewHref,
   parseVehicleListPageParam,
   parseVehicleListPageSizeParam,
   rememberVehicleListHref,
@@ -229,7 +230,7 @@ function IOSVehicleCard({ vehicle, isAdmin, onEdit, onDelete }: IOSVehicleCardPr
                 e.preventDefault();
                 e.stopPropagation();
                 console.log('[iOS] View button clicked for vehicle:', vehicleId);
-                router.push(`/vehicles/${encodeURIComponent(vehicleId)}/view`);
+                router.push(getVehicleViewHref(vehicleId));
               }}
               className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-emerald-50 dark:bg-emerald-900/35 text-emerald-700 dark:text-emerald-300 border border-emerald-200/70 dark:border-emerald-500/30 rounded-xl font-medium active:scale-[0.98] transition-transform touch-manipulation min-h-[44px]"
             >
@@ -360,6 +361,7 @@ function computeVehicleMeta(vehicles: Vehicle[] | undefined | null): VehicleMeta
 export default function VehiclesClient() {
   const user = useAuthUser();
   const searchParams = useSearchParams();
+  const router = useRouter();
   const isAdmin = user.role === "Admin";
   const [isIOSSafari, setIsIOSSafari] = useState(false);
 
@@ -525,6 +527,56 @@ export default function VehiclesClient() {
     const query = listParams.toString();
     rememberVehicleListHref(query ? `/vehicles?${query}` : "/vehicles");
   }, [currentPage, pageSize, searchParams]);
+
+  const buildVehicleListHref = useCallback(
+    (nextPage: number, nextPageSize: number) => {
+      const listParams = getVehicleListSearchParams(searchParams);
+
+      if (nextPage > 1) {
+        listParams.set(VEHICLE_LIST_PAGE_PARAM, String(nextPage));
+      } else {
+        listParams.delete(VEHICLE_LIST_PAGE_PARAM);
+      }
+
+      if (nextPageSize !== 10) {
+        listParams.set(VEHICLE_LIST_PAGE_SIZE_PARAM, String(nextPageSize));
+      } else {
+        listParams.delete(VEHICLE_LIST_PAGE_SIZE_PARAM);
+      }
+
+      listParams.delete(VEHICLE_LIST_FOCUS_PARAM);
+
+      const query = listParams.toString();
+      return query ? `/vehicles?${query}` : "/vehicles";
+    },
+    [searchParams]
+  );
+
+  const rememberAndReplaceVehicleListHref = useCallback(
+    (nextPage: number, nextPageSize: number) => {
+      const nextHref = buildVehicleListHref(nextPage, nextPageSize);
+      rememberVehicleListHref(nextHref);
+      router.replace(nextHref, { scroll: false });
+    },
+    [buildVehicleListHref, router]
+  );
+
+  const handlePageChange = useCallback(
+    (nextPage: number) => {
+      setCurrentPage(nextPage);
+      rememberAndReplaceVehicleListHref(nextPage, pageSize);
+    },
+    [pageSize, rememberAndReplaceVehicleListHref]
+  );
+
+  const handlePageSizeChange = useCallback(
+    (nextPageSize: number) => {
+      setPageSize(nextPageSize);
+      setCurrentPage(1);
+      rememberAndReplaceVehicleListHref(1, nextPageSize);
+    },
+    [rememberAndReplaceVehicleListHref]
+  );
 
   useEffect(() => {
     if (!isIOSSafari) return;
@@ -1175,7 +1227,7 @@ export default function VehiclesClient() {
                 <div className="mt-4 flex items-center justify-between rounded-xl bg-white p-3 shadow-sm dark:bg-gray-900">
                   <button
                     type="button"
-                    onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+                    onClick={() => handlePageChange(Math.max(1, safeCurrentPage - 1))}
                     disabled={safeCurrentPage <= 1}
                     className="flex items-center gap-1 rounded-lg px-3 py-2 text-sm font-medium text-gray-700 disabled:cursor-not-allowed disabled:opacity-40 active:scale-95 transition-transform dark:text-gray-300"
                   >
@@ -1197,7 +1249,7 @@ export default function VehiclesClient() {
 
                   <button
                     type="button"
-                    onClick={() => setCurrentPage((prev) => Math.min(safeTotalPages, prev + 1))}
+                    onClick={() => handlePageChange(Math.min(safeTotalPages, safeCurrentPage + 1))}
                     disabled={safeCurrentPage >= safeTotalPages}
                     className="flex items-center gap-1 rounded-lg px-3 py-2 text-sm font-medium text-gray-700 disabled:cursor-not-allowed disabled:opacity-40 active:scale-95 transition-transform dark:text-gray-300"
                   >
@@ -1644,8 +1696,8 @@ export default function VehiclesClient() {
                   totalPages={totalPages}
                   pageSize={pageSize}
                   totalItems={filteredVehicles.length}
-                  onPageChange={setCurrentPage}
-                  onPageSizeChange={setPageSize}
+                  onPageChange={handlePageChange}
+                  onPageSizeChange={handlePageSizeChange}
                 />
               )}
 

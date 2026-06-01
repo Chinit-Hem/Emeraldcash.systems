@@ -1,17 +1,15 @@
 "use client";
 
 import React, { useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import ImageModal from "@/shared/components/ImageModal";
 import { formatCurrency, formatVehicleTime, formatVehicleId } from "@/shared/utils/format";
 import { driveThumbnailUrl, extractDriveFileId } from "@/shared/utils/drive";
 import type { Vehicle } from "@/shared/types/types";
 import { TAX_TYPE_METADATA } from "@/shared/types/types";
 import { cn } from "@/shared/utils/ui";
-import {
-  getVehicleListHrefWithFallback,
-  withVehicleListQueryFallback,
-} from "@/systems/vms/utils/vehicleListState";
+import { withVehicleListQueryFallback } from "@/systems/vms/utils/vehicleListState";
+import { useVehicleListBackLink } from "@/systems/vms/hooks/useVehicleListBackLink";
 
 // Modern Icon Components
 const Icons = {
@@ -143,8 +141,7 @@ export function VehicleDetailsCard({
   isDeleting = false,
 }: VehicleDetailsCardProps) {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const listHref = getVehicleListHrefWithFallback(searchParams);
+  const { href: listHref, label: backToListLabel, searchParams } = useVehicleListBackLink();
   const [isImageModalOpen, setIsImageModalOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 
@@ -165,6 +162,10 @@ export function VehicleDetailsCard({
       await onDelete();
     }
     setIsDeleteDialogOpen(false);
+  };
+
+  const handleBackToList = () => {
+    router.push(listHref);
   };
 
   // Helper to get proper image URL
@@ -246,7 +247,7 @@ export function VehicleDetailsCard({
             <div className="flex items-center justify-between gap-4">
               <div className="flex items-center gap-4">
                 <button
-                  onClick={() => router.back()}
+                  onClick={handleBackToList}
                   className="flex items-center justify-center w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600 transition-all duration-200 shadow-sm hover:shadow-md"
                 >
                   <Icons.Back />
@@ -528,11 +529,11 @@ export function VehicleDetailsCard({
                 </button>
               )}
               <button 
-                onClick={() => router.push(listHref)}
+                onClick={handleBackToList}
                 className="flex items-center gap-2 px-6 py-3 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-300 rounded-xl font-semibold transition-all duration-200"
               >
                 <Icons.List />
-                <span>Back to List</span>
+                <span>{backToListLabel}</span>
               </button>
             </div>
           </div>
@@ -561,11 +562,11 @@ export function VehicleDetailsCard({
               </button>
             )}
             <button
-              onClick={() => router.push(listHref)}
+              onClick={handleBackToList}
               className="flex-1 flex items-center justify-center gap-2 py-3 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl font-semibold"
             >
               <Icons.List />
-              <span>Back</span>
+              <span>{backToListLabel}</span>
             </button>
           </div>
         </div>

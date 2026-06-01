@@ -28,7 +28,8 @@ import {
   VEHICLE_LIST_FOCUS_PARAM,
   VEHICLE_LIST_PAGE_PARAM,
   VEHICLE_LIST_PAGE_SIZE_PARAM,
-  withVehicleListQuery,
+  withVehicleListFocusHref,
+  withVehicleListReturnHref,
   type VehicleGroupByOption
 } from "@/systems/vms/utils/vehicleListState";
 import SearchSuggestions from "@/shared/components/SearchSuggestions";
@@ -1020,6 +1021,7 @@ export default function VehiclesClientEnhanced() {
   const { success, error: showError } = useToast();
   const isAdmin = user?.role === "Admin";
   const [isMobileSafeMode, setIsMobileSafeMode] = useState(detectMobileSafariLike);
+  const activeListHrefRef = useRef<string | null>(null);
   const userSelectedViewModeRef = useRef(false);
   const skipNextFilterPageResetRef = useRef(
     Boolean(searchParams.get(VEHICLE_LIST_PAGE_PARAM) || searchParams.get(VEHICLE_LIST_FOCUS_PARAM))
@@ -1617,6 +1619,11 @@ const isTukTukCategory = useCallback((cat: string | undefined): boolean => {
     return query ? `/vehicles?${query}` : "/vehicles";
   }, []);
 
+  const rememberActiveListHref = useCallback((href: string) => {
+    activeListHrefRef.current = href;
+    rememberVehicleListHref(href);
+  }, []);
+
   const buildVehicleListParams = useCallback((
     options: {
       page?: number;
@@ -1652,9 +1659,9 @@ const isTukTukCategory = useCallback((cat: string | undefined): boolean => {
   const replaceCurrentHistoryWithListState = useCallback((params: URLSearchParams) => {
     if (typeof window === "undefined") return;
     const returnUrl = getVehicleListUrl(params);
-    rememberVehicleListHref(returnUrl);
+    rememberActiveListHref(returnUrl);
     window.history.replaceState(window.history.state, "", returnUrl);
-  }, [getVehicleListUrl]);
+  }, [getVehicleListUrl, rememberActiveListHref]);
 
   const handlePageChange = useCallback((nextPage: number) => {
     const safeTotalPages = Math.max(1, totalPages);
@@ -1663,9 +1670,9 @@ const isTukTukCategory = useCallback((cat: string | undefined): boolean => {
 
     setCurrentPage(safePage);
     const nextHref = getVehicleListUrl(nextParams);
-    rememberVehicleListHref(nextHref);
+    rememberActiveListHref(nextHref);
     router.replace(nextHref, { scroll: false });
-  }, [buildVehicleListParams, getVehicleListUrl, router, totalPages]);
+  }, [buildVehicleListParams, getVehicleListUrl, rememberActiveListHref, router, totalPages]);
 
   const handleItemsPerPageChange = useCallback((nextItemsPerPage: number) => {
     const nextParams = buildVehicleListParams({
@@ -1677,9 +1684,9 @@ const isTukTukCategory = useCallback((cat: string | undefined): boolean => {
     setItemsPerPage(nextItemsPerPage);
     setCurrentPage(1);
     const nextHref = getVehicleListUrl(nextParams);
-    rememberVehicleListHref(nextHref);
+    rememberActiveListHref(nextHref);
     router.replace(nextHref, { scroll: false });
-  }, [buildVehicleListParams, getVehicleListUrl, router]);
+  }, [buildVehicleListParams, getVehicleListUrl, rememberActiveListHref, router]);
 
   const handleRefresh = useCallback(async () => {
     setIsRefreshing(true);
@@ -1725,6 +1732,7 @@ const isTukTukCategory = useCallback((cat: string | undefined): boolean => {
     });
     setQuickFilter(null);
     setCurrentPage(1);
+    rememberActiveListHref("/vehicles");
     router.push("/vehicles", { scroll: false });
   };
 
@@ -1748,9 +1756,9 @@ const isTukTukCategory = useCallback((cat: string | undefined): boolean => {
     nextParams.delete(VEHICLE_LIST_FOCUS_PARAM);
     setCurrentPage(1);
     const nextHref = getVehicleListUrl(nextParams);
-    rememberVehicleListHref(nextHref);
+    rememberActiveListHref(nextHref);
     router.replace(nextHref, { scroll: false });
-  }, [getVehicleListUrl, router, searchParams]);
+  }, [getVehicleListUrl, rememberActiveListHref, router, searchParams]);
 
   const cacheVehicleForDetail = useCallback((id: string) => {
     if (typeof window === "undefined") return;
@@ -1768,24 +1776,31 @@ const isTukTukCategory = useCallback((cat: string | undefined): boolean => {
     }
   }, [filteredVehicles, vehicles]);
 
+  const getReturnHrefForVehicle = useCallback((id: string) => {
+    const currentListHref = activeListHrefRef.current ?? getVehicleListUrl(buildVehicleListParams());
+    return withVehicleListFocusHref(currentListHref, id);
+  }, [buildVehicleListParams, getVehicleListUrl]);
+
   const handleView = useCallback((id: string) => {
     cacheVehicleForDetail(id);
-    const returnParams = buildVehicleListParams({ focusVehicleId: id });
+    const returnHref = getReturnHrefForVehicle(id);
+    const returnParams = new URLSearchParams(returnHref.split("?")[1] ?? "");
     replaceCurrentHistoryWithListState(returnParams);
-    router.push(withVehicleListQuery(`/vehicles/${encodeURIComponent(id)}/view`, returnParams));
-  }, [buildVehicleListParams, cacheVehicleForDetail, replaceCurrentHistoryWithListState, router]);
+    router.push(withVehicleListReturnHref(`/vehicles/${encodeURIComponent(id)}/view`, returnHref));
+  }, [cacheVehicleForDetail, getReturnHrefForVehicle, replaceCurrentHistoryWithListState, router]);
 
   const handleEdit = useCallback((id: string) => {
     cacheVehicleForDetail(id);
-    const returnParams = buildVehicleListParams({ focusVehicleId: id });
+    const returnHref = getReturnHrefForVehicle(id);
+    const returnParams = new URLSearchParams(returnHref.split("?")[1] ?? "");
     replaceCurrentHistoryWithListState(returnParams);
-    router.push(withVehicleListQuery(`/vehicles/${encodeURIComponent(id)}/edit`, returnParams));
-  }, [buildVehicleListParams, cacheVehicleForDetail, replaceCurrentHistoryWithListState, router]);
+    router.push(withVehicleListReturnHref(`/vehicles/${encodeURIComponent(id)}/edit`, returnHref));
+  }, [cacheVehicleForDetail, getReturnHrefForVehicle, replaceCurrentHistoryWithListState, router]);
 
   useEffect(() => {
     const listParams = buildVehicleListParams();
-    rememberVehicleListHref(getVehicleListUrl(listParams));
-  }, [buildVehicleListParams, getVehicleListUrl]);
+    rememberActiveListHref(getVehicleListUrl(listParams));
+  }, [buildVehicleListParams, getVehicleListUrl, rememberActiveListHref]);
 
   const handleDelete = (vehicle: Vehicle) => {
     setVehicleToDelete(vehicle);

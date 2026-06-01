@@ -5,6 +5,7 @@ import { derivePrices } from "@/systems/vms/utils/pricing";
 import type { Vehicle } from "@/shared/types/types";
 import { useRouter } from "next/navigation";
 import React, { useMemo } from "react";
+import { getVehicleEditHref, getVehicleViewHref } from "@/systems/vms/utils/vehicleListState";
 
 type VehicleCardProps = {
   vehicle: Vehicle;
@@ -76,13 +77,13 @@ export default function VehicleCard({
 
   const handleClick = () => {
     if (!vehicleId) return;
-    router.push(`/vehicles/${encodeURIComponent(vehicleId)}/view`);
+    router.push(getVehicleViewHref(vehicleId));
   };
 
   const handleEdit = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (!vehicleId) return;
-    router.push(`/vehicles/${encodeURIComponent(vehicleId)}/edit`);
+    router.push(getVehicleEditHref(vehicleId));
   };
 
   const handleDelete = (e: React.MouseEvent) => {

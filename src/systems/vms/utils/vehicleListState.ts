@@ -5,6 +5,7 @@ export const VEHICLE_LIST_PATH = "/vehicles";
 export const VEHICLE_LIST_PAGE_PARAM = "page";
 export const VEHICLE_LIST_PAGE_SIZE_PARAM = "pageSize";
 export const VEHICLE_LIST_FOCUS_PARAM = "focusVehicle";
+export const VEHICLE_LIST_RETURN_PARAM = "from";
 export const VEHICLE_LIST_RETURN_STORAGE_KEY = "vms-vehicle-list-return-href";
 
 export type VehicleGroupByOption = (typeof VEHICLE_GROUP_BY_OPTIONS)[number];
@@ -27,6 +28,14 @@ const VEHICLE_LIST_QUERY_KEYS: VehicleListQueryKey[] = [
   VEHICLE_LIST_PAGE_PARAM,
   VEHICLE_LIST_PAGE_SIZE_PARAM,
   VEHICLE_LIST_FOCUS_PARAM,
+];
+
+const VEHICLE_LIST_CONTEXT_KEYS: VehicleListQueryKey[] = [
+  "category",
+  "withoutImage",
+  "noImage",
+  "groupBy",
+  VEHICLE_LIST_PAGE_SIZE_PARAM,
 ];
 
 export function parseVehicleGroupByParam(value: string | null | undefined): VehicleGroupByOption {
@@ -102,6 +111,13 @@ export function getStoredVehicleListHref(fallback = VEHICLE_LIST_PATH): string {
   }
 }
 
+export function getCurrentVehicleListHref(fallback = VEHICLE_LIST_PATH): string {
+  if (typeof window === "undefined") return fallback;
+
+  const currentHref = normalizeVehicleListHref(`${window.location.pathname}${window.location.search}`);
+  return currentHref ?? getStoredVehicleListHref(fallback);
+}
+
 export function getVehicleGroupValue(vehicle: Vehicle, groupBy: VehicleGroupByOption): string {
   switch (groupBy) {
     case "category": return normalizeVehicleGroupText(vehicle.Category || "") || "Uncategorized";
@@ -131,6 +147,76 @@ export function getVehicleListSearchParams(searchParams: SearchParamsLike | null
   return next;
 }
 
+function getVehicleListHrefFromParams(params: URLSearchParams): string {
+  const query = params.toString();
+  return query ? `${VEHICLE_LIST_PATH}?${query}` : VEHICLE_LIST_PATH;
+}
+
+function getStoredVehicleListSearchParams(): URLSearchParams {
+  const storedHref = getStoredVehicleListHref("");
+  const storedQuery = storedHref.split("?")[1] ?? "";
+
+  return getVehicleListSearchParams(new URLSearchParams(storedQuery));
+}
+
+function haveSameQueryValues(
+  left: URLSearchParams,
+  right: URLSearchParams,
+  key: VehicleListQueryKey
+): boolean {
+  const leftValues = left.getAll(key);
+  const rightValues = right.getAll(key);
+
+  return (
+    leftValues.length === rightValues.length &&
+    leftValues.every((value, index) => value === rightValues[index])
+  );
+}
+
+function shouldMergeStoredVehicleListParams(
+  current: URLSearchParams,
+  stored: URLSearchParams
+): boolean {
+  if (!current.toString()) return true;
+  if (!stored.toString()) return false;
+  if (current.has(VEHICLE_LIST_PAGE_PARAM)) return false;
+
+  return VEHICLE_LIST_CONTEXT_KEYS.every((key) => {
+    if (!current.has(key)) return true;
+    return haveSameQueryValues(current, stored, key);
+  });
+}
+
+function mergeVehicleListSearchParams(
+  base: URLSearchParams,
+  overrides: URLSearchParams
+): URLSearchParams {
+  const merged = new URLSearchParams(base.toString());
+
+  for (const key of VEHICLE_LIST_QUERY_KEYS) {
+    const values = overrides.getAll(key);
+    if (values.length === 0) continue;
+
+    merged.delete(key);
+    for (const value of values) {
+      merged.append(key, value);
+    }
+  }
+
+  return merged;
+}
+
+function getVehicleListSearchParamsWithFallback(
+  searchParams: SearchParamsLike | null | undefined
+): URLSearchParams {
+  const current = getVehicleListSearchParams(searchParams);
+  const stored = getStoredVehicleListSearchParams();
+
+  return shouldMergeStoredVehicleListParams(current, stored)
+    ? mergeVehicleListSearchParams(stored, current)
+    : current;
+}
+
 export function setVehicleListQueryValue(
   searchParams: SearchParamsLike | null | undefined,
   key: VehicleListQueryKey,
@@ -142,21 +228,80 @@ export function setVehicleListQueryValue(
   return next;
 }
 
-export function withVehicleListQuery(path: string, searchParams: SearchParamsLike | null | undefined): string {
-  const query = getVehicleListSearchParams(searchParams).toString();
-  return query ? `${path}?${query}` : path;
+export function withVehicleListFocusHref(href: string, focusVehicleId: string | null | undefined): string {
+  const safeHref = normalizeVehicleListHref(href) ?? VEHICLE_LIST_PATH;
+  const params = getVehicleListSearchParams(
+    new URLSearchParams(safeHref.split("?")[1] ?? "")
+  );
+
+  if (focusVehicleId) {
+    params.set(VEHICLE_LIST_FOCUS_PARAM, focusVehicleId);
+  } else {
+    params.delete(VEHICLE_LIST_FOCUS_PARAM);
+  }
+
+  return getVehicleListHrefFromParams(params);
+}
+
+export function withVehicleListReturnHref(path: string, returnHref: string): string {
+  const safeReturnHref = normalizeVehicleListHref(returnHref) ?? VEHICLE_LIST_PATH;
+  const params = getVehicleListSearchParams(
+    new URLSearchParams(safeReturnHref.split("?")[1] ?? "")
+  );
+  params.set(VEHICLE_LIST_RETURN_PARAM, safeReturnHref);
+
+  return `${path}?${params.toString()}`;
+}
+
+export function getVehicleViewHref(vehicleId: string, returnHref = getCurrentVehicleListHref()): string {
+  return withVehicleListReturnHref(
+    `/vehicles/${encodeURIComponent(vehicleId)}/view`,
+    returnHref
+  );
+}
+
+export function getVehicleEditHref(vehicleId: string, returnHref = getCurrentVehicleListHref()): string {
+  return withVehicleListReturnHref(
+    `/vehicles/${encodeURIComponent(vehicleId)}/edit`,
+    returnHref
+  );
 }
 
 export function getVehicleListHrefWithFallback(searchParams: SearchParamsLike | null | undefined): string {
-  const queryHref = withVehicleListQuery(VEHICLE_LIST_PATH, searchParams);
-  return queryHref === VEHICLE_LIST_PATH ? getStoredVehicleListHref(queryHref) : queryHref;
+  const returnHref = normalizeVehicleListHref(searchParams?.get(VEHICLE_LIST_RETURN_PARAM));
+  if (returnHref) {
+    const returnParams = getVehicleListSearchParams(
+      new URLSearchParams(returnHref.split("?")[1] ?? "")
+    );
+    const currentParams = getVehicleListSearchParams(searchParams);
+
+    for (const key of VEHICLE_LIST_QUERY_KEYS) {
+      if (!returnParams.has(key) && currentParams.has(key)) {
+        for (const value of currentParams.getAll(key)) {
+          returnParams.append(key, value);
+        }
+      }
+    }
+
+    return getVehicleListHrefFromParams(returnParams);
+  }
+
+  return getVehicleListHrefFromParams(getVehicleListSearchParamsWithFallback(searchParams));
+}
+
+export function getVehicleListPageFromHref(href: string): number {
+  try {
+    const parsed = new URL(href, "http://localhost");
+    return parseVehicleListPageParam(parsed.searchParams.get(VEHICLE_LIST_PAGE_PARAM));
+  } catch {
+    return 1;
+  }
+}
+
+export function getVehicleListBackLabel(href: string): string {
+  return `Back to List ${getVehicleListPageFromHref(href)}`;
 }
 
 export function withVehicleListQueryFallback(path: string, searchParams: SearchParamsLike | null | undefined): string {
-  const query = getVehicleListSearchParams(searchParams).toString();
-  if (query) return `${path}?${query}`;
-
-  const storedHref = getStoredVehicleListHref();
-  const storedQuery = getVehicleListSearchParams(new URLSearchParams(storedHref.split("?")[1] ?? "")).toString();
-  return storedQuery ? `${path}?${storedQuery}` : path;
+  return withVehicleListReturnHref(path, getVehicleListHrefWithFallback(searchParams));
 }
