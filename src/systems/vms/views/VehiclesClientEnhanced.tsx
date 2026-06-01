@@ -18,9 +18,15 @@ import { getFuzzySuggestions } from "@/systems/vms/utils/fuzzySearch";
 import {
   getVehicleGroupKey,
   getVehicleGroupValue,
+  getVehicleListItemElementId,
   normalizeVehicleGroupText,
   parseVehicleGroupByParam,
+  parseVehicleListPageParam,
+  parseVehicleListPageSizeParam,
   setVehicleListQueryValue,
+  VEHICLE_LIST_FOCUS_PARAM,
+  VEHICLE_LIST_PAGE_PARAM,
+  VEHICLE_LIST_PAGE_SIZE_PARAM,
   withVehicleListQuery,
   type VehicleGroupByOption
 } from "@/systems/vms/utils/vehicleListState";
@@ -754,7 +760,12 @@ function VehicleCard({
   const colorLabel = translateVehicleColor(vehicle.Color, language);
 
 return (
-    <div className="group overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-[0_4px_20px_rgba(0,0,0,0.08)] transition-all duration-150 hover:border-emerald-200 hover:shadow-[0_8px_30px_rgba(0,0,0,0.12)] dark:border-slate-700/80 dark:bg-slate-900 dark:shadow-[0_16px_32px_rgba(2,6,23,0.45)] dark:hover:border-emerald-500/35 dark:hover:shadow-[0_20px_42px_rgba(2,6,23,0.62)]">
+    <div
+      id={getVehicleListItemElementId(vehicle.VehicleId)}
+      data-vehicle-list-item-id={vehicle.VehicleId}
+      tabIndex={-1}
+      className="group scroll-mt-24 overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-[0_4px_20px_rgba(0,0,0,0.08)] transition-all duration-150 hover:border-emerald-200 hover:shadow-[0_8px_30px_rgba(0,0,0,0.12)] focus:outline-none focus:ring-2 focus:ring-emerald-400/40 dark:border-slate-700/80 dark:bg-slate-900 dark:shadow-[0_16px_32px_rgba(2,6,23,0.45)] dark:hover:border-emerald-500/35 dark:hover:shadow-[0_20px_42px_rgba(2,6,23,0.62)]"
+    >
       {/* Image */}
       <div className="relative aspect-[4/3] overflow-hidden bg-slate-100 dark:bg-slate-800">
         {imageUrl ? (
@@ -896,8 +907,10 @@ function MobileVehicleListCard({
 
   return (
     <article
+      data-vehicle-list-item-id={vehicle.VehicleId}
+      tabIndex={-1}
       onClick={() => onView(vehicle.VehicleId)}
-      className="rounded-2xl border border-slate-100 bg-white p-4 shadow-[0_4px_16px_rgba(15,23,42,0.07)] transition-transform active:scale-[0.99] dark:border-slate-700/80 dark:bg-slate-900 dark:shadow-[0_14px_30px_rgba(2,6,23,0.45)]"
+      className="scroll-mt-24 rounded-2xl border border-slate-100 bg-white p-4 shadow-[0_4px_16px_rgba(15,23,42,0.07)] transition-transform focus:outline-none focus:ring-2 focus:ring-emerald-400/40 active:scale-[0.99] dark:border-slate-700/80 dark:bg-slate-900 dark:shadow-[0_14px_30px_rgba(2,6,23,0.45)]"
     >
       <div className="flex items-start gap-3">
         <div className="relative h-16 w-16 flex-shrink-0 overflow-hidden rounded-xl bg-slate-100 shadow-sm dark:bg-slate-800">
@@ -1007,6 +1020,9 @@ export default function VehiclesClientEnhanced() {
   const isAdmin = user?.role === "Admin";
   const [isMobileSafeMode, setIsMobileSafeMode] = useState(detectMobileSafariLike);
   const userSelectedViewModeRef = useRef(false);
+  const skipNextFilterPageResetRef = useRef(
+    Boolean(searchParams.get(VEHICLE_LIST_PAGE_PARAM) || searchParams.get(VEHICLE_LIST_FOCUS_PARAM))
+  );
 
   // ==========================================================================
   // State Management
@@ -1014,7 +1030,9 @@ export default function VehiclesClientEnhanced() {
 
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
   const [totalsMode, setTotalsMode] = useState<TotalsMode>("all");
-  const [currentPage, setCurrentPage] = useState(1);
+  const [currentPage, setCurrentPage] = useState(() =>
+    parseVehicleListPageParam(searchParams.get(VEHICLE_LIST_PAGE_PARAM))
+  );
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [lastSync, setLastSync] = useState<Date>(new Date());
   const [showColumnMenu, setShowColumnMenu] = useState(false);
@@ -1046,6 +1064,17 @@ export default function VehiclesClientEnhanced() {
     }
     return null;
   });
+  const filterResetValuesRef = useRef({
+    hasImage: filters.hasImage,
+    quickFilter,
+  });
+
+  useEffect(() => {
+    filterResetValuesRef.current = {
+      hasImage: filters.hasImage,
+      quickFilter,
+    };
+  }, [filters.hasImage, quickFilter]);
 
   // Visible columns - load from localStorage or use defaults
   const [visibleColumns, setVisibleColumns] = useState<ColumnKey[]>(() => {
@@ -1081,6 +1110,12 @@ export default function VehiclesClientEnhanced() {
 
   // Items Per Page
   const [itemsPerPage, setItemsPerPage] = useState<number>(() => {
+    const pageSizeParam = parseVehicleListPageSizeParam(
+      searchParams.get(VEHICLE_LIST_PAGE_SIZE_PARAM),
+      ITEMS_PER_PAGE_OPTIONS
+    );
+    if (pageSizeParam) return pageSizeParam;
+
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('vehiclesItemsPerPage');
       if (saved) {
@@ -1184,6 +1219,30 @@ export default function VehiclesClientEnhanced() {
       const noImageParam = searchParams.get("withoutImage") ?? searchParams.get("noImage");
       const nextHasImage = isTruthyQueryParam(noImageParam) ? "no" : "";
       const nextGroupBy = parseVehicleGroupByParam(searchParams.get("groupBy"));
+      const nextPage = parseVehicleListPageParam(searchParams.get(VEHICLE_LIST_PAGE_PARAM));
+      const nextPageSize = parseVehicleListPageSizeParam(
+        searchParams.get(VEHICLE_LIST_PAGE_SIZE_PARAM),
+        ITEMS_PER_PAGE_OPTIONS
+      );
+      const hasPositionQuery = Boolean(
+        searchParams.get(VEHICLE_LIST_PAGE_PARAM) || searchParams.get(VEHICLE_LIST_FOCUS_PARAM)
+      );
+      const nextQuickFilter = (() => {
+        if (!categoryParam) return null;
+
+        const normalized = categoryParam.toLowerCase();
+        if (normalized.includes("car")) return "cars";
+        if (normalized.includes("motor")) return "motorcycles";
+        if (normalized.includes("tuk")) return "tuktuks";
+        return null;
+      })();
+      const willUpdateFilterState =
+        filterResetValuesRef.current.hasImage !== nextHasImage ||
+        filterResetValuesRef.current.quickFilter !== nextQuickFilter;
+
+      if (hasPositionQuery && willUpdateFilterState) {
+        skipNextFilterPageResetRef.current = true;
+      }
 
       setFilters(prev =>
         prev.hasImage === nextHasImage
@@ -1191,16 +1250,13 @@ export default function VehiclesClientEnhanced() {
           : { ...prev, hasImage: nextHasImage }
       );
 
-      if (categoryParam) {
-        const normalized = categoryParam.toLowerCase();
-        if (normalized.includes("car")) setQuickFilter("cars");
-        else if (normalized.includes("motor")) setQuickFilter("motorcycles");
-        else if (normalized.includes("tuk")) setQuickFilter("tuktuks");
-      } else {
-        setQuickFilter(null);
-      }
+      setQuickFilter(prev => (prev === nextQuickFilter ? prev : nextQuickFilter));
 
       setGroupBy(prev => (prev === nextGroupBy ? prev : nextGroupBy));
+      setCurrentPage(prev => (prev === nextPage ? prev : nextPage));
+      if (nextPageSize) {
+        setItemsPerPage(prev => (prev === nextPageSize ? prev : nextPageSize));
+      }
     }, 0);
 
     return () => clearTimeout(timeoutId);
@@ -1219,6 +1275,11 @@ export default function VehiclesClientEnhanced() {
 
   // Reset page when filters change
   useEffect(() => {
+    if (skipNextFilterPageResetRef.current) {
+      skipNextFilterPageResetRef.current = false;
+      return;
+    }
+
     const timeoutId = setTimeout(() => setCurrentPage(1), 0);
     return () => clearTimeout(timeoutId);
   }, [filters, quickFilter]);
@@ -1508,6 +1569,7 @@ const isTukTukCategory = useCallback((cat: string | undefined): boolean => {
   }, [filteredVehicles, currentPage, itemsPerPage]);
 
   const totalPages = Math.ceil(filteredVehicles.length / itemsPerPage);
+  const focusedVehicleId = searchParams.get(VEHICLE_LIST_FOCUS_PARAM) ?? "";
 
   const visibleVehicleGroups = useMemo(
     () => groupVehicles(groupBy === "none" && !deferredFilters.search ? paginatedVehicles : filteredVehicles, groupBy),
@@ -1519,9 +1581,98 @@ const isTukTukCategory = useCallback((cat: string | undefined): boolean => {
     [groupBy, searchParams]
   );
 
+  useEffect(() => {
+    if (totalPages <= 0 || currentPage <= totalPages) return;
+    setCurrentPage(totalPages);
+  }, [currentPage, totalPages]);
+
+  useEffect(() => {
+    if (!focusedVehicleId || isInitialVehiclesLoad) return;
+
+    const timeoutId = window.setTimeout(() => {
+      const directTarget = document.getElementById(getVehicleListItemElementId(focusedVehicleId));
+      const dataTargets = Array.from(
+        document.querySelectorAll<HTMLElement>("[data-vehicle-list-item-id]")
+      ).filter((element) => element.dataset.vehicleListItemId === focusedVehicleId);
+      const target =
+        (directTarget?.offsetParent ? directTarget : null) ??
+        dataTargets.find((element) => element.offsetParent !== null) ??
+        directTarget ??
+        dataTargets[0];
+
+      target?.scrollIntoView({ block: "center", behavior: "smooth" });
+      target?.focus({ preventScroll: true });
+    }, 80);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [focusedVehicleId, isInitialVehiclesLoad, paginatedVehicles]);
+
   // ==========================================================================
   // Event Handlers
   // ==========================================================================
+
+  const getVehicleListUrl = useCallback((params: URLSearchParams) => {
+    const query = params.toString();
+    return query ? `/vehicles?${query}` : "/vehicles";
+  }, []);
+
+  const buildVehicleListParams = useCallback((
+    options: {
+      page?: number;
+      pageSize?: number;
+      focusVehicleId?: string | null;
+    } = {}
+  ) => {
+    const nextParams = new URLSearchParams(currentVehicleListSearchParams.toString());
+    const nextPage = Math.max(1, options.page ?? currentPage);
+    const nextPageSize = options.pageSize ?? itemsPerPage;
+
+    if (nextPage > 1) {
+      nextParams.set(VEHICLE_LIST_PAGE_PARAM, String(nextPage));
+    } else {
+      nextParams.delete(VEHICLE_LIST_PAGE_PARAM);
+    }
+
+    if (nextPageSize !== DEFAULT_ITEMS_PER_PAGE) {
+      nextParams.set(VEHICLE_LIST_PAGE_SIZE_PARAM, String(nextPageSize));
+    } else {
+      nextParams.delete(VEHICLE_LIST_PAGE_SIZE_PARAM);
+    }
+
+    if (options.focusVehicleId) {
+      nextParams.set(VEHICLE_LIST_FOCUS_PARAM, options.focusVehicleId);
+    } else if (options.focusVehicleId === null) {
+      nextParams.delete(VEHICLE_LIST_FOCUS_PARAM);
+    }
+
+    return nextParams;
+  }, [currentPage, currentVehicleListSearchParams, itemsPerPage]);
+
+  const replaceCurrentHistoryWithListState = useCallback((params: URLSearchParams) => {
+    if (typeof window === "undefined") return;
+    window.history.replaceState(window.history.state, "", getVehicleListUrl(params));
+  }, [getVehicleListUrl]);
+
+  const handlePageChange = useCallback((nextPage: number) => {
+    const safeTotalPages = Math.max(1, totalPages);
+    const safePage = Math.min(Math.max(1, nextPage), safeTotalPages);
+    const nextParams = buildVehicleListParams({ page: safePage, focusVehicleId: null });
+
+    setCurrentPage(safePage);
+    router.replace(getVehicleListUrl(nextParams), { scroll: false });
+  }, [buildVehicleListParams, getVehicleListUrl, router, totalPages]);
+
+  const handleItemsPerPageChange = useCallback((nextItemsPerPage: number) => {
+    const nextParams = buildVehicleListParams({
+      page: 1,
+      pageSize: nextItemsPerPage,
+      focusVehicleId: null,
+    });
+
+    setItemsPerPage(nextItemsPerPage);
+    setCurrentPage(1);
+    router.replace(getVehicleListUrl(nextParams), { scroll: false });
+  }, [buildVehicleListParams, getVehicleListUrl, router]);
 
   const handleRefresh = useCallback(async () => {
     setIsRefreshing(true);
@@ -1586,9 +1737,11 @@ const isTukTukCategory = useCallback((cat: string | undefined): boolean => {
       "groupBy",
       nextGroupBy === "none" ? null : nextGroupBy
     );
-    const query = nextParams.toString();
-    router.replace(query ? `/vehicles?${query}` : "/vehicles", { scroll: false });
-  }, [router, searchParams]);
+    nextParams.delete(VEHICLE_LIST_PAGE_PARAM);
+    nextParams.delete(VEHICLE_LIST_FOCUS_PARAM);
+    setCurrentPage(1);
+    router.replace(getVehicleListUrl(nextParams), { scroll: false });
+  }, [getVehicleListUrl, router, searchParams]);
 
   const cacheVehicleForDetail = useCallback((id: string) => {
     if (typeof window === "undefined") return;
@@ -1608,13 +1761,17 @@ const isTukTukCategory = useCallback((cat: string | undefined): boolean => {
 
   const handleView = useCallback((id: string) => {
     cacheVehicleForDetail(id);
-    router.push(withVehicleListQuery(`/vehicles/${encodeURIComponent(id)}/view`, currentVehicleListSearchParams));
-  }, [cacheVehicleForDetail, currentVehicleListSearchParams, router]);
+    const returnParams = buildVehicleListParams({ focusVehicleId: id });
+    replaceCurrentHistoryWithListState(returnParams);
+    router.push(withVehicleListQuery(`/vehicles/${encodeURIComponent(id)}/view`, returnParams));
+  }, [buildVehicleListParams, cacheVehicleForDetail, replaceCurrentHistoryWithListState, router]);
 
   const handleEdit = useCallback((id: string) => {
     cacheVehicleForDetail(id);
-    router.push(withVehicleListQuery(`/vehicles/${encodeURIComponent(id)}/edit`, currentVehicleListSearchParams));
-  }, [cacheVehicleForDetail, currentVehicleListSearchParams, router]);
+    const returnParams = buildVehicleListParams({ focusVehicleId: id });
+    replaceCurrentHistoryWithListState(returnParams);
+    router.push(withVehicleListQuery(`/vehicles/${encodeURIComponent(id)}/edit`, returnParams));
+  }, [buildVehicleListParams, cacheVehicleForDetail, replaceCurrentHistoryWithListState, router]);
 
   const handleDelete = (vehicle: Vehicle) => {
     setVehicleToDelete(vehicle);
@@ -2413,8 +2570,10 @@ const getVehicleImageUrl = useCallback((imageValue: unknown): string | null => {
                         {group.vehicles.map((vehicle, index) => (
                           <tr
                             key={vehicle.VehicleId}
+                            data-vehicle-list-item-id={vehicle.VehicleId}
+                            tabIndex={-1}
                             onClick={() => handleView(vehicle.VehicleId)}
-                            className="group cursor-pointer transition-all duration-200 hover:bg-slate-50/80 dark:hover:bg-slate-800/70"
+                            className="group scroll-mt-24 cursor-pointer transition-all duration-200 hover:bg-slate-50/80 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-emerald-400/40 dark:hover:bg-slate-800/70"
                             style={{ animationDelay: `${index * 50}ms` }}
                           >
                             {visibleColumns.includes("id") && (
@@ -2635,8 +2794,7 @@ const getVehicleImageUrl = useCallback((imageValue: unknown): string | null => {
                     value={itemsPerPage}
                     onChange={(e) => {
                       const newValue = parseInt(e.target.value, 10);
-                      setItemsPerPage(newValue);
-                      setCurrentPage(1); // Reset to first page when changing items per page
+                      handleItemsPerPageChange(newValue);
                     }}
                     className="h-11 cursor-pointer appearance-none rounded-lg border border-slate-200/70 bg-white px-3 pr-8 text-sm font-medium text-slate-700 shadow-[2px_2px_4px_#e2e8f0,-2px_-2px_4px_#ffffff] focus:outline-none focus:ring-2 focus:ring-emerald-500/30 dark:border-slate-700/70 dark:bg-slate-800 dark:text-slate-100 dark:shadow-[0_8px_18px_rgba(2,6,23,0.45)]"
                   >
@@ -2656,7 +2814,7 @@ const getVehicleImageUrl = useCallback((imageValue: unknown): string | null => {
                 <NeuButton
                   variant="default"
                   size="sm"
-                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  onClick={() => handlePageChange(currentPage - 1)}
                   disabled={currentPage <= 1}
                   className="min-h-11 flex-1 sm:flex-none"
                 >
@@ -2681,7 +2839,7 @@ const getVehicleImageUrl = useCallback((imageValue: unknown): string | null => {
                       <button
                         type="button"
                         key={pageNum}
-                        onClick={() => setCurrentPage(pageNum)}
+                        onClick={() => handlePageChange(pageNum)}
                         aria-label={`Go to page ${pageNum}`}
                         aria-current={currentPage === pageNum ? "page" : undefined}
                         className={cn(
@@ -2700,7 +2858,7 @@ const getVehicleImageUrl = useCallback((imageValue: unknown): string | null => {
                 <NeuButton
                   variant="default"
                   size="sm"
-                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                  onClick={() => handlePageChange(currentPage + 1)}
                   disabled={currentPage >= totalPages}
                   className="min-h-11 flex-1 sm:flex-none"
                 >
@@ -2718,7 +2876,7 @@ const getVehicleImageUrl = useCallback((imageValue: unknown): string | null => {
             onClose={() => setShowAddModal(false)}
             onSuccess={() => {
               refresh();
-              setCurrentPage(1);
+              handlePageChange(1);
               setLastSync(new Date());
             }}
           />

@@ -1,13 +1,31 @@
 import type { Vehicle } from "@/shared/types/types";
 
 export const VEHICLE_GROUP_BY_OPTIONS = ["none", "category", "brand", "year", "condition", "color"] as const;
+export const VEHICLE_LIST_PAGE_PARAM = "page";
+export const VEHICLE_LIST_PAGE_SIZE_PARAM = "pageSize";
+export const VEHICLE_LIST_FOCUS_PARAM = "focusVehicle";
 
 export type VehicleGroupByOption = (typeof VEHICLE_GROUP_BY_OPTIONS)[number];
 
 type SearchParamsLike = Pick<URLSearchParams, "get" | "getAll" | "toString">;
-type VehicleListQueryKey = "category" | "withoutImage" | "noImage" | "groupBy";
+type VehicleListQueryKey =
+  | "category"
+  | "withoutImage"
+  | "noImage"
+  | "groupBy"
+  | typeof VEHICLE_LIST_PAGE_PARAM
+  | typeof VEHICLE_LIST_PAGE_SIZE_PARAM
+  | typeof VEHICLE_LIST_FOCUS_PARAM;
 
-const VEHICLE_LIST_QUERY_KEYS: VehicleListQueryKey[] = ["category", "withoutImage", "noImage", "groupBy"];
+const VEHICLE_LIST_QUERY_KEYS: VehicleListQueryKey[] = [
+  "category",
+  "withoutImage",
+  "noImage",
+  "groupBy",
+  VEHICLE_LIST_PAGE_PARAM,
+  VEHICLE_LIST_PAGE_SIZE_PARAM,
+  VEHICLE_LIST_FOCUS_PARAM,
+];
 
 export function parseVehicleGroupByParam(value: string | null | undefined): VehicleGroupByOption {
   return VEHICLE_GROUP_BY_OPTIONS.includes(value as VehicleGroupByOption)
@@ -15,8 +33,25 @@ export function parseVehicleGroupByParam(value: string | null | undefined): Vehi
     : "none";
 }
 
+export function parseVehicleListPageParam(value: string | null | undefined): number {
+  const parsed = Number.parseInt(value ?? "", 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 1;
+}
+
+export function parseVehicleListPageSizeParam(
+  value: string | null | undefined,
+  allowedSizes: readonly number[]
+): number | null {
+  const parsed = Number.parseInt(value ?? "", 10);
+  return Number.isFinite(parsed) && allowedSizes.includes(parsed) ? parsed : null;
+}
+
 export function normalizeVehicleGroupText(value: string): string {
   return value.trim().replace(/\s+/g, " ");
+}
+
+export function getVehicleListItemElementId(vehicleId: string): string {
+  return `vehicle-list-item-${vehicleId.replace(/[^a-zA-Z0-9_-]/g, "-")}`;
 }
 
 export function getVehicleGroupValue(vehicle: Vehicle, groupBy: VehicleGroupByOption): string {
