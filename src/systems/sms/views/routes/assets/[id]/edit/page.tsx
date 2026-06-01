@@ -2,9 +2,14 @@
 
 import { ArrowLeft, Loader2 } from "lucide-react";
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
 import AssetFormModal from "@/systems/sms/components/assets/AssetFormModal";
+import {
+  buildAssetDetailPath,
+  getSafeAssetListReturnPath,
+  SMS_ASSET_RETURN_PARAM,
+} from "@/systems/sms/utils/assetNavigation";
 
 interface SmsAsset {
   id: string;
@@ -24,8 +29,17 @@ interface SmsAsset {
 
 export default function EditAssetPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const params = useParams<{ id: string }>();
   const id = typeof params?.id === "string" ? params.id : "";
+  const assetsBackHref = useMemo(
+    () => getSafeAssetListReturnPath(searchParams.get(SMS_ASSET_RETURN_PARAM)),
+    [searchParams]
+  );
+  const detailHref = useMemo(
+    () => buildAssetDetailPath(id, assetsBackHref),
+    [assetsBackHref, id]
+  );
 
   const [asset, setAsset] = useState<SmsAsset | null>(null);
   const [loading, setLoading] = useState(true);
@@ -71,7 +85,7 @@ export default function EditAssetPage() {
       const result = await response.json();
 
       if (result.success) {
-        router.push(`/sms/assets/${id}`);
+        router.push(detailHref);
         router.refresh();
         return { success: true };
       }
@@ -82,7 +96,7 @@ export default function EditAssetPage() {
   };
 
   const handleClose = () => {
-    router.push(`/sms/assets/${id}`);
+    router.push(detailHref);
   };
 
   if (loading) {
@@ -102,7 +116,7 @@ export default function EditAssetPage() {
         <div className="text-center max-w-md">
           <p className="mb-6 text-red-600 text-lg">{error || "Asset not found"}</p>
           <Link
-            href="/sms/assets"
+            href={assetsBackHref}
             className="inline-flex items-center gap-2 bg-emerald-600 text-white px-6 py-3 rounded-2xl font-bold hover:bg-emerald-700 transition-all"
           >
             <ArrowLeft className="h-4 w-4" />
@@ -115,7 +129,7 @@ export default function EditAssetPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-emerald-50">
-<AssetFormModal
+      <AssetFormModal
         isOpen={true}
         onClose={handleClose}
         onSave={handleSave}

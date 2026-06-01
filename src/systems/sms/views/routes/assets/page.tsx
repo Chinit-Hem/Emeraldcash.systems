@@ -4,6 +4,7 @@ import { useAuthUser } from '@/shared/hooks/AuthContext';
 import { AlertCircle, Edit3, Eye, Filter, ImageIcon, Loader2, Package, Plus, Search, Trash2 } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import AssetFormModal from '@/systems/sms/components/assets/AssetFormModal';
 import ImageModal from '@/systems/sms/components/assets/ImageModal';
@@ -16,6 +17,15 @@ import {
   smsSecondaryButtonClass,
   smsSelectClass,
 } from '@/systems/sms/components/SmsShared';
+import {
+  areAssetListFiltersEqual,
+  buildAssetDetailPath,
+  buildAssetListPath,
+  getAssetListItemElementId,
+  parseAssetListFilters,
+  SMS_ASSET_FOCUS_PARAM,
+  type AssetListFilters,
+} from '@/systems/sms/utils/assetNavigation';
 
 interface SmsAsset {
   id: string;
@@ -51,35 +61,26 @@ interface ApiResponse<T> {
   error?: string;
 }
 
-type AssetFilters = {
-  search: string;
-  status: string;
-  assignedTo: string;
-  page: number;
-  pageSize: number;
-};
-
-type AssetFilterKey = keyof AssetFilters;
+type AssetFilterKey = keyof AssetListFilters;
 
 export default function AssetsPage() {
   const user = useAuthUser();
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const isAdmin = user?.role === 'Admin';
   const [assets, setAssets] = useState<SmsAsset[]>([]);
   const [stats, setStats] = useState<SmsStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [filters, setFilters] = useState<AssetFilters>({
-    search: '',
-    status: '',
-    assignedTo: '',
-    page: 1,
-    pageSize: 20
-  });
+  const [filters, setFilters] = useState<AssetListFilters>(() =>
+    parseAssetListFilters(searchParams)
+  );
   const [totalPages, setTotalPages] = useState(1);
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [editingAsset, setEditingAsset] = useState<SmsAsset | null>(null);
   const [imageErrors, setImageErrors] = useState<Set<string>>(new Set());
   const [viewImage, setViewImage] = useState<{ src: string; alt: string } | null>(null);
+  const focusedAssetId = searchParams.get(SMS_ASSET_FOCUS_PARAM) ?? '';
 
   // Track images that failed to load - reset when assets change
   useEffect(() => {
@@ -91,7 +92,7 @@ export default function AssetsPage() {
     setImageErrors(prev => new Set(prev).add(assetId));
   }, []);
 
-  const fetchAssets = useCallback(async (pageFilters: AssetFilters, signal?: AbortSignal) => {
+  const fetchAssets = useCallback(async (pageFilters: AssetListFilters, signal?: AbortSignal) => {
     try {
       setLoading(true);
       setError(null);
@@ -128,7 +129,7 @@ export default function AssetsPage() {
   const fetchStats = useCallback(async () => {
     try {
       const response = await fetch('/api/sms/stats');
-const data: ApiResponse<SmsStats> = await response.json();
+      const data: ApiResponse<SmsStats> = await response.json();
       if (data.success) {
         setStats(data.data ?? null);
       }
@@ -141,15 +142,54 @@ const data: ApiResponse<SmsStats> = await response.json();
     void fetchStats();
   }, [fetchStats]);
 
-  const handleFilterChange = <K extends AssetFilterKey>(key: K, value: AssetFilters[K]) => {
-    setFilters(prev => ({
-      ...prev,
-      [key]: value,
-      page: key === 'page' ? Number(value) : 1
-    }));
-  };
+  useEffect(() => {
+    const nextFilters = parseAssetListFilters(searchParams);
 
-  const filtersKey = useMemo(() => JSON.stringify(filters), [filters]);
+    setFilters((currentFilters) =>
+      areAssetListFiltersEqual(currentFilters, nextFilters) ? currentFilters : nextFilters
+    );
+  }, [searchParams]);
+
+  const handleFilterChange = useCallback(
+    (key: AssetFilterKey, value: string | number) => {
+      const nextFilters: AssetListFilters = {
+        ...filters,
+        [key]: key === 'page' || key === 'pageSize' ? Number(value) : String(value),
+        page: key === 'page' ? Number(value) : 1,
+      };
+
+      setFilters(nextFilters);
+      router.replace(buildAssetListPath(nextFilters), { scroll: false });
+    },
+    [filters, router]
+  );
+
+  const getAssetDetailHref = useCallback(
+    (assetId: string) => buildAssetDetailPath(assetId, buildAssetListPath(filters, assetId)),
+    [filters]
+  );
+
+  const rememberAssetReturnTarget = useCallback(
+    (assetId: string, event: React.MouseEvent<HTMLAnchorElement>) => {
+      if (
+        event.defaultPrevented ||
+        event.button !== 0 ||
+        event.metaKey ||
+        event.ctrlKey ||
+        event.shiftKey ||
+        event.altKey
+      ) {
+        return;
+      }
+
+      window.history.replaceState(
+        window.history.state,
+        '',
+        buildAssetListPath(filters, assetId)
+      );
+    },
+    [filters]
+  );
 
   useEffect(() => {
     const controller = new AbortController();
@@ -160,9 +200,28 @@ const data: ApiResponse<SmsStats> = await response.json();
       clearTimeout(timeout);
       controller.abort();
     };
-  }, [filters, filtersKey, fetchAssets]);
+  }, [filters, fetchAssets]);
 
-const handleSaveAsset = async (data: Omit<SmsAsset, 'id'>): Promise<{ success: boolean; error?: string; errors?: Record<string, string> }> => {
+  useEffect(() => {
+    if (loading || !focusedAssetId || assets.length === 0) {
+      return;
+    }
+
+    const target = document.getElementById(getAssetListItemElementId(focusedAssetId));
+
+    if (!target) {
+      return;
+    }
+
+    const scrollTimeout = window.setTimeout(() => {
+      target.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      target.focus({ preventScroll: true });
+    }, 80);
+
+    return () => window.clearTimeout(scrollTimeout);
+  }, [assets, focusedAssetId, loading]);
+
+  const handleSaveAsset = async (data: Omit<SmsAsset, 'id'>): Promise<{ success: boolean; error?: string; errors?: Record<string, string> }> => {
     try {
       const method = editingAsset ? 'PUT' : 'POST';
       const url = editingAsset ? `/api/sms/assets/${editingAsset.id}` : '/api/sms/assets';
@@ -359,11 +418,18 @@ const handleSaveAsset = async (data: Omit<SmsAsset, 'id'>): Promise<{ success: b
           ) : (
             <>
               <div className="grid min-w-0 gap-3 p-2.5 md:hidden">
-                {assets.map((asset) => (
-                  <article
-                    key={asset.id}
-                    className="min-w-0 overflow-hidden rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700/80 dark:bg-slate-900/80"
-                  >
+                {assets.map((asset) => {
+                  const isFocused = asset.id === focusedAssetId;
+
+                  return (
+                    <article
+                      key={asset.id}
+                      id={getAssetListItemElementId(asset.id)}
+                      tabIndex={isFocused ? -1 : undefined}
+                      className={`scroll-mt-24 min-w-0 overflow-hidden rounded-xl border border-slate-200 bg-white p-4 shadow-sm outline-none transition-shadow dark:border-slate-700/80 dark:bg-slate-900/80 ${
+                        isFocused ? 'ring-2 ring-emerald-500 ring-offset-2' : ''
+                      }`}
+                    >
                     <div className="flex min-w-0 items-start gap-3">
                       {asset.imageUrl && !imageErrors.has(asset.id) ? (
                         <button
@@ -422,7 +488,8 @@ const handleSaveAsset = async (data: Omit<SmsAsset, 'id'>): Promise<{ success: b
 
                     <div className={`mt-4 grid min-w-0 gap-2 ${isAdmin ? 'grid-cols-[minmax(0,1fr)_minmax(0,1fr)_2.75rem]' : 'grid-cols-2'}`}>
                       <Link
-                        href={`/sms/assets/${asset.id}`}
+                        href={getAssetDetailHref(asset.id)}
+                        onClick={(event) => rememberAssetReturnTarget(asset.id, event)}
                         className="inline-flex min-h-11 min-w-0 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
                       >
                         <Eye className="h-4 w-4" />
@@ -448,8 +515,9 @@ const handleSaveAsset = async (data: Omit<SmsAsset, 'id'>): Promise<{ success: b
                         </button>
                       )}
                     </div>
-                  </article>
-                ))}
+                    </article>
+                  );
+                })}
               </div>
 
               <div className="hidden overflow-x-auto md:block">
@@ -465,8 +533,18 @@ const handleSaveAsset = async (data: Omit<SmsAsset, 'id'>): Promise<{ success: b
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-200">
-                    {Array.isArray(assets) && assets.map((asset) => (
-                      <tr key={asset.id} className="hover:bg-slate-50/50 transition-colors">
+                    {Array.isArray(assets) && assets.map((asset) => {
+                      const isFocused = asset.id === focusedAssetId;
+
+                      return (
+                        <tr
+                          key={asset.id}
+                          id={getAssetListItemElementId(asset.id)}
+                          tabIndex={isFocused ? -1 : undefined}
+                          className={`scroll-mt-24 outline-none transition-colors ${
+                            isFocused ? 'bg-emerald-50 ring-2 ring-inset ring-emerald-500' : 'hover:bg-slate-50/50'
+                          }`}
+                        >
                         <td className="px-6 py-6 whitespace-nowrap">
                           <div className="flex items-center gap-4">
                             {asset.imageUrl && !imageErrors.has(asset.id) ? (
@@ -518,8 +596,9 @@ const handleSaveAsset = async (data: Omit<SmsAsset, 'id'>): Promise<{ success: b
                         <td className="px-6 py-6 whitespace-nowrap text-right text-sm font-medium">
                           <div className="flex items-center gap-2 justify-end">
                             <Link
-                              href={`/sms/assets/${asset.id}`}
-                                className="p-2 text-slate-500 hover:text-slate-900 hover:bg-slate-200 rounded-md transition-colors"
+                              href={getAssetDetailHref(asset.id)}
+                              onClick={(event) => rememberAssetReturnTarget(asset.id, event)}
+                              className="p-2 text-slate-500 hover:text-slate-900 hover:bg-slate-200 rounded-md transition-colors"
                               title="View details"
                             >
                               <Eye className="w-4 h-4" />
@@ -547,8 +626,9 @@ const handleSaveAsset = async (data: Omit<SmsAsset, 'id'>): Promise<{ success: b
                             )}
                           </div>
                         </td>
-                      </tr>
-                    ))}
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>

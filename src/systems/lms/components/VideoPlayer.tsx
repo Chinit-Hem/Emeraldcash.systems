@@ -145,6 +145,9 @@ const PROGRESS_POLL_INTERVAL_MS = 1_000;
 const SMOOTH_PROGRESS_FRAME_MS = 90;
 const VIDEO_CONTROLS_HIDE_DELAY_MS = 2_200;
 const TOUCH_CLICK_SUPPRESS_MS = 600;
+const DOUBLE_TAP_WINDOW_MS = 320;
+const SEEK_JUMP_SECONDS = 15;
+const SEEK_FEEDBACK_HIDE_DELAY_MS = 700;
 const SEEK_SETTLE_LOCK_MS = 8_000;
 const SEEK_SETTLE_TOLERANCE_SECONDS = 0.75;
 const MAX_PLAYBACK_RATE = 1.25;
@@ -153,6 +156,18 @@ const COMPLETE_END_TOLERANCE_SECONDS = 5;
 const PLAYBACK_RATES = [0.5, 1, 1.25, 1.5, 2];
 
 let youtubeApiPromise: Promise<YouTubeNamespace> | null = null;
+
+type SeekJumpDirection = "backward" | "forward";
+
+type SurfaceTapState = {
+  direction: SeekJumpDirection;
+  time: number;
+};
+
+type SeekFeedbackState = {
+  direction: SeekJumpDirection;
+  key: number;
+};
 
 function loadYouTubeIframeApi() {
   if (window.YT?.Player) {
@@ -231,6 +246,13 @@ function formatTime(seconds: number) {
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
+}
+
+function getSeekGestureDirection(clientX: number, element: HTMLElement): SeekJumpDirection {
+  const rect = element.getBoundingClientRect();
+  const midpoint = rect.left + rect.width / 2;
+
+  return clientX < midpoint ? "backward" : "forward";
 }
 
 function getActiveFullscreenElement() {
@@ -692,6 +714,7 @@ export function VideoPlayer({
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [hasRequestedLandscapeFullscreen, setHasRequestedLandscapeFullscreen] = useState(false);
   const [isLandscapeFullscreen, setIsLandscapeFullscreen] = useState(false);
+  const [isVideoDocked, setIsVideoDocked] = useState(false);
   const [hasError, setHasError] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isReady, setIsReady] = useState(false);
@@ -705,6 +728,7 @@ export function VideoPlayer({
   const [isGeneratingTranscript, setIsGeneratingTranscript] = useState(false);
   const [transcriptError, setTranscriptError] = useState<string | null>(null);
   const [showPlaybackSettings, setShowPlaybackSettings] = useState(false);
+  const [seekFeedback, setSeekFeedback] = useState<SeekFeedbackState | null>(null);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const playerMountRef = useRef<HTMLDivElement>(null);
@@ -726,6 +750,9 @@ export function VideoPlayer({
   const pendingSeekUntilRef = useRef(0);
   const seekPreviewPercentRef = useRef<number | null>(null);
   const lastTouchInteractionRef = useRef(0);
+  const pendingSurfaceTapRef = useRef<SurfaceTapState | null>(null);
+  const surfaceTapTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const seekFeedbackTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const onProgressChangeRef = useRef(onProgressChange);
 
   const effectiveInstructions = generatedTranscript ?? stepByStepInstructions;
@@ -791,6 +818,33 @@ export function VideoPlayer({
       smoothProgressFrameRef.current = null;
     }
   }, []);
+
+  const clearSurfaceTapTimeout = useCallback(() => {
+    if (surfaceTapTimeoutRef.current) {
+      clearTimeout(surfaceTapTimeoutRef.current);
+      surfaceTapTimeoutRef.current = null;
+    }
+  }, []);
+
+  const clearSeekFeedbackTimeout = useCallback(() => {
+    if (seekFeedbackTimeoutRef.current) {
+      clearTimeout(seekFeedbackTimeoutRef.current);
+      seekFeedbackTimeoutRef.current = null;
+    }
+  }, []);
+
+  const showSeekGestureFeedback = useCallback(
+    (direction: SeekJumpDirection) => {
+      clearSeekFeedbackTimeout();
+      setSeekFeedback({ direction, key: Date.now() });
+
+      seekFeedbackTimeoutRef.current = setTimeout(() => {
+        setSeekFeedback(null);
+        seekFeedbackTimeoutRef.current = null;
+      }, SEEK_FEEDBACK_HIDE_DELAY_MS);
+    },
+    [clearSeekFeedbackTimeout]
+  );
 
   const lockSeekDisplay = useCallback((seconds: number, duration: number) => {
     const safeSeekTime =
@@ -881,6 +935,18 @@ export function VideoPlayer({
       }
 
       revealVideoControls();
+    });
+  }, [revealVideoControls]);
+
+  const restoreDockedVideo = useCallback(() => {
+    setIsVideoDocked(false);
+    revealVideoControls();
+
+    window.requestAnimationFrame(() => {
+      containerRef.current?.scrollIntoView({
+        block: "start",
+        behavior: "smooth",
+      });
     });
   }, [revealVideoControls]);
 
@@ -976,6 +1042,13 @@ export function VideoPlayer({
       document.documentElement.style.removeProperty("--lms-mobile-transcript-top");
     };
   }, []);
+
+  useEffect(() => {
+    return () => {
+      clearSurfaceTapTimeout();
+      clearSeekFeedbackTimeout();
+    };
+  }, [clearSeekFeedbackTimeout, clearSurfaceTapTimeout]);
 
   const updateWatchState = useCallback(
     (
@@ -1111,6 +1184,7 @@ export function VideoPlayer({
     setIsPlaying(false);
     setWarning(null);
     setShowInstructions(false);
+    setIsVideoDocked(false);
     setTranscriptSearch("");
     pendingSeekTimeRef.current = null;
     pendingSeekUntilRef.current = 0;
@@ -1351,18 +1425,6 @@ useEffect(() => {
     }
   }, [isPlaying, isReady, revealVideoControls, saveProgress]);
 
-  const handleVideoSurfaceClick = useCallback(
-    (event: React.MouseEvent<HTMLButtonElement>) => {
-      if (Date.now() - lastTouchInteractionRef.current < TOUCH_CLICK_SUPPRESS_MS) {
-        event.preventDefault();
-        return;
-      }
-
-      toggleVideoControls();
-    },
-    [toggleVideoControls]
-  );
-
   const handlePreviousLesson = useCallback(() => {
     if (!canGoPrevious || !onPrevious) {
       return;
@@ -1403,7 +1465,7 @@ useEffect(() => {
       if (!playerRef.current || safeDuration <= 0) {
         seekPreviewPercentRef.current = null;
         setSeekPreviewPercent(null);
-        return;
+        return false;
       }
 
       const safeProgress = clamp(requestedProgress, 0, 100);
@@ -1425,7 +1487,7 @@ useEffect(() => {
         playerRef.current.seekTo(maxWatchedRef.current, true);
         updateWatchState(maxWatchedRef.current, maxWatchedRef.current, safeDuration);
         showWarning("Seeking forward is locked until you watch that part of the lesson.");
-        return;
+        return false;
       }
 
       lockSeekDisplay(requestedTime, safeDuration);
@@ -1440,6 +1502,7 @@ useEffect(() => {
         safeDuration
       );
       saveProgress();
+      return true;
     },
     [completionThreshold, lockSeekDisplay, saveProgress, showWarning, updateWatchState]
   );
@@ -1526,6 +1589,123 @@ useEffect(() => {
     isScrubbingRef.current = false;
     commitSeek(requestedProgress);
   };
+
+  const jumpVideoBySeconds = useCallback(
+    (direction: SeekJumpDirection) => {
+      const player = playerRef.current;
+      const duration = durationRef.current || player?.getDuration() || videoDuration;
+
+      if (!isReady || !player || duration <= 0) {
+        revealVideoControls();
+        return;
+      }
+
+      const playerTime = player.getCurrentTime();
+      const currentTime =
+        getPendingSeekDisplayTime(duration) ??
+        (Number.isFinite(playerTime) ? playerTime : currentTimeRef.current);
+      const nextTime =
+        direction === "forward"
+          ? currentTime + SEEK_JUMP_SECONDS
+          : currentTime - SEEK_JUMP_SECONDS;
+      const didSeek = commitSeek((clamp(nextTime, 0, duration) / duration) * 100);
+
+      revealVideoControls();
+
+      if (didSeek) {
+        showSeekGestureFeedback(direction);
+      }
+    },
+    [
+      commitSeek,
+      getPendingSeekDisplayTime,
+      isReady,
+      revealVideoControls,
+      showSeekGestureFeedback,
+      videoDuration,
+    ]
+  );
+
+  const handleVideoSurfaceTap = useCallback(
+    (clientX: number, element: HTMLElement) => {
+      if (isVideoDocked) {
+        clearSurfaceTapTimeout();
+        pendingSurfaceTapRef.current = null;
+        restoreDockedVideo();
+        return;
+      }
+
+      if (!isReady) {
+        revealVideoControls();
+        return;
+      }
+
+      const now = Date.now();
+      const direction = getSeekGestureDirection(clientX, element);
+      const pendingTap = pendingSurfaceTapRef.current;
+      const isDoubleTap =
+        pendingTap?.direction === direction &&
+        now - pendingTap.time <= DOUBLE_TAP_WINDOW_MS;
+
+      if (isDoubleTap) {
+        clearSurfaceTapTimeout();
+        pendingSurfaceTapRef.current = null;
+        jumpVideoBySeconds(direction);
+        return;
+      }
+
+      clearSurfaceTapTimeout();
+      pendingSurfaceTapRef.current = { direction, time: now };
+      surfaceTapTimeoutRef.current = setTimeout(() => {
+        pendingSurfaceTapRef.current = null;
+        toggleVideoControls();
+        surfaceTapTimeoutRef.current = null;
+      }, DOUBLE_TAP_WINDOW_MS);
+    },
+    [
+      clearSurfaceTapTimeout,
+      isReady,
+      isVideoDocked,
+      jumpVideoBySeconds,
+      revealVideoControls,
+      restoreDockedVideo,
+      toggleVideoControls,
+    ]
+  );
+
+  const handleVideoSurfaceClick = useCallback(
+    (event: React.MouseEvent<HTMLButtonElement>) => {
+      if (Date.now() - lastTouchInteractionRef.current < TOUCH_CLICK_SUPPRESS_MS) {
+        event.preventDefault();
+        return;
+      }
+
+      event.preventDefault();
+      handleVideoSurfaceTap(event.clientX, event.currentTarget);
+    },
+    [handleVideoSurfaceTap]
+  );
+
+  const handleTouchGesture = useCallback(
+    (event: React.TouchEvent<HTMLDivElement>) => {
+      if (
+        event.target instanceof Element &&
+        event.target.closest("[data-lms-video-controls]")
+      ) {
+        return;
+      }
+
+      const touch = event.changedTouches[0] || event.touches[0];
+      if (!touch) {
+        return;
+      }
+
+      event.preventDefault();
+      lastTouchInteractionRef.current = Date.now();
+      handleVideoSurfaceTap(touch.clientX, event.currentTarget);
+    },
+    [handleVideoSurfaceTap]
+  );
 
   const handleTranscriptTimelineClick = useCallback(
     (seconds: number) => {
@@ -1623,21 +1803,6 @@ useEffect(() => {
     setShowInstructions(true);
   }, [requestTranscriptGeneration, revealVideoControls]);
 
-// Mobile tap gesture handler: tapping the video surface hides/shows every overlay control.
-  const handleTouchGesture = useCallback((e: React.TouchEvent<HTMLDivElement>) => {
-    if (e.target instanceof Element && e.target.closest("[data-lms-video-controls]")) {
-      return;
-    }
-    
-    // Use changedTouches for touchend event (touches is empty on touchend)
-    const touch = e.touches[0] || e.changedTouches[0];
-    if (!touch) return;
-
-    lastTouchInteractionRef.current = Date.now();
-    
-    toggleVideoControls();
-  }, [toggleVideoControls]);
-
   const handlePlaybackRateChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
     revealVideoControls();
     const nextRate = Number(event.target.value);
@@ -1660,13 +1825,11 @@ useEffect(() => {
 
   const restartVideo = () => {
     revealVideoControls();
-    // Use refs to get the most accurate duration value
     const safeDuration = durationRef.current;
     playerRef.current?.seekTo(0, true);
     playerRef.current?.playVideo();
     setSmoothCurrentTime(0);
     lastSmoothProgressFrameAtRef.current = performance.now();
-    // Fix: Use durationRef.current instead of videoDuration (which can be stale state)
     updateWatchState(0, maxWatchedRef.current, safeDuration);
   };
 
@@ -1707,6 +1870,28 @@ useEffect(() => {
     revealVideoControls,
     syncFullscreenVideoLayout,
   ]);
+
+  const handleVideoDropdown = useCallback(async () => {
+    if (isVideoDocked) {
+      restoreDockedVideo();
+      return;
+    }
+
+    revealVideoControls();
+    setShowPlaybackSettings(false);
+    setShowInstructions(false);
+    void saveProgress();
+
+    if (getActiveFullscreenElement()) {
+      await exitFullscreenElement();
+    }
+
+    unlockScreenOrientation();
+    setHasRequestedLandscapeFullscreen(false);
+    setIsLandscapeFullscreen(false);
+    setIsFullscreen(false);
+    setIsVideoDocked(true);
+  }, [isVideoDocked, restoreDockedVideo, revealVideoControls, saveProgress]);
 
   const handleComplete = async () => {
     if (!completionAllowed) {
@@ -1797,12 +1982,14 @@ useEffect(() => {
           <section className="space-y-4 lg:col-span-2">
             <div
               ref={containerRef}
-              className={isFullscreen ? "lms-video-fullscreen-shell" : ""}
+              className={`${isFullscreen ? "lms-video-fullscreen-shell" : ""} ${
+                isVideoDocked ? "lms-video-docked-shell" : ""
+              }`.trim()}
             >
               <GlassCard
                 className={`overflow-hidden rounded-2xl p-0 ${
                   isFullscreen ? "lms-video-fullscreen-card" : ""
-                }`}
+                } ${isVideoDocked ? "lms-video-docked-card" : ""}`}
               >
                 <div
                   className={`lms-video-stage relative bg-black ${
@@ -1813,7 +2000,7 @@ useEffect(() => {
                           isLandscapeFullscreen ? "lms-video-stage-fullscreen-landscape" : ""
                         }`
                       : "aspect-video"
-                  }`}
+                  } ${isVideoDocked ? "lms-video-stage-docked" : ""}`}
                   onFocusCapture={revealVideoControls}
                   onTouchEnd={handleTouchGesture}
                 >
@@ -1837,7 +2024,11 @@ useEffect(() => {
                         onClick={handleVideoSurfaceClick}
                         aria-disabled={!isReady}
                         className="absolute inset-0 z-10 cursor-pointer bg-transparent"
-                        aria-label={areControlsVisible ? "Hide video controls" : "Show video controls"}
+                        aria-label={
+                          areControlsVisible
+                            ? "Hide video controls. Double-tap left or right to skip 15 seconds."
+                            : "Show video controls. Double-tap left or right to skip 15 seconds."
+                        }
                       />
 
                       <div
@@ -1850,12 +2041,16 @@ useEffect(() => {
                       >
                         <button
                           type="button"
-                          onClick={onBack}
+                          onClick={handleVideoDropdown}
                           className="lms-video-top-button lms-video-top-ghost-button pointer-events-auto inline-flex items-center justify-center rounded-full text-white transition hover:scale-105 active:scale-95"
-                          aria-label="Back"
-                          title="Back"
+                          aria-label={isVideoDocked ? "Restore video" : "Minimize video"}
+                          title={isVideoDocked ? "Restore video" : "Minimize video"}
                         >
-                          <ChevronDown className="lms-video-top-icon stroke-[3]" />
+                          <ChevronDown
+                            className={`lms-video-top-icon stroke-[3] ${
+                              isVideoDocked ? "rotate-180" : ""
+                            }`}
+                          />
                         </button>
 
                         <div className="lms-video-top-action-row pointer-events-auto flex items-center">
@@ -1903,6 +2098,29 @@ useEffect(() => {
                           {watermarkName} • {new Date().toLocaleDateString()}
                         </div>
                       </div>
+
+                      {seekFeedback && (
+                        <div
+                          key={seekFeedback.key}
+                          aria-hidden="true"
+                          className={`lms-video-seek-feedback pointer-events-none absolute z-30 flex items-center justify-center text-white ${
+                            seekFeedback.direction === "backward"
+                              ? "lms-video-seek-feedback-left"
+                              : "lms-video-seek-feedback-right"
+                          }`}
+                        >
+                          <div className="lms-video-seek-feedback-badge flex flex-col items-center justify-center">
+                            {seekFeedback.direction === "backward" ? (
+                              <SkipBack className="lms-video-seek-feedback-icon fill-current" />
+                            ) : (
+                              <SkipForward className="lms-video-seek-feedback-icon fill-current" />
+                            )}
+                            <span className="lms-video-seek-feedback-text">
+                              {SEEK_JUMP_SECONDS}s
+                            </span>
+                          </div>
+                        </div>
+                      )}
 
                       {warning && (
                         <div className="absolute left-4 right-4 top-4 z-50 flex items-center gap-2 rounded-lg border border-amber-400/40 bg-amber-500/90 px-4 py-3 text-sm font-medium text-white shadow-lg">
@@ -2123,7 +2341,7 @@ useEffect(() => {
                   )}
                 </div>
 
-                <div className="flex flex-col gap-2 border-t border-gray-200 p-3 dark:border-gray-700 sm:flex-row sm:items-center sm:justify-between sm:gap-3 sm:p-4">
+                <div className="lms-video-card-footer flex flex-col gap-2 border-t border-gray-200 p-3 dark:border-gray-700 sm:flex-row sm:items-center sm:justify-between sm:gap-3 sm:p-4">
                   <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-xs text-gray-500 dark:text-gray-400 sm:text-sm">
                     <div className="flex items-center gap-1">
                       <Clock className="h-3.5 w-3.5 sm:h-4 sm:w-4" />

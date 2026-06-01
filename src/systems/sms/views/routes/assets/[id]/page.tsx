@@ -21,10 +21,15 @@ import {
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import ImageModal from "@/systems/sms/components/assets/ImageModal";
 import { formatCambodiaDisplayDateTime } from "@/shared/utils/cambodiaTime";
+import {
+  buildAssetEditPath,
+  getSafeAssetListReturnPath,
+  SMS_ASSET_RETURN_PARAM,
+} from "@/systems/sms/utils/assetNavigation";
 
 interface SmsAsset {
   id: string;
@@ -136,13 +141,18 @@ export default function SmsAssetDetailPage() {
   const user = useAuthUser();
   const isAdmin = user?.role === "Admin";
   const router = useRouter();
+  const searchParams = useSearchParams();
   const params = useParams<{ id: string }>();
   const id = typeof params?.id === "string" ? params.id : "";
+  const assetsBackHref = useMemo(
+    () => getSafeAssetListReturnPath(searchParams.get(SMS_ASSET_RETURN_PARAM)),
+    [searchParams]
+  );
 
-const [asset, setAsset] = useState<SmsAsset | null>(null);
+  const [asset, setAsset] = useState<SmsAsset | null>(null);
   const [transfers, setTransfers] = useState<SmsTransfer[]>([]);
   const [history, setHistory] = useState<AssetHistory | null>(null);
-const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [imageError, setImageError] = useState(false);
   const [viewImage, setViewImage] = useState<{ src: string; alt: string } | null>(null);
@@ -194,7 +204,7 @@ const [loading, setLoading] = useState(true);
   const latestTransfer = useMemo(() => transfers[0], [transfers]);
   const historyEvents = history?.events || [];
 
-const handleDelete = async () => {
+  const handleDelete = async () => {
     if (!asset) return;
     if (!confirm(`Delete ${asset.name}? This cannot be undone.`)) return;
 
@@ -204,7 +214,7 @@ const handleDelete = async () => {
         const body = await res.json().catch(() => null);
         throw new Error(body?.error || "Delete failed");
       }
-      router.push("/sms/assets");
+      router.push(assetsBackHref);
     } catch (err) {
       alert(err instanceof Error ? err.message : "Delete failed");
     }
@@ -230,7 +240,7 @@ const handleDelete = async () => {
       <div className="min-h-screen bg-slate-50 p-6">
         <div className="mx-auto max-w-3xl rounded-lg border border-red-200 bg-white p-6">
           <p className="mb-4 font-medium text-red-600">{error || "Asset not found"}</p>
-          <Link href="/sms/assets" className="inline-flex items-center gap-2 text-sm font-semibold text-emerald-700 hover:underline">
+          <Link href={assetsBackHref} className="inline-flex items-center gap-2 text-sm font-semibold text-emerald-700 hover:underline">
             <ArrowLeft className="h-4 w-4" />
             Back to Assets
           </Link>
@@ -244,7 +254,7 @@ const handleDelete = async () => {
       <div className="mx-auto max-w-7xl space-y-6">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <Link
-            href="/sms/assets"
+            href={assetsBackHref}
             className="inline-flex w-fit items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-100"
           >
             <ArrowLeft className="h-4 w-4" />
@@ -252,8 +262,8 @@ const handleDelete = async () => {
           </Link>
 
           <div className="flex flex-wrap gap-2">
-<Link
-              href={`/sms/assets/${asset.id}/edit`}
+            <Link
+              href={buildAssetEditPath(asset.id, assetsBackHref)}
               className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-100"
             >
               <Edit3 className="h-4 w-4" />
