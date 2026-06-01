@@ -23,6 +23,7 @@ import {
   parseVehicleGroupByParam,
   parseVehicleListPageParam,
   parseVehicleListPageSizeParam,
+  rememberVehicleListHref,
   setVehicleListQueryValue,
   VEHICLE_LIST_FOCUS_PARAM,
   VEHICLE_LIST_PAGE_PARAM,
@@ -1650,7 +1651,9 @@ const isTukTukCategory = useCallback((cat: string | undefined): boolean => {
 
   const replaceCurrentHistoryWithListState = useCallback((params: URLSearchParams) => {
     if (typeof window === "undefined") return;
-    window.history.replaceState(window.history.state, "", getVehicleListUrl(params));
+    const returnUrl = getVehicleListUrl(params);
+    rememberVehicleListHref(returnUrl);
+    window.history.replaceState(window.history.state, "", returnUrl);
   }, [getVehicleListUrl]);
 
   const handlePageChange = useCallback((nextPage: number) => {
@@ -1659,7 +1662,9 @@ const isTukTukCategory = useCallback((cat: string | undefined): boolean => {
     const nextParams = buildVehicleListParams({ page: safePage, focusVehicleId: null });
 
     setCurrentPage(safePage);
-    router.replace(getVehicleListUrl(nextParams), { scroll: false });
+    const nextHref = getVehicleListUrl(nextParams);
+    rememberVehicleListHref(nextHref);
+    router.replace(nextHref, { scroll: false });
   }, [buildVehicleListParams, getVehicleListUrl, router, totalPages]);
 
   const handleItemsPerPageChange = useCallback((nextItemsPerPage: number) => {
@@ -1671,7 +1676,9 @@ const isTukTukCategory = useCallback((cat: string | undefined): boolean => {
 
     setItemsPerPage(nextItemsPerPage);
     setCurrentPage(1);
-    router.replace(getVehicleListUrl(nextParams), { scroll: false });
+    const nextHref = getVehicleListUrl(nextParams);
+    rememberVehicleListHref(nextHref);
+    router.replace(nextHref, { scroll: false });
   }, [buildVehicleListParams, getVehicleListUrl, router]);
 
   const handleRefresh = useCallback(async () => {
@@ -1740,7 +1747,9 @@ const isTukTukCategory = useCallback((cat: string | undefined): boolean => {
     nextParams.delete(VEHICLE_LIST_PAGE_PARAM);
     nextParams.delete(VEHICLE_LIST_FOCUS_PARAM);
     setCurrentPage(1);
-    router.replace(getVehicleListUrl(nextParams), { scroll: false });
+    const nextHref = getVehicleListUrl(nextParams);
+    rememberVehicleListHref(nextHref);
+    router.replace(nextHref, { scroll: false });
   }, [getVehicleListUrl, router, searchParams]);
 
   const cacheVehicleForDetail = useCallback((id: string) => {
@@ -1772,6 +1781,11 @@ const isTukTukCategory = useCallback((cat: string | undefined): boolean => {
     replaceCurrentHistoryWithListState(returnParams);
     router.push(withVehicleListQuery(`/vehicles/${encodeURIComponent(id)}/edit`, returnParams));
   }, [buildVehicleListParams, cacheVehicleForDetail, replaceCurrentHistoryWithListState, router]);
+
+  useEffect(() => {
+    const listParams = buildVehicleListParams();
+    rememberVehicleListHref(getVehicleListUrl(listParams));
+  }, [buildVehicleListParams, getVehicleListUrl]);
 
   const handleDelete = (vehicle: Vehicle) => {
     setVehicleToDelete(vehicle);

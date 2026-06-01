@@ -16,8 +16,9 @@ import { useDeleteVehicle } from "@/systems/vms/components/vehicles/useDeleteVeh
 import { useVehicles } from "@/systems/vms/hooks/useVehicles";
 import {
   getVehicleGroupKey,
+  getVehicleListHrefWithFallback,
   parseVehicleGroupByParam,
-  withVehicleListQuery
+  withVehicleListQueryFallback
 } from "@/systems/vms/utils/vehicleListState";
 import { formatVehicleId, formatVehicleTime } from "@/shared/utils/format";
 import type { Vehicle } from "@/shared/types/types";
@@ -39,7 +40,7 @@ function EditVehicleInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const groupBy = parseVehicleGroupByParam(searchParams.get("groupBy"));
-  const listHref = useMemo(() => withVehicleListQuery("/vehicles", searchParams), [searchParams]);
+  const listHref = useMemo(() => getVehicleListHrefWithFallback(searchParams), [searchParams]);
   const params = useParams<{ id: string }>();
   const rawId = typeof params?.id === "string" ? params.id : "";
 
@@ -61,11 +62,11 @@ function EditVehicleInner() {
   }, [isReservedId, listHref, router]);
 
   const getViewHref = useCallback((vehicleId: string) => (
-    withVehicleListQuery(`/vehicles/${encodeURIComponent(vehicleId)}/view`, searchParams)
+    withVehicleListQueryFallback(`/vehicles/${encodeURIComponent(vehicleId)}/view`, searchParams)
   ), [searchParams]);
 
   const getEditHref = useCallback((vehicleId: string) => (
-    withVehicleListQuery(`/vehicles/${encodeURIComponent(vehicleId)}/edit`, searchParams)
+    withVehicleListQueryFallback(`/vehicles/${encodeURIComponent(vehicleId)}/edit`, searchParams)
   ), [searchParams]);
 
   // Hooks

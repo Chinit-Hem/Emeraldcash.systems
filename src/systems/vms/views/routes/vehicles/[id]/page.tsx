@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useEffect, useState, useCallback, useMemo } from "react";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useAuthUser } from "@/shared/hooks/AuthContext";
 import { VehicleDetailsCard } from "@/systems/vms/components/vehicles/VehicleDetailsCard";
 import { VehicleForm } from "@/systems/vms/components/vehicles/VehicleForm";
@@ -12,6 +12,10 @@ import { extractDriveFileId } from "@/shared/utils/drive";
 import { refreshVehicleCache, writeVehicleCache } from "@/systems/vms/utils/vehicleCache";
 import type { Vehicle } from "@/shared/types/types";
 import { derivePrices } from "@/systems/vms/utils/pricing";
+import {
+  getVehicleListHrefWithFallback,
+  withVehicleListQueryFallback,
+} from "@/systems/vms/utils/vehicleListState";
 import { useMounted } from "@/shared/hooks/useMounted";
 import ErrorBoundary from "@/shared/components/ErrorBoundary";
 
@@ -25,6 +29,8 @@ export default function VehicleDetailPage() {
 
 function VehicleDetailInner() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const listHref = useMemo(() => getVehicleListHrefWithFallback(searchParams), [searchParams]);
   const params = useParams<{ id: string }>();
   const id = typeof params?.id === "string" ? params.id : "";
   const user = useAuthUser();
@@ -142,13 +148,13 @@ function VehicleDetailInner() {
       }
 
       await refreshVehicleCache();
-      router.push("/vehicles");
+      router.push(listHref);
     } catch (err) {
       alert(err instanceof Error ? err.message : "Delete failed");
     } finally {
       setIsDeleting(false);
     }
-  }, [vehicle, router]);
+  }, [listHref, vehicle, router]);
 
   // Handle save
   const handleSave = useCallback(async (formData: Vehicle & { imageFile?: File | null }) => {
@@ -276,7 +282,8 @@ function VehicleDetailInner() {
       setIsEditModalOpen(false);
       
       // Redirect to view page with refresh parameter to skip cache
-      router.push(`/vehicles/${vehicle.VehicleId}/view?refresh=1`);
+      const viewHref = withVehicleListQueryFallback(`/vehicles/${vehicle.VehicleId}/view`, searchParams);
+      router.push(`${viewHref}${viewHref.includes("?") ? "&" : "?"}refresh=1`);
       
       // Show success toast (you can integrate with your toast system)
       // toast.success("Vehicle updated successfully");
@@ -286,7 +293,7 @@ function VehicleDetailInner() {
     } finally {
       setIsSaving(false);
     }
-  }, [vehicle, router]);
+  }, [searchParams, vehicle, router]);
 
   // Loading state
   if (loading) {
@@ -338,7 +345,7 @@ function VehicleDetailInner() {
                 Retry
               </button>
               <button
-                onClick={() => router.push("/vehicles")}
+                onClick={() => router.push(listHref)}
                 className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors font-medium"
               >
                 Back to List
@@ -380,7 +387,7 @@ function VehicleDetailInner() {
               The vehicle you&apos;re looking for doesn&apos;t exist or has been removed.
             </p>
             <button
-              onClick={() => router.push("/vehicles")}
+              onClick={() => router.push(listHref)}
               className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors font-medium"
             >
               Back to Vehicles

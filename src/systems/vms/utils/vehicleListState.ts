@@ -1,9 +1,11 @@
 import type { Vehicle } from "@/shared/types/types";
 
 export const VEHICLE_GROUP_BY_OPTIONS = ["none", "category", "brand", "year", "condition", "color"] as const;
+export const VEHICLE_LIST_PATH = "/vehicles";
 export const VEHICLE_LIST_PAGE_PARAM = "page";
 export const VEHICLE_LIST_PAGE_SIZE_PARAM = "pageSize";
 export const VEHICLE_LIST_FOCUS_PARAM = "focusVehicle";
+export const VEHICLE_LIST_RETURN_STORAGE_KEY = "vms-vehicle-list-return-href";
 
 export type VehicleGroupByOption = (typeof VEHICLE_GROUP_BY_OPTIONS)[number];
 
@@ -54,6 +56,52 @@ export function getVehicleListItemElementId(vehicleId: string): string {
   return `vehicle-list-item-${vehicleId.replace(/[^a-zA-Z0-9_-]/g, "-")}`;
 }
 
+function normalizeVehicleListHref(href: string | null | undefined): string | null {
+  const trimmedHref = href?.trim();
+  if (!trimmedHref || trimmedHref.startsWith("//")) return null;
+
+  try {
+    if (trimmedHref.startsWith("/")) {
+      const parsed = new URL(trimmedHref, "http://localhost");
+      return parsed.pathname === VEHICLE_LIST_PATH
+        ? `${parsed.pathname}${parsed.search}`
+        : null;
+    }
+
+    if (typeof window === "undefined") return null;
+
+    const parsed = new URL(trimmedHref);
+    return parsed.origin === window.location.origin && parsed.pathname === VEHICLE_LIST_PATH
+      ? `${parsed.pathname}${parsed.search}`
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+export function rememberVehicleListHref(href: string): void {
+  if (typeof window === "undefined") return;
+
+  const safeHref = normalizeVehicleListHref(href);
+  if (!safeHref) return;
+
+  try {
+    window.sessionStorage.setItem(VEHICLE_LIST_RETURN_STORAGE_KEY, safeHref);
+  } catch {
+    // Best-effort navigation handoff only.
+  }
+}
+
+export function getStoredVehicleListHref(fallback = VEHICLE_LIST_PATH): string {
+  if (typeof window === "undefined") return fallback;
+
+  try {
+    return normalizeVehicleListHref(window.sessionStorage.getItem(VEHICLE_LIST_RETURN_STORAGE_KEY)) ?? fallback;
+  } catch {
+    return fallback;
+  }
+}
+
 export function getVehicleGroupValue(vehicle: Vehicle, groupBy: VehicleGroupByOption): string {
   switch (groupBy) {
     case "category": return normalizeVehicleGroupText(vehicle.Category || "") || "Uncategorized";
@@ -97,4 +145,18 @@ export function setVehicleListQueryValue(
 export function withVehicleListQuery(path: string, searchParams: SearchParamsLike | null | undefined): string {
   const query = getVehicleListSearchParams(searchParams).toString();
   return query ? `${path}?${query}` : path;
+}
+
+export function getVehicleListHrefWithFallback(searchParams: SearchParamsLike | null | undefined): string {
+  const queryHref = withVehicleListQuery(VEHICLE_LIST_PATH, searchParams);
+  return queryHref === VEHICLE_LIST_PATH ? getStoredVehicleListHref(queryHref) : queryHref;
+}
+
+export function withVehicleListQueryFallback(path: string, searchParams: SearchParamsLike | null | undefined): string {
+  const query = getVehicleListSearchParams(searchParams).toString();
+  if (query) return `${path}?${query}`;
+
+  const storedHref = getStoredVehicleListHref();
+  const storedQuery = getVehicleListSearchParams(new URLSearchParams(storedHref.split("?")[1] ?? "")).toString();
+  return storedQuery ? `${path}?${storedQuery}` : path;
 }

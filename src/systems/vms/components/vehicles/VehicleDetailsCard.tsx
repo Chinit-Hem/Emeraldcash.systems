@@ -1,13 +1,17 @@
 "use client";
 
 import React, { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import ImageModal from "@/shared/components/ImageModal";
 import { formatCurrency, formatVehicleTime, formatVehicleId } from "@/shared/utils/format";
 import { driveThumbnailUrl, extractDriveFileId } from "@/shared/utils/drive";
 import type { Vehicle } from "@/shared/types/types";
 import { TAX_TYPE_METADATA } from "@/shared/types/types";
 import { cn } from "@/shared/utils/ui";
+import {
+  getVehicleListHrefWithFallback,
+  withVehicleListQueryFallback,
+} from "@/systems/vms/utils/vehicleListState";
 
 // Modern Icon Components
 const Icons = {
@@ -139,6 +143,8 @@ export function VehicleDetailsCard({
   isDeleting = false,
 }: VehicleDetailsCardProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const listHref = getVehicleListHrefWithFallback(searchParams);
   const [isImageModalOpen, setIsImageModalOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 
@@ -150,7 +156,7 @@ export function VehicleDetailsCard({
     if (onEdit) {
       onEdit();
     } else {
-      router.push(`/vehicles/${vehicle.VehicleId}/edit`);
+      router.push(withVehicleListQueryFallback(`/vehicles/${vehicle.VehicleId}/edit`, searchParams));
     }
   };
 
@@ -522,7 +528,7 @@ export function VehicleDetailsCard({
                 </button>
               )}
               <button 
-                onClick={() => router.push("/vehicles")} 
+                onClick={() => router.push(listHref)}
                 className="flex items-center gap-2 px-6 py-3 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-300 rounded-xl font-semibold transition-all duration-200"
               >
                 <Icons.List />
@@ -555,7 +561,7 @@ export function VehicleDetailsCard({
               </button>
             )}
             <button
-              onClick={() => router.push("/vehicles")}
+              onClick={() => router.push(listHref)}
               className="flex-1 flex items-center justify-center gap-2 py-3 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl font-semibold"
             >
               <Icons.List />

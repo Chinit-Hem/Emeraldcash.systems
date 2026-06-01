@@ -29,6 +29,15 @@ import { derivePrices } from "@/systems/vms/utils/pricing";
 import { useRouter } from "next/navigation";
 import { safeParseDate } from "@/shared/utils/safeDate";
 import { VirtualTable } from "@/systems/vms/utils/virtualized-table";
+import {
+  getVehicleListSearchParams,
+  parseVehicleListPageParam,
+  parseVehicleListPageSizeParam,
+  rememberVehicleListHref,
+  VEHICLE_LIST_FOCUS_PARAM,
+  VEHICLE_LIST_PAGE_PARAM,
+  VEHICLE_LIST_PAGE_SIZE_PARAM,
+} from "@/systems/vms/utils/vehicleListState";
 
 // iOS Vehicle Card Component with Image, Expand, and Admin Actions
 interface IOSVehicleCardProps {
@@ -486,8 +495,36 @@ export default function VehiclesClient() {
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
 
   // Pagination state
-  const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
+  const [currentPage, setCurrentPage] = useState(() =>
+    parseVehicleListPageParam(searchParams.get(VEHICLE_LIST_PAGE_PARAM))
+  );
+  const [pageSize, setPageSize] = useState(() =>
+    parseVehicleListPageSizeParam(searchParams.get(VEHICLE_LIST_PAGE_SIZE_PARAM), [10, 20, 50, 100]) ?? 10
+  );
+  const skipNextPageResetRef = useRef(
+    Boolean(searchParams.get(VEHICLE_LIST_PAGE_PARAM) || searchParams.get(VEHICLE_LIST_FOCUS_PARAM))
+  );
+
+  useEffect(() => {
+    const listParams = getVehicleListSearchParams(searchParams);
+
+    if (currentPage > 1) {
+      listParams.set(VEHICLE_LIST_PAGE_PARAM, String(currentPage));
+    } else {
+      listParams.delete(VEHICLE_LIST_PAGE_PARAM);
+    }
+
+    if (pageSize !== 10) {
+      listParams.set(VEHICLE_LIST_PAGE_SIZE_PARAM, String(pageSize));
+    } else {
+      listParams.delete(VEHICLE_LIST_PAGE_SIZE_PARAM);
+    }
+
+    listParams.delete(VEHICLE_LIST_FOCUS_PARAM);
+
+    const query = listParams.toString();
+    rememberVehicleListHref(query ? `/vehicles?${query}` : "/vehicles");
+  }, [currentPage, pageSize, searchParams]);
 
   useEffect(() => {
     if (!isIOSSafari) return;
@@ -783,6 +820,11 @@ export default function VehiclesClient() {
 
   // Reset page when filters change - use setTimeout to avoid synchronous setState in effect
   useEffect(() => {
+    if (skipNextPageResetRef.current) {
+      skipNextPageResetRef.current = false;
+      return;
+    }
+
     const timeoutId = setTimeout(() => setCurrentPage(1), 0);
     return () => clearTimeout(timeoutId);
   }, [filters.search, filters.category, filters.brand, filters.condition, filters.color, filters.yearMin, filters.yearMax, filters.priceMin, filters.priceMax, filters.dateFrom, filters.dateTo, filters.withoutImage, pageSize]);
@@ -798,6 +840,9 @@ export default function VehiclesClient() {
     const nextCategory = categoryParam ? normalizeCategoryLabel(categoryParam) : "All";
     const nextCondition = conditionParam ? normalizeConditionLabel(conditionParam) : "All";
     const nextWithoutImage = noImageParam === "1" || noImageParam === "true";
+    const hasPositionQuery = Boolean(
+      searchParams.get(VEHICLE_LIST_PAGE_PARAM) || searchParams.get(VEHICLE_LIST_FOCUS_PARAM)
+    );
 
     // Use setTimeout to avoid synchronous setState in effect
     const timeoutId = setTimeout(() => {
@@ -811,6 +856,10 @@ export default function VehiclesClient() {
           return prev;
         }
 
+        if (hasPositionQuery) {
+          skipNextPageResetRef.current = true;
+        }
+
         return {
           ...prev,
           category: nextCategory,
@@ -820,7 +869,7 @@ export default function VehiclesClient() {
       });
     }, 0);
     return () => clearTimeout(timeoutId);
-  }, [categoryParam, conditionParam, noImageParam]);
+  }, [categoryParam, conditionParam, noImageParam, searchParams]);
 
 
   // Check if filters are active

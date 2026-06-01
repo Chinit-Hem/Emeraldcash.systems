@@ -10,7 +10,7 @@ import type { Vehicle } from "@/shared/types/types";
 import { TAX_TYPE_METADATA } from "@/shared/types/types";
 import { useMounted } from "@/shared/hooks/useMounted";
 import { getVehicleImageUrls, getVehiclePrimaryImageUrl, mergeVehicleImages } from "@/systems/vms/utils/vehicle-helpers";
-import { withVehicleListQuery } from "@/systems/vms/utils/vehicleListState";
+import { getVehicleListHrefWithFallback } from "@/systems/vms/utils/vehicleListState";
 import { 
   ArrowLeft, 
   Car,
@@ -400,7 +400,7 @@ export default function ViewVehiclePage() {
 function ViewVehicleInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const listHref = useMemo(() => withVehicleListQuery("/vehicles", searchParams), [searchParams]);
+  const listHref = useMemo(() => getVehicleListHrefWithFallback(searchParams), [searchParams]);
   const params = useParams<{ id: string }>();
   const rawId = typeof params?.id === "string" ? params.id : "";
   
