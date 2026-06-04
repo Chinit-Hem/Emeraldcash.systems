@@ -6,9 +6,30 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useLanguage } from "@/shared/hooks/LanguageContext";
 import { useTranslation } from "@/shared/utils/i18n";
 import { OptimizedLink } from "@/shared/components/OptimizedLink";
+import { hasAppPermission } from "@/shared/utils/permissions";
 import { useVehicleStats } from "@/systems/vms/hooks/useVehiclesNeon";
+import {
+  clearStoredVehicleListState,
+  rememberVehicleListScrollSnapshot,
+  VEHICLE_LIST_ALL_HREF,
+  VEHICLE_LIST_URL_CHANGE_EVENT,
+  type VehicleListScrollSnapshot
+} from "@/systems/vms/utils/vehicleListState";
 import { TukTukIcon } from "@/shared/components/icons/TukTukIcon";
-import { Bike, Boxes, Calculator, Car, Package } from "lucide-react";
+import { cn } from "@/shared/utils/ui";
+import {
+  ArrowLeftRight,
+  Bike,
+  BookOpen,
+  Boxes,
+  Calculator,
+  Car,
+  Clock,
+  History,
+  Package,
+  PlayCircle,
+  Users,
+} from "lucide-react";
 import { startTransition, useCallback, useEffect, useMemo, useState } from "react";
 
 function normalizeCategory(value: unknown) {
@@ -26,9 +47,9 @@ function IconDashboard({ className }: { className?: string }) {
   return <Calculator className={className || "w-5 h-5"} />;
 }
 
-function IconLms() {
+function IconLms({ className }: { className?: string }) {
   return (
-    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <svg className={className} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20" />
     </svg>
   );
@@ -60,16 +81,29 @@ function IconFleet({ className }: { className?: string }) {
   return <Package className={className || "w-5 h-5"} />;
 }
 
-function IconSettings() {
+function IconSettings({ className }: { className?: string }) {
   return (
-    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <svg className={className} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.1a2 2 0 0 1-1-1.72v-.51a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
       <circle cx="12" cy="12" r="3" />
     </svg>
   );
 }
 
+function getVehicleListScrollSnapshot(): VehicleListScrollSnapshot {
+  const scrollContainer =
+    typeof document === "undefined"
+      ? null
+      : document.querySelector<HTMLElement>('[data-app-scroll-container="true"]');
+
+  return {
+    scrollX: scrollContainer?.scrollLeft ?? window.scrollX,
+    scrollY: scrollContainer?.scrollTop ?? window.scrollY,
+  };
+}
+
 type SidebarMode = "desktop" | "drawer";
+type ActiveSystem = "vms" | "lms" | "sms";
 
 interface SidebarProps {
   user: User;
@@ -95,6 +129,7 @@ interface NavItemProps {
   onClick: () => void;
   count?: number;
   priority?: "high" | "normal" | "low";
+  compact?: boolean;
 }
 
 
@@ -105,26 +140,38 @@ function NavItem({
   active, 
   onClick, 
   count,
-  priority = "normal"
+  priority = "normal",
+  compact = false
 }: NavItemProps) {
 
   return (
     <OptimizedLink
       href={href || "#"}
       onClick={onClick}
-      className="flex items-center gap-4 w-full group"
+      className={cn(
+        "flex w-full min-w-0 items-center group",
+        compact ? "gap-[clamp(0.65rem,1.7dvh,1rem)]" : "gap-4"
+      )}
       priority={priority}
     >
 
-      <div className={`w-12 h-12 flex items-center justify-center rounded-2xl transition-all duration-200 ease-out ${
-        active 
+      <div className={cn(
+        "flex items-center justify-center transition-all duration-200 ease-out",
+        compact
+          ? "h-[clamp(2.15rem,6.2dvh,3rem)] w-[clamp(2.15rem,6.2dvh,3rem)] rounded-[clamp(0.75rem,1.8dvh,1rem)]"
+          : "h-12 w-12 rounded-2xl",
+        active
           ? "bg-emerald-50 dark:bg-emerald-500/15 border border-emerald-200 dark:border-emerald-500/40 shadow-sm text-emerald-600 dark:text-emerald-300"
           : "bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700/60 hover:text-emerald-600 dark:hover:text-emerald-300"
-      }`}>
-        <Icon className="w-6 h-6" />
+      )}>
+        <Icon className={compact ? "h-[clamp(1rem,2.8dvh,1.5rem)] w-[clamp(1rem,2.8dvh,1.5rem)]" : "h-6 w-6"} />
       </div>
-      <div className="flex-1 text-left">
-        <span className={`text-sm font-medium transition-colors duration-200 ${active ? "text-emerald-600 dark:text-emerald-300" : "text-slate-600 dark:text-slate-300 group-hover:text-emerald-600 dark:group-hover:text-emerald-300"}`}>
+      <div className="min-w-0 flex-1 text-left">
+        <span className={cn(
+          "block truncate whitespace-nowrap font-medium transition-colors duration-200",
+          compact ? "text-[clamp(0.78rem,2dvh,0.875rem)]" : "text-sm",
+          active ? "text-emerald-600 dark:text-emerald-300" : "text-slate-600 dark:text-slate-300 group-hover:text-emerald-600 dark:group-hover:text-emerald-300"
+        )}>
           {label}
         </span>
         {count !== undefined && count > 0 && (
@@ -146,6 +193,7 @@ interface QuickFilterButtonProps {
   onClick: () => void;
   color: "emerald" | "blue" | "purple" | "orange" | "slate";
   isAddButton?: boolean;
+  compact?: boolean;
 }
 
 function QuickFilterButton({ 
@@ -155,7 +203,8 @@ function QuickFilterButton({
   isActive, 
   onClick, 
   color,
-  isAddButton
+  isAddButton,
+  compact = false
 }: QuickFilterButtonProps) {
   const colorStyles = {
     emerald: {
@@ -200,32 +249,59 @@ function QuickFilterButton({
   return (
     <button
       onClick={onClick}
-      className={`group relative flex items-center justify-between w-full p-3 rounded-2xl transition-colors duration-200 border shadow-sm ${
+      className={cn(
+        "group relative flex w-full items-center justify-between overflow-hidden border shadow-sm transition-colors duration-200",
+        compact
+          ? "min-h-[clamp(2.75rem,7.7dvh,4.25rem)] rounded-[clamp(1rem,2.4dvh,1rem)] p-[clamp(0.45rem,1.4dvh,0.75rem)]"
+          : "rounded-2xl p-3",
         isActive
           ? `${styles.activeBg} ${styles.activeBorder}`
           : "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/60"
-      }`}
+      )}
     >
-      <div className="relative z-10 flex items-center gap-3">
-        <div className={`w-10 h-10 flex items-center justify-center rounded-xl transition-all duration-300 ${
+      <div className={cn(
+        "relative z-10 flex min-w-0 items-center",
+        compact ? "gap-[clamp(0.55rem,1.6dvh,0.75rem)]" : "gap-3"
+      )}>
+        <div className={cn(
+          "flex shrink-0 items-center justify-center transition-all duration-300",
+          compact
+            ? "h-[clamp(2rem,5.8dvh,2.5rem)] w-[clamp(2rem,5.8dvh,2.5rem)] rounded-[clamp(0.75rem,1.8dvh,0.75rem)]"
+            : "h-10 w-10 rounded-xl",
           isActive
             ? "bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm"
             : "bg-slate-50 dark:bg-slate-700/60 border border-slate-200 dark:border-slate-700 shadow-sm group-hover:bg-white dark:group-hover:bg-slate-800"
-        }`}>
+        )}>
           {isAddButton ? (
-            <span className={`text-lg font-bold ${isActive ? styles.active : styles.inactive}`}>+</span>
+            <span className={cn(
+              "font-bold",
+              compact ? "text-[clamp(0.95rem,2.6dvh,1.125rem)]" : "text-lg",
+              isActive ? styles.active : styles.inactive
+            )}>+</span>
           ) : (
-            <Icon className={`w-5 h-5 transition-colors duration-300 ${isActive ? styles.active : styles.inactive}`} />
+            <Icon className={cn(
+              "transition-colors duration-300",
+              compact ? "h-[clamp(1rem,2.6dvh,1.25rem)] w-[clamp(1rem,2.6dvh,1.25rem)]" : "h-5 w-5",
+              isActive ? styles.active : styles.inactive
+            )} />
           )}
         </div>
         
-        <span className={`text-sm font-medium transition-colors duration-300 ${isActive ? styles.active : styles.inactive}`}>
+        <span className={cn(
+          "min-w-0 truncate whitespace-nowrap font-medium transition-colors duration-300",
+          compact ? "text-[clamp(0.78rem,2dvh,0.875rem)]" : "text-sm",
+          isActive ? styles.active : styles.inactive
+        )}>
           {label}
         </span>
       </div>
 
         {count !== undefined && count > 0 && (
-          <span className={`relative z-10 ${styles.countBg} text-[10px] px-2 py-0.5 rounded-full font-bold shadow-sm`}>
+          <span className={cn(
+            "relative z-10 shrink-0 rounded-full font-bold shadow-sm",
+            styles.countBg,
+            compact ? "px-[clamp(0.4rem,1.4dvh,0.5rem)] py-0.5 text-[clamp(0.55rem,1.45dvh,0.625rem)]" : "px-2 py-0.5 text-[10px]"
+          )}>
             {count.toLocaleString()}
           </span>
         )}
@@ -243,6 +319,12 @@ export default function Sidebar({
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const frameworkSearchText = searchParams?.toString() ?? "";
+  const [nativeSearchText, setNativeSearchText] = useState<string | null>(null);
+  const activeSearchParams = useMemo(
+    () => new URLSearchParams(nativeSearchText ?? frameworkSearchText),
+    [frameworkSearchText, nativeSearchText]
+  );
   const isIOS =
     typeof navigator !== "undefined" && /iPad|iPhone|iPod/.test(navigator.userAgent);
 
@@ -254,17 +336,30 @@ export default function Sidebar({
   const { language } = useLanguage();
   const { t } = useTranslation(language);
   const systemsLabel = language === "km" ? "ប្រព័ន្ធ" : "Systems";
+  const shortcutsLabel = language === "km" ? "ផ្លូវកាត់" : "Shortcuts";
+  const systemLabels = {
+    vms: language === "km" ? "VMS - វាយតម្លៃយានយន្ត" : "VMS - Vehicle Valuation",
+    lms: language === "km" ? "LMS - មជ្ឈមណ្ឌលសិក្សា" : "LMS - Learning Center",
+    sms: language === "km" ? "SMS - បញ្ជីទ្រព្យសម្បត្តិ" : "SMS - Asset Inventory",
+  };
   const [pendingHref, setPendingHref] = useState<string | null>(null);
 
-  const isAdmin = user.role === "Admin";
-  const activeCategory = pathname === "/vehicles" ? searchParams?.get("category") || "" : "";
+  const canViewVehicles = hasAppPermission(user.role, "vehicles:view");
+  const canCreateVehicles = hasAppPermission(user.role, "vehicles:create");
+  const canViewLms = hasAppPermission(user.role, "lms:view");
+  const canManageLms = hasAppPermission(user.role, "lms:manage");
+  const canViewSms = hasAppPermission(user.role, "sms:view");
+  const canCreateSms = hasAppPermission(user.role, "sms:create");
+  const canTransferSms = hasAppPermission(user.role, "sms:transfer");
+  const activeCategory = pathname === "/vehicles" ? activeSearchParams.get("category") || "" : "";
 
   // Route active states
   const isDashboardActive = pathname === "/" || pathname === "/dashboard";
   const isLmsActive = pathname.startsWith("/lms");
   const isAdminLmsActive = pathname.startsWith("/admin/lms");
   const isSmsActive = pathname.startsWith("/sms");
-  const isVehiclesActive = pathname === "/vehicles" && !activeCategory;
+  const activeSystem: ActiveSystem = isLmsActive || isAdminLmsActive ? "lms" : isSmsActive ? "sms" : "vms";
+  const isVehiclesActive = pathname === "/vehicles" && (!activeCategory || normalizeCategory(activeCategory) === "all");
   const isCarsActive = pathname === "/vehicles" && normalizeCategory(activeCategory) === "cars";
 
   // Some pages use category labels in different casing (Cars/Car). Treat both as active.
@@ -273,14 +368,77 @@ export default function Sidebar({
   const isTukTuksActive = pathname === "/vehicles" && (normalizeCategory(activeCategory) === "tuktuks" || isTukTukCategory(activeCategory));
   const isStockActive = pathname.startsWith("/stock");
   const isSettingsActive = pathname === "/settings";
+  const isSmsMovementActive = pathname === "/sms/transfer" || pathname === "/sms/return";
 
   useEffect(() => {
     setPendingHref(null);
   }, [pathname, searchParams]);
 
+  useEffect(() => {
+    setNativeSearchText(null);
+  }, [frameworkSearchText]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const syncSearchFromHref = (href: string) => {
+      const nextUrl = new URL(href, window.location.origin);
+      if (nextUrl.pathname === "/vehicles") {
+        setNativeSearchText(nextUrl.search.slice(1));
+      }
+    };
+
+    const handleVehicleListUrlChange = (event: Event) => {
+      const detail = (event as CustomEvent<{ href?: string }>).detail;
+      syncSearchFromHref(detail?.href ?? `${window.location.pathname}${window.location.search}`);
+    };
+
+    const handlePopState = () => {
+      syncSearchFromHref(`${window.location.pathname}${window.location.search}`);
+    };
+
+    window.addEventListener(VEHICLE_LIST_URL_CHANGE_EVENT, handleVehicleListUrlChange);
+    window.addEventListener("popstate", handlePopState);
+
+    return () => {
+      window.removeEventListener(VEHICLE_LIST_URL_CHANGE_EVENT, handleVehicleListUrlChange);
+      window.removeEventListener("popstate", handlePopState);
+    };
+  }, []);
+
   const sidebarRoutes = useMemo(
-    () => ["/", "/lms", "/sms", "/vehicles", "/vehicles?category=cars", "/vehicles?category=motorcycles", "/vehicles?category=tuktuks", "/settings"],
-    []
+    () => {
+      const routes: string[] = ["/settings"];
+
+      if (canViewVehicles) {
+        routes.push(
+          "/",
+          VEHICLE_LIST_ALL_HREF,
+          "/vehicles?category=cars",
+          "/vehicles?category=motorcycles",
+          "/vehicles?category=tuktuks"
+        );
+      }
+
+      if (canViewLms) {
+        routes.push("/lms");
+      }
+
+      if (canManageLms) {
+        routes.push("/lms/admin/categories", "/lms/admin/lessons", "/lms/admin/staff");
+      }
+
+      if (canViewSms) {
+        routes.push("/sms", "/sms/assets", "/sms/history");
+      }
+
+      if (canTransferSms) {
+        routes.push("/sms/transfer", "/sms/pending");
+      }
+
+      return routes;
+    },
+    [canManageLms, canTransferSms, canViewLms, canViewSms, canViewVehicles]
   );
 
   // Safe prefetch with fallback for iOS Safari
@@ -320,13 +478,33 @@ export default function Sidebar({
     // Do not block navigation based on pathname/search param equality.
     // In this app, quick-filter navigation frequently updates only query params,
     // and blocking based on a potentially stale comparison can prevent state from clearing/setting.
+    if (href === "/vehicles" || href === VEHICLE_LIST_ALL_HREF) {
+      clearStoredVehicleListState();
+    }
+
     setPendingHref(href);
 
     onNavigate?.();
 
     try {
       startTransition(() => {
-        router.push(href);
+        if (pathname === "/vehicles" && href.startsWith("/vehicles")) {
+          const nextUrl = new URL(href, window.location.origin);
+          const nextHref = `${nextUrl.pathname}${nextUrl.search}`;
+          const currentHref = `${window.location.pathname}${window.location.search}`;
+          const scrollSnapshot = getVehicleListScrollSnapshot();
+
+          rememberVehicleListScrollSnapshot(currentHref, scrollSnapshot);
+          rememberVehicleListScrollSnapshot(nextHref, scrollSnapshot);
+          window.history.pushState(window.history.state, "", nextHref);
+          window.dispatchEvent(
+            new CustomEvent(VEHICLE_LIST_URL_CHANGE_EVENT, {
+              detail: { href: nextHref, scrollSnapshot },
+            })
+          );
+        } else {
+          router.push(href);
+        }
         // Clear immediately so another Quick Filter click never gets blocked.
         setPendingHref(null);
       });
@@ -352,134 +530,278 @@ export default function Sidebar({
 
 
   return (
-    <aside className="w-[280px] h-screen overflow-y-auto flex flex-col bg-slate-100 dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 shadow-sm print:hidden relative z-[50]">
+    <aside
+      className={cn(
+        "relative z-[50] flex flex-col border-r border-slate-200 bg-slate-100 shadow-sm print:hidden dark:border-slate-800 dark:bg-slate-900",
+        isDrawer ? "h-dvh max-h-dvh w-full max-w-[85vw] overflow-hidden" : "h-screen w-[280px] overflow-y-auto"
+      )}
+    >
       {/* Header */}
-      <div className="p-6 pb-4">
-        <div className="flex items-center gap-4">
-          <div className="w-14 h-14 flex items-center justify-center rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm bg-white dark:bg-white">
+      <div className={isDrawer ? "px-5 pb-[clamp(0.25rem,1dvh,1rem)] pt-[clamp(0.55rem,1.8dvh,1.5rem)]" : "p-6 pb-4"}>
+        <div className={cn("flex items-center", isDrawer ? "gap-[clamp(0.65rem,1.7dvh,1rem)]" : "gap-4")}>
+          <div className={cn(
+            "flex shrink-0 items-center justify-center border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-white",
+            isDrawer
+              ? "h-[clamp(2.25rem,6.4dvh,3.5rem)] w-[clamp(2.25rem,6.4dvh,3.5rem)] rounded-[clamp(0.8rem,2dvh,1rem)]"
+              : "h-14 w-14 rounded-2xl"
+          )}>
             <Image
               src="/logo.png"
               alt="Emerald Cash"
               width={40}
               height={40}
-              className="w-10 h-10 object-contain"
+              className={isDrawer ? "h-[clamp(1.55rem,4.6dvh,2.5rem)] w-[clamp(1.55rem,4.6dvh,2.5rem)] object-contain" : "h-10 w-10 object-contain"}
               priority
             />
           </div>
-          <div>
-            <h1 className="text-lg font-bold text-slate-800 dark:text-slate-100">Emerald Cash</h1>
-            <span className="text-xs bg-emerald-500 text-white px-2 py-0.5 rounded-full">{systemsLabel}</span>
+          <div className="min-w-0">
+            <h1 className={cn(
+              "truncate font-bold leading-tight text-slate-800 dark:text-slate-100",
+              isDrawer ? "text-[clamp(0.95rem,2.3dvh,1.125rem)]" : "text-lg"
+            )}>Emerald Cash</h1>
+            <span className={cn(
+              "inline-flex rounded-full bg-emerald-500 px-2 py-0.5 font-medium leading-none text-white",
+              isDrawer ? "text-[clamp(0.6rem,1.55dvh,0.75rem)]" : "text-xs"
+            )}>{systemsLabel}</span>
           </div>
         </div>
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 px-6 py-4 flex flex-col gap-6" aria-label="Main navigation">
-        {/* Main Section */}
-        <div className="flex flex-col gap-4">
-          <NavItem
-            href="/"
-            icon={IconDashboard}
-            label={t.dashboard}
-            active={isDashboardActive || isPendingActive("/")}
-            onClick={() => handleLinkClick("/")}
-            priority="high"
-          />
-          <NavItem
-            href="/lms"
-            icon={IconLms}
-            label={language === 'km' ? 'ការបណ្តុះបណ្តាល' : 'LMS'}
-            active={isLmsActive || isAdminLmsActive || isPendingActive("/lms")}
-            onClick={() => handleLinkClick("/lms")}
-            priority="high"
-          />
+      <nav
+        className={cn(
+          "flex min-h-0 flex-1 flex-col",
+          isDrawer
+            ? "gap-[clamp(0.45rem,1.25dvh,1rem)] overflow-y-auto overscroll-contain px-5 py-[clamp(0.2rem,0.8dvh,1rem)]"
+            : "gap-6 px-6 py-4"
+        )}
+        aria-label="Main navigation"
+      >
+        {/* Systems */}
+        <div className={cn("flex flex-col", isDrawer ? "gap-[clamp(0.25rem,0.9dvh,1rem)]" : "gap-4")}>
+          <h2 className={cn(
+            "px-2 font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400",
+            isDrawer ? "mb-[clamp(0.1rem,0.45dvh,0.5rem)] text-[clamp(0.58rem,1.45dvh,0.75rem)]" : "text-xs"
+          )}>
+            {systemsLabel}
+          </h2>
+          {canViewVehicles && (
+            <NavItem
+              href="/"
+              icon={IconDashboard}
+              label={systemLabels.vms}
+              active={isDashboardActive || isPendingActive("/")}
+              onClick={() => handleLinkClick("/")}
+              priority="high"
+              compact={isDrawer}
+            />
+          )}
+          {canViewLms && (
+            <NavItem
+              href="/lms"
+              icon={IconLms}
+              label={systemLabels.lms}
+              active={isLmsActive || isAdminLmsActive || isPendingActive("/lms")}
+              onClick={() => handleLinkClick("/lms")}
+              priority="high"
+              compact={isDrawer}
+            />
+          )}
 
-          <NavItem
-            href="/sms"
-            icon={IconSms}
-            label={language === 'km' ? 'គ្រប់គ្រងស្តុក' : 'SMS'}
-            active={isSmsActive || isPendingActive("/sms")}
-            onClick={() => handleLinkClick("/sms")}
-            priority="high"
-          />
+          {canViewSms && (
+            <NavItem
+              href="/sms"
+              icon={IconSms}
+              label={systemLabels.sms}
+              active={isSmsActive || isPendingActive("/sms")}
+              onClick={() => handleLinkClick("/sms")}
+              priority="high"
+              compact={isDrawer}
+            />
+          )}
 
 
 
         </div>
 
-        {/* Quick Filters Section */}
-        <div className="px-4 py-6">
-          <h2 className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-4 px-2">
-            {language === 'km' ? 'តម្រងរហ័ស' : 'Quick Filters'}
+        {/* Context Shortcuts */}
+        <div className={isDrawer ? "px-[clamp(0.15rem,1dvh,1rem)] py-[clamp(0.25rem,1.1dvh,1.5rem)]" : "px-4 py-6"}>
+          <h2 className={cn(
+            "px-2 font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400",
+            isDrawer ? "mb-[clamp(0.25rem,0.9dvh,1rem)] text-[clamp(0.58rem,1.45dvh,0.75rem)]" : "mb-4 text-xs"
+          )}>
+            {shortcutsLabel}
           </h2>
           
-          <div className="flex flex-col gap-3">
-            {/* All Vehicles */}
-            <QuickFilterButton
-              icon={IconFleet}
-              label={t.vehicles}
-              count={allVehiclesCount}
-              isActive={isVehiclesActive || isPendingActive("/vehicles")}
-              onClick={() => handleNavigate("/vehicles")}
-              color="emerald"
-            />
+          <div className={cn("flex flex-col", isDrawer ? "gap-[clamp(0.35rem,1.15dvh,0.75rem)]" : "gap-3")}>
+            {activeSystem === "vms" && canViewVehicles && (
+              <>
+                <QuickFilterButton
+                  icon={IconFleet}
+                  label={t.vehicles}
+                  count={allVehiclesCount}
+                  isActive={isVehiclesActive || isPendingActive("/vehicles") || isPendingActive(VEHICLE_LIST_ALL_HREF)}
+                  onClick={() => handleNavigate(VEHICLE_LIST_ALL_HREF)}
+                  color="emerald"
+                  compact={isDrawer}
+                />
+                <QuickFilterButton
+                  icon={IconCar}
+                  label={language === 'km' ? 'រថយន្ត' : 'Cars'}
+                  count={carsCount}
+                  isActive={isCarsActive || isPendingActive("/vehicles?category=cars")}
+                  onClick={() => handleNavigate("/vehicles?category=cars")}
+                  color="blue"
+                  compact={isDrawer}
+                />
+                <QuickFilterButton
+                  icon={IconMotorcycle}
+                  label={language === 'km' ? 'ម៉ូតូ' : 'Motorcycles'}
+                  count={motorcyclesCount}
+                  isActive={isMotorcyclesActive || isPendingActive("/vehicles?category=motorcycles")}
+                  onClick={() => handleNavigate("/vehicles?category=motorcycles")}
+                  color="purple"
+                  compact={isDrawer}
+                />
+                <QuickFilterButton
+                  icon={IconTukTuk}
+                  label={language === 'km' ? 'កង់បី' : 'TukTuks'}
+                  count={tukTuksCount}
+                  isActive={isTukTuksActive || isPendingActive("/vehicles?category=tuktuks")}
+                  onClick={() => handleNavigate("/vehicles?category=tuktuks")}
+                  color="orange"
+                  compact={isDrawer}
+                />
+                {canCreateVehicles && (
+                  <button
+                    onClick={() => {
+                      if (pathname !== "/vehicles") {
+                        handleNavigate(VEHICLE_LIST_ALL_HREF);
+                        window.setTimeout(() => {
+                          window.dispatchEvent(new CustomEvent('openAddVehicleModal'));
+                        }, 120);
+                      } else {
+                        window.dispatchEvent(new CustomEvent('openAddVehicleModal'));
+                        onNavigate?.();
+                      }
+                    }}
+                    className={cn(
+                      "group relative flex w-full items-center justify-between overflow-hidden border border-slate-200 bg-white shadow-sm transition-colors duration-200 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700/60",
+                      isDrawer
+                        ? "min-h-[clamp(2.75rem,7.7dvh,4.25rem)] rounded-[clamp(1rem,2.4dvh,1rem)] p-[clamp(0.45rem,1.4dvh,0.75rem)]"
+                        : "rounded-2xl p-3"
+                    )}
+                  >
+                    <div className={cn(
+                      "relative z-10 flex min-w-0 items-center",
+                      isDrawer ? "gap-[clamp(0.55rem,1.6dvh,0.75rem)]" : "gap-3"
+                    )}>
+                      <div className={cn(
+                        "flex shrink-0 items-center justify-center border border-slate-200 bg-slate-50 shadow-sm group-hover:bg-white dark:border-slate-700 dark:bg-slate-700/60 dark:group-hover:bg-slate-800",
+                        isDrawer
+                          ? "h-[clamp(2rem,5.8dvh,2.5rem)] w-[clamp(2rem,5.8dvh,2.5rem)] rounded-[clamp(0.75rem,1.8dvh,0.75rem)]"
+                          : "h-10 w-10 rounded-xl"
+                      )}>
+                        <span className={cn(
+                          "font-bold text-slate-700 dark:text-slate-200",
+                          isDrawer ? "text-[clamp(0.95rem,2.6dvh,1.125rem)]" : "text-lg"
+                        )}>+</span>
+                      </div>
+                      <span className={cn(
+                        "min-w-0 truncate whitespace-nowrap font-medium text-slate-700 dark:text-slate-300",
+                        isDrawer ? "text-[clamp(0.78rem,2dvh,0.875rem)]" : "text-sm"
+                      )}>
+                        {language === 'km' ? 'បន្ថែមយានយន្ត' : 'Add Vehicle'}
+                      </span>
+                    </div>
+                  </button>
+                )}
+              </>
+            )}
 
-            {/* Cars */}
-            <QuickFilterButton
-              icon={IconCar}
-              label={language === 'km' ? 'រថយន្ត' : 'Cars'}
-              count={carsCount}
-              isActive={isCarsActive || isPendingActive("/vehicles?category=cars")}
-              onClick={() => handleNavigate("/vehicles?category=cars")}
-              color="blue"
-            />
+            {activeSystem === "lms" && canViewLms && (
+              <>
+                <QuickFilterButton
+                  icon={BookOpen}
+                  label={language === 'km' ? 'ការសិក្សារបស់ខ្ញុំ' : 'My Learning'}
+                  isActive={pathname === "/lms" || isPendingActive("/lms")}
+                  onClick={() => handleNavigate("/lms")}
+                  color="emerald"
+                  compact={isDrawer}
+                />
+                {canManageLms && (
+                  <>
+                    <QuickFilterButton
+                      icon={PlayCircle}
+                      label={language === 'km' ? 'គ្រប់គ្រងមាតិកា' : 'Content Manager'}
+                      isActive={pathname === "/lms/admin/categories" || pathname === "/lms/admin/lessons" || isPendingActive("/lms/admin/categories") || isPendingActive("/lms/admin/lessons")}
+                      onClick={() => handleNavigate("/lms/admin/categories")}
+                      color="purple"
+                      compact={isDrawer}
+                    />
+                    <QuickFilterButton
+                      icon={Users}
+                      label={language === 'km' ? 'តាមដានបុគ្គលិក' : 'Staff Tracking'}
+                      isActive={pathname === "/lms/admin/staff" || isPendingActive("/lms/admin/staff")}
+                      onClick={() => handleNavigate("/lms/admin/staff")}
+                      color="purple"
+                      compact={isDrawer}
+                    />
+                  </>
+                )}
+              </>
+            )}
 
-            {/* Motorcycles */}
-            <QuickFilterButton
-              icon={IconMotorcycle}
-              label={language === 'km' ? 'ម៉ូតូ' : 'Motorcycles'}
-              count={motorcyclesCount}
-              isActive={isMotorcyclesActive || isPendingActive("/vehicles?category=motorcycles")}
-              onClick={() => handleNavigate("/vehicles?category=motorcycles")}
-              color="purple"
-            />
-
-            {/* TukTuks */}
-            <QuickFilterButton
-              icon={IconTukTuk}
-              label={language === 'km' ? 'កង់បី' : 'TukTuks'}
-              count={tukTuksCount}
-              isActive={isTukTuksActive || isPendingActive("/vehicles?category=tuktuks")}
-              onClick={() => handleNavigate("/vehicles?category=tuktuks")}
-              color="orange"
-            />
-
-
-            {/* Add Vehicle - Admin only */}
-            {isAdmin && (
-              <button
-                onClick={() => {
-                  if (pathname !== "/vehicles") {
-                    handleNavigate("/vehicles");
-                    window.setTimeout(() => {
-                      window.dispatchEvent(new CustomEvent('openAddVehicleModal'));
-                    }, 120);
-                  } else {
-                    window.dispatchEvent(new CustomEvent('openAddVehicleModal'));
-                    onNavigate?.();
-                  }
-                }}
-                className="group relative flex items-center justify-between w-full p-3 rounded-2xl transition-colors duration-200 overflow-hidden bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm hover:bg-slate-50 dark:hover:bg-slate-700/60"
-              >
-                <div className="relative z-10 flex items-center gap-3">
-                  <div className="w-10 h-10 flex items-center justify-center rounded-xl bg-slate-50 dark:bg-slate-700/60 border border-slate-200 dark:border-slate-700 shadow-sm group-hover:bg-white dark:group-hover:bg-slate-800">
-                    <span className="text-lg font-bold text-slate-700 dark:text-slate-200">+</span>
-                  </div>
-                  <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
-                    {language === 'km' ? 'បន្ថែមយានយន្ត' : 'Add Vehicle'}
-                  </span>
-                </div>
-              </button>
+            {activeSystem === "sms" && canViewSms && (
+              <>
+                <QuickFilterButton
+                  icon={IconStock}
+                  label={language === 'km' ? 'ទ្រព្យសម្បត្តិ' : 'Assets'}
+                  isActive={pathname.startsWith("/sms/assets") || isPendingActive("/sms/assets")}
+                  onClick={() => handleNavigate("/sms/assets")}
+                  color="emerald"
+                  compact={isDrawer}
+                />
+                {canTransferSms && (
+                  <>
+                    <QuickFilterButton
+                      icon={ArrowLeftRight}
+                      label={language === 'km' ? 'ផ្លាស់ទីទ្រព្យ' : 'Asset Movement'}
+                      isActive={isSmsMovementActive || isPendingActive("/sms/transfer")}
+                      onClick={() => handleNavigate("/sms/transfer")}
+                      color="blue"
+                      compact={isDrawer}
+                    />
+                    <QuickFilterButton
+                      icon={Clock}
+                      label={language === 'km' ? 'សំណើផ្ទេរ' : 'Transfer Requests'}
+                      isActive={pathname === "/sms/pending" || isPendingActive("/sms/pending")}
+                      onClick={() => handleNavigate("/sms/pending")}
+                      color="purple"
+                      compact={isDrawer}
+                    />
+                  </>
+                )}
+                <QuickFilterButton
+                  icon={History}
+                  label={language === 'km' ? 'ប្រវត្តិចលនា' : 'Movement History'}
+                  isActive={pathname === "/sms/history" || isPendingActive("/sms/history")}
+                  onClick={() => handleNavigate("/sms/history")}
+                  color="orange"
+                  compact={isDrawer}
+                />
+                {canCreateSms && (
+                  <QuickFilterButton
+                    icon={IconStock}
+                    label={language === 'km' ? 'បង្កើតទ្រព្យថ្មី' : 'New Asset'}
+                    isActive={pathname === "/sms/assets" && searchParams.get("action") === "new"}
+                    onClick={() => handleNavigate("/sms/assets?action=new")}
+                    color="slate"
+                    isAddButton
+                    compact={isDrawer}
+                  />
+                )}
+              </>
             )}
           </div>
         </div>
@@ -493,14 +815,18 @@ export default function Sidebar({
             active={isSettingsActive || isPendingActive("/settings")}
             onClick={() => handleLinkClick("/settings")}
             priority="high"
+            compact={isDrawer}
           />
 
         </div>
       </nav> 
 
       {/* Footer */}
-      <div className="p-6 pt-4">
-        <div className="text-center text-xs text-slate-500 dark:text-slate-400">
+      <div className={isDrawer ? "px-5 pb-[clamp(0.45rem,1.4dvh,1.5rem)] pt-[clamp(0.15rem,0.7dvh,1rem)]" : "p-6 pt-4"}>
+        <div className={cn(
+          "truncate text-center text-slate-500 dark:text-slate-400",
+          isDrawer ? "text-[clamp(0.55rem,1.35dvh,0.75rem)]" : "text-xs"
+        )}>
           {language === 'km' ? '© ២០២៥ អេមើរ៉ល ឃែស' : '© 2025 Emerald Cash'}
         </div>
       </div>

@@ -15,23 +15,51 @@ export async function GET(req: NextRequest) {
     const search = searchParams.get('search') || undefined;
     const status = searchParams.get('status') || undefined;
     const assigned_to = searchParams.get('assigned_to') || searchParams.get('assignedTo') || undefined;
+    const created_by = searchParams.get('created_by') || searchParams.get('createdBy') || undefined;
+    const category = searchParams.get('category') || undefined;
+    const type = searchParams.get('type') || undefined;
+    const location = searchParams.get('location') || undefined;
+    const sort = searchParams.get('sort') || undefined;
 
     const filters = {
       search,
       status,
       assigned_to,
+      created_by,
+      category,
+      type,
+      location,
+      sort,
       limit: pageSize,
       offset: (page - 1) * pageSize
     };
-    const result = await smsService.getAssets(filters as SmsFilters);
+    const countFilters = {
+      search,
+      status,
+      assigned_to,
+      created_by,
+      category,
+      type,
+      location,
+    };
+    const [result, countResult] = await Promise.all([
+      smsService.getAssets(filters as SmsFilters),
+      smsService.countAssets(countFilters as SmsFilters),
+    ]);
     if (!result.success) {
       return NextResponse.json(
         { success: false, error: result.error || 'Failed to fetch assets' },
         { status: 500 }
       );
     }
+    if (!countResult.success) {
+      return NextResponse.json(
+        { success: false, error: countResult.error || 'Failed to count assets' },
+        { status: 500 }
+      );
+    }
 
-    const total = result.data?.length || 0;
+    const total = countResult.data || 0;
 
     return NextResponse.json({
       success: true,
@@ -60,6 +88,7 @@ function mapToDbPayload(data: Record<string, unknown>): Omit<SmsAssetDB, 'id' | 
     quantity: data.quantity !== undefined ? Number(data.quantity) : null,
     location: (data.location ?? null) as string | null,
     assigned_to: (data.assigned_to ?? data.assignedTo ?? null) as string | null,
+    created_by: (data.created_by ?? data.createdBy ?? null) as string | null,
     image_url: (data.image_url ?? data.imageUrl ?? null) as string | null,
     document_url: (data.document_url ?? data.documentUrl ?? null) as string | null,
     description: (data.description ?? null) as string | null,
@@ -75,32 +104,28 @@ export async function POST(req: NextRequest) {
 
     const body = await req.json();
 
-    // Debug: Log the incoming body for troubleshooting
-    console.log('[SMS Assets POST] Received body:', JSON.stringify(body));
-
     // Validate incoming data
     const { isValid, errors } = validateAssetForm(body);
     if (!isValid) {
-      console.log('[SMS Assets POST] Validation failed:', errors);
       return NextResponse.json(
         { success: false, error: 'Validation failed. Please check the form fields below.', errors },
         { status: 400 }
       );
     }
 
-    const dbPayload = mapToDbPayload(body);
-    console.log('[SMS Assets POST] DB payload:', JSON.stringify(dbPayload));
+    const dbPayload = {
+      ...mapToDbPayload(body),
+      created_by: auth.session.username,
+    };
 
     const result = await smsService.createAsset(dbPayload);
     if (!result.success) {
-      console.log('[SMS Assets POST] Create failed:', result.error);
       return NextResponse.json(
         { success: false, error: result.error || 'Failed to create asset' },
         { status: 500 }
       );
     }
 
-    console.log('[SMS Assets POST] Created successfully:', result.data?.id);
     return NextResponse.json({ success: true, data: result.data, meta: result.meta }, { status: 201 });
   } catch (error) {
     console.error('[SMS Assets POST] Error:', error);

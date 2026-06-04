@@ -3,6 +3,7 @@
  */
 
 import { sql, queryWithRetry } from "@/lib/db-singleton";
+import { revokeUserSessions } from "@/lib/auth";
 import {
   DatabaseError,
   NotFoundError,
@@ -11,7 +12,7 @@ import {
 } from "@/lib/errors";
 import { log } from "@/lib/logger";
 
-export type Role = "Admin" | "Staff" | "Accounting" | "Transfer";
+export type Role = "Admin" | "Staff" | "Accounting";
 
 export interface UserDB {
   username: string;
@@ -30,7 +31,7 @@ export interface UserDB {
 // Validation constants
 const USERNAME_REGEX = /^[a-z0-9._-]{3,32}$/;
 const MAX_PASSWORD_HASH_LENGTH = 255;
-const VALID_ROLES: Role[] = ["Admin", "Staff", "Accounting", "Transfer"];
+const VALID_ROLES: Role[] = ["Admin", "Staff", "Accounting"];
 
 // Input validation functions
 function validateUsername(username: string): void {
@@ -108,7 +109,7 @@ export async function ensureUsersTable(): Promise<void> {
       async () => sql`
         CREATE TABLE IF NOT EXISTS users (
           username VARCHAR(32) PRIMARY KEY,
-          role VARCHAR(20) NOT NULL CHECK (role IN ('Admin', 'Staff', 'Accounting', 'Transfer')),
+          role VARCHAR(20) NOT NULL CHECK (role IN ('Admin', 'Staff', 'Accounting')),
           password_hash VARCHAR(255) NOT NULL,
           created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
           updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
@@ -123,6 +124,10 @@ export async function ensureUsersTable(): Promise<void> {
         BEGIN
           ALTER TABLE users ALTER COLUMN role TYPE VARCHAR(20);
 
+          UPDATE users
+          SET role = 'Staff'
+          WHERE role = 'Transfer';
+
           IF EXISTS (
             SELECT 1
             FROM pg_constraint
@@ -134,7 +139,7 @@ export async function ensureUsersTable(): Promise<void> {
 
           ALTER TABLE users
           ADD CONSTRAINT users_role_check
-          CHECK (role IN ('Admin', 'Staff', 'Accounting', 'Transfer'));
+          CHECK (role IN ('Admin', 'Staff', 'Accounting'));
         END $$;
       `,
       "ensureUsersTable-role-constraint"
@@ -154,6 +159,9 @@ export async function createUserInDB(params: {
   passwordHash: string;
   role: Role;
   createdBy: string;
+  full_name?: string | null;
+  email?: string | null;
+  phone?: string | null;
 }): Promise<UserDB> {
   log("INFO", "Attempting to INSERT user", { username: params.username });
 
@@ -176,12 +184,15 @@ export async function createUserInDB(params: {
   try {
     // Rely on unique constraint for username to prevent duplicates
     const result = await queryWithRetry(async () => sql`
-      INSERT INTO users (username, role, password_hash, created_by)
+      INSERT INTO users (username, role, password_hash, created_by, full_name, email, phone)
       VALUES (
         ${normalizedUsername},
         ${params.role},
         ${params.passwordHash},
-        ${params.createdBy.trim()}
+        ${params.createdBy.trim()},
+        ${params.full_name || null},
+        ${params.email || null},
+        ${params.phone || null}
       )
       RETURNING *
     `, "createUserInDB-insert");
@@ -413,6 +424,174 @@ async function updateUsernameReferences(
   }
 }
 
+type DeletedUserReferenceIdentity = Pick<UserDB, "username" | "full_name" | "email">;
+
+function normalizeReferenceValue(value?: string | null): string {
+  return value?.trim().toLowerCase() || "";
+}
+
+async function runDeletedUserCleanup(
+  label: string,
+  username: string,
+  run: () => Promise<unknown>
+): Promise<void> {
+  try {
+    await queryWithRetry(run, `cleanupDeletedUserReferences:${label}`);
+  } catch (error) {
+    if (isOptionalReferenceTableError(error)) {
+      log("WARN", "Skipped optional deleted user reference cleanup", {
+        label,
+        username,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return;
+    }
+
+    log("ERROR", "Failed to clean deleted user reference", {
+      label,
+      username,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    throw new DatabaseError("Failed to clean deleted user references");
+  }
+}
+
+async function cleanupDeletedUserReferences(user: DeletedUserReferenceIdentity): Promise<void> {
+  const username = normalizeReferenceValue(user.username);
+  const fullName = normalizeReferenceValue(user.full_name);
+  const email = normalizeReferenceValue(user.email);
+
+  await runDeletedUserCleanup("users.created_by", username, () => sql`
+    UPDATE users
+    SET created_by = 'system'
+    WHERE LOWER(TRIM(COALESCE(created_by, ''))) = ${username}
+  `);
+
+  await runDeletedUserCleanup("audit_logs.actor_username", username, () => sql`
+    UPDATE audit_logs
+    SET actor_username = NULL
+    WHERE LOWER(TRIM(COALESCE(actor_username, ''))) = ${username}
+  `);
+
+  await runDeletedUserCleanup("lms_lesson_progress", username, () => sql`
+    DELETE FROM lms_lesson_progress
+    WHERE staff_id IN (
+      SELECT id
+      FROM lms_staff
+      WHERE
+        LOWER(TRIM(COALESCE(full_name, ''))) = ${username}
+        OR LOWER(TRIM(COALESCE(email, ''))) = ${username}
+        OR (${fullName} <> '' AND LOWER(TRIM(COALESCE(full_name, ''))) = ${fullName})
+        OR (${email} <> '' AND LOWER(TRIM(COALESCE(email, ''))) = ${email})
+    )
+  `);
+
+  await runDeletedUserCleanup("lms_lesson_completions", username, () => sql`
+    DELETE FROM lms_lesson_completions
+    WHERE staff_id IN (
+      SELECT id
+      FROM lms_staff
+      WHERE
+        LOWER(TRIM(COALESCE(full_name, ''))) = ${username}
+        OR LOWER(TRIM(COALESCE(email, ''))) = ${username}
+        OR (${fullName} <> '' AND LOWER(TRIM(COALESCE(full_name, ''))) = ${fullName})
+        OR (${email} <> '' AND LOWER(TRIM(COALESCE(email, ''))) = ${email})
+    )
+  `);
+
+  await runDeletedUserCleanup("lms_last_watched", username, () => sql`
+    DELETE FROM lms_last_watched
+    WHERE staff_id IN (
+      SELECT id
+      FROM lms_staff
+      WHERE
+        LOWER(TRIM(COALESCE(full_name, ''))) = ${username}
+        OR LOWER(TRIM(COALESCE(email, ''))) = ${username}
+        OR (${fullName} <> '' AND LOWER(TRIM(COALESCE(full_name, ''))) = ${fullName})
+        OR (${email} <> '' AND LOWER(TRIM(COALESCE(email, ''))) = ${email})
+    )
+  `);
+
+  await runDeletedUserCleanup("lms_staff", username, () => sql`
+    DELETE FROM lms_staff
+    WHERE
+      LOWER(TRIM(COALESCE(full_name, ''))) = ${username}
+      OR LOWER(TRIM(COALESCE(email, ''))) = ${username}
+      OR (${fullName} <> '' AND LOWER(TRIM(COALESCE(full_name, ''))) = ${fullName})
+      OR (${email} <> '' AND LOWER(TRIM(COALESCE(email, ''))) = ${email})
+  `);
+
+  await runDeletedUserCleanup("sms_assets.assigned_to", username, () => sql`
+    UPDATE sms_assets
+    SET
+      assigned_to = NULL,
+      status = CASE
+        WHEN LOWER(TRIM(COALESCE(status, ''))) IN ('in use', 'borrowed', 'out', 'not returned')
+          THEN 'Available'
+        ELSE status
+      END
+    WHERE
+      LOWER(TRIM(COALESCE(assigned_to, ''))) = ${username}
+      OR (${fullName} <> '' AND LOWER(TRIM(COALESCE(assigned_to, ''))) = ${fullName})
+      OR (${email} <> '' AND LOWER(TRIM(COALESCE(assigned_to, ''))) = ${email})
+  `);
+
+  await runDeletedUserCleanup("sms_notifications.pending_transfers", username, () => sql`
+    DELETE FROM sms_notifications
+    WHERE transfer_id IN (
+      SELECT id
+      FROM sms_transfers
+      WHERE LOWER(TRIM(COALESCE(status, ''))) = 'pending'
+        AND (
+          LOWER(TRIM(COALESCE(sender_id, ''))) = ${username}
+          OR LOWER(TRIM(COALESCE(receiver_id, ''))) = ${username}
+          OR (${fullName} <> '' AND LOWER(TRIM(COALESCE(sender_id, ''))) = ${fullName})
+          OR (${fullName} <> '' AND LOWER(TRIM(COALESCE(receiver_id, ''))) = ${fullName})
+          OR (${email} <> '' AND LOWER(TRIM(COALESCE(sender_id, ''))) = ${email})
+          OR (${email} <> '' AND LOWER(TRIM(COALESCE(receiver_id, ''))) = ${email})
+        )
+    )
+  `);
+
+  await runDeletedUserCleanup("sms_transfers.pending", username, () => sql`
+    DELETE FROM sms_transfers
+    WHERE LOWER(TRIM(COALESCE(status, ''))) = 'pending'
+      AND (
+        LOWER(TRIM(COALESCE(sender_id, ''))) = ${username}
+        OR LOWER(TRIM(COALESCE(receiver_id, ''))) = ${username}
+        OR (${fullName} <> '' AND LOWER(TRIM(COALESCE(sender_id, ''))) = ${fullName})
+        OR (${fullName} <> '' AND LOWER(TRIM(COALESCE(receiver_id, ''))) = ${fullName})
+        OR (${email} <> '' AND LOWER(TRIM(COALESCE(sender_id, ''))) = ${email})
+        OR (${email} <> '' AND LOWER(TRIM(COALESCE(receiver_id, ''))) = ${email})
+      )
+  `);
+
+  await runDeletedUserCleanup("sms_notifications.user_refs", username, () => sql`
+    DELETE FROM sms_notifications
+    WHERE
+      LOWER(TRIM(COALESCE(recipient_id, ''))) = ${username}
+      OR LOWER(TRIM(COALESCE(actor_id, ''))) = ${username}
+      OR (${fullName} <> '' AND LOWER(TRIM(COALESCE(recipient_id, ''))) = ${fullName})
+      OR (${fullName} <> '' AND LOWER(TRIM(COALESCE(actor_id, ''))) = ${fullName})
+      OR (${email} <> '' AND LOWER(TRIM(COALESCE(recipient_id, ''))) = ${email})
+      OR (${email} <> '' AND LOWER(TRIM(COALESCE(actor_id, ''))) = ${email})
+  `);
+
+  await runDeletedUserCleanup("stock_notifications.recipient_id", username, () => sql`
+    DELETE FROM stock_notifications
+    WHERE
+      LOWER(TRIM(COALESCE(recipient_id, ''))) = ${username}
+      OR (${fullName} <> '' AND LOWER(TRIM(COALESCE(recipient_id, ''))) = ${fullName})
+      OR (${email} <> '' AND LOWER(TRIM(COALESCE(recipient_id, ''))) = ${email})
+  `);
+
+  log("INFO", "Deleted user references cleaned", {
+    username,
+    hasFullName: Boolean(fullName),
+    hasEmail: Boolean(email),
+  });
+}
+
 // List all users
 export async function listUsersFromDB(): Promise<UserDB[]> {
   log("INFO", "Listing all users from database");
@@ -496,6 +675,7 @@ export async function updateUserAccountInDB(params: {
   currentUsername: string;
   username?: string;
   passwordHash?: string;
+  role?: Role;
   full_name?: string | null;
   email?: string | null;
   phone?: string | null;
@@ -506,6 +686,7 @@ export async function updateUserAccountInDB(params: {
     currentUsername: params.currentUsername,
     newUsername: params.username,
     hasPassword: Boolean(params.passwordHash),
+    newRole: params.role,
   });
 
   try {
@@ -515,6 +696,9 @@ export async function updateUserAccountInDB(params: {
     }
     if (params.passwordHash !== undefined) {
       validatePasswordHash(params.passwordHash);
+    }
+    if (params.role !== undefined) {
+      validateRole(params.role);
     }
   } catch (error) {
     log("ERROR", "Input validation failed for account update", {
@@ -546,12 +730,21 @@ export async function updateUserAccountInDB(params: {
     const bio = params.bio !== undefined ? params.bio : currentUser.bio;
     const profile_picture = params.profile_picture !== undefined ? params.profile_picture : currentUser.profile_picture;
     const password_hash = params.passwordHash ?? currentUser.password_hash;
+    const role = params.role ?? currentUser.role;
+
+    if (currentUser.role === "Admin" && role !== "Admin") {
+      const adminCount = await countAdminUsers();
+      if (adminCount <= 1) {
+        throw new ValidationError("Cannot remove the last Admin role");
+      }
+    }
 
     const result = await queryWithRetry(
       async () => sql`
         UPDATE users
         SET
           username = ${nextUsername},
+          role = ${role},
           password_hash = ${password_hash},
           full_name = ${full_name || null},
           email = ${email || null},
@@ -575,6 +768,7 @@ export async function updateUserAccountInDB(params: {
     log("INFO", "User account updated successfully", {
       currentUsername,
       username: nextUsername,
+      role,
     });
 
     return result[0] as UserDB;
@@ -620,21 +814,27 @@ export async function deleteUserFromDB(username: string): Promise<boolean> {
   const normalizedUsername = username.trim().toLowerCase();
 
   try {
-    // Use a transaction to ensure atomicity for last admin check
+    // Keep the admin guard, reference cleanup, and final delete on the same retryable path.
     const deleted = await queryWithRetry(async () => {
-      // Access the underlying client for transaction
-      // Note: The `sql` template literal function from db-singleton is already transaction-aware
-      // when used within dbManager.query. We need to ensure this specific check and delete
-      // happen as one atomic unit.
       const adminCountResult = await sql`SELECT COUNT(*) as count FROM users WHERE role = 'Admin'`;
       const adminCountRow = adminCountResult[0] as { count?: string | number } | undefined;
       const adminCount = parseInt(String(adminCountRow?.count ?? 0), 10);
 
-      const userToDelete = await sql`SELECT role FROM users WHERE username = ${normalizedUsername}`;
-      const userToDeleteRow = userToDelete[0] as { role?: string } | undefined;
+      const userToDelete = await sql`
+        SELECT username, role, full_name, email
+        FROM users
+        WHERE username = ${normalizedUsername}
+      `;
+      const userToDeleteRow = userToDelete[0] as Pick<UserDB, "username" | "role" | "full_name" | "email"> | undefined;
+      if (!userToDeleteRow) {
+        throw new NotFoundError("User");
+      }
+
       if (userToDeleteRow?.role === 'Admin' && adminCount <= 1) {
         throw new ValidationError("Cannot delete the last Admin account");
       }
+
+      await cleanupDeletedUserReferences(userToDeleteRow);
 
       const result = await sql`DELETE FROM users WHERE username = ${normalizedUsername} RETURNING username`;
       return result.length > 0;
@@ -646,6 +846,7 @@ export async function deleteUserFromDB(username: string): Promise<boolean> {
     }
 
     clearAdminUserCache();
+    revokeUserSessions(normalizedUsername);
     log("INFO", "User deleted successfully", { username: normalizedUsername });
     return true;
   } catch (error) {

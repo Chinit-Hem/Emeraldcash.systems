@@ -9,59 +9,92 @@ import { ConfirmDeleteModal } from "@/systems/vms/components/vehicles/ConfirmDel
 import { useDeleteVehicle } from "@/systems/vms/components/vehicles/useDeleteVehicle";
 import { useToast } from "@/shared/components/ui/glass/GlassToast";
 import { isDriveHostedImageUrl } from "@/shared/utils/drive";
-import { getVehicleThumbnailUrl, isCloudinaryUrl } from "@/systems/vms/utils/vehicle-helpers";
+import { getVehicleThumbnailUrl, isCloudinaryUrl, mergeVehicleImages } from "@/systems/vms/utils/vehicle-helpers";
 import { getVehicleColorHex, translateVehicleColor } from "@/systems/vms/utils/vehicleColors";
 import type { Vehicle } from "@/shared/types/types";
 import { cn } from "@/shared/utils/ui";
+import { formatVehicleId } from "@/shared/utils/format";
 import { useVehiclesNeon } from "@/systems/vms/hooks/useVehiclesNeon";
 import { getFuzzySuggestions } from "@/systems/vms/utils/fuzzySearch";
+import {
+  INVALID_BRAND_NAMES,
+  brandMatchesFilter,
+  getBrandFallbackLabel,
+  getBrandKey,
+  getBrandLogoSources,
+  getCanonicalBrandName,
+  getFeaturedBrandNamesForCategory,
+  getFeaturedModelNamesForBrand,
+  getModelFilterValue,
+  getModelKey,
+  isBrandAllowedForCategory,
+  normalizeModelName,
+} from "@/systems/vms/utils/vehicleBrandMetadata";
 import {
   getVehicleGroupKey,
   getVehicleGroupValue,
   getVehicleListItemElementId,
+  getVehicleListSearchParamsWithFallback,
+  getStoredVehicleListScrollPosition,
+  getStoredVehicleListScrollSnapshot,
+  clearStoredVehicleListState,
   normalizeVehicleGroupText,
   parseVehicleGroupByParam,
   parseVehicleListPageParam,
-  parseVehicleListPageSizeParam,
+  parseVehicleListViewParam,
   rememberVehicleListHref,
+  rememberVehicleListScrollPosition,
+  rememberVehicleListScrollSnapshot,
   setVehicleListQueryValue,
+  VEHICLE_LIST_ALL_HREF,
   VEHICLE_LIST_FOCUS_PARAM,
   VEHICLE_LIST_PAGE_PARAM,
-  VEHICLE_LIST_PAGE_SIZE_PARAM,
+  VEHICLE_LIST_URL_CHANGE_EVENT,
+  VEHICLE_LIST_VIEW_PARAM,
   withVehicleListFocusHref,
   withVehicleListReturnHref,
-  type VehicleGroupByOption
+  type VehicleGroupByOption,
+  type VehicleListScrollSnapshot
 } from "@/systems/vms/utils/vehicleListState";
 import SearchSuggestions from "@/shared/components/SearchSuggestions";
-import { TukTukIcon } from "@/shared/components/icons/TukTukIcon";
 import {
   AlertCircle,
   ArrowDown,
+  ArrowLeft,
   ArrowUp,
   ArrowUpDown,
-  Bike,
   Car,
-  CheckCircle2,
+  CarFront,
+  CarTaxiFront,
+  BusFront,
+  Bookmark,
   ChevronDown,
   Clock,
   Columns,
   Eye,
   Filter,
   Grid3X3,
+  ImageIcon,
   List,
+  MoreVertical,
   Pen,
   Plus,
-  Package,
   RefreshCw,
   RotateCcw,
   Search,
+  Share2,
+  Shapes,
   Trash2,
-  X
+  Truck,
+  Van,
+  X,
+  type LucideIcon,
 } from "lucide-react";
 import dynamic from "next/dynamic";
 import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 
 const AddVehicleModalOptimistic = dynamic(
   () => import("@/systems/vms/components/vehicles/AddVehicleModalOptimistic"),
@@ -86,7 +119,6 @@ interface ColumnConfig {
 }
 
 type ViewMode = "grid" | "list";
-type TotalsMode = "all" | "filtered";
 type GroupByOption = VehicleGroupByOption;
 
 interface FilterState {
@@ -97,6 +129,7 @@ interface FilterState {
   model: string;
   year: string;
   plate: string;
+  bodyType: string;
   minPrice: string;
   maxPrice: string;
   taxType: string;
@@ -125,13 +158,135 @@ const COLUMNS: ColumnConfig[] = [
   { key: "actions", label: "Actions", width: "140px", sortable: false, defaultVisible: true },
 ];
 
-const ITEMS_PER_PAGE_OPTIONS = [10, 20, 30, 50, 100, 500, 2000];
-const DEFAULT_ITEMS_PER_PAGE = 10;
-const MOBILE_VEHICLE_FETCH_LIMIT = 200;
+const DEFAULT_ITEMS_PER_PAGE = 50;
+const MOBILE_VEHICLE_FETCH_LIMIT = 2000;
 const DESKTOP_VEHICLE_FETCH_LIMIT = 2000;
 const FILTER_LABEL_CLASS = "mb-1.5 block text-xs font-medium text-slate-600 dark:text-slate-400";
 const FILTER_FIELD_CLASS =
   "w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 transition-all placeholder-slate-400 focus:border-emerald-500/30 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 dark:border-slate-700 dark:bg-slate-800/80 dark:text-slate-100 dark:placeholder-slate-500";
+const BRAND_FILTER_VISIBLE_COUNT = 20;
+const MODEL_FILTER_VISIBLE_COUNT = 24;
+type BrandOption = {
+  name: string;
+  count: number;
+};
+
+type ModelOption = {
+  label: string;
+  value: string;
+  count: number;
+};
+
+type BodyTypeOption = {
+  label: string;
+  value: string;
+  aliases: string[];
+  icon: LucideIcon;
+  tone: string;
+  count: number;
+};
+
+const BODY_TYPE_OPTIONS: Omit<BodyTypeOption, "count">[] = [
+  {
+    label: "Sedan",
+    value: "Sedan",
+    aliases: ["sedan", "saloon"],
+    icon: Car,
+    tone: "text-sky-600",
+  },
+  {
+    label: "Hatchback",
+    value: "Hatchback",
+    aliases: ["hatchback", "hatch"],
+    icon: CarFront,
+    tone: "text-blue-600",
+  },
+  {
+    label: "Pickup",
+    value: "Pickup",
+    aliases: ["pickup", "pick up", "pick-up", "truck"],
+    icon: Truck,
+    tone: "text-cyan-700",
+  },
+  {
+    label: "SUV",
+    value: "SUV",
+    aliases: ["suv", "crossover"],
+    icon: Car,
+    tone: "text-indigo-600",
+  },
+  {
+    label: "Convertible",
+    value: "Convertible",
+    aliases: ["convertible", "cabriolet", "roadster"],
+    icon: CarTaxiFront,
+    tone: "text-blue-500",
+  },
+  {
+    label: "MPV (Minivan)",
+    value: "MPV",
+    aliases: ["mpv", "minivan", "mini van", "van"],
+    icon: Van,
+    tone: "text-sky-700",
+  },
+  {
+    label: "Sports",
+    value: "Sports",
+    aliases: ["sports", "sport", "coupe"],
+    icon: CarFront,
+    tone: "text-blue-700",
+  },
+  {
+    label: "Station Wagon",
+    value: "Station Wagon",
+    aliases: ["station wagon", "wagon", "estate"],
+    icon: BusFront,
+    tone: "text-slate-600",
+  },
+  {
+    label: "Other",
+    value: "Other",
+    aliases: ["other", "others"],
+    icon: Shapes,
+    tone: "text-sky-600",
+  },
+];
+
+function normalizeBodyTypeName(value: unknown): string {
+  return typeof value === "string" ? value.trim().replace(/\s+/g, " ") : "";
+}
+
+function getBodyTypeKey(value: string): string {
+  return normalizeBodyTypeName(value).toLocaleLowerCase("en-US").replace(/[^a-z0-9]+/g, "");
+}
+
+function getCanonicalBodyTypeName(value: string): string {
+  const bodyTypeKey = getBodyTypeKey(value);
+  if (!bodyTypeKey) return "";
+
+  const matchedOption = BODY_TYPE_OPTIONS.find((option) =>
+    option.aliases.some((alias) => bodyTypeKey.includes(getBodyTypeKey(alias)))
+  );
+
+  return matchedOption?.label ?? normalizeBodyTypeName(value);
+}
+
+function bodyTypeMatchesFilter(bodyType: unknown, filterValue: string): boolean {
+  const rawBodyType = normalizeBodyTypeName(bodyType);
+  const rawBodyTypeKey = getBodyTypeKey(rawBodyType);
+  const filterKey = getBodyTypeKey(filterValue);
+  if (!rawBodyTypeKey || !filterKey) return false;
+
+  const matchedOption = BODY_TYPE_OPTIONS.find((option) =>
+    getBodyTypeKey(option.value) === filterKey || getBodyTypeKey(option.label) === filterKey
+  );
+
+  if (!matchedOption) {
+    return rawBodyTypeKey.includes(filterKey);
+  }
+
+  return matchedOption.aliases.some((alias) => rawBodyTypeKey.includes(getBodyTypeKey(alias)));
+}
 
 const normalizeGroupKey = (value: string, groupBy: GroupByOption): string => {
   const normalizedValue = normalizeVehicleGroupText(value);
@@ -149,6 +304,36 @@ function detectMobileSafariLike(): boolean {
     (platform === "MacIntel" && maxTouchPoints > 1);
 
   return isIOS || maxTouchPoints > 1;
+}
+
+function getVehicleListScrollContainer(): HTMLElement | null {
+  if (typeof document === "undefined") return null;
+
+  return document.querySelector<HTMLElement>('[data-app-scroll-container="true"]');
+}
+
+function getVehicleListScrollSnapshot(): VehicleListScrollSnapshot {
+  const scrollContainer = getVehicleListScrollContainer();
+
+  return {
+    scrollX: scrollContainer?.scrollLeft ?? window.scrollX,
+    scrollY: scrollContainer?.scrollTop ?? window.scrollY,
+  };
+}
+
+function restoreVehicleListScrollSnapshot(snapshot: VehicleListScrollSnapshot): void {
+  const scrollOptions: ScrollToOptions = {
+    left: snapshot.scrollX,
+    top: snapshot.scrollY,
+    behavior: "auto",
+  };
+  const scrollContainer = getVehicleListScrollContainer();
+
+  if (scrollContainer) {
+    scrollContainer.scrollTo(scrollOptions);
+  } else {
+    window.scrollTo(scrollOptions);
+  }
 }
 
 function normalizeVehicleImageValue(imageValue: unknown): string {
@@ -381,7 +566,7 @@ function NeuInput({
 }) {
   return (
     <div className={cn("relative", className)}>
-      {Icon && <Icon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 dark:text-slate-500" />}
+      {Icon && <Icon className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 dark:text-slate-500 sm:left-4 sm:h-5 sm:w-5" />}
       <input
         type={type}
         title={placeholder}
@@ -395,165 +580,313 @@ function NeuInput({
           "focus:shadow-[6px_6px_12px_#e2e8f0,-6px_-6px_12px_#ffffff]",
           "dark:focus:shadow-[0_14px_30px_rgba(2,6,23,0.58)]",
           "focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500/40",
-          "text-slate-700 placeholder-slate-400 outline-none dark:text-slate-100 dark:placeholder-slate-500",
-          Icon ? "pl-12 pr-4 py-3" : "px-4 py-3"
+          "text-sm text-slate-700 placeholder-slate-400 outline-none dark:text-slate-100 dark:placeholder-slate-500",
+          Icon ? "py-2.5 pl-10 pr-3 sm:py-3 sm:pl-12 sm:pr-4" : "px-3 py-2.5 sm:px-4 sm:py-3"
         )}
       />
     </div>
   );
 }
 
-function AnimatedCounter({ value, duration = 1000 }: { value: number; duration?: number }) {
-  const [displayValue, setDisplayValue] = useState(0);
+// ============================================================================
+// Brand Filter Component
+// ============================================================================
+
+function BrandLogoMark({ brand }: { brand: string }) {
+  const logoSources = useMemo(() => getBrandLogoSources(brand), [brand]);
+  const fallbackLabel = useMemo(() => getBrandFallbackLabel(brand), [brand]);
+  const isOtherBrand = getBrandKey(brand).startsWith("other");
+  const [logoSourceIndex, setLogoSourceIndex] = useState(0);
 
   useEffect(() => {
-    let startTime: number;
-    let animationFrame: number;
+    setLogoSourceIndex(0);
+  }, [brand, logoSources.length]);
 
-    const animate = (currentTime: number) => {
-      if (!startTime) startTime = currentTime;
-      const progress = Math.min((currentTime - startTime) / duration, 1);
-      const easeOutQuart = 1 - Math.pow(1 - progress, 4);
-      setDisplayValue(Math.floor(easeOutQuart * value));
-      if (progress < 1) animationFrame = requestAnimationFrame(animate);
-    };
-
-    animationFrame = requestAnimationFrame(animate);
-    return () => cancelAnimationFrame(animationFrame);
-  }, [value, duration]);
-
-  return <span>{displayValue.toLocaleString()}</span>;
-}
-
-// ============================================================================
-// Quick Filter Card Component
-// ============================================================================
-
-function QuickFilterCard({
-  active,
-  onClick,
-  icon: Icon,
-  label,
-  count,
-  color,
-  index = 0
-}: {
-  active: boolean;
-  onClick: () => void;
-  icon: React.ComponentType<{ className?: string }>;
-  label: string;
-  count: number;
-  color: "emerald" | "blue" | "purple" | "orange" | "slate";
-  index?: number;
-}) {
-  const [isHovered, setIsHovered] = useState(false);
-  const [isPressed, setIsPressed] = useState(false);
-
-  const colorClasses = {
-    emerald: {
-      gradient: "from-emerald-500 via-emerald-600 to-emerald-700",
-      bg: "bg-emerald-500",
-      light: "bg-emerald-100 dark:bg-emerald-500/15",
-      text: "text-emerald-700",
-      shadow: "shadow-emerald-500/30",
-      glow: "shadow-emerald-500/50",
-      ring: "ring-emerald-200"
-    },
-    blue: {
-      gradient: "from-blue-500 via-blue-600 to-blue-700",
-      bg: "bg-blue-500",
-      light: "bg-blue-100 dark:bg-blue-500/15",
-      text: "text-blue-700",
-      shadow: "shadow-blue-500/30",
-      glow: "shadow-blue-500/50",
-      ring: "ring-blue-200"
-    },
-    purple: {
-      gradient: "from-purple-500 via-purple-600 to-purple-700",
-      bg: "bg-purple-500",
-      light: "bg-purple-100 dark:bg-purple-500/15",
-      text: "text-purple-700",
-      shadow: "shadow-purple-500/30",
-      glow: "shadow-purple-500/50",
-      ring: "ring-purple-200"
-    },
-    orange: {
-      gradient: "from-orange-500 via-orange-600 to-orange-700",
-      bg: "bg-orange-500",
-      light: "bg-orange-100 dark:bg-orange-500/15",
-      text: "text-orange-700",
-      shadow: "shadow-orange-500/30",
-      glow: "shadow-orange-500/50",
-      ring: "ring-orange-200"
-    },
-    slate: {
-      gradient: "from-slate-500 via-slate-600 to-slate-700",
-      bg: "bg-slate-500",
-      light: "bg-slate-100 dark:bg-slate-700/70",
-      text: "text-slate-700",
-      shadow: "shadow-slate-500/30",
-      glow: "shadow-slate-500/50",
-      ring: "ring-slate-200"
-    },
-  };
-
-  const colors = colorClasses[color];
+  const logoSource = logoSources[logoSourceIndex];
 
   return (
-    <button
-      onClick={onClick}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => { setIsHovered(false); setIsPressed(false); }}
-      onMouseDown={() => setIsPressed(true)}
-      onMouseUp={() => setIsPressed(false)}
-      className={cn(
-        "group relative flex flex-col items-start gap-3 p-5 rounded-2xl transition-all duration-500 w-full overflow-hidden border backdrop-blur-xl",
-        active
-          ? cn("bg-gradient-to-br text-white border-white/20", colors.gradient, colors.shadow, "shadow-lg scale-[1.02]")
-          : cn("border-white/60 bg-white/80 shadow-[0_4px_20px_rgba(0,0,0,0.05)] hover:-translate-y-1 hover:scale-[1.02] hover:bg-white/95 hover:shadow-xl hover:shadow-slate-200/50 dark:border-slate-700/70 dark:bg-slate-900/80 dark:shadow-[0_14px_30px_rgba(2,6,23,0.4)] dark:hover:bg-slate-800/90 dark:hover:shadow-black/30"),
-        isPressed && "scale-[0.98] transition-transform duration-150"
+    <span className="flex h-7 w-7 items-center justify-center overflow-hidden rounded-full bg-[#f6fbff] p-1 shadow-[0_5px_10px_rgba(15,23,42,0.12)] ring-1 ring-slate-200/80 dark:bg-[#f6fbff] dark:shadow-[0_8px_18px_rgba(0,0,0,0.35)] dark:ring-transparent sm:h-[72px] sm:w-[72px] sm:p-2">
+      {logoSource ? (
+        <img
+          key={logoSource}
+          src={logoSource}
+          alt=""
+          aria-hidden="true"
+          loading="lazy"
+          decoding="async"
+          onError={() => setLogoSourceIndex((index) => index + 1)}
+          className="h-auto max-h-5 w-auto max-w-6 object-contain saturate-100 sm:max-h-12 sm:max-w-14"
+        />
+      ) : isOtherBrand ? (
+        <Shapes className="h-4 w-4 text-sky-600 sm:h-9 sm:w-9" aria-hidden="true" />
+      ) : (
+        <span
+          aria-hidden="true"
+          className="max-w-full px-0.5 text-center text-[7px] font-black leading-none tracking-normal text-slate-700 sm:text-sm"
+        >
+          {fallbackLabel}
+        </span>
       )}
-      style={{ animationDelay: `${index * 100}ms` }}
-    >
-      <div className={cn(
-        "absolute inset-0 opacity-0 transition-opacity duration-500",
-        active ? "opacity-100" : "group-hover:opacity-100",
-        "bg-gradient-to-br from-white/10 to-transparent"
-      )} />
+    </span>
+  );
+}
 
-      <div className="relative flex items-center justify-between w-full">
-<div className={cn(
-          "flex items-center justify-center w-12 h-12 rounded-xl transition-all duration-150",
-          active
-            ? "bg-white/20 shadow-inner"
-            : cn("bg-gradient-to-br shadow-md", colors.light, "group-hover:shadow-lg group-hover:scale-110")
-        )}>
-          {Icon && <Icon className="w-6 h-6 transition-all duration-150" />}
-        </div>
-        {active && <CheckCircle2 className="w-5 h-5 text-white/80" />}
+function BrandFilterSection({
+  title,
+  brands,
+  selectedBrand,
+  isExpanded,
+  onToggleExpanded,
+  onBrandSelect,
+}: {
+  title: string;
+  brands: BrandOption[];
+  selectedBrand: string;
+  isExpanded: boolean;
+  onToggleExpanded: () => void;
+  onBrandSelect: (brand: string) => void;
+}) {
+  const selectedBrandKey = getBrandKey(selectedBrand);
+  const hasHiddenBrands = brands.length > BRAND_FILTER_VISIBLE_COUNT;
+  const visibleBrands = isExpanded ? brands : brands.slice(0, BRAND_FILTER_VISIBLE_COUNT);
+
+  return (
+    <section className="overflow-hidden rounded-2xl border border-slate-200/70 bg-white/90 p-4 text-slate-900 shadow-[0_14px_34px_rgba(15,23,42,0.08)] ring-1 ring-white/70 dark:border-slate-800/80 dark:bg-[#111827] dark:text-white dark:shadow-[0_18px_45px_rgba(0,0,0,0.22)] dark:ring-black/20 sm:p-7">
+      <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100 sm:text-xl">{title}</h2>
+
+      <div className="mt-4 grid [grid-template-columns:repeat(auto-fit,minmax(46px,1fr))] gap-x-1.5 gap-y-3 sm:mt-7 sm:grid-cols-5 sm:gap-x-3 sm:gap-y-8 md:grid-cols-6 lg:grid-cols-10">
+        {visibleBrands.map((brand) => {
+          const isActive = selectedBrandKey === getBrandKey(brand.name);
+
+          return (
+            <button
+              key={brand.name}
+              type="button"
+              aria-pressed={isActive}
+              onClick={() => onBrandSelect(brand.name)}
+              className={cn(
+                "group flex min-h-[58px] min-w-0 flex-col items-center justify-start gap-1 rounded-xl px-0 py-1 text-center transition sm:min-h-[122px] sm:gap-3 sm:px-2 sm:py-2",
+                "hover:bg-slate-100/75 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/70 dark:hover:bg-white/5 dark:focus-visible:ring-emerald-400/80",
+                isActive && "bg-emerald-50 ring-2 ring-emerald-500/70 dark:bg-white/10 dark:ring-emerald-400/90"
+              )}
+            >
+              <BrandLogoMark brand={brand.name} />
+              <span className="line-clamp-2 min-h-[18px] w-full max-w-[54px] break-words text-[7px] font-medium leading-tight text-slate-700 transition group-hover:text-slate-950 dark:text-slate-100 dark:group-hover:text-white sm:min-h-9 sm:max-w-none sm:text-base">
+                {brand.name}
+              </span>
+            </button>
+          );
+        })}
       </div>
 
-      <div className="relative w-full text-left">
-        <div className={cn(
-"text-3xl font-bold tracking-tight transition-all duration-150",
-          active ? "text-white" : "text-slate-800 dark:text-slate-100"
-        )}>
-          <AnimatedCounter value={count} duration={800 + index * 100} />
-        </div>
-        <div className={cn(
-"text-sm font-medium transition-all duration-150",
-          active ? "text-white/80" : "text-slate-500 dark:text-slate-400"
-        )}>
-          {label}
-        </div>
+      {hasHiddenBrands && (
+        <button
+          type="button"
+          onClick={onToggleExpanded}
+          className="mt-5 flex min-h-10 w-full items-center justify-center rounded-xl bg-slate-100 px-4 text-xs font-medium text-slate-600 transition hover:bg-slate-200 hover:text-slate-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/70 dark:bg-slate-800 dark:text-slate-400 dark:hover:bg-slate-700 dark:hover:text-slate-100 dark:focus-visible:ring-emerald-400/80 sm:mt-7 sm:min-h-14 sm:text-sm"
+        >
+          {isExpanded ? "Show Less" : "Show More"}
+        </button>
+      )}
+    </section>
+  );
+}
+
+function ModelFilterSection({
+  title,
+  backLabel,
+  models,
+  selectedModel,
+  isExpanded,
+  onBackToBrands,
+  onToggleExpanded,
+  onModelSelect,
+}: {
+  title: string;
+  backLabel: string;
+  models: ModelOption[];
+  selectedModel: string;
+  isExpanded: boolean;
+  onBackToBrands: () => void;
+  onToggleExpanded: () => void;
+  onModelSelect: (model: string) => void;
+}) {
+  const selectedModelKey = getModelKey(selectedModel);
+  const hasHiddenModels = models.length > MODEL_FILTER_VISIBLE_COUNT;
+  const visibleModels = isExpanded ? models : models.slice(0, MODEL_FILTER_VISIBLE_COUNT);
+
+  return (
+    <section className="overflow-hidden rounded-2xl border border-slate-200/70 bg-white/90 p-4 text-slate-900 shadow-[0_14px_34px_rgba(15,23,42,0.08)] ring-1 ring-white/70 dark:border-slate-800/80 dark:bg-[#111827] dark:text-white dark:shadow-[0_18px_45px_rgba(0,0,0,0.22)] dark:ring-black/20 sm:p-7">
+      <div className="flex items-center justify-between gap-3">
+        <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100 sm:text-xl">{title}</h2>
+        <button
+          type="button"
+          onClick={onBackToBrands}
+          className="inline-flex min-h-9 items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 text-xs font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-100 hover:text-slate-950 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/70 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:border-slate-600 dark:hover:bg-slate-700 dark:hover:text-white dark:focus-visible:ring-emerald-400/80 sm:min-h-10 sm:text-sm"
+        >
+          <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+          {backLabel}
+        </button>
       </div>
 
-      <div className={cn(
-        "absolute -inset-px rounded-2xl opacity-0 transition-opacity duration-500 pointer-events-none",
-        isHovered && !active && colors.glow,
-        isHovered && "opacity-20 blur-xl"
-      )} />
-    </button>
+      <div className="mt-4 grid grid-cols-2 gap-2 sm:mt-6 sm:grid-cols-3 lg:grid-cols-6">
+        {visibleModels.map((model) => {
+          const isActive = selectedModelKey === getModelKey(model.value);
+
+          return (
+            <button
+              key={model.label}
+              type="button"
+              aria-pressed={isActive}
+              onClick={() => onModelSelect(model.value)}
+              className={cn(
+                "flex min-h-12 items-center justify-center rounded-xl px-3 py-2 text-center text-xs font-medium leading-tight transition focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/70 sm:min-h-14 sm:text-base",
+                "bg-slate-100 text-slate-700 hover:bg-slate-200 hover:text-slate-950 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700 dark:hover:text-white",
+                isActive && "text-sky-600 ring-2 ring-sky-500/70 dark:text-sky-400 dark:ring-sky-400/80"
+              )}
+            >
+              {model.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {hasHiddenModels && (
+        <button
+          type="button"
+          onClick={onToggleExpanded}
+          className="mt-4 flex min-h-10 w-full items-center justify-center rounded-xl bg-slate-100 px-4 text-xs font-medium text-slate-600 transition hover:bg-slate-200 hover:text-slate-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/70 dark:bg-slate-800 dark:text-slate-400 dark:hover:bg-slate-700 dark:hover:text-slate-100 dark:focus-visible:ring-emerald-400/80 sm:min-h-14 sm:text-sm"
+        >
+          {isExpanded ? "Show Less" : "Show More"}
+        </button>
+      )}
+    </section>
+  );
+}
+
+function BodyTypeVehicleSvg({ type }: { type: string }) {
+  const key = getBodyTypeKey(type);
+  const isPickup = key === "pickup";
+  const isConvertible = key === "convertible";
+  const isSports = key === "sports";
+  const isMpv = key === "mpv";
+  const isWagon = key === "stationwagon";
+  const isSuv = key === "suv";
+  const isHatchback = key === "hatchback";
+
+  const bodyPath = isPickup
+    ? "M10 38 C14 33 20 30 30 30 H50 L57 37 H82 C86 37 90 41 91 46 L87 50 H15 L9 46 Z"
+    : isSports
+      ? "M8 40 C17 33 30 30 45 30 H68 C78 30 88 36 92 45 L88 49 H14 L8 45 Z"
+      : isConvertible
+        ? "M10 40 C18 34 27 31 42 31 H67 C79 31 87 37 91 46 L87 50 H15 L9 46 Z"
+        : isMpv
+          ? "M9 40 C11 31 20 25 33 24 H67 C80 25 88 34 91 46 L87 50 H14 L9 46 Z"
+          : isWagon
+            ? "M9 40 C13 31 22 27 35 27 H69 C80 28 88 36 91 46 L87 50 H14 L9 46 Z"
+            : isSuv
+              ? "M9 40 C12 31 22 26 35 26 H67 C80 27 88 36 91 46 L87 50 H14 L9 46 Z"
+              : isHatchback
+                ? "M10 40 C15 32 24 28 38 28 H66 C78 29 87 37 91 46 L87 50 H15 L9 46 Z"
+                : "M9 40 C16 32 27 28 42 28 H68 C79 29 88 37 91 46 L87 50 H14 L9 46 Z";
+
+  const roofPath = isPickup
+    ? "M30 30 L38 20 H52 L61 37 H49 L44 28 H32 Z"
+    : isSports
+      ? "M31 30 L43 22 H60 L72 31 H58 L53 27 H43 L38 31 Z"
+      : isConvertible
+        ? "M35 31 H63"
+        : isMpv
+          ? "M31 25 L39 16 H65 L77 34 H36 Z"
+          : isWagon
+            ? "M31 27 L40 18 H66 L77 35 H36 Z"
+            : isSuv
+              ? "M32 26 L41 17 H65 L77 35 H37 Z"
+              : isHatchback
+                ? "M32 28 L42 18 H62 L76 36 H38 Z"
+                : "M31 28 L41 18 H60 L74 36 H36 Z";
+
+  return (
+    <svg viewBox="0 0 96 64" role="img" aria-hidden="true" className="h-6 w-8 sm:h-12 sm:w-14">
+      <ellipse cx="48" cy="51" rx="38" ry="4" fill="#cbd5e1" opacity="0.45" />
+      <path d={bodyPath} fill="#0ea5e9" stroke="#0369a1" strokeWidth="2" strokeLinejoin="round" />
+      <path
+        d={roofPath}
+        fill={isConvertible ? "none" : "#e0f2fe"}
+        stroke="#0369a1"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      {!isConvertible && <path d="M43 20 V35 M62 21 V36" stroke="#7dd3fc" strokeWidth="2" opacity="0.8" />}
+      {isPickup && <path d="M58 38 H82" stroke="#e0f2fe" strokeWidth="2" strokeLinecap="round" />}
+      <circle cx="27" cy="49" r="7" fill="#0f172a" />
+      <circle cx="76" cy="49" r="7" fill="#0f172a" />
+      <circle cx="27" cy="49" r="3" fill="#e2e8f0" />
+      <circle cx="76" cy="49" r="3" fill="#e2e8f0" />
+      <path d="M15 41 H8 M91 42 H84" stroke="#fef3c7" strokeWidth="2" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function BodyTypeMark({ option }: { option: BodyTypeOption }) {
+  const isOtherBodyType = getBodyTypeKey(option.value) === "other";
+
+  return (
+    <span className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-full bg-[#f6fbff] shadow-[0_5px_10px_rgba(15,23,42,0.12)] ring-1 ring-slate-200/80 dark:bg-[#f6fbff] dark:shadow-[0_8px_18px_rgba(0,0,0,0.35)] dark:ring-transparent sm:h-[72px] sm:w-[72px]">
+      {isOtherBodyType ? (
+        <Shapes className="h-5 w-5 text-sky-600 sm:h-9 sm:w-9" aria-hidden="true" />
+      ) : (
+        <BodyTypeVehicleSvg type={option.value} />
+      )}
+    </span>
+  );
+}
+
+function BodyTypeFilterSection({
+  title,
+  bodyTypes,
+  selectedBodyType,
+  onBodyTypeSelect,
+}: {
+  title: string;
+  bodyTypes: BodyTypeOption[];
+  selectedBodyType: string;
+  onBodyTypeSelect: (bodyType: string) => void;
+}) {
+  const selectedBodyTypeKey = getBodyTypeKey(selectedBodyType);
+
+  return (
+    <section className="overflow-hidden rounded-2xl border border-slate-200/70 bg-white/90 p-4 text-slate-900 shadow-[0_14px_34px_rgba(15,23,42,0.08)] ring-1 ring-white/70 dark:border-slate-800/80 dark:bg-[#111827] dark:text-white dark:shadow-[0_18px_45px_rgba(0,0,0,0.22)] dark:ring-black/20 sm:p-7">
+      <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100 sm:text-xl">{title}</h2>
+
+      <div className="mt-4 grid [grid-template-columns:repeat(auto-fit,minmax(48px,1fr))] gap-x-1.5 gap-y-3 sm:mt-7 sm:grid-cols-5 sm:gap-x-3 sm:gap-y-8 md:grid-cols-6 lg:grid-cols-9">
+        {bodyTypes.map((bodyType) => {
+          const isActive =
+            selectedBodyTypeKey === getBodyTypeKey(bodyType.value) ||
+            selectedBodyTypeKey === getBodyTypeKey(bodyType.label);
+
+          return (
+            <button
+              key={bodyType.label}
+              type="button"
+              aria-pressed={isActive}
+              onClick={() => onBodyTypeSelect(bodyType.value)}
+              className={cn(
+                "group flex min-h-[58px] min-w-0 flex-col items-center justify-start gap-1 rounded-xl px-0 py-1 text-center transition sm:min-h-[122px] sm:gap-3 sm:px-2 sm:py-2",
+                "hover:bg-slate-100/75 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/70 dark:hover:bg-white/5 dark:focus-visible:ring-emerald-400/80",
+                isActive && "bg-emerald-50 ring-2 ring-emerald-500/70 dark:bg-white/10 dark:ring-emerald-400/90"
+              )}
+            >
+              <BodyTypeMark option={bodyType} />
+              <span className="line-clamp-2 min-h-[18px] w-full max-w-[56px] break-words text-[7px] font-medium leading-tight text-slate-700 transition group-hover:text-slate-950 dark:text-slate-100 dark:group-hover:text-white sm:min-h-9 sm:max-w-none sm:text-base">
+                {bodyType.label}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </section>
   );
 }
 
@@ -571,14 +904,14 @@ function ViewToggle({
   t: ReturnType<typeof useTranslation>["t"];
 }) {
   return (
-    <div className="flex items-center gap-1 rounded-xl bg-slate-100/80 p-1 shadow-[inset_2px_2px_4px_#cbd5e1,inset_-2px_-2px_4px_#ffffff] dark:bg-slate-800/80 dark:shadow-[inset_2px_2px_6px_rgba(2,6,23,0.65),inset_-2px_-2px_6px_rgba(51,65,85,0.22)]">
+    <div className="flex items-center gap-1 rounded-2xl bg-slate-100/80 p-1 shadow-[inset_2px_2px_4px_#cbd5e1,inset_-2px_-2px_4px_#ffffff] dark:bg-slate-800/80 dark:shadow-[inset_2px_2px_6px_rgba(2,6,23,0.65),inset_-2px_-2px_6px_rgba(51,65,85,0.22)]">
       <button
         type="button"
         onClick={() => onChange("grid")}
         aria-label={t.grid}
         title={t.grid}
         className={cn(
-          "flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200",
+          "flex min-h-9 items-center gap-2 rounded-xl px-2.5 py-2 text-sm font-medium transition-all duration-200 sm:min-h-0 sm:px-3",
           view === "grid"
             ? "bg-white text-emerald-600 shadow-[2px_2px_4px_#cbd5e1,-2px_-2px_4px_#ffffff] dark:bg-slate-900 dark:text-emerald-300 dark:shadow-[0_6px_14px_rgba(2,6,23,0.4)]"
             : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-100"
@@ -593,7 +926,7 @@ function ViewToggle({
         aria-label={t.list}
         title={t.list}
         className={cn(
-          "flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200",
+          "flex min-h-9 items-center gap-2 rounded-xl px-2.5 py-2 text-sm font-medium transition-all duration-200 sm:min-h-0 sm:px-3",
           view === "list"
             ? "bg-white text-emerald-600 shadow-[2px_2px_4px_#cbd5e1,-2px_-2px_4px_#ffffff] dark:bg-slate-900 dark:text-emerald-300 dark:shadow-[0_6px_14px_rgba(2,6,23,0.4)]"
             : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-100"
@@ -602,47 +935,6 @@ function ViewToggle({
         <List className="w-4 h-4" />
         <span className="hidden sm:inline">{t.list}</span>
       </button>
-    </div>
-  );
-}
-
-// ============================================================================
-// Totals Toggle Component
-// ============================================================================
-
-function TotalsToggle({
-  mode,
-  onChange
-}: {
-  mode: TotalsMode;
-  onChange: (mode: TotalsMode) => void;
-}) {
-  return (
-    <div className="flex items-center gap-2 text-sm">
-      <span className={cn("font-medium transition-colors", mode === "all" ? "text-slate-800 dark:text-slate-100" : "text-slate-500 dark:text-slate-400")}>
-        All-time
-      </span>
-      <button
-        type="button"
-        onClick={() => onChange(mode === "all" ? "filtered" : "all")}
-        aria-label="Toggle totals mode"
-        aria-pressed={mode === "filtered" ? "true" : "false"}
-        title="Toggle totals mode"
-        className={cn(
-"relative w-12 h-6 rounded-full transition-colors duration-150 shadow-[inset_2px_2px_4px_#cbd5e1,inset_-2px_-2px_4px_#ffffff]",
-          mode === "filtered" ? "bg-emerald-500" : "bg-slate-200 dark:bg-slate-800"
-        )}
-      >
-        <span
-          className={cn(
-"absolute top-1 left-1 w-4 h-4 rounded-full bg-white shadow-md transition-transform duration-150 dark:bg-slate-200",
-            mode === "filtered" ? "translate-x-6" : "translate-x-0"
-          )}
-        />
-      </button>
-      <span className={cn("font-medium transition-colors", mode === "filtered" ? "text-slate-800 dark:text-slate-100" : "text-slate-500 dark:text-slate-400")}>
-        Filtered
-      </span>
     </div>
   );
 }
@@ -721,52 +1013,239 @@ return (
   );
 }
 
+type VehicleActionMenuPosition = {
+  top: number;
+  left: number;
+  width: number;
+};
+
+function getVehicleActionMenuPosition(trigger: HTMLElement): VehicleActionMenuPosition {
+  const rect = trigger.getBoundingClientRect();
+  const isSmallScreen = window.matchMedia("(max-width: 639px)").matches;
+  const width = isSmallScreen ? 96 : 160;
+  const estimatedHeight = isSmallScreen ? 88 : 156;
+  const margin = 8;
+  const left = Math.min(Math.max(rect.right - width, margin), window.innerWidth - width - margin);
+  const topBelow = rect.bottom + 6;
+  const hasRoomBelow = topBelow + estimatedHeight <= window.innerHeight - margin;
+  const top = hasRoomBelow ? topBelow : Math.max(margin, rect.top - estimatedHeight - 6);
+
+  return { top, left, width };
+}
+
+function VehicleImageActions({ vehicle, photoCount }: { vehicle: Vehicle; photoCount: number }) {
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isSaved, setIsSaved] = useState(false);
+  const [menuPosition, setMenuPosition] = useState<VehicleActionMenuPosition | null>(null);
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
+  const menuRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!isMenuOpen) return;
+
+    const closeMenu = () => setIsMenuOpen(false);
+    const closeMenuOnOutsidePress = (event: PointerEvent) => {
+      const target = event.target instanceof Node ? event.target : null;
+      if (!target) return;
+      if (triggerRef.current?.contains(target) || menuRef.current?.contains(target)) return;
+      setIsMenuOpen(false);
+    };
+    const closeMenuOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setIsMenuOpen(false);
+    };
+
+    document.addEventListener("pointerdown", closeMenuOnOutsidePress);
+    document.addEventListener("keydown", closeMenuOnEscape);
+    window.addEventListener("resize", closeMenu);
+    window.addEventListener("scroll", closeMenu, true);
+
+    return () => {
+      document.removeEventListener("pointerdown", closeMenuOnOutsidePress);
+      document.removeEventListener("keydown", closeMenuOnEscape);
+      window.removeEventListener("resize", closeMenu);
+      window.removeEventListener("scroll", closeMenu, true);
+    };
+  }, [isMenuOpen]);
+
+  const handleMenuToggle = (event: React.MouseEvent<HTMLButtonElement>) => {
+    event.stopPropagation();
+
+    if (isMenuOpen) {
+      setIsMenuOpen(false);
+      return;
+    }
+
+    setMenuPosition(getVehicleActionMenuPosition(event.currentTarget));
+    setIsMenuOpen(true);
+  };
+
+  const handleSave = (event: React.MouseEvent<HTMLButtonElement>) => {
+    event.stopPropagation();
+    setIsSaved(prev => !prev);
+    setIsMenuOpen(false);
+  };
+
+  const handleShare = async (event: React.MouseEvent<HTMLButtonElement>) => {
+    event.stopPropagation();
+    const vehiclePath = `/vehicles/${encodeURIComponent(vehicle.VehicleId)}/view`;
+    const shareUrl = typeof window === "undefined" ? vehiclePath : `${window.location.origin}${vehiclePath}`;
+    const browserNavigator =
+      typeof navigator === "undefined"
+        ? null
+        : (navigator as Navigator & {
+            share?: (data: ShareData) => Promise<void>;
+            clipboard?: Clipboard;
+          });
+
+    try {
+      if (browserNavigator?.share) {
+        await browserNavigator.share({
+          title: `${vehicle.Brand || ""} ${vehicle.Model || ""}`.trim() || "Vehicle",
+          url: shareUrl,
+        });
+      } else if (browserNavigator?.clipboard) {
+        await browserNavigator.clipboard.writeText(shareUrl);
+      }
+    } catch {
+      // Share can be cancelled by the user.
+    } finally {
+      setIsMenuOpen(false);
+    }
+  };
+
+  const handleReport = (event: React.MouseEvent<HTMLButtonElement>) => {
+    event.stopPropagation();
+    setIsMenuOpen(false);
+  };
+
+  const menu =
+    isMenuOpen && menuPosition && typeof document !== "undefined"
+      ? createPortal(
+          <div
+            ref={menuRef}
+            className="fixed z-[1000] overflow-hidden rounded-sm bg-[#2f2f2f] py-1 text-white shadow-2xl ring-1 ring-white/10"
+            style={{ top: menuPosition.top, left: menuPosition.left, width: menuPosition.width }}
+            onClick={(event) => event.stopPropagation()}
+          >
+            <button
+              type="button"
+              onClick={handleSave}
+              className="flex w-full items-center gap-2 px-2 py-1.5 text-left text-[11px] transition hover:bg-white/10 sm:gap-3 sm:px-4 sm:py-3 sm:text-base"
+            >
+              <Bookmark className={cn("h-3 w-3 sm:h-5 sm:w-5", isSaved && "fill-white")} />
+              <span>Save</span>
+            </button>
+            <button
+              type="button"
+              onClick={handleShare}
+              className="flex w-full items-center gap-2 px-2 py-1.5 text-left text-[11px] transition hover:bg-white/10 sm:gap-3 sm:px-4 sm:py-3 sm:text-base"
+            >
+              <Share2 className="h-3 w-3 sm:h-5 sm:w-5" />
+              <span>Share</span>
+            </button>
+            <button
+              type="button"
+              onClick={handleReport}
+              className="flex w-full items-center gap-2 px-2 py-1.5 text-left text-[11px] transition hover:bg-white/10 sm:gap-3 sm:px-4 sm:py-3 sm:text-base"
+            >
+              <AlertCircle className="h-3 w-3 sm:h-5 sm:w-5" />
+              <span>Report</span>
+            </button>
+          </div>,
+          document.body
+        )
+      : null;
+
+  return (
+    <>
+      <button
+        ref={triggerRef}
+        type="button"
+        onClick={handleMenuToggle}
+        aria-label="Vehicle actions"
+        aria-expanded={isMenuOpen}
+        className="absolute right-0.5 top-0.5 z-20 flex h-5 w-5 items-center justify-center rounded-full bg-slate-950/82 text-white shadow-sm backdrop-blur-sm transition hover:bg-slate-950 active:scale-95 sm:right-2 sm:top-2 sm:h-9 sm:w-9"
+      >
+        <MoreVertical className="h-3 w-3 sm:h-5 sm:w-5" />
+      </button>
+
+      {menu}
+
+      {photoCount > 0 && (
+        <div className="absolute bottom-1 right-1 z-20 flex items-center gap-0.5 rounded bg-slate-950/75 px-1 py-0.5 text-[9px] font-semibold leading-none text-white shadow-md backdrop-blur-sm sm:bottom-2 sm:right-2 sm:gap-1.5 sm:px-2 sm:py-1 sm:text-xs">
+          <ImageIcon className="h-2.5 w-2.5 sm:h-4 sm:w-4" />
+          <span>{photoCount}</span>
+        </div>
+      )}
+    </>
+  );
+}
+
+function VehicleGroupHeader({
+  label,
+  count,
+  avgPrice,
+}: {
+  label: string;
+  count: number;
+  avgPrice: number;
+}) {
+  return (
+    <div className="grid gap-2 rounded-2xl border border-slate-200/60 bg-gradient-to-br from-white to-slate-50/90 px-3 py-3 shadow-sm dark:border-slate-700/70 dark:from-slate-900 dark:to-slate-800/80 sm:flex sm:items-center sm:justify-between sm:px-4">
+      <h3 className="min-w-0 break-words text-base font-bold leading-snug text-slate-800 dark:text-slate-100 sm:text-lg">
+        {label}
+      </h3>
+      <div className="flex min-w-0 flex-wrap items-center gap-2 text-xs sm:justify-end sm:text-sm">
+        <span className="inline-flex max-w-full items-center rounded-full bg-emerald-100 px-3 py-1 font-semibold leading-tight text-emerald-700 shadow-sm dark:bg-emerald-500/15 dark:text-emerald-300">
+          <span className="font-bold">{count.toLocaleString()}</span>
+          <span className="ml-1">vehicles</span>
+        </span>
+        <span className="inline-flex max-w-full items-center rounded-full bg-slate-100 px-3 py-1 leading-tight text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+          <span>Avg:</span>
+          <span className="ml-1 font-bold text-emerald-600 dark:text-emerald-300">
+            ${Math.round(avgPrice).toLocaleString()}
+          </span>
+        </span>
+      </div>
+    </div>
+  );
+}
+
 // ============================================================================
 // Vehicle Card Component (Grid View)
 // ============================================================================
 
-function VehicleCard({
+const VehicleCard = memo(function VehicleCard({
   vehicle,
-  isAdmin,
   onView,
-  onEdit,
-  onDelete,
   getImageUrl,
   t,
   language
 }: {
   vehicle: Vehicle;
-  isAdmin: boolean;
   onView: (id: string) => void;
-  onEdit: (id: string) => void;
-  onDelete: (vehicle: Vehicle) => void;
   getImageUrl: (imageValue: unknown) => string | null;
   t: Translations;
   language: Language;
 }) {
-  const getCategoryColor = (category: string) => {
-    const cat = category?.toLowerCase() || "";
-    if (cat.includes("car")) return "bg-blue-50 text-blue-700 ring-blue-100 dark:bg-blue-500/15 dark:text-blue-300 dark:ring-blue-500/30";
-    if (cat.includes("motor") || cat.includes("bike")) return "bg-purple-50 text-purple-700 ring-purple-100 dark:bg-purple-500/15 dark:text-purple-300 dark:ring-purple-500/30";
-    if (cat.includes("tuk") || cat.includes("rickshaw")) return "bg-orange-50 text-orange-700 ring-orange-100 dark:bg-orange-500/15 dark:text-orange-300 dark:ring-orange-500/30";
-    return "bg-slate-50 text-slate-700 ring-slate-100 dark:bg-slate-800 dark:text-slate-300 dark:ring-slate-700";
-  };
-
-  const getConditionColor = (condition: string) => {
-    return condition?.toLowerCase() === "new"
-      ? "bg-emerald-50 text-emerald-700 ring-emerald-200 dark:bg-emerald-500/15 dark:text-emerald-300 dark:ring-emerald-500/30"
-      : "bg-amber-50 text-amber-700 ring-amber-200 dark:bg-amber-500/15 dark:text-amber-300 dark:ring-amber-500/30";
-  };
-
   const imageUrl = getImageUrl(vehicle.Image);
+  const photoCount = Math.max(mergeVehicleImages(vehicle.Images, vehicle.Image).length, imageUrl ? 1 : 0);
   const colorLabel = translateVehicleColor(vehicle.Color, language);
 
 return (
     <div
       id={getVehicleListItemElementId(vehicle.VehicleId)}
       data-vehicle-list-item-id={vehicle.VehicleId}
-      tabIndex={-1}
-      className="group scroll-mt-24 overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-[0_4px_20px_rgba(0,0,0,0.08)] transition-all duration-150 hover:border-emerald-200 hover:shadow-[0_8px_30px_rgba(0,0,0,0.12)] focus:outline-none focus:ring-2 focus:ring-emerald-400/40 dark:border-slate-700/80 dark:bg-slate-900 dark:shadow-[0_16px_32px_rgba(2,6,23,0.45)] dark:hover:border-emerald-500/35 dark:hover:shadow-[0_20px_42px_rgba(2,6,23,0.62)]"
+      role="button"
+      tabIndex={0}
+      aria-label={`View ${vehicle.Brand || "vehicle"} ${vehicle.Model || ""}`.trim()}
+      onClick={() => onView(vehicle.VehicleId)}
+      onKeyDown={(event) => {
+        if (event.key !== "Enter" && event.key !== " ") return;
+        event.preventDefault();
+        onView(vehicle.VehicleId);
+      }}
+      className="group scroll-mt-24 cursor-pointer overflow-hidden rounded-lg border border-slate-100 bg-white shadow-[0_4px_20px_rgba(0,0,0,0.08)] transition-all duration-150 hover:border-emerald-200 hover:shadow-[0_8px_30px_rgba(0,0,0,0.12)] focus:outline-none focus:ring-2 focus:ring-emerald-400/40 active:scale-[0.98] dark:border-slate-700/80 dark:bg-slate-900 dark:shadow-[0_16px_32px_rgba(2,6,23,0.45)] dark:hover:border-emerald-500/35 dark:hover:shadow-[0_20px_42px_rgba(2,6,23,0.62)] sm:rounded-2xl"
     >
       {/* Image */}
       <div className="relative aspect-[4/3] overflow-hidden bg-slate-100 dark:bg-slate-800">
@@ -775,11 +1254,10 @@ return (
               src={imageUrl}
               alt={`${vehicle.Brand} ${vehicle.Model}`}
               fill
-              sizes="(max-width: 768px) 100vw, 33vw"
+              sizes="(max-width: 640px) 25vw, (max-width: 1024px) 50vw, (max-width: 1280px) 33vw, 25vw"
               unoptimized={shouldBypassNextImageOptimization(imageUrl)}
               className="object-cover group-hover:scale-105 transition-transform duration-500"
               onError={(e) => {
-                console.warn('[Image onError]', imageUrl);
                 e.currentTarget.style.display = "none";
               }}
             />
@@ -788,44 +1266,25 @@ return (
               <Car className="h-10 w-10 text-slate-300 dark:text-slate-600" aria-hidden="true" />
             </div>
           )}
-        <div className="absolute top-3 left-3">
-          <span className={cn(
-            "px-2.5 py-1 rounded-lg text-xs font-medium ring-1",
-            getCategoryColor(vehicle.Category)
-          )}>
-            {vehicle.Category}
-          </span>
-        </div>
-        <div className="absolute top-3 right-3">
-          <span className={cn(
-            "px-2.5 py-1 rounded-full text-xs font-medium ring-1 flex items-center gap-1.5",
-            getConditionColor(vehicle.Condition)
-          )}>
-            <span className={cn(
-              "w-1.5 h-1.5 rounded-full",
-              vehicle.Condition?.toLowerCase() === "new" ? "bg-emerald-500" : "bg-amber-500"
-            )} />
-            {vehicle.Condition}
-          </span>
-        </div>
+        <VehicleImageActions vehicle={vehicle} photoCount={photoCount} />
       </div>
 
       {/* Content */}
-      <div className="p-4">
-        <div className="flex items-start justify-between mb-2">
-          <div>
-            <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100">{vehicle.Brand}</h3>
-            <p className="text-sm text-slate-500 dark:text-slate-400">{vehicle.Model}</p>
+      <div className="p-1.5 sm:p-4">
+        <div className="mb-1 flex min-w-0 flex-col gap-1 sm:mb-2 sm:flex-row sm:items-start sm:justify-between">
+          <div className="min-w-0">
+            <h3 className="truncate text-[10px] font-bold leading-tight text-slate-800 dark:text-slate-100 sm:text-lg">{vehicle.Brand}</h3>
+            <p className="truncate text-[9px] leading-tight text-slate-500 dark:text-slate-400 sm:text-sm">{vehicle.Model}</p>
           </div>
-          <div className="text-right">
-            <p className="font-bold text-emerald-600 text-lg">
+          <div className="min-w-0 sm:text-right">
+            <p className="truncate text-[10px] font-bold leading-tight text-emerald-600 sm:text-lg">
               ${vehicle.PriceNew?.toLocaleString() || "-"}
             </p>
-            <p className="text-xs text-slate-400 dark:text-slate-500">{t.marketPrice}</p>
+            <p className="hidden text-xs text-slate-400 dark:text-slate-500 sm:block">{t.marketPrice}</p>
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-2 mb-4 text-sm">
+        <div className="mb-4 hidden grid-cols-2 gap-2 text-sm sm:grid">
           <div className="flex items-center gap-2 text-slate-600 dark:text-slate-300">
             <span className="text-slate-400 dark:text-slate-500">{t.year}:</span>
             <span className="font-medium">{vehicle.Year || "-"}</span>
@@ -853,41 +1312,14 @@ return (
           )}
         </div>
 
-        {/* Actions */}
-        <div className="flex items-center gap-2 border-t border-slate-100 pt-3 dark:border-slate-800">
-          <ActionButton
-            onClick={() => onView(vehicle.VehicleId)}
-            icon={Eye}
-            label={t.view}
-          />
-          {isAdmin && (
-            <>
-              <ActionButton
-                onClick={() => onEdit(vehicle.VehicleId)}
-                icon={Pen}
-                label={t.edit}
-                variant="edit"
-              />
-              <ActionButton
-                onClick={() => onDelete(vehicle)}
-                icon={Trash2}
-                label={t.delete}
-                variant="delete"
-              />
-            </>
-          )}
-        </div>
       </div>
     </div>
   );
-}
+});
 
-function MobileVehicleListCard({
+const MobileVehicleListCard = memo(function MobileVehicleListCard({
   vehicle,
-  isAdmin,
   onView,
-  onEdit,
-  onDelete,
   getImageUrl,
 }: {
   vehicle: Vehicle;
@@ -898,6 +1330,7 @@ function MobileVehicleListCard({
   getImageUrl: (imageValue: unknown) => string | null;
 }) {
   const imageUrl = getImageUrl(vehicle.Image);
+  const photoCount = Math.max(mergeVehicleImages(vehicle.Images, vehicle.Image).length, imageUrl ? 1 : 0);
 
   const getMobileCategoryClass = (category: string) => {
     const cat = category?.toLowerCase() || "";
@@ -909,104 +1342,68 @@ function MobileVehicleListCard({
 
   return (
     <article
+      id={getVehicleListItemElementId(vehicle.VehicleId)}
       data-vehicle-list-item-id={vehicle.VehicleId}
-      tabIndex={-1}
+      role="button"
+      tabIndex={0}
+      aria-label={`View ${vehicle.Brand || "vehicle"} ${vehicle.Model || ""}`.trim()}
       onClick={() => onView(vehicle.VehicleId)}
-      className="scroll-mt-24 rounded-2xl border border-slate-100 bg-white p-4 shadow-[0_4px_16px_rgba(15,23,42,0.07)] transition-transform focus:outline-none focus:ring-2 focus:ring-emerald-400/40 active:scale-[0.99] dark:border-slate-700/80 dark:bg-slate-900 dark:shadow-[0_14px_30px_rgba(2,6,23,0.45)]"
+      onKeyDown={(event) => {
+        if (event.key !== "Enter" && event.key !== " ") return;
+        event.preventDefault();
+        onView(vehicle.VehicleId);
+      }}
+      className="grid min-h-[126px] scroll-mt-24 cursor-pointer grid-cols-[140px_minmax(0,1fr)] overflow-hidden rounded-lg border border-slate-100 bg-white shadow-[0_4px_16px_rgba(15,23,42,0.07)] transition-transform focus:outline-none focus:ring-2 focus:ring-emerald-400/40 active:scale-[0.99] dark:border-slate-700/80 dark:bg-slate-900 dark:shadow-[0_14px_30px_rgba(2,6,23,0.45)] sm:min-h-[180px] sm:grid-cols-[220px_minmax(0,1fr)] lg:min-h-[220px] lg:grid-cols-[280px_minmax(0,1fr)]"
     >
-      <div className="flex items-start gap-3">
-        <div className="relative h-16 w-16 flex-shrink-0 overflow-hidden rounded-xl bg-slate-100 shadow-sm dark:bg-slate-800">
-          <Car className="absolute inset-0 m-auto h-6 w-6 text-slate-300 dark:text-slate-600" aria-hidden="true" />
-          {imageUrl && (
-            <Image
-              src={imageUrl}
-              alt={vehicle.Model || "Vehicle"}
-              fill
-              sizes="64px"
-              unoptimized={shouldBypassNextImageOptimization(imageUrl)}
-              className="object-cover"
-              loading="lazy"
-              onError={(e) => {
-                e.currentTarget.style.display = "none";
-              }}
-            />
-          )}
-        </div>
-
-        <div className="min-w-0 flex-1">
-          <div className="mb-2 flex items-start justify-between gap-2">
-            <div className="min-w-0">
-              <h3 className="truncate text-base font-bold text-slate-900 dark:text-slate-100">
-                {vehicle.Brand || "-"} {vehicle.Model || "-"}
-              </h3>
-              <p className="truncate text-sm text-slate-500 dark:text-slate-400">
-                {vehicle.Year || "-"} {vehicle.Plate ? `- ${vehicle.Plate}` : ""}
-              </p>
-            </div>
-            <span className={cn(
-              "flex-shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold ring-1",
-              getMobileCategoryClass(vehicle.Category)
-            )}>
-              {vehicle.Category || "-"}
-            </span>
-          </div>
-
-          <div className="grid grid-cols-2 gap-2 text-sm">
-            <div className="rounded-xl bg-slate-50 px-3 py-2 dark:bg-slate-800/80">
-              <div className="text-[11px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">Brand</div>
-              <div className="truncate font-semibold text-slate-800 dark:text-slate-100">{vehicle.Brand || "-"}</div>
-            </div>
-            <div className="rounded-xl bg-slate-50 px-3 py-2 dark:bg-slate-800/80">
-              <div className="text-[11px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">Model</div>
-              <div className="truncate font-semibold text-slate-800 dark:text-slate-100">{vehicle.Model || "-"}</div>
-            </div>
-            <div className="rounded-xl bg-slate-50 px-3 py-2 dark:bg-slate-800/80">
-              <div className="text-[11px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">Price</div>
-              <div className="truncate font-bold text-emerald-600">
-                {vehicle.PriceNew == null ? "-" : `$${vehicle.PriceNew.toLocaleString()}`}
-              </div>
-            </div>
-            <div className="rounded-xl bg-slate-50 px-3 py-2 dark:bg-slate-800/80">
-              <div className="text-[11px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">Condition</div>
-              <div className="truncate font-semibold text-slate-800 dark:text-slate-100">{vehicle.Condition || "-"}</div>
-            </div>
-          </div>
-        </div>
+      <div className="relative min-h-[126px] overflow-hidden bg-slate-100 dark:bg-slate-800 sm:min-h-[180px] lg:min-h-[220px]">
+        <Car className="absolute inset-0 m-auto h-8 w-8 text-slate-300 dark:text-slate-600 sm:h-12 sm:w-12" aria-hidden="true" />
+        {imageUrl && (
+          <Image
+            src={imageUrl}
+            alt={vehicle.Model || "Vehicle"}
+            fill
+            sizes="(max-width: 640px) 140px, (max-width: 1024px) 220px, 280px"
+            unoptimized={shouldBypassNextImageOptimization(imageUrl)}
+            className="object-cover"
+            loading="lazy"
+            onError={(e) => {
+              e.currentTarget.style.display = "none";
+            }}
+          />
+        )}
+        <VehicleImageActions vehicle={vehicle} photoCount={photoCount} />
       </div>
 
-      <div className="mt-4 flex gap-2" onClick={(event) => event.stopPropagation()}>
-        <button
-          type="button"
-          onClick={() => onView(vehicle.VehicleId)}
-          className="flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl bg-slate-100 px-3 text-sm font-bold text-slate-700 transition-colors active:bg-slate-200 dark:bg-slate-800 dark:text-slate-200 dark:active:bg-slate-700"
-        >
-          <Eye className="h-4 w-4" />
-          View
-        </button>
-        {isAdmin && (
-          <>
-            <button
-              type="button"
-              onClick={() => onEdit(vehicle.VehicleId)}
-              className="flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl bg-emerald-50 px-3 text-sm font-bold text-emerald-700 transition-colors active:bg-emerald-100 dark:bg-emerald-500/15 dark:text-emerald-300 dark:active:bg-emerald-500/25"
-            >
-              <Pen className="h-4 w-4" />
-              Edit
-            </button>
-            <button
-              type="button"
-              onClick={() => onDelete(vehicle)}
-              className="flex min-h-11 w-11 items-center justify-center rounded-xl bg-red-50 text-red-600 transition-colors active:bg-red-100 dark:bg-red-500/15 dark:text-red-300 dark:active:bg-red-500/25"
-              aria-label={`Delete ${vehicle.Brand || "vehicle"} ${vehicle.Model || ""}`.trim()}
-            >
-              <Trash2 className="h-4 w-4" />
-            </button>
-          </>
-        )}
+      <div className="flex min-w-0 flex-col px-3 py-2.5 sm:px-5 sm:py-4 lg:px-6 lg:py-5">
+        <div className="flex min-w-0 items-start justify-between gap-2">
+          <div className="min-w-0 pr-1">
+            <h3 className="line-clamp-2 text-sm font-bold leading-snug text-slate-900 dark:text-slate-100 sm:text-lg lg:text-xl">
+              {vehicle.Brand || "-"} {vehicle.Model || "-"}
+            </h3>
+            <p className="mt-1 truncate text-[11px] text-slate-500 dark:text-slate-400 sm:text-sm">
+              {vehicle.Year || "-"} {vehicle.Plate ? `- ${vehicle.Plate}` : ""}
+            </p>
+            <p className="mt-1 truncate text-[11px] text-slate-500 dark:text-slate-400 sm:text-sm">
+              {vehicle.Condition || "-"} - {vehicle.Plate ? `Plate ${vehicle.Plate}` : "Plate Number"}
+            </p>
+          </div>
+          <span className={cn(
+            "flex-shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold ring-1 sm:px-3 sm:py-1 sm:text-xs",
+            getMobileCategoryClass(vehicle.Category)
+          )}>
+            {vehicle.Category || "-"}
+          </span>
+        </div>
+
+        <div className="mt-auto pt-3">
+          <div className="truncate text-sm font-bold text-emerald-600 sm:text-lg lg:text-xl">
+            {vehicle.PriceNew == null ? "-" : `$${vehicle.PriceNew.toLocaleString()}`}
+          </div>
+        </div>
       </div>
     </article>
   );
-}
+});
 
 // ============================================================================
 // Main Component
@@ -1017,29 +1414,44 @@ export default function VehiclesClientEnhanced() {
   const { t } = useTranslation(language);
   const router = useRouter();
   const searchParams = useSearchParams();
+  const frameworkVehicleListSearch = searchParams.toString();
+  const [nativeVehicleListSearch, setNativeVehicleListSearch] = useState<string | null>(null);
+  const effectiveVehicleListSearchParams = useMemo(
+    () => getVehicleListSearchParamsWithFallback(
+      nativeVehicleListSearch === null ? searchParams : new URLSearchParams(nativeVehicleListSearch)
+    ),
+    [nativeVehicleListSearch, searchParams]
+  );
   const user = useAuthUser();
   const { success, error: showError } = useToast();
   const isAdmin = user?.role === "Admin";
   const [isMobileSafeMode, setIsMobileSafeMode] = useState(detectMobileSafariLike);
   const activeListHrefRef = useRef<string | null>(null);
-  const userSelectedViewModeRef = useRef(false);
+  const pendingListScrollRestoreRef = useRef<VehicleListScrollSnapshot | null>(null);
+  const userSelectedViewModeRef = useRef(Boolean(effectiveVehicleListSearchParams.get(VEHICLE_LIST_VIEW_PARAM)));
   const skipNextFilterPageResetRef = useRef(
-    Boolean(searchParams.get(VEHICLE_LIST_PAGE_PARAM) || searchParams.get(VEHICLE_LIST_FOCUS_PARAM))
+    Boolean(
+      effectiveVehicleListSearchParams.get(VEHICLE_LIST_PAGE_PARAM) ||
+      effectiveVehicleListSearchParams.get(VEHICLE_LIST_FOCUS_PARAM)
+    )
   );
 
   // ==========================================================================
   // State Management
   // ==========================================================================
 
-  const [viewMode, setViewMode] = useState<ViewMode>("grid");
-  const [totalsMode, setTotalsMode] = useState<TotalsMode>("all");
+  const [viewMode, setViewMode] = useState<ViewMode>(() =>
+    parseVehicleListViewParam(effectiveVehicleListSearchParams.get(VEHICLE_LIST_VIEW_PARAM))
+  );
   const [currentPage, setCurrentPage] = useState(() =>
-    parseVehicleListPageParam(searchParams.get(VEHICLE_LIST_PAGE_PARAM))
+    parseVehicleListPageParam(effectiveVehicleListSearchParams.get(VEHICLE_LIST_PAGE_PARAM))
   );
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [lastSync, setLastSync] = useState<Date>(new Date());
   const [showColumnMenu, setShowColumnMenu] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
+  const [showAllBrands, setShowAllBrands] = useState(false);
+  const [showAllModels, setShowAllModels] = useState(true);
 
   // Filter state
   const [filters, setFilters] = useState<FilterState>({
@@ -1050,15 +1462,19 @@ export default function VehiclesClientEnhanced() {
     model: "",
     year: "",
     plate: "",
+    bodyType: "",
     minPrice: "",
     maxPrice: "",
     taxType: "",
-    hasImage: isTruthyQueryParam(searchParams.get("withoutImage") ?? searchParams.get("noImage")) ? "no" : "",
+    hasImage: isTruthyQueryParam(
+      effectiveVehicleListSearchParams.get("withoutImage") ??
+      effectiveVehicleListSearchParams.get("noImage")
+    ) ? "no" : "",
   });
 
   // Quick filter - read from URL query param
   const [quickFilter, setQuickFilter] = useState<string | null>(() => {
-    const categoryParam = searchParams.get("category");
+    const categoryParam = effectiveVehicleListSearchParams.get("category");
     if (categoryParam) {
       const normalized = categoryParam.toLowerCase();
       if (normalized.includes("car")) return "cars";
@@ -1109,36 +1525,16 @@ export default function VehiclesClientEnhanced() {
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
 
   // Group By
-  const [groupBy, setGroupBy] = useState<GroupByOption>(() => parseVehicleGroupByParam(searchParams.get("groupBy")));
+  const [groupBy, setGroupBy] = useState<GroupByOption>(() =>
+    parseVehicleGroupByParam(effectiveVehicleListSearchParams.get("groupBy"))
+  );
 
-  // Items Per Page
-  const [itemsPerPage, setItemsPerPage] = useState<number>(() => {
-    const pageSizeParam = parseVehicleListPageSizeParam(
-      searchParams.get(VEHICLE_LIST_PAGE_SIZE_PARAM),
-      ITEMS_PER_PAGE_OPTIONS
-    );
-    if (pageSizeParam) return pageSizeParam;
-
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('vehiclesItemsPerPage');
-      if (saved) {
-        const parsed = parseInt(saved, 10);
-        if (ITEMS_PER_PAGE_OPTIONS.includes(parsed)) return parsed;
-      }
-    }
-    return DEFAULT_ITEMS_PER_PAGE;
-  });
-
-  // Save items per page to localStorage
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('vehiclesItemsPerPage', itemsPerPage.toString());
-    }
-  }, [itemsPerPage]);
+  const itemsPerPage = DEFAULT_ITEMS_PER_PAGE;
 
   // Refs for click outside
   const columnMenuRef = useRef<HTMLDivElement>(null);
   const columnsButtonRef = useRef<HTMLButtonElement>(null);
+  const infiniteScrollSentinelRef = useRef<HTMLDivElement>(null);
 
   // Add Vehicle Modal state
   const [showAddModal, setShowAddModal] = useState(false);
@@ -1146,6 +1542,66 @@ export default function VehiclesClientEnhanced() {
   // Delete Vehicle Modal state
   const [vehicleToDelete, setVehicleToDelete] = useState<Vehicle | null>(null);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+
+  const preserveVehicleListScrollForUpdate = useCallback(() => {
+    if (typeof window === "undefined") return null;
+    const scrollSnapshot = getVehicleListScrollSnapshot();
+    const currentHref = `${window.location.pathname}${window.location.search}`;
+    pendingListScrollRestoreRef.current = scrollSnapshot;
+    rememberVehicleListScrollSnapshot(currentHref, scrollSnapshot);
+    skipNextFilterPageResetRef.current = true;
+    return scrollSnapshot;
+  }, []);
+
+  const resetVisibleVehicleBatch = useCallback(() => {
+    setCurrentPage(prev => (pendingListScrollRestoreRef.current ? prev : 1));
+  }, []);
+
+  useEffect(() => {
+    setNativeVehicleListSearch(null);
+  }, [frameworkVehicleListSearch]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const syncVehicleListUrl = (href: string, scrollSnapshot?: VehicleListScrollSnapshot | null) => {
+      const nextUrl = new URL(href, window.location.origin);
+      if (nextUrl.pathname !== "/vehicles") return;
+
+      const nextHref = `${nextUrl.pathname}${nextUrl.search}`;
+      const storedScrollSnapshot = scrollSnapshot ?? getStoredVehicleListScrollSnapshot(nextHref);
+
+      if (storedScrollSnapshot) {
+        pendingListScrollRestoreRef.current = storedScrollSnapshot;
+        skipNextFilterPageResetRef.current = true;
+      }
+
+      setNativeVehicleListSearch(nextUrl.search);
+    };
+
+    const handleVehicleListUrlChange = (event: Event) => {
+      const detail = (event as CustomEvent<{
+        href?: string;
+        scrollSnapshot?: VehicleListScrollSnapshot;
+      }>).detail;
+      syncVehicleListUrl(detail?.href ?? `${window.location.pathname}${window.location.search}`, detail?.scrollSnapshot);
+    };
+
+    const handlePopState = () => {
+      syncVehicleListUrl(`${window.location.pathname}${window.location.search}`);
+    };
+
+    const previousScrollRestoration = window.history.scrollRestoration;
+    window.history.scrollRestoration = "manual";
+    window.addEventListener(VEHICLE_LIST_URL_CHANGE_EVENT, handleVehicleListUrlChange);
+    window.addEventListener("popstate", handlePopState);
+
+    return () => {
+      window.removeEventListener(VEHICLE_LIST_URL_CHANGE_EVENT, handleVehicleListUrlChange);
+      window.removeEventListener("popstate", handlePopState);
+      window.history.scrollRestoration = previousScrollRestoration;
+    };
+  }, []);
 
   useEffect(() => {
     setIsMobileSafeMode(detectMobileSafariLike());
@@ -1169,8 +1625,7 @@ export default function VehiclesClientEnhanced() {
   // Data Fetching
   // ==========================================================================
 
-  // Desktop can keep the full local dataset. Mobile Safari needs a smaller
-  // payload to avoid tab reloads on memory-constrained devices.
+  // Keep the full local dataset available so the list can scroll without pagination.
   const apiCategoryFilter = useMemo(
     () => categoryFilterToApiCategory(
       quickFilter ?? (filters.category !== "all" ? filters.category : null)
@@ -1186,14 +1641,151 @@ export default function VehiclesClientEnhanced() {
   });
   const isInitialVehiclesLoad = loading && vehicles.length === 0;
 
-  // The vehicles endpoint already includes aggregate stats in its meta payload.
-  // Using that avoids a duplicate dashboard-stats request during page load.
-  const safeStats = useMemo(() => ({
-    total: meta?.total || vehicles.length || 0,
-    cars: meta?.countsByCategory?.Cars || 0,
-    motorcycles: meta?.countsByCategory?.Motorcycles || 0,
-    tuktuks: meta?.countsByCategory?.TukTuks || 0,
-  }), [meta, vehicles.length]);
+  const brandOptions = useMemo<BrandOption[]>(() => {
+    const counts = new Map<string, BrandOption>();
+
+    vehicles.forEach((vehicle) => {
+      const brandName = getCanonicalBrandName(vehicle.Brand);
+      const brandKey = getBrandKey(brandName);
+      if (!brandKey || INVALID_BRAND_NAMES.has(brandKey)) return;
+      if (!isBrandAllowedForCategory(brandName, apiCategoryFilter)) return;
+
+      const existing = counts.get(brandKey);
+      if (existing) {
+        existing.count += 1;
+      } else {
+        counts.set(brandKey, { name: brandName, count: 1 });
+      }
+    });
+
+    const featuredBrandNames = getFeaturedBrandNamesForCategory(apiCategoryFilter);
+    const usedKeys = new Set<string>();
+    const featuredBrands = featuredBrandNames.map((brandName) => {
+      const brandKey = getBrandKey(brandName);
+      const countedBrand = counts.get(brandKey);
+      usedKeys.add(brandKey);
+      return countedBrand ?? { name: brandName, count: 0 };
+    });
+
+    const extraBrands = Array.from(counts.entries())
+      .filter(([brandKey]) => !usedKeys.has(brandKey))
+      .map(([, brand]) => brand)
+      .filter((brand) => isBrandAllowedForCategory(brand.name, apiCategoryFilter))
+      .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
+
+    return [...featuredBrands, ...extraBrands];
+  }, [apiCategoryFilter, vehicles]);
+
+  const selectedBrandName = getCanonicalBrandName(filters.brand);
+
+  const modelOptions = useMemo<ModelOption[]>(() => {
+    if (!selectedBrandName) return [];
+
+    const counts = new Map<string, ModelOption>();
+
+    vehicles.forEach((vehicle) => {
+      if (!brandMatchesFilter(vehicle.Brand, selectedBrandName)) return;
+
+      const modelName = normalizeModelName(vehicle.Model);
+      const modelKey = getModelKey(modelName);
+      if (!modelKey) return;
+
+      const existing = counts.get(modelKey);
+      if (existing) {
+        existing.count += 1;
+      } else {
+        counts.set(modelKey, {
+          label: modelName,
+          value: modelName,
+          count: 1,
+        });
+      }
+    });
+
+    const usedKeys = new Set<string>();
+    const featuredModels = getFeaturedModelNamesForBrand(selectedBrandName, apiCategoryFilter).map((modelLabel) => {
+      const modelValue = getModelFilterValue(modelLabel);
+      const labelKey = getModelKey(modelLabel);
+      const valueKey = getModelKey(modelValue);
+      const countedModel = counts.get(valueKey) ?? counts.get(labelKey);
+      usedKeys.add(labelKey);
+      usedKeys.add(valueKey);
+
+      return {
+        label: modelLabel,
+        value: modelValue,
+        count: countedModel?.count ?? 0,
+      };
+    });
+
+    const extraModels = Array.from(counts.entries())
+      .filter(([modelKey]) => !usedKeys.has(modelKey))
+      .map(([, model]) => model)
+      .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label, undefined, { sensitivity: "base" }));
+
+    const mergedModels = [...featuredModels, ...extraModels];
+    return mergedModels.length > 0
+      ? mergedModels
+      : [{ label: "Other - ផ្សេងៗ", value: "Other", count: 0 }];
+  }, [apiCategoryFilter, selectedBrandName, vehicles]);
+
+  useEffect(() => {
+    setShowAllBrands(false);
+  }, [apiCategoryFilter]);
+
+  useEffect(() => {
+    setShowAllModels(true);
+  }, [selectedBrandName]);
+
+  useEffect(() => {
+    const selectedBrandKey = getBrandKey(filters.brand);
+    if (!selectedBrandKey) return;
+
+    const selectedBrandIsVisible = brandOptions.some(
+      (brand) => getBrandKey(brand.name) === selectedBrandKey
+    );
+    if (selectedBrandIsVisible) return;
+
+    setFilters((prev) =>
+      getBrandKey(prev.brand) === selectedBrandKey
+        ? { ...prev, brand: "", model: "" }
+        : prev
+    );
+  }, [brandOptions, filters.brand]);
+
+  const bodyTypeOptions = useMemo<BodyTypeOption[]>(() => {
+    const counts = new Map<string, number>();
+
+    vehicles.forEach((vehicle) => {
+      const bodyTypeName = normalizeBodyTypeName(vehicle.BodyType);
+      if (!bodyTypeName) return;
+
+      const canonicalName = getCanonicalBodyTypeName(bodyTypeName);
+      if (!canonicalName) return;
+
+      counts.set(canonicalName, (counts.get(canonicalName) ?? 0) + 1);
+    });
+
+    const fixedLabels = new Set(BODY_TYPE_OPTIONS.map((option) => option.label));
+    const fixedBodyTypes = BODY_TYPE_OPTIONS.map((option) => ({
+      ...option,
+      count: counts.get(option.label) ?? 0,
+    }));
+
+    const extraBodyTypes = Array.from(counts.entries())
+      .filter(([label]) => !fixedLabels.has(label))
+      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], undefined, { sensitivity: "base" }))
+      .map(([label, count]) => ({
+        label,
+        value: label,
+        aliases: [label],
+        icon: Car,
+        tone: "text-slate-600",
+        count,
+      }));
+
+    return [...fixedBodyTypes, ...extraBodyTypes];
+  }, [vehicles]);
 
   // Delete vehicle hook
   const { deleteVehicle, isDeleting } = useDeleteVehicle(
@@ -1218,17 +1810,20 @@ export default function VehiclesClientEnhanced() {
   // Sync quickFilter with URL changes (for sidebar navigation)
   useEffect(() => {
     const timeoutId = setTimeout(() => {
-      const categoryParam = searchParams.get("category");
-      const noImageParam = searchParams.get("withoutImage") ?? searchParams.get("noImage");
+      const categoryParam = effectiveVehicleListSearchParams.get("category");
+      const noImageParam =
+        effectiveVehicleListSearchParams.get("withoutImage") ??
+        effectiveVehicleListSearchParams.get("noImage");
       const nextHasImage = isTruthyQueryParam(noImageParam) ? "no" : "";
-      const nextGroupBy = parseVehicleGroupByParam(searchParams.get("groupBy"));
-      const nextPage = parseVehicleListPageParam(searchParams.get(VEHICLE_LIST_PAGE_PARAM));
-      const nextPageSize = parseVehicleListPageSizeParam(
-        searchParams.get(VEHICLE_LIST_PAGE_SIZE_PARAM),
-        ITEMS_PER_PAGE_OPTIONS
+      const nextGroupBy = parseVehicleGroupByParam(effectiveVehicleListSearchParams.get("groupBy"));
+      const viewModeParam = effectiveVehicleListSearchParams.get(VEHICLE_LIST_VIEW_PARAM);
+      const nextViewMode = parseVehicleListViewParam(viewModeParam);
+      const nextPage = parseVehicleListPageParam(
+        effectiveVehicleListSearchParams.get(VEHICLE_LIST_PAGE_PARAM)
       );
       const hasPositionQuery = Boolean(
-        searchParams.get(VEHICLE_LIST_PAGE_PARAM) || searchParams.get(VEHICLE_LIST_FOCUS_PARAM)
+        effectiveVehicleListSearchParams.get(VEHICLE_LIST_PAGE_PARAM) ||
+        effectiveVehicleListSearchParams.get(VEHICLE_LIST_FOCUS_PARAM)
       );
       const nextQuickFilter = (() => {
         if (!categoryParam) return null;
@@ -1256,14 +1851,17 @@ export default function VehiclesClientEnhanced() {
       setQuickFilter(prev => (prev === nextQuickFilter ? prev : nextQuickFilter));
 
       setGroupBy(prev => (prev === nextGroupBy ? prev : nextGroupBy));
-      setCurrentPage(prev => (prev === nextPage ? prev : nextPage));
-      if (nextPageSize) {
-        setItemsPerPage(prev => (prev === nextPageSize ? prev : nextPageSize));
+      if (viewModeParam) {
+        userSelectedViewModeRef.current = true;
+        setViewMode(prev => (prev === nextViewMode ? prev : nextViewMode));
+      }
+      if (effectiveVehicleListSearchParams.has(VEHICLE_LIST_PAGE_PARAM) || !pendingListScrollRestoreRef.current) {
+        setCurrentPage(prev => (prev === nextPage ? prev : nextPage));
       }
     }, 0);
 
     return () => clearTimeout(timeoutId);
-  }, [searchParams]);
+  }, [effectiveVehicleListSearchParams]);
 
   // ==========================================================================
   // Effects
@@ -1320,18 +1918,6 @@ export default function VehiclesClientEnhanced() {
   // ==========================================================================
   // Helper Functions
   // ==========================================================================
-
-const isCarCategory = useCallback((cat: string | undefined): boolean => {
-    return cat?.toLowerCase().includes('car') || false;
-  }, []);
-
-const isMotorcycleCategory = useCallback((cat: string | undefined): boolean => {
-    return cat?.toLowerCase().includes('motor') || cat?.toLowerCase().includes('bike') || false;
-  }, []);
-
-const isTukTukCategory = useCallback((cat: string | undefined): boolean => {
-    return cat?.toLowerCase().includes('tuk') || false;
-  }, []);
 
   // ==========================================================================
   // Grouping Logic
@@ -1418,93 +2004,62 @@ const isTukTukCategory = useCallback((cat: string | undefined): boolean => {
   const filteredVehicles = useMemo(() => {
     if (!vehicles) return [];
 
-    let result = [...vehicles];
+    const quickCategoryFilter = deferredQuickFilter
+      ? {
+          cars: "cars",
+          motorcycles: "motorcycles",
+          tuktuks: "tuktuks",
+        }[deferredQuickFilter]
+      : "";
+    const searchTerms = deferredFilters.search
+      .toLowerCase()
+      .trim()
+      .split(/\s+/)
+      .filter(Boolean);
+    const categoryFilter = deferredFilters.category !== "all" ? deferredFilters.category : "";
+    const conditionFilter = deferredFilters.condition !== "all" ? deferredFilters.condition.toLowerCase() : "";
+    const modelFilter = deferredFilters.model.toLowerCase();
+    const yearFilter = deferredFilters.year;
+    const plateFilter = deferredFilters.plate.toLowerCase();
+    const taxTypeFilter = deferredFilters.taxType.toLowerCase();
+    const minPrice = Number.parseFloat(deferredFilters.minPrice);
+    const maxPrice = Number.parseFloat(deferredFilters.maxPrice);
+    const hasMinPrice = Number.isFinite(minPrice);
+    const hasMaxPrice = Number.isFinite(maxPrice);
+    const onlyWithoutImage = deferredFilters.hasImage === "no";
+    const result: Vehicle[] = [];
 
-    // Apply quick filter
-    if (deferredQuickFilter) {
-      switch (deferredQuickFilter) {
-        case "cars":
-          result = result.filter(v => categoryMatchesFilter(v.Category, "cars"));
-          break;
-        case "motorcycles":
-          result = result.filter(v => categoryMatchesFilter(v.Category, "motorcycles"));
-          break;
-        case "tuktuks":
-          result = result.filter(v => categoryMatchesFilter(v.Category, "tuktuks"));
-          break;
-      }
-    }
-
-    // Apply advanced filters
-    if (deferredFilters.search) {
-      const searchTerms = deferredFilters.search.toLowerCase().trim().split(/\s+/).filter(term => term.length > 0);
+    for (const vehicle of vehicles) {
+      if (quickCategoryFilter && !categoryMatchesFilter(vehicle.Category, quickCategoryFilter)) continue;
+      if (categoryFilter && !categoryMatchesFilter(vehicle.Category, categoryFilter)) continue;
+      if (conditionFilter && vehicle.Condition?.toLowerCase() !== conditionFilter) continue;
+      if (deferredFilters.brand && !brandMatchesFilter(vehicle.Brand, deferredFilters.brand)) continue;
+      if (modelFilter && !vehicle.Model?.toLowerCase().includes(modelFilter)) continue;
+      if (yearFilter && !vehicle.Year?.toString().includes(yearFilter)) continue;
+      if (plateFilter && !vehicle.Plate?.toLowerCase().includes(plateFilter)) continue;
+      if (deferredFilters.bodyType && !bodyTypeMatchesFilter(vehicle.BodyType, deferredFilters.bodyType)) continue;
+      if (hasMinPrice && (vehicle.PriceNew || 0) < minPrice) continue;
+      if (hasMaxPrice && (vehicle.PriceNew || 0) > maxPrice) continue;
+      if (taxTypeFilter && !vehicle.TaxType?.toLowerCase().includes(taxTypeFilter)) continue;
+      if (onlyWithoutImage && vehicleHasDisplayableImage(vehicle.Image)) continue;
 
       if (searchTerms.length > 0) {
-        result = result.filter(v => {
-          // Create a searchable string from all vehicle fields
-          const searchableText = [
-            v.Brand,
-            v.Model,
-            v.Plate,
-            v.Category,
-            v.Year?.toString(),
-            v.Color,
-            v.Condition,
-            v.BodyType,
-            v.TaxType
-          ].filter(Boolean).join(' ').toLowerCase();
+        const searchableText = [
+          vehicle.Brand,
+          vehicle.Model,
+          vehicle.Plate,
+          vehicle.Category,
+          vehicle.Year?.toString(),
+          vehicle.Color,
+          vehicle.Condition,
+          vehicle.BodyType,
+          vehicle.TaxType,
+        ].filter(Boolean).join(" ").toLowerCase();
 
-          // ALL search terms must match somewhere in the vehicle data
-          return searchTerms.every(term => searchableText.includes(term));
-        });
+        if (!searchTerms.every((term) => searchableText.includes(term))) continue;
       }
-    }
 
-    if (deferredFilters.category && deferredFilters.category !== "all") {
-      result = result.filter(v => categoryMatchesFilter(v.Category, deferredFilters.category));
-    }
-
-    if (deferredFilters.condition && deferredFilters.condition !== "all") {
-      result = result.filter(v => v.Condition?.toLowerCase() === deferredFilters.condition.toLowerCase());
-    }
-
-    if (deferredFilters.brand) {
-      result = result.filter(v => v.Brand?.toLowerCase().includes(deferredFilters.brand.toLowerCase()));
-    }
-
-    if (deferredFilters.model) {
-      result = result.filter(v => v.Model?.toLowerCase().includes(deferredFilters.model.toLowerCase()));
-    }
-
-    if (deferredFilters.year) {
-      result = result.filter(v => v.Year?.toString().includes(deferredFilters.year));
-    }
-
-    if (deferredFilters.plate) {
-      result = result.filter(v => v.Plate?.toLowerCase().includes(deferredFilters.plate.toLowerCase()));
-    }
-
-    if (deferredFilters.minPrice) {
-      const minPrice = parseFloat(deferredFilters.minPrice);
-      if (!isNaN(minPrice)) {
-        result = result.filter(v => (v.PriceNew || 0) >= minPrice);
-      }
-    }
-
-    if (deferredFilters.maxPrice) {
-      const maxPrice = parseFloat(deferredFilters.maxPrice);
-      if (!isNaN(maxPrice)) {
-        result = result.filter(v => (v.PriceNew || 0) <= maxPrice);
-      }
-    }
-
-    if (deferredFilters.taxType) {
-      result = result.filter(v => v.TaxType?.toLowerCase().includes(deferredFilters.taxType.toLowerCase()));
-    }
-
-    // Apply image filter
-    if (deferredFilters.hasImage === 'no') {
-      result = result.filter(v => !vehicleHasDisplayableImage(v.Image));
+      result.push(vehicle);
     }
 
     // Apply sorting
@@ -1539,60 +2094,80 @@ const isTukTukCategory = useCallback((cat: string | undefined): boolean => {
   }, [vehicles, filters.search, filteredVehicles.length]);
 
   // ==========================================================================
-  // Stats Calculation
+  // Progressive rendering keeps the full result set available without rendering every card at once.
   // ==========================================================================
 
-  const displayStats = useMemo(() => {
-    if (totalsMode === "all") {
-      return safeStats;
-    }
-
-    // Calculate from filtered vehicles (local counts)
-    return {
-      total: filteredVehicles.length,
-      ...filteredVehicles.reduce(
-        (counts, vehicle) => {
-          if (isCarCategory(vehicle.Category)) counts.cars += 1;
-          else if (isMotorcycleCategory(vehicle.Category)) counts.motorcycles += 1;
-          else if (isTukTukCategory(vehicle.Category)) counts.tuktuks += 1;
-          return counts;
-        },
-        { cars: 0, motorcycles: 0, tuktuks: 0 }
-      ),
-    };
-  }, [totalsMode, safeStats, filteredVehicles, isCarCategory, isMotorcycleCategory, isTukTukCategory]);
-
-  // ==========================================================================
-  // Pagination
-  // ==========================================================================
-
-  const paginatedVehicles = useMemo(() => {
-    const start = (currentPage - 1) * itemsPerPage;
-    return filteredVehicles.slice(start, start + itemsPerPage);
-  }, [filteredVehicles, currentPage, itemsPerPage]);
-
-  const totalPages = Math.ceil(filteredVehicles.length / itemsPerPage);
-  const focusedVehicleId = searchParams.get(VEHICLE_LIST_FOCUS_PARAM) ?? "";
+  const totalLoadBatches = Math.max(1, Math.ceil(filteredVehicles.length / itemsPerPage));
+  const visibleVehicleLimit = Math.min(currentPage * itemsPerPage, filteredVehicles.length);
+  const visibleVehicles = useMemo(
+    () => filteredVehicles.slice(0, visibleVehicleLimit),
+    [filteredVehicles, visibleVehicleLimit]
+  );
+  const hasMoreVehicles = visibleVehicleLimit < filteredVehicles.length;
+  const currentPageEndItem = visibleVehicles.length;
+  const focusedVehicleId = effectiveVehicleListSearchParams.get(VEHICLE_LIST_FOCUS_PARAM) ?? "";
 
   const visibleVehicleGroups = useMemo(
-    () => groupVehicles(groupBy === "none" && !deferredFilters.search ? paginatedVehicles : filteredVehicles, groupBy),
-    [deferredFilters.search, filteredVehicles, groupBy, paginatedVehicles, groupVehicles]
+    () => groupVehicles(visibleVehicles, groupBy),
+    [visibleVehicles, groupBy, groupVehicles]
   );
 
   const currentVehicleListSearchParams = useMemo(
-    () => setVehicleListQueryValue(searchParams, "groupBy", groupBy === "none" ? null : groupBy),
-    [groupBy, searchParams]
+    () => setVehicleListQueryValue(
+      effectiveVehicleListSearchParams,
+      "groupBy",
+      groupBy === "none" ? null : groupBy
+    ),
+    [effectiveVehicleListSearchParams, groupBy]
   );
 
   useEffect(() => {
-    if (totalPages <= 0 || currentPage <= totalPages) return;
-    setCurrentPage(totalPages);
-  }, [currentPage, totalPages]);
+    if (totalLoadBatches <= 0 || currentPage <= totalLoadBatches) return;
+    setCurrentPage(totalLoadBatches);
+  }, [currentPage, totalLoadBatches]);
 
   useEffect(() => {
+    if (!hasMoreVehicles || isInitialVehiclesLoad) return;
+
+    const sentinel = infiniteScrollSentinelRef.current;
+    if (!sentinel || typeof IntersectionObserver === "undefined") return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (!entry?.isIntersecting) return;
+        setCurrentPage(prev => Math.min(prev + 1, totalLoadBatches));
+      },
+      { rootMargin: "700px 0px 700px 0px" }
+    );
+
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [hasMoreVehicles, isInitialVehiclesLoad, totalLoadBatches]);
+
+  useLayoutEffect(() => {
+    const snapshot = pendingListScrollRestoreRef.current;
+    if (!snapshot || typeof window === "undefined") return;
+
+    const restoreScroll = () => restoreVehicleListScrollSnapshot(snapshot);
+    restoreScroll();
+    const animationFrameId = window.requestAnimationFrame(restoreScroll);
+    const timeoutId = window.setTimeout(() => {
+      restoreScroll();
+      pendingListScrollRestoreRef.current = null;
+    }, 180);
+
+    return () => {
+      window.cancelAnimationFrame(animationFrameId);
+      window.clearTimeout(timeoutId);
+    };
+  }, [filteredVehicles.length, visibleVehicles.length, quickFilter, filters.hasImage, groupBy, viewMode]);
+
+  useLayoutEffect(() => {
     if (!focusedVehicleId || isInitialVehiclesLoad) return;
 
-    const timeoutId = window.setTimeout(() => {
+    let restoreAnimationFrame: number | null = null;
+    let restoreTimeoutId: number | null = null;
+    const restoreFocusedVehicleScroll = () => {
       const directTarget = document.getElementById(getVehicleListItemElementId(focusedVehicleId));
       const dataTargets = Array.from(
         document.querySelectorAll<HTMLElement>("[data-vehicle-list-item-id]")
@@ -1603,12 +2178,50 @@ const isTukTukCategory = useCallback((cat: string | undefined): boolean => {
         directTarget ??
         dataTargets[0];
 
-      target?.scrollIntoView({ block: "center", behavior: "smooth" });
-      target?.focus({ preventScroll: true });
-    }, 80);
+      const currentListHref = `${window.location.pathname}${window.location.search}`;
+      const storedScrollPosition = getStoredVehicleListScrollPosition(currentListHref, focusedVehicleId);
 
-    return () => window.clearTimeout(timeoutId);
-  }, [focusedVehicleId, isInitialVehiclesLoad, paginatedVehicles]);
+      if (storedScrollPosition) {
+        const restoreScrollPosition = () => {
+          const scrollOptions: ScrollToOptions = {
+            left: storedScrollPosition.scrollX,
+            top: storedScrollPosition.scrollY,
+            behavior: "auto",
+          };
+          const scrollContainer = getVehicleListScrollContainer();
+
+          if (scrollContainer) {
+            scrollContainer.scrollTo(scrollOptions);
+          } else {
+            window.scrollTo(scrollOptions);
+          }
+
+          target?.focus({ preventScroll: true });
+        };
+
+        restoreScrollPosition();
+        restoreAnimationFrame = window.requestAnimationFrame(restoreScrollPosition);
+        restoreTimeoutId = window.setTimeout(restoreScrollPosition, 180);
+        return;
+      }
+
+      target?.scrollIntoView({ block: "center", behavior: "auto" });
+      target?.focus({ preventScroll: true });
+    };
+
+    restoreFocusedVehicleScroll();
+    restoreAnimationFrame = window.requestAnimationFrame(restoreFocusedVehicleScroll);
+    restoreTimeoutId = window.setTimeout(restoreFocusedVehicleScroll, 120);
+
+    return () => {
+      if (restoreAnimationFrame !== null) {
+        window.cancelAnimationFrame(restoreAnimationFrame);
+      }
+      if (restoreTimeoutId !== null) {
+        window.clearTimeout(restoreTimeoutId);
+      }
+    };
+  }, [focusedVehicleId, isInitialVehiclesLoad, visibleVehicles]);
 
   // ==========================================================================
   // Event Handlers
@@ -1624,16 +2237,59 @@ const isTukTukCategory = useCallback((cat: string | undefined): boolean => {
     rememberVehicleListHref(href);
   }, []);
 
+  const navigateVehicleListInPlace = useCallback((
+    href: string,
+    mode: "push" | "replace" = "push"
+  ) => {
+    if (typeof window === "undefined") {
+      if (mode === "replace") {
+        router.replace(href, { scroll: false });
+      } else {
+        router.push(href, { scroll: false });
+      }
+      return;
+    }
+
+    const nextUrl = new URL(href, window.location.origin);
+    const nextHref = `${nextUrl.pathname}${nextUrl.search}`;
+    const scrollSnapshot = preserveVehicleListScrollForUpdate() ?? getVehicleListScrollSnapshot();
+
+    rememberVehicleListScrollSnapshot(nextHref, scrollSnapshot);
+    rememberActiveListHref(nextHref);
+
+    if (mode === "replace") {
+      window.history.replaceState(window.history.state, "", nextHref);
+    } else {
+      window.history.pushState(window.history.state, "", nextHref);
+    }
+
+    setNativeVehicleListSearch(nextUrl.search);
+  }, [preserveVehicleListScrollForUpdate, rememberActiveListHref, router]);
+
+  const showAllVehicles = useCallback(() => {
+    clearStoredVehicleListState();
+    navigateVehicleListInPlace(VEHICLE_LIST_ALL_HREF);
+  }, [navigateVehicleListInPlace]);
+
+  const getCurrentVehicleListScrollPosition = useCallback(() => {
+    const scrollContainer = getVehicleListScrollContainer();
+
+    return {
+      scrollX: scrollContainer?.scrollLeft ?? window.scrollX,
+      scrollY: scrollContainer?.scrollTop ?? window.scrollY,
+    };
+  }, []);
+
   const buildVehicleListParams = useCallback((
     options: {
       page?: number;
-      pageSize?: number;
       focusVehicleId?: string | null;
+      viewMode?: ViewMode;
     } = {}
   ) => {
     const nextParams = new URLSearchParams(currentVehicleListSearchParams.toString());
     const nextPage = Math.max(1, options.page ?? currentPage);
-    const nextPageSize = options.pageSize ?? itemsPerPage;
+    const nextViewMode = options.viewMode ?? viewMode;
 
     if (nextPage > 1) {
       nextParams.set(VEHICLE_LIST_PAGE_PARAM, String(nextPage));
@@ -1641,11 +2297,7 @@ const isTukTukCategory = useCallback((cat: string | undefined): boolean => {
       nextParams.delete(VEHICLE_LIST_PAGE_PARAM);
     }
 
-    if (nextPageSize !== DEFAULT_ITEMS_PER_PAGE) {
-      nextParams.set(VEHICLE_LIST_PAGE_SIZE_PARAM, String(nextPageSize));
-    } else {
-      nextParams.delete(VEHICLE_LIST_PAGE_SIZE_PARAM);
-    }
+    nextParams.set(VEHICLE_LIST_VIEW_PARAM, nextViewMode);
 
     if (options.focusVehicleId) {
       nextParams.set(VEHICLE_LIST_FOCUS_PARAM, options.focusVehicleId);
@@ -1654,7 +2306,7 @@ const isTukTukCategory = useCallback((cat: string | undefined): boolean => {
     }
 
     return nextParams;
-  }, [currentPage, currentVehicleListSearchParams, itemsPerPage]);
+  }, [currentPage, currentVehicleListSearchParams, viewMode]);
 
   const replaceCurrentHistoryWithListState = useCallback((params: URLSearchParams) => {
     if (typeof window === "undefined") return;
@@ -1662,31 +2314,6 @@ const isTukTukCategory = useCallback((cat: string | undefined): boolean => {
     rememberActiveListHref(returnUrl);
     window.history.replaceState(window.history.state, "", returnUrl);
   }, [getVehicleListUrl, rememberActiveListHref]);
-
-  const handlePageChange = useCallback((nextPage: number) => {
-    const safeTotalPages = Math.max(1, totalPages);
-    const safePage = Math.min(Math.max(1, nextPage), safeTotalPages);
-    const nextParams = buildVehicleListParams({ page: safePage, focusVehicleId: null });
-
-    setCurrentPage(safePage);
-    const nextHref = getVehicleListUrl(nextParams);
-    rememberActiveListHref(nextHref);
-    router.replace(nextHref, { scroll: false });
-  }, [buildVehicleListParams, getVehicleListUrl, rememberActiveListHref, router, totalPages]);
-
-  const handleItemsPerPageChange = useCallback((nextItemsPerPage: number) => {
-    const nextParams = buildVehicleListParams({
-      page: 1,
-      pageSize: nextItemsPerPage,
-      focusVehicleId: null,
-    });
-
-    setItemsPerPage(nextItemsPerPage);
-    setCurrentPage(1);
-    const nextHref = getVehicleListUrl(nextParams);
-    rememberActiveListHref(nextHref);
-    router.replace(nextHref, { scroll: false });
-  }, [buildVehicleListParams, getVehicleListUrl, rememberActiveListHref, router]);
 
   const handleRefresh = useCallback(async () => {
     setIsRefreshing(true);
@@ -1706,9 +2333,58 @@ const isTukTukCategory = useCallback((cat: string | undefined): boolean => {
   }, [sortField]);
 
   const handleViewModeChange = useCallback((nextViewMode: ViewMode) => {
+    preserveVehicleListScrollForUpdate();
     userSelectedViewModeRef.current = true;
     setViewMode(nextViewMode);
-  }, []);
+    const nextParams = buildVehicleListParams({
+      focusVehicleId: null,
+      viewMode: nextViewMode,
+    });
+    const nextHref = getVehicleListUrl(nextParams);
+    navigateVehicleListInPlace(nextHref, "replace");
+  }, [buildVehicleListParams, getVehicleListUrl, navigateVehicleListInPlace, preserveVehicleListScrollForUpdate]);
+
+  const handleBrandSelect = useCallback((brand: string) => {
+    preserveVehicleListScrollForUpdate();
+    const selectedBrandKey = getBrandKey(brand);
+    setFilters(prev => ({
+      ...prev,
+      brand: getBrandKey(prev.brand) === selectedBrandKey ? "" : getCanonicalBrandName(brand),
+      model: "",
+    }));
+    setShowAllModels(true);
+    resetVisibleVehicleBatch();
+  }, [preserveVehicleListScrollForUpdate, resetVisibleVehicleBatch]);
+
+  const handleBackToBrands = useCallback(() => {
+    preserveVehicleListScrollForUpdate();
+    setFilters(prev => ({
+      ...prev,
+      brand: "",
+      model: "",
+    }));
+    setShowAllBrands(false);
+    setShowAllModels(true);
+    resetVisibleVehicleBatch();
+  }, [preserveVehicleListScrollForUpdate, resetVisibleVehicleBatch]);
+
+  const handleModelSelect = useCallback((model: string) => {
+    preserveVehicleListScrollForUpdate();
+    setFilters(prev => ({
+      ...prev,
+      model: getModelKey(prev.model) === getModelKey(model) ? "" : model,
+    }));
+    resetVisibleVehicleBatch();
+  }, [preserveVehicleListScrollForUpdate, resetVisibleVehicleBatch]);
+
+  const handleBodyTypeSelect = useCallback((bodyType: string) => {
+    preserveVehicleListScrollForUpdate();
+    setFilters(prev => ({
+      ...prev,
+      bodyType: getBodyTypeKey(prev.bodyType) === getBodyTypeKey(bodyType) ? "" : bodyType,
+    }));
+    resetVisibleVehicleBatch();
+  }, [preserveVehicleListScrollForUpdate, resetVisibleVehicleBatch]);
 
   const toggleColumn = (key: ColumnKey) => {
     setVisibleColumns(prev =>
@@ -1725,20 +2401,20 @@ const isTukTukCategory = useCallback((cat: string | undefined): boolean => {
       model: "",
       year: "",
       plate: "",
+      bodyType: "",
       minPrice: "",
       maxPrice: "",
       taxType: "",
       hasImage: "",
     });
     setQuickFilter(null);
-    setCurrentPage(1);
-    rememberActiveListHref("/vehicles");
-    router.push("/vehicles", { scroll: false });
+    resetVisibleVehicleBatch();
+    showAllVehicles();
   };
 
   const hasActiveFilters = () => {
     return filters.search || filters.brand || filters.model || filters.year ||
-           filters.plate || filters.minPrice || filters.maxPrice || filters.taxType ||
+           filters.plate || filters.bodyType || filters.minPrice || filters.maxPrice || filters.taxType ||
            filters.hasImage ||
            (filters.category && filters.category !== "all") ||
            (filters.condition && filters.condition !== "all") ||
@@ -1746,19 +2422,19 @@ const isTukTukCategory = useCallback((cat: string | undefined): boolean => {
   };
 
   const handleGroupByChange = useCallback((nextGroupBy: GroupByOption) => {
+    preserveVehicleListScrollForUpdate();
     setGroupBy(nextGroupBy);
     const nextParams = setVehicleListQueryValue(
-      searchParams,
+      effectiveVehicleListSearchParams,
       "groupBy",
       nextGroupBy === "none" ? null : nextGroupBy
     );
     nextParams.delete(VEHICLE_LIST_PAGE_PARAM);
     nextParams.delete(VEHICLE_LIST_FOCUS_PARAM);
-    setCurrentPage(1);
+    resetVisibleVehicleBatch();
     const nextHref = getVehicleListUrl(nextParams);
-    rememberActiveListHref(nextHref);
-    router.replace(nextHref, { scroll: false });
-  }, [getVehicleListUrl, rememberActiveListHref, router, searchParams]);
+    navigateVehicleListInPlace(nextHref, "replace");
+  }, [effectiveVehicleListSearchParams, getVehicleListUrl, navigateVehicleListInPlace, preserveVehicleListScrollForUpdate, resetVisibleVehicleBatch]);
 
   const cacheVehicleForDetail = useCallback((id: string) => {
     if (typeof window === "undefined") return;
@@ -1777,41 +2453,47 @@ const isTukTukCategory = useCallback((cat: string | undefined): boolean => {
   }, [filteredVehicles, vehicles]);
 
   const getReturnHrefForVehicle = useCallback((id: string) => {
-    const currentListHref = activeListHrefRef.current ?? getVehicleListUrl(buildVehicleListParams());
+    const currentListHref = getVehicleListUrl(buildVehicleListParams());
     return withVehicleListFocusHref(currentListHref, id);
   }, [buildVehicleListParams, getVehicleListUrl]);
 
   const handleView = useCallback((id: string) => {
     cacheVehicleForDetail(id);
     const returnHref = getReturnHrefForVehicle(id);
+    const scrollPosition = getCurrentVehicleListScrollPosition();
+    rememberVehicleListScrollPosition(returnHref, id, scrollPosition);
+    rememberVehicleListScrollSnapshot(returnHref, scrollPosition);
     const returnParams = new URLSearchParams(returnHref.split("?")[1] ?? "");
     replaceCurrentHistoryWithListState(returnParams);
     router.push(withVehicleListReturnHref(`/vehicles/${encodeURIComponent(id)}/view`, returnHref));
-  }, [cacheVehicleForDetail, getReturnHrefForVehicle, replaceCurrentHistoryWithListState, router]);
+  }, [cacheVehicleForDetail, getCurrentVehicleListScrollPosition, getReturnHrefForVehicle, replaceCurrentHistoryWithListState, router]);
 
   const handleEdit = useCallback((id: string) => {
     cacheVehicleForDetail(id);
     const returnHref = getReturnHrefForVehicle(id);
+    const scrollPosition = getCurrentVehicleListScrollPosition();
+    rememberVehicleListScrollPosition(returnHref, id, scrollPosition);
+    rememberVehicleListScrollSnapshot(returnHref, scrollPosition);
     const returnParams = new URLSearchParams(returnHref.split("?")[1] ?? "");
     replaceCurrentHistoryWithListState(returnParams);
     router.push(withVehicleListReturnHref(`/vehicles/${encodeURIComponent(id)}/edit`, returnHref));
-  }, [cacheVehicleForDetail, getReturnHrefForVehicle, replaceCurrentHistoryWithListState, router]);
+  }, [cacheVehicleForDetail, getCurrentVehicleListScrollPosition, getReturnHrefForVehicle, replaceCurrentHistoryWithListState, router]);
 
   useEffect(() => {
     const listParams = buildVehicleListParams();
     rememberActiveListHref(getVehicleListUrl(listParams));
   }, [buildVehicleListParams, getVehicleListUrl, rememberActiveListHref]);
 
-  const handleDelete = (vehicle: Vehicle) => {
+  const handleDelete = useCallback((vehicle: Vehicle) => {
     setVehicleToDelete(vehicle);
     setIsDeleteModalOpen(true);
-  };
+  }, []);
 
-  const handleConfirmDelete = async () => {
+  const handleConfirmDelete = useCallback(async () => {
     if (vehicleToDelete) {
       await deleteVehicle(vehicleToDelete);
     }
-  };
+  }, [deleteVehicle, vehicleToDelete]);
 
   // ==========================================================================
   // Image URL Helper
@@ -1836,9 +2518,6 @@ const getVehicleImageUrl = useCallback((imageValue: unknown): string | null => {
       return `https://res.cloudinary.com/${cloud}/image/upload/w400,h300,c_fill/${trimmed}`;
     }
 
-    if (process.env.NODE_ENV === 'development') {
-      console.warn('[Image] Unknown format:', trimmed);
-    }
     return null;
   }, []);
 
@@ -1904,8 +2583,8 @@ const getVehicleImageUrl = useCallback((imageValue: unknown): string | null => {
   }
 
   return (
-    <div className="ec-dark-scope min-h-screen bg-gradient-to-br from-slate-50 via-slate-100 to-slate-200 p-4 dark:from-slate-950 dark:via-slate-950 dark:to-slate-900 sm:p-6 lg:p-8">
-      <div className="max-w-[1600px] mx-auto space-y-6">
+    <div className="ec-dark-scope min-h-screen bg-gradient-to-br from-slate-50 via-slate-100 to-slate-200 px-2 pb-2 pt-3 dark:from-slate-950 dark:via-slate-950 dark:to-slate-900 sm:p-6 lg:p-8">
+      <div className="mx-auto max-w-[1600px] space-y-4 sm:space-y-6">
 
         {/* Header Section */}
         <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-center">
@@ -1935,9 +2614,6 @@ const getVehicleImageUrl = useCallback((imageValue: unknown): string | null => {
               </span>
             </div>
 
-            {/* Totals Toggle */}
-            <TotalsToggle mode={totalsMode} onChange={setTotalsMode} />
-
             {/* Refresh Button */}
             <NeuButton
               variant="default"
@@ -1963,72 +2639,39 @@ const getVehicleImageUrl = useCallback((imageValue: unknown): string | null => {
           </div>
         </div>
 
-        {/* Quick Filter Cards */}
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <QuickFilterCard
-            active={quickFilter === null}
-            onClick={() => {
-              router.push("/vehicles", { scroll: false });
-            }}
-            icon={Package}
-            label={t.totalVehicles}
-            count={displayStats.total}
-            color="emerald"
-            index={0}
+        {selectedBrandName ? (
+          <ModelFilterSection
+            title={t.model}
+            backLabel={t.brand}
+            models={modelOptions}
+            selectedModel={filters.model}
+            isExpanded={showAllModels}
+            onBackToBrands={handleBackToBrands}
+            onToggleExpanded={() => setShowAllModels(prev => !prev)}
+            onModelSelect={handleModelSelect}
           />
-          <QuickFilterCard
-            active={quickFilter === "cars"}
-            onClick={() => {
-              const newFilter = quickFilter === "cars" ? null : "cars";
-              if (newFilter) {
-                router.push("/vehicles?category=cars", { scroll: false });
-              } else {
-                router.push("/vehicles", { scroll: false });
-              }
-            }}
-            icon={Car}
-            label={t.cars}
-            count={displayStats.cars}
-            color="blue"
-            index={1}
+        ) : (
+          <BrandFilterSection
+            title={t.brand}
+            brands={brandOptions}
+            selectedBrand={filters.brand}
+            isExpanded={showAllBrands}
+            onToggleExpanded={() => setShowAllBrands(prev => !prev)}
+            onBrandSelect={handleBrandSelect}
           />
-          <QuickFilterCard
-            active={quickFilter === "motorcycles"}
-            onClick={() => {
-              const newFilter = quickFilter === "motorcycles" ? null : "motorcycles";
-              if (newFilter) {
-                router.push("/vehicles?category=motorcycles", { scroll: false });
-              } else {
-                router.push("/vehicles", { scroll: false });
-              }
-            }}
-            icon={Bike}
-            label={t.motorcycles}
-            count={displayStats.motorcycles}
-            color="purple"
-            index={2}
-          />
-          <QuickFilterCard
-            active={quickFilter === "tuktuks"}
-            onClick={() => {
-              const newFilter = quickFilter === "tuktuks" ? null : "tuktuks";
-              if (newFilter) {
-                router.push("/vehicles?category=tuktuks", { scroll: false });
-              } else {
-                router.push("/vehicles", { scroll: false });
-              }
-            }}
-            icon={TukTukIcon}
-            label={t.tuktuks}
-            count={displayStats.tuktuks}
-            color="orange"
-            index={3}
-          />
-        </div>
+        )}
 
-          {/* Search and Filters Bar */}
-          <div className="space-y-4">
-            <div className="flex flex-col lg:flex-row gap-4">
+        <BodyTypeFilterSection
+          title={t.bodyType}
+          bodyTypes={bodyTypeOptions}
+          selectedBodyType={filters.bodyType}
+          onBodyTypeSelect={handleBodyTypeSelect}
+        />
+
+        <div className="sticky top-0 z-40 space-y-3 rounded-[1.35rem] border border-slate-200/70 bg-slate-50/95 p-3 shadow-[0_12px_30px_rgba(15,23,42,0.08)] backdrop-blur-xl dark:border-slate-800/80 dark:bg-slate-950/95 dark:shadow-[0_18px_45px_rgba(0,0,0,0.26)] sm:-mx-3 sm:space-y-4 sm:rounded-2xl sm:px-3 sm:py-3">
+        {/* Search and Filters Bar */}
+        <div className="space-y-3 sm:space-y-4">
+            <div className="flex flex-col gap-3 lg:flex-row lg:gap-4">
               {/* Search Input */}
               <div className="flex-1">
                 <NeuInput
@@ -2050,43 +2693,47 @@ const getVehicleImageUrl = useCallback((imageValue: unknown): string | null => {
                       if (value === "all") {
                         setQuickFilter(null);
                         setFilters(prev => ({ ...prev, category: "all" }));
-                        router.push("/vehicles", { scroll: false });
+                        showAllVehicles();
                       } else {
                         setQuickFilter(value);
                         setFilters(prev => ({ ...prev, category: "all" }));
-                        router.push(`/vehicles?category=${value}`, { scroll: false });
+                        navigateVehicleListInPlace(`/vehicles?category=${value}`);
                       }
                     }}
-                    className="w-full cursor-pointer appearance-none rounded-xl border border-slate-200/70 bg-white px-4 py-3 text-sm font-medium text-slate-700 shadow-[4px_4px_8px_#e2e8f0,-4px_-4px_8px_#ffffff] focus:outline-none focus:ring-2 focus:ring-emerald-500/30 dark:border-slate-700/70 dark:bg-slate-900 dark:text-slate-100 dark:shadow-[0_10px_24px_rgba(2,6,23,0.45)]"
+                    className="w-full cursor-pointer appearance-none rounded-2xl border border-slate-200/70 bg-white px-3 py-2.5 pr-9 text-sm font-medium text-slate-700 shadow-[4px_4px_8px_#e2e8f0,-4px_-4px_8px_#ffffff] focus:outline-none focus:ring-2 focus:ring-emerald-500/30 dark:border-slate-700/70 dark:bg-slate-900 dark:text-slate-100 dark:shadow-[0_10px_24px_rgba(2,6,23,0.45)] sm:px-4 sm:py-3"
                   >
                     <option value="all">{t.allCategories}</option>
-                    <option value="cars">🚗 Cars</option>
-                    <option value="motorcycles">🏍️ Motorcycles</option>
-                    <option value="tuktuks">🛺 TukTuks</option>
+                    <option value="cars">Cars</option>
+                    <option value="motorcycles">Motorcycles</option>
+                    <option value="tuktuks">TukTuks</option>
                   </select>
                   <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 dark:text-slate-500" />
                 </div>
               </div>
 
               {/* Filter Controls */}
-              <div className="flex flex-wrap items-center gap-3">
+              <div className="flex flex-wrap items-center gap-2 sm:gap-3">
                 <NeuButton
                   variant={showFilters ? "primary" : "default"}
-                  size="md"
+                  size="sm"
                   onClick={() => setShowFilters(!showFilters)}
                   icon={Filter}
+                  className="min-h-10 rounded-2xl sm:text-sm"
                 >
-                  More Filters
+                  <span className="sm:hidden">Filters</span>
+                  <span className="hidden sm:inline">More Filters</span>
                 </NeuButton>
 
               {hasActiveFilters() && (
                 <NeuButton
                   variant="ghost"
-                  size="md"
+                  size="sm"
                   onClick={resetFilters}
                   icon={RotateCcw}
+                  className="min-h-10 rounded-2xl sm:text-sm"
                 >
-                  Reset
+                  <span className="sm:hidden">Clear</span>
+                  <span className="hidden sm:inline">Reset</span>
                 </NeuButton>
               )}
 
@@ -2096,14 +2743,14 @@ const getVehicleImageUrl = useCallback((imageValue: unknown): string | null => {
                   title="Group vehicles by"
                   value={groupBy}
                   onChange={(e) => handleGroupByChange(e.target.value as GroupByOption)}
-                  className="w-full cursor-pointer appearance-none rounded-xl border border-slate-200/70 bg-white px-4 py-2.5 pr-10 text-sm font-medium text-slate-700 shadow-[4px_4px_8px_#e2e8f0,-4px_-4px_8px_#ffffff] focus:outline-none focus:ring-2 focus:ring-emerald-500/30 dark:border-slate-700/70 dark:bg-slate-900 dark:text-slate-100 dark:shadow-[0_10px_24px_rgba(2,6,23,0.45)]"
+                  className="w-full cursor-pointer appearance-none rounded-2xl border border-slate-200/70 bg-white px-3 py-2.5 pr-9 text-sm font-medium text-slate-700 shadow-[4px_4px_8px_#e2e8f0,-4px_-4px_8px_#ffffff] focus:outline-none focus:ring-2 focus:ring-emerald-500/30 dark:border-slate-700/70 dark:bg-slate-900 dark:text-slate-100 dark:shadow-[0_10px_24px_rgba(2,6,23,0.45)] sm:px-4 sm:pr-10"
                 >
-                  <option value="none">Group: None</option>
-                  <option value="category">Group: Category</option>
-                  <option value="brand">Group: Brand</option>
-                  <option value="year">Group: Year</option>
-                  <option value="condition">Group: Condition</option>
-                  <option value="color">Group: Color</option>
+                  <option value="none">None</option>
+                  <option value="category">Category</option>
+                  <option value="brand">Brand</option>
+                  <option value="year">Year</option>
+                  <option value="condition">Condition</option>
+                  <option value="color">Color</option>
                 </select>
                 <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 dark:text-slate-500" />
               </div>
@@ -2119,7 +2766,7 @@ const getVehicleImageUrl = useCallback((imageValue: unknown): string | null => {
                   aria-expanded={showColumnMenu ? "true" : "false"}
                   aria-haspopup="dialog"
                   className={cn(
-                    "flex items-center gap-2 px-4 py-2.5 rounded-xl font-medium text-sm",
+                    "flex min-h-10 items-center gap-2 rounded-2xl px-3 py-2 text-sm font-medium sm:px-4 sm:py-2.5",
                     "bg-gradient-to-br from-[#f8fafc] to-[#f1f5f9] text-slate-600 dark:from-slate-900 dark:to-slate-800 dark:text-slate-200",
                     "shadow-[4px_4px_8px_#cbd5e1,-4px_-4px_8px_#ffffff]",
                     "dark:shadow-[0_10px_24px_rgba(2,6,23,0.45)]",
@@ -2131,7 +2778,7 @@ const getVehicleImageUrl = useCallback((imageValue: unknown): string | null => {
                   )}
                 >
                   <Columns className="w-4 h-4" />
-                  Columns
+                  <span className="hidden sm:inline">Columns</span>
                 </button>
 
                 {showColumnMenu && (
@@ -2139,19 +2786,19 @@ const getVehicleImageUrl = useCallback((imageValue: unknown): string | null => {
                     <button
                       type="button"
                       aria-label="Close columns menu"
-                      className="fixed inset-0 z-[900] bg-slate-950/35 backdrop-blur-[1px] sm:hidden"
+                      className="fixed inset-0 z-[900] bg-slate-950/25 backdrop-blur-[1px] sm:hidden"
                       onClick={() => setShowColumnMenu(false)}
                     />
                     <NeuCard
-                      className="fixed inset-x-3 bottom-[calc(env(safe-area-inset-bottom)+5.5rem)] z-[910] flex max-h-[calc(100dvh-env(safe-area-inset-bottom)-10.5rem)] flex-col overflow-hidden rounded-2xl p-4 sm:absolute sm:inset-x-auto sm:bottom-auto sm:right-0 sm:top-full sm:z-50 sm:mt-2 sm:w-72 sm:max-h-[34rem] sm:p-4"
+                      className="fixed right-4 top-[calc(env(safe-area-inset-top)+6.25rem)] z-[910] flex max-h-[min(60dvh,24rem)] w-[min(calc(100vw-2rem),20rem)] flex-col overflow-hidden rounded-2xl p-3 sm:absolute sm:inset-x-auto sm:bottom-auto sm:right-0 sm:top-full sm:z-50 sm:mt-2 sm:w-72 sm:max-h-[34rem] sm:p-4"
                       hover={false}
                       role="dialog"
                       aria-labelledby="vehicle-columns-menu-title"
                     >
-                      <div className="flex min-h-0 flex-1 flex-col gap-3">
-                        <div className="flex shrink-0 items-center justify-between gap-3 border-b border-slate-200 pb-3 dark:border-slate-700">
-                          <span id="vehicle-columns-menu-title" className="font-semibold text-slate-700 dark:text-slate-100">{t.visibleColumns}</span>
-                          <span className="ml-auto rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-500 dark:bg-slate-800 dark:text-slate-300">
+                      <div className="flex min-h-0 flex-1 flex-col gap-2 sm:gap-3">
+                        <div className="flex shrink-0 items-center justify-between gap-2 border-b border-slate-200 pb-2 dark:border-slate-700 sm:gap-3 sm:pb-3">
+                          <span id="vehicle-columns-menu-title" className="text-sm font-semibold text-slate-700 dark:text-slate-100 sm:text-base">{t.visibleColumns}</span>
+                          <span className="ml-auto rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-500 dark:bg-slate-800 dark:text-slate-300 sm:py-1 sm:text-xs">
                             {visibleColumns.filter(key => key !== "actions").length}/{COLUMNS.length - 1}
                           </span>
                           <button
@@ -2159,41 +2806,41 @@ const getVehicleImageUrl = useCallback((imageValue: unknown): string | null => {
                             onClick={() => setShowColumnMenu(false)}
                             aria-label="Close columns menu"
                             title="Close columns menu"
-                            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700 active:bg-slate-200 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100 dark:active:bg-slate-700"
+                            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700 active:bg-slate-200 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100 dark:active:bg-slate-700 sm:h-10 sm:w-10"
                           >
                             <X className="w-4 h-4" />
                           </button>
                         </div>
 
-                        <div className="min-h-0 flex-1 space-y-1 overflow-y-auto overscroll-contain pr-1 sm:max-h-64 sm:flex-none">
+                        <div className="min-h-0 flex-1 space-y-0.5 overflow-y-auto overscroll-contain pr-1 sm:max-h-64 sm:flex-none sm:space-y-1">
                           {COLUMNS.filter(col => col.key !== "actions").map((col) => (
                             <label
                               key={col.key}
-                              className="flex min-h-11 cursor-pointer items-center gap-3 rounded-lg px-2.5 py-2 transition-colors hover:bg-slate-50 active:bg-slate-100 dark:hover:bg-slate-800 dark:active:bg-slate-700/70"
+                              className="flex min-h-9 cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 transition-colors hover:bg-slate-50 active:bg-slate-100 dark:hover:bg-slate-800 dark:active:bg-slate-700/70 sm:min-h-11 sm:gap-3 sm:px-2.5 sm:py-2"
                             >
                               <input
                                 type="checkbox"
                                 checked={visibleColumns.includes(col.key)}
                                 onChange={() => toggleColumn(col.key)}
-                                className="h-5 w-5 shrink-0 rounded border-slate-300 text-emerald-500 focus:ring-emerald-500 dark:border-slate-600"
+                                className="h-4 w-4 shrink-0 rounded border-slate-300 text-emerald-500 focus:ring-emerald-500 dark:border-slate-600 sm:h-5 sm:w-5"
                               />
-                              <span className="min-w-0 text-sm font-medium text-slate-600 dark:text-slate-300">{col.label}</span>
+                              <span className="min-w-0 text-xs font-medium text-slate-600 dark:text-slate-300 sm:text-sm">{col.label}</span>
                             </label>
                           ))}
                         </div>
 
-                        <div className="grid shrink-0 grid-cols-2 gap-2 border-t border-slate-200 pt-3 dark:border-slate-700">
+                        <div className="grid shrink-0 grid-cols-2 gap-2 border-t border-slate-200 pt-2 dark:border-slate-700 sm:pt-3">
                           <button
                             type="button"
                             onClick={() => setVisibleColumns(COLUMNS.map(c => c.key))}
-                            className="min-h-11 rounded-lg bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-600 transition-colors hover:bg-emerald-100 active:bg-emerald-200 dark:bg-emerald-500/15 dark:text-emerald-300 dark:hover:bg-emerald-500/25 dark:active:bg-emerald-500/35 sm:min-h-0 sm:py-1.5 sm:text-xs"
+                            className="min-h-9 rounded-lg bg-emerald-50 px-2 py-1.5 text-xs font-semibold text-emerald-600 transition-colors hover:bg-emerald-100 active:bg-emerald-200 dark:bg-emerald-500/15 dark:text-emerald-300 dark:hover:bg-emerald-500/25 dark:active:bg-emerald-500/35 sm:min-h-0"
                           >
                             Select All
                           </button>
                           <button
                             type="button"
                             onClick={() => setVisibleColumns(["image", "brand", "model", "actions"])}
-                            className="min-h-11 rounded-lg bg-slate-100 px-3 py-2 text-sm font-semibold text-slate-600 transition-colors hover:bg-slate-200 active:bg-slate-300 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700 dark:active:bg-slate-600 sm:min-h-0 sm:py-1.5 sm:text-xs"
+                            className="min-h-9 rounded-lg bg-slate-100 px-2 py-1.5 text-xs font-semibold text-slate-600 transition-colors hover:bg-slate-200 active:bg-slate-300 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700 dark:active:bg-slate-600 sm:min-h-0"
                           >
                             Minimal
                           </button>
@@ -2208,7 +2855,7 @@ const getVehicleImageUrl = useCallback((imageValue: unknown): string | null => {
 
           {/* Advanced Filters Panel */}
 {showFilters && (
-            <div className="animate-in slide-in-from-top-2 rounded-2xl border border-slate-200 bg-white/90 p-5 shadow-lg backdrop-blur-xl duration-300 dark:border-slate-700/80 dark:bg-slate-900/90 dark:shadow-[0_18px_40px_rgba(2,6,23,0.5)]">
+            <div className="max-h-[calc(100dvh-env(safe-area-inset-top)-30rem)] overflow-y-auto overscroll-contain rounded-2xl border border-slate-200 bg-white/90 p-5 shadow-lg backdrop-blur-xl duration-300 animate-in slide-in-from-top-2 dark:border-slate-700/80 dark:bg-slate-900/90 dark:shadow-[0_18px_40px_rgba(2,6,23,0.5)] sm:max-h-none sm:overflow-visible">
               <div className="flex items-center justify-between mb-4">
                 <h4 className="flex items-center gap-2 text-sm font-semibold text-slate-700 dark:text-slate-100">
                   <Filter className="w-4 h-4 text-emerald-500" />
@@ -2262,7 +2909,7 @@ const getVehicleImageUrl = useCallback((imageValue: unknown): string | null => {
                   <input
                     type="text"
                     value={filters.brand}
-                    onChange={(e) => setFilters(prev => ({ ...prev, brand: e.target.value }))}
+                    onChange={(e) => setFilters(prev => ({ ...prev, brand: e.target.value, model: "" }))}
                     placeholder="e.g. Toyota"
                     className={FILTER_FIELD_CLASS}
                   />
@@ -2299,6 +2946,21 @@ const getVehicleImageUrl = useCallback((imageValue: unknown): string | null => {
                     placeholder="e.g. PP-1234"
                     className={FILTER_FIELD_CLASS}
                   />
+                </div>
+
+                <div>
+                  <label className={FILTER_LABEL_CLASS}>{t.bodyType}</label>
+                  <select
+                    title="Filter by body type"
+                    value={filters.bodyType}
+                    onChange={(e) => setFilters(prev => ({ ...prev, bodyType: e.target.value }))}
+                    className={FILTER_FIELD_CLASS}
+                  >
+                    <option value="">All Body Types</option>
+                    {BODY_TYPE_OPTIONS.map((bodyType) => (
+                      <option key={bodyType.value} value={bodyType.value}>{bodyType.label}</option>
+                    ))}
+                  </select>
                 </div>
 
                 <div>
@@ -2345,7 +3007,11 @@ const getVehicleImageUrl = useCallback((imageValue: unknown): string | null => {
                     onClick={() => {
                       const nextHasImage = filters.hasImage === 'no' ? '' : 'no';
                       setFilters(prev => ({ ...prev, hasImage: nextHasImage }));
-                      router.push(nextHasImage === 'no' ? "/vehicles?withoutImage=true" : "/vehicles", { scroll: false });
+                      if (nextHasImage === 'no') {
+                        navigateVehicleListInPlace("/vehicles?withoutImage=true");
+                      } else {
+                        showAllVehicles();
+                      }
                     }}
                     className={cn(
                       "w-full px-3 py-2 rounded-xl text-sm font-medium transition-all duration-200 flex items-center justify-center gap-2",
@@ -2384,7 +3050,7 @@ const getVehicleImageUrl = useCallback((imageValue: unknown): string | null => {
                   value={formatCategoryFilterValue(quickFilter)}
                   onRemove={() => {
                     setQuickFilter(null);
-                    router.push("/vehicles", { scroll: false });
+                    showAllVehicles();
                   }}
                 />
               )}
@@ -2409,7 +3075,7 @@ const getVehicleImageUrl = useCallback((imageValue: unknown): string | null => {
                 <FilterTag
                   label="Brand"
                   value={filters.brand}
-                  onRemove={() => setFilters(prev => ({ ...prev, brand: "" }))}
+                  onRemove={() => setFilters(prev => ({ ...prev, brand: "", model: "" }))}
                 />
               )}
 
@@ -2437,6 +3103,14 @@ const getVehicleImageUrl = useCallback((imageValue: unknown): string | null => {
                 />
               )}
 
+              {filters.bodyType && (
+                <FilterTag
+                  label="Body Type"
+                  value={getCanonicalBodyTypeName(filters.bodyType)}
+                  onRemove={() => setFilters(prev => ({ ...prev, bodyType: "" }))}
+                />
+              )}
+
               {(filters.minPrice || filters.maxPrice) && (
                 <FilterTag
                   label="Price"
@@ -2459,7 +3133,7 @@ const getVehicleImageUrl = useCallback((imageValue: unknown): string | null => {
                   value="No Image Only"
                   onRemove={() => {
                     setFilters(prev => ({ ...prev, hasImage: "" }));
-                    router.push("/vehicles", { scroll: false });
+                    showAllVehicles();
                   }}
                 />
               )}
@@ -2475,25 +3149,29 @@ const getVehicleImageUrl = useCallback((imageValue: unknown): string | null => {
                 <>
                   Loading <span className="font-semibold text-slate-800 dark:text-slate-100">vehicles</span>...
                 </>
-              ) : groupBy !== "none" ? (
-                <>
-                  Showing all <span className="font-semibold text-slate-800 dark:text-slate-100">{filteredVehicles.length}</span> vehicles
-                  <span className="ml-2 rounded-lg bg-blue-50 px-2 py-1 text-xs text-blue-600 dark:bg-blue-500/15 dark:text-blue-300">
-                    Grouped by {groupBy}
-                  </span>
-                </>
               ) : (
                 <>
-                  Showing <span className="font-semibold text-slate-800 dark:text-slate-100">{paginatedVehicles.length}</span> of{" "}
-                  <span className="font-semibold text-slate-800 dark:text-slate-100">{meta?.total || filteredVehicles.length}</span> vehicles
+                  {hasMoreVehicles ? (
+                    <>
+                      Showing <span className="font-semibold text-slate-800 dark:text-slate-100">{currentPageEndItem}</span> of{" "}
+                      <span className="font-semibold text-slate-800 dark:text-slate-100">{filteredVehicles.length}</span> vehicles
+                    </>
+                  ) : (
+                    <>
+                      Showing all <span className="font-semibold text-slate-800 dark:text-slate-100">{filteredVehicles.length}</span> vehicles
+                    </>
+                  )}
+                  {groupBy !== "none" && (
+                    <span className="ml-2 rounded-lg bg-blue-50 px-2 py-1 text-xs text-blue-600 dark:bg-blue-500/15 dark:text-blue-300">
+                      Grouped by {groupBy}
+                    </span>
+                  )}
+                  {meta?.total && meta.total !== filteredVehicles.length && (
+                    <span className="ml-1 text-slate-500 dark:text-slate-400">from {meta.total.toLocaleString()}</span>
+                  )}
                 </>
               )}
             </span>
-            {totalsMode === "filtered" && groupBy === "none" && (
-              <span className="rounded-lg bg-emerald-50 px-2 py-1 text-xs text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-300">
-                Filtered view
-              </span>
-            )}
           </div>
 
           {viewMode === "list" && groupBy === "none" && (
@@ -2503,34 +3181,23 @@ const getVehicleImageUrl = useCallback((imageValue: unknown): string | null => {
           )}
         </div>
 
+        </div>
+
         {/* Vehicle Display */}
         {viewMode === "grid" ? (
           // Grid View with Grouping
-          <div className="space-y-8">
+          <div className="space-y-4 sm:space-y-8">
             {filteredVehicles.length > 0 && visibleVehicleGroups.map((group) => (
-              <div key={group.key} className="space-y-4">
+              <div key={group.key} className="space-y-2 sm:space-y-4">
                 {/* Group Header */}
-                <div className="flex items-center justify-between rounded-xl border border-slate-200/60 bg-gradient-to-r from-slate-50 to-slate-100/80 px-4 py-3 shadow-sm dark:border-slate-700/70 dark:from-slate-900 dark:to-slate-800/80">
-                  <div className="flex items-center gap-3">
-                    <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100">{group.label}</h3>
-                    <span className="rounded-full bg-emerald-100 px-3 py-1 text-sm font-semibold text-emerald-700 shadow-sm dark:bg-emerald-500/15 dark:text-emerald-300">
-                      {group.count} vehicles
-                    </span>
-                  </div>
-                  <div className="text-sm text-slate-600 dark:text-slate-300">
-                    Avg Price: <span className="font-bold text-emerald-600">${Math.round(group.avgPrice).toLocaleString()}</span>
-                  </div>
-                </div>
+                <VehicleGroupHeader label={group.label} count={group.count} avgPrice={group.avgPrice} />
                 {/* Group Vehicles Grid */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                <div className="grid grid-cols-4 gap-1.5 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3 lg:gap-6 xl:grid-cols-4">
                   {group.vehicles.map((vehicle) => (
                     <VehicleCard
                       key={vehicle.VehicleId}
                       vehicle={vehicle}
-                      isAdmin={isAdmin}
                       onView={handleView}
-                      onEdit={handleEdit}
-                      onDelete={handleDelete}
                       getImageUrl={getVehicleImageUrl}
                       t={t}
                       language={language}
@@ -2546,19 +3213,9 @@ const getVehicleImageUrl = useCallback((imageValue: unknown): string | null => {
             {filteredVehicles.length > 0 && visibleVehicleGroups.map((group) => (
               <div key={group.key} className="space-y-3">
                 {/* Group Header */}
-                <div className="flex items-center justify-between rounded-xl border border-slate-200/60 bg-gradient-to-r from-slate-50 to-slate-100/80 px-4 py-3 shadow-sm dark:border-slate-700/70 dark:from-slate-900 dark:to-slate-800/80">
-                  <div className="flex items-center gap-3">
-                    <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100">{group.label}</h3>
-                    <span className="rounded-full bg-emerald-100 px-3 py-1 text-sm font-semibold text-emerald-700 shadow-sm dark:bg-emerald-500/15 dark:text-emerald-300">
-                      {group.count} vehicles
-                    </span>
-                  </div>
-                  <div className="text-sm text-slate-600 dark:text-slate-300">
-                    Avg Price: <span className="font-bold text-emerald-600">${Math.round(group.avgPrice).toLocaleString()}</span>
-                  </div>
-                </div>
+                <VehicleGroupHeader label={group.label} count={group.count} avgPrice={group.avgPrice} />
                 {/* Group Vehicles List */}
-                <div className="space-y-3 md:hidden">
+                <div className="space-y-3 sm:space-y-4 lg:space-y-5">
                   {group.vehicles.map((vehicle) => (
                     <MobileVehicleListCard
                       key={vehicle.VehicleId}
@@ -2572,7 +3229,8 @@ const getVehicleImageUrl = useCallback((imageValue: unknown): string | null => {
                   ))}
                 </div>
 
-                <div className="hidden overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-[0_4px_20px_rgba(0,0,0,0.08)] dark:border-slate-700/80 dark:bg-slate-900 dark:shadow-[0_18px_40px_rgba(2,6,23,0.5)] md:block">
+                {false && (
+                <div className="hidden overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-[0_4px_20px_rgba(0,0,0,0.08)] dark:border-slate-700/80 dark:bg-slate-900 dark:shadow-[0_18px_40px_rgba(2,6,23,0.5)]">
                   <div className="overflow-x-auto">
                     <table className="w-full">
                       <thead className="sticky top-0 z-10">
@@ -2606,7 +3264,9 @@ const getVehicleImageUrl = useCallback((imageValue: unknown): string | null => {
                             style={{ animationDelay: `${index * 50}ms` }}
                           >
                             {visibleColumns.includes("id") && (
-                              <td className="px-4 py-3.5 text-sm font-medium text-slate-500 dark:text-slate-400">#{vehicle.VehicleId}</td>
+                              <td className="px-4 py-3.5 text-sm font-medium text-slate-500 dark:text-slate-400">
+                                {vehicle.VehicleId?.startsWith("temp-") ? "Saving..." : `#${formatVehicleId(vehicle.VehicleId)}`}
+                              </td>
                             )}
 
                             {visibleColumns.includes("image") && (
@@ -2765,6 +3425,7 @@ const getVehicleImageUrl = useCallback((imageValue: unknown): string | null => {
                     </table>
                   </div>
                 </div>
+                )}
               </div>
             ))}
 
@@ -2805,97 +3466,8 @@ const getVehicleImageUrl = useCallback((imageValue: unknown): string | null => {
           </div>
         )}
 
-        {/* Pagination - only show when not grouping and not searching */}
-        {totalPages > 1 && groupBy === "none" && !filters.search && (
-          <div className="rounded-2xl border border-slate-100 bg-white/80 p-3 shadow-[0_4px_16px_rgba(15,23,42,0.07)] dark:border-slate-700/80 dark:bg-slate-900/80 dark:shadow-[0_18px_40px_rgba(2,6,23,0.5)] sm:p-4">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div className="flex flex-wrap items-center gap-3">
-                <div className="text-sm text-slate-500 dark:text-slate-400">
-                Page {currentPage} of {totalPages}
-                </div>
-
-                {/* Items Per Page Dropdown */}
-                <div className="flex min-w-0 items-center gap-2">
-                  <span className="text-sm text-slate-500 dark:text-slate-400">Show:</span>
-                  <div className="relative">
-                    <select
-                    title="Items per page"
-                    value={itemsPerPage}
-                    onChange={(e) => {
-                      const newValue = parseInt(e.target.value, 10);
-                      handleItemsPerPageChange(newValue);
-                    }}
-                    className="h-11 cursor-pointer appearance-none rounded-lg border border-slate-200/70 bg-white px-3 pr-8 text-sm font-medium text-slate-700 shadow-[2px_2px_4px_#e2e8f0,-2px_-2px_4px_#ffffff] focus:outline-none focus:ring-2 focus:ring-emerald-500/30 dark:border-slate-700/70 dark:bg-slate-800 dark:text-slate-100 dark:shadow-[0_8px_18px_rgba(2,6,23,0.45)]"
-                  >
-                    {ITEMS_PER_PAGE_OPTIONS.map((option) => (
-                      <option key={option} value={option}>
-                        {option}
-                      </option>
-                    ))}
-                  </select>
-                    <ChevronDown className="pointer-events-none absolute right-2 top-1/2 h-3 w-3 -translate-y-1/2 text-slate-400 dark:text-slate-500" />
-                  </div>
-                  <span className="text-sm text-slate-500 dark:text-slate-400">{t.perPage}</span>
-                </div>
-              </div>
-
-              <div className="flex flex-wrap items-center gap-2 sm:justify-end">
-                <NeuButton
-                  variant="default"
-                  size="sm"
-                  onClick={() => handlePageChange(currentPage - 1)}
-                  disabled={currentPage <= 1}
-                  className="min-h-11 flex-1 sm:flex-none"
-                >
-                  Previous
-                </NeuButton>
-
-                <div className="order-first flex w-full items-center justify-center gap-1 sm:order-none sm:w-auto">
-                  {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                    // Show pages around current page
-                    let pageNum;
-                    if (totalPages <= 5) {
-                      pageNum = i + 1;
-                    } else if (currentPage <= 3) {
-                      pageNum = i + 1;
-                    } else if (currentPage >= totalPages - 2) {
-                      pageNum = totalPages - 4 + i;
-                    } else {
-                      pageNum = currentPage - 2 + i;
-                    }
-
-                    return (
-                      <button
-                        type="button"
-                        key={pageNum}
-                        onClick={() => handlePageChange(pageNum)}
-                        aria-label={`Go to page ${pageNum}`}
-                        aria-current={currentPage === pageNum ? "page" : undefined}
-                        className={cn(
-                          "h-10 w-10 rounded-lg text-sm font-medium transition-colors",
-                          currentPage === pageNum
-                            ? "bg-emerald-500 text-white shadow-md"
-                            : "bg-white text-slate-600 shadow-sm hover:bg-slate-50 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
-                        )}
-                      >
-                        {pageNum}
-                      </button>
-                    );
-                  })}
-                </div>
-
-                <NeuButton
-                  variant="default"
-                  size="sm"
-                  onClick={() => handlePageChange(currentPage + 1)}
-                  disabled={currentPage >= totalPages}
-                  className="min-h-11 flex-1 sm:flex-none"
-                >
-                  Next
-                </NeuButton>
-              </div>
-            </div>
-          </div>
+        {filteredVehicles.length > 0 && hasMoreVehicles && (
+          <div ref={infiniteScrollSentinelRef} className="h-12" aria-hidden="true" />
         )}
 
         {/* Add Vehicle Modal */}
@@ -2905,7 +3477,7 @@ const getVehicleImageUrl = useCallback((imageValue: unknown): string | null => {
             onClose={() => setShowAddModal(false)}
             onSuccess={() => {
               refresh();
-              handlePageChange(1);
+              setCurrentPage(1);
               setLastSync(new Date());
             }}
           />

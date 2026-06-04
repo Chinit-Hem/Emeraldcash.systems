@@ -1,8 +1,8 @@
 "use client";
 
 import {
-  Car,
   Calculator,
+  Boxes,
   Check,
   ChevronRight,
   Edit3,
@@ -28,8 +28,9 @@ import { useRouter } from "next/navigation";
 import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { clearCachedUser } from "@/shared/utils/authCache";
-import { useAuthUser } from "@/shared/hooks/AuthContext";
+import { useAuthContext, useAuthUser } from "@/shared/hooks/AuthContext";
 import ThemeToggle from "@/shared/components/ThemeToggle";
+import ChangePasswordModal from "@/shared/components/ChangePasswordModal";
 import { CambodiaFlag } from "@/shared/components/ui/CambodiaFlag";
 import { UKFlag } from "@/shared/components/ui/UKFlag";
 import { useTranslation } from "@/shared/utils/i18n";
@@ -49,6 +50,8 @@ type ManagedUser = {
 };
 
 type TabType = "profile" | "users" | "system";
+const USER_ROLE_OPTIONS: Role[] = ["Staff", "Accounting", "Admin"];
+const USER_PASSWORD_MIN_LENGTH = 8;
 
 const UserAvatar = memo(({ 
   user, 
@@ -128,6 +131,7 @@ QuickLinkCard.displayName = "QuickLinkCard";
 export default function SettingsContent() {
   const router = useRouter();
   const user = useAuthUser();
+  const { updateProfile, refreshUser } = useAuthContext();
   const { language, toggleLanguage } = useLanguage();
   const { t } = useTranslation(language);
   
@@ -144,14 +148,29 @@ export default function SettingsContent() {
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   
   const [newUsername, setNewUsername] = useState("");
+  const [newFullName, setNewFullName] = useState("");
+  const [newEmail, setNewEmail] = useState("");
+  const [newPhone, setNewPhone] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [newRole, setNewRole] = useState<Role>("Staff");
+
+  const [isProfileEditing, setIsProfileEditing] = useState(false);
+  const [profileFullName, setProfileFullName] = useState(user.full_name || "");
+  const [profileEmail, setProfileEmail] = useState(user.email || "");
+  const [profilePhone, setProfilePhone] = useState(user.phone || "");
+  const [profilePicture, setProfilePicture] = useState<string | null>(user.profile_picture || null);
+  const [isProfileUpdating, setIsProfileUpdating] = useState(false);
+  const [isProfileUploading, setIsProfileUploading] = useState(false);
+  const [profileError, setProfileError] = useState("");
+  const [profileSuccess, setProfileSuccess] = useState("");
+  const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
 
   const [editingUser, setEditingUser] = useState<ManagedUser | null>(null);
   const [editUsername, setEditUsername] = useState("");
   const [editPassword, setEditPassword] = useState("");
   const [editConfirmPassword, setEditConfirmPassword] = useState("");
+  const [editRole, setEditRole] = useState<Role>("Staff");
   const [editFullName, setEditFullName] = useState("");
   const [editEmail, setEditEmail] = useState("");
   const [editPhone, setEditPhone] = useState("");
@@ -161,24 +180,33 @@ export default function SettingsContent() {
   const [isUpdating, setIsUpdating] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [deletingUser, setDeletingUser] = useState<string | null>(null);
-  
+
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [usersError, setUsersError] = useState("");
-  
+
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const profileFileInputRef = useRef<HTMLInputElement>(null);
 
   const quickLinks = useMemo(() => {
     const links: { href: string; icon: LucideIcon; label: string; color: string }[] = [
-      { href: "/", icon: Calculator, label: t.dashboard, color: "from-emerald-500 to-teal-600" },
-      { href: "/vehicles", icon: Car, label: t.vehicles, color: "from-blue-500 to-indigo-600" },
-      { href: "/lms", icon: GraduationCap, label: t.training, color: "from-violet-500 to-purple-600" },
+      { href: "/", icon: Calculator, label: "VMS - Vehicle Valuation", color: "from-emerald-500 to-teal-600" },
+      { href: "/lms", icon: GraduationCap, label: "LMS - Learning Center", color: "from-violet-500 to-purple-600" },
+      { href: "/sms", icon: Boxes, label: "SMS - Asset Inventory", color: "from-blue-500 to-indigo-600" },
     ];
     if (isAdmin) {
-      links.push({ href: "/lms/admin/staff", icon: Users, label: t.lmsStaff, color: "from-amber-500 to-orange-600" });
+      links.push({ href: "/lms/admin/staff", icon: Users, label: language === "km" ? "តាមដានបុគ្គលិក" : "Staff Tracking", color: "from-amber-500 to-orange-600" });
     }
     return links;
-  }, [isAdmin, t]);
+  }, [isAdmin, language]);
+
+  useEffect(() => {
+    if (isProfileEditing) return;
+    setProfileFullName(user.full_name || "");
+    setProfileEmail(user.email || "");
+    setProfilePhone(user.phone || "");
+    setProfilePicture(user.profile_picture || null);
+  }, [isProfileEditing, user.email, user.full_name, user.phone, user.profile_picture]);
 
   const loadUsers = useCallback(async () => {
     if (!isAdmin) return;
@@ -248,13 +276,23 @@ export default function SettingsContent() {
       const res = await fetch("/api/auth/users", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, password: newPassword, role: newRole }),
+        body: JSON.stringify({
+          username,
+          password: newPassword,
+          role: newRole,
+          full_name: newFullName.trim() || null,
+          email: newEmail.trim() || null,
+          phone: newPhone.trim() || null,
+        }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || t.saveError);
 
       setSuccess(t.createSuccess);
       setNewUsername("");
+      setNewFullName("");
+      setNewEmail("");
+      setNewPhone("");
       setNewPassword("");
       setConfirmPassword("");
       setNewRole("Staff");
@@ -264,7 +302,60 @@ export default function SettingsContent() {
     } finally {
       setIsCreating(false);
     }
-  }, [newUsername, newPassword, confirmPassword, newRole, t, loadUsers]);
+  }, [newUsername, newFullName, newEmail, newPhone, newPassword, confirmPassword, newRole, t, loadUsers]);
+
+  const handleProfileAvatarUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsProfileUploading(true);
+    setProfileError("");
+    setProfileSuccess("");
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await fetch("/api/auth/upload-avatar", { method: "POST", body: formData });
+      const data = await res.json();
+      if (data.ok && data.url) {
+        setProfilePicture(data.url);
+        setProfileSuccess(t.uploadSuccess);
+      } else {
+        setProfileError(data.error || t.unknownError);
+      }
+    } catch (err) {
+      setProfileError(err instanceof Error ? err.message : t.unknownError);
+    } finally {
+      setIsProfileUploading(false);
+      e.target.value = "";
+    }
+  }, [t]);
+
+  const handleSaveProfile = useCallback(async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsProfileUpdating(true);
+    setProfileError("");
+    setProfileSuccess("");
+    try {
+      const result = await updateProfile({
+        full_name: profileFullName.trim(),
+        email: profileEmail.trim(),
+        phone: profilePhone.trim(),
+        profile_picture: profilePicture || "",
+      });
+
+      if (!result.success) {
+        throw new Error(result.error || t.saveError);
+      }
+
+      await refreshUser();
+      setProfileSuccess(t.updateSuccess);
+      setIsProfileEditing(false);
+    } catch (err) {
+      setProfileError(err instanceof Error ? err.message : t.saveError);
+    } finally {
+      setIsProfileUpdating(false);
+    }
+  }, [profileEmail, profileFullName, profilePhone, profilePicture, refreshUser, t.saveError, t.updateSuccess, updateProfile]);
 
   const handleDeleteUser = useCallback(async (username: string) => {
     if (!confirm(`${t.confirmDelete} ${username}?`)) return;
@@ -291,6 +382,7 @@ export default function SettingsContent() {
     setEditUsername(user.username);
     setEditPassword("");
     setEditConfirmPassword("");
+    setEditRole(USER_ROLE_OPTIONS.includes(user.role) ? user.role : "Staff");
     setEditFullName(user.full_name || "");
     setEditEmail(user.email || "");
     setEditPhone(user.phone || "");
@@ -304,6 +396,7 @@ export default function SettingsContent() {
     setEditUsername("");
     setEditPassword("");
     setEditConfirmPassword("");
+    setEditRole("Staff");
     setEditFullName("");
     setEditEmail("");
     setEditPhone("");
@@ -347,6 +440,10 @@ export default function SettingsContent() {
       setError(t.passwordMismatch);
       return;
     }
+    if (editPassword && editPassword.length < USER_PASSWORD_MIN_LENGTH) {
+      setError(`Password must be at least ${USER_PASSWORD_MIN_LENGTH} characters`);
+      return;
+    }
 
     setIsUpdating(true);
     setError("");
@@ -357,6 +454,7 @@ export default function SettingsContent() {
         body: JSON.stringify({
           username: editingUser.username,
           newUsername: nextUsername,
+          role: editRole,
           ...(editPassword ? { password: editPassword, confirmPassword: editConfirmPassword } : {}),
           full_name: editFullName.trim() || null,
           email: editEmail.trim() || null,
@@ -370,7 +468,7 @@ export default function SettingsContent() {
       setSuccess(t.updateSuccess);
       cancelEdit();
       loadUsers();
-      if (editingUser.username === user.username && nextUsername !== user.username) {
+      if (editingUser.username === user.username && (nextUsername !== user.username || editRole !== user.role)) {
         clearCachedUser();
         router.refresh();
       }
@@ -379,7 +477,7 @@ export default function SettingsContent() {
     } finally {
       setIsUpdating(false);
     }
-  }, [editingUser, editUsername, editPassword, editConfirmPassword, editFullName, editEmail, editPhone, editProfilePicture, t, cancelEdit, loadUsers, user.username, router]);
+  }, [editingUser, editUsername, editPassword, editConfirmPassword, editRole, editFullName, editEmail, editPhone, editProfilePicture, t, cancelEdit, loadUsers, user.username, user.role, router]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-emerald-50/30 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 pb-24">
@@ -446,7 +544,7 @@ export default function SettingsContent() {
             }`}
           >
             <Shield className="w-4 h-4" />
-            {t.system}
+            {language === "km" ? "ចំណូលចិត្ត" : "Preferences"}
           </button>
         </div>
 
@@ -482,6 +580,172 @@ export default function SettingsContent() {
                   </button>
                 </div>
               </div>
+            </div>
+
+            {/* Profile Details */}
+            <div className="rounded-3xl bg-white dark:bg-slate-900 border border-slate-200/70 dark:border-slate-700 shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.2)] overflow-hidden">
+              <div className="flex flex-col gap-4 border-b border-slate-200/70 bg-gradient-to-r from-slate-50 to-white p-6 dark:border-slate-700 dark:from-slate-800/50 dark:to-slate-900 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-xl bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600 dark:text-emerald-400">
+                    <User className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-bold text-slate-800 dark:text-white">{language === "km" ? "ព័ត៌មានគណនី" : "Account Details"}</h3>
+                    <p className="text-sm text-slate-500 dark:text-slate-400">{user.email || `@${user.username}`}</p>
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsPasswordModalOpen(true)}
+                    className="rounded-xl bg-slate-100 px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
+                  >
+                    {language === "km" ? "ប្តូរពាក្យសម្ងាត់" : "Change Password"}
+                  </button>
+                  {!isProfileEditing && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsProfileEditing(true);
+                        setProfileError("");
+                        setProfileSuccess("");
+                      }}
+                      className="rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 px-4 py-2.5 text-sm font-medium text-white shadow-lg shadow-emerald-500/25 transition-all hover:shadow-emerald-500/40"
+                    >
+                      {language === "km" ? "កែប្រែប្រវត្តិរូប" : "Edit Profile"}
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              <form onSubmit={handleSaveProfile} className="p-6">
+                <div className="grid gap-6 lg:grid-cols-[auto,1fr]">
+                  <div className="flex flex-col items-center">
+                    <div className="relative">
+                      <UserAvatar
+                        user={{
+                          username: user.username,
+                          full_name: profileFullName,
+                          profile_picture: profilePicture,
+                        }}
+                        size="lg"
+                      />
+                      {isProfileUploading && (
+                        <div className="absolute inset-0 flex items-center justify-center rounded-xl bg-black/50">
+                          <RefreshCw className="h-6 w-6 animate-spin text-white" />
+                        </div>
+                      )}
+                    </div>
+                    {isProfileEditing && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => profileFileInputRef.current?.click()}
+                          disabled={isProfileUploading}
+                          className="mt-3 flex items-center gap-2 rounded-xl bg-slate-100 px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-200 disabled:opacity-50 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
+                        >
+                          <Upload className="w-4 h-4" />
+                          {isProfileUploading ? t.loading : t.change}
+                        </button>
+                        <input
+                          ref={profileFileInputRef}
+                          type="file"
+                          title={t.change}
+                          accept="image/*"
+                          onChange={handleProfileAvatarUpload}
+                          className="hidden"
+                        />
+                      </>
+                    )}
+                  </div>
+
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div>
+                      <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">{t.fullName}</label>
+                      <input
+                        type="text"
+                        title={t.fullName}
+                        value={profileFullName}
+                        onChange={(e) => setProfileFullName(e.target.value)}
+                        disabled={!isProfileEditing || isProfileUpdating}
+                        placeholder={t.enterFullName}
+                        className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-slate-900 transition-all placeholder:text-slate-400 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 disabled:bg-slate-50 disabled:text-slate-500 dark:border-slate-700 dark:bg-slate-800 dark:text-white dark:disabled:bg-slate-800/50"
+                      />
+                    </div>
+                    <div>
+                      <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">{t.email}</label>
+                      <input
+                        type="email"
+                        title={t.email}
+                        value={profileEmail}
+                        onChange={(e) => setProfileEmail(e.target.value)}
+                        disabled={!isProfileEditing || isProfileUpdating}
+                        placeholder={t.enterEmail}
+                        className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-slate-900 transition-all placeholder:text-slate-400 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 disabled:bg-slate-50 disabled:text-slate-500 dark:border-slate-700 dark:bg-slate-800 dark:text-white dark:disabled:bg-slate-800/50"
+                      />
+                    </div>
+                    <div>
+                      <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">{t.phone}</label>
+                      <input
+                        type="tel"
+                        title={t.phone}
+                        value={profilePhone}
+                        onChange={(e) => setProfilePhone(e.target.value)}
+                        disabled={!isProfileEditing || isProfileUpdating}
+                        placeholder={t.enterPhone}
+                        className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-slate-900 transition-all placeholder:text-slate-400 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 disabled:bg-slate-50 disabled:text-slate-500 dark:border-slate-700 dark:bg-slate-800 dark:text-white dark:disabled:bg-slate-800/50"
+                      />
+                    </div>
+                    <div>
+                      <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">{t.role}</label>
+                      <input
+                        type="text"
+                        title={t.role}
+                        value={formatRoleLabel(user.role)}
+                        disabled
+                        className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-500 dark:border-slate-700 dark:bg-slate-800/50 dark:text-slate-400"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {(profileError || profileSuccess || isProfileEditing) && (
+                  <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="min-w-0">
+                      {profileError && <p className="text-sm text-red-600 dark:text-red-400">{profileError}</p>}
+                      {profileSuccess && <p className="text-sm text-emerald-600 dark:text-emerald-400">{profileSuccess}</p>}
+                    </div>
+                    {isProfileEditing && (
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsProfileEditing(false);
+                            setProfileFullName(user.full_name || "");
+                            setProfileEmail(user.email || "");
+                            setProfilePhone(user.phone || "");
+                            setProfilePicture(user.profile_picture || null);
+                            setProfileError("");
+                            setProfileSuccess("");
+                          }}
+                          disabled={isProfileUpdating}
+                          className="rounded-xl bg-slate-100 px-5 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-200 disabled:opacity-50 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
+                        >
+                          {t.cancel}
+                        </button>
+                        <button
+                          type="submit"
+                          disabled={isProfileUpdating || isProfileUploading}
+                          className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 px-5 py-2.5 text-sm font-medium text-white shadow-lg shadow-emerald-500/25 transition-all hover:shadow-emerald-500/40 disabled:opacity-50"
+                        >
+                          {isProfileUpdating ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+                          {isProfileUpdating ? t.loading : t.save}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </form>
             </div>
 
             {/* Quick Links */}
@@ -535,10 +799,49 @@ export default function SettingsContent() {
                       onChange={(e) => setNewRole(e.target.value as Role)}
                       className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 shadow-sm hover:shadow-md dark:shadow-slate-900/20 dark:hover:shadow-slate-900/40 transition-all"
                     >
-                      <option value="Staff">{t.staff}</option>
-                      <option value="Accounting">{formatRoleLabel("Accounting")}</option>
-                      <option value="Admin">{t.admin}</option>
+                      {USER_ROLE_OPTIONS.map((role) => (
+                        <option key={role} value={role}>{formatRoleLabel(role)}</option>
+                      ))}
                     </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                      {t.fullName}
+                    </label>
+                    <input
+                      type="text"
+                      title={t.fullName}
+                      value={newFullName}
+                      onChange={(e) => setNewFullName(e.target.value)}
+                      placeholder={t.enterFullName}
+                      className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 shadow-sm hover:shadow-md dark:shadow-slate-900/20 dark:hover:shadow-slate-900/40 transition-all"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                      {t.email}
+                    </label>
+                    <input
+                      type="email"
+                      title={t.email}
+                      value={newEmail}
+                      onChange={(e) => setNewEmail(e.target.value)}
+                      placeholder={t.enterEmail}
+                      className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 shadow-sm hover:shadow-md dark:shadow-slate-900/20 dark:hover:shadow-slate-900/40 transition-all"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                      {t.phone}
+                    </label>
+                    <input
+                      type="tel"
+                      title={t.phone}
+                      value={newPhone}
+                      onChange={(e) => setNewPhone(e.target.value)}
+                      placeholder={t.enterPhone}
+                      className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 shadow-sm hover:shadow-md dark:shadow-slate-900/20 dark:hover:shadow-slate-900/40 transition-all"
+                    />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
@@ -759,7 +1062,7 @@ export default function SettingsContent() {
           </div>
         )}
 
-        {/* System Tab */}
+        {/* Preferences Tab */}
         {activeTab === "system" && (
           <div className="space-y-6">
             {/* Appearance Settings */}
@@ -828,7 +1131,7 @@ export default function SettingsContent() {
               </div>
             </div>
 
-            {/* System Info */}
+            {/* App Info */}
             <div className="rounded-3xl bg-white dark:bg-slate-900 border border-slate-200/70 dark:border-slate-700 shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.2)] overflow-hidden">
               <div className="p-6 border-b border-slate-200/70 dark:border-slate-700 bg-gradient-to-r from-blue-50/50 to-cyan-50/50 dark:from-slate-800/50 dark:to-slate-800/30">
                 <div className="flex items-center gap-3">
@@ -836,7 +1139,7 @@ export default function SettingsContent() {
                     <Shield className="w-5 h-5" />
                   </div>
                   <div>
-                    <h3 className="text-lg font-bold text-slate-800 dark:text-white">{language === 'km' ? 'ព័ត៌មានប្រព័ន្ធ' : 'System Information'}</h3>
+                    <h3 className="text-lg font-bold text-slate-800 dark:text-white">{language === 'km' ? 'ព័ត៌មានកម្មវិធី' : 'App Information'}</h3>
                     <p className="text-sm text-slate-500 dark:text-slate-400">{language === 'km' ? 'កំណែទំរង់ និងព័ត៌មាន' : 'Version and details'}</p>
                   </div>
                 </div>
@@ -856,8 +1159,8 @@ export default function SettingsContent() {
                 <div className="mt-4 p-4 rounded-2xl bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-900/20 dark:to-teal-900/20 border border-emerald-200/50 dark:border-emerald-800/50">
                   <p className="text-sm text-emerald-700 dark:text-emerald-300 text-center">
                     {language === 'km' 
-                      ? '© 2024 អេមើរ៉ល ឃែស - រក្សាសិទ្ធិគ្រប់យ៉ាង' 
-                      : '© 2024 Emerald Cash - All rights reserved'}
+                      ? `© ${new Date().getFullYear()} អេមើរ៉ល ឃែស - រក្សាសិទ្ធិគ្រប់យ៉ាង`
+                      : `© ${new Date().getFullYear()} Emerald Cash - All rights reserved`}
                   </p>
                 </div>
               </div>
@@ -865,6 +1168,11 @@ export default function SettingsContent() {
           </div>
         )}
       </div>
+
+      <ChangePasswordModal
+        isOpen={isPasswordModalOpen}
+        onClose={() => setIsPasswordModalOpen(false)}
+      />
 
       {/* Edit User Modal */}
       {editingUser && (
@@ -877,8 +1185,12 @@ export default function SettingsContent() {
                     <Edit3 className="w-5 h-5" />
                   </div>
                   <div>
-                    <h3 className="text-lg font-bold text-slate-800 dark:text-white">{t.edit}</h3>
-                    <p className="text-sm text-slate-500 dark:text-slate-400">{editingUser.username}</p>
+                    <h3 className="text-lg font-bold text-slate-800 dark:text-white">
+                      {language === "km" ? "កែអ្នកប្រើប្រាស់" : "Edit User"}
+                    </h3>
+                    <p className="text-sm text-slate-500 dark:text-slate-400">
+                      {language === "km" ? "កែសិទ្ធិចូលប្រើ និងព័ត៌មានប្រវត្តិរូប" : "Update access and profile details"}
+                    </p>
                   </div>
                 </div>
                 <button
@@ -948,6 +1260,13 @@ export default function SettingsContent() {
               )}
 
               <form onSubmit={handleUpdateUser} className="space-y-4">
+                {editingUser.username === user.username && (
+                  <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200">
+                    {language === "km"
+                      ? "អ្នកកំពុងកែគណនីរបស់អ្នក។ ការផ្លាស់ប្តូរ username ឬ role អាចធ្វើឲ្យ session refresh។"
+                      : "You are editing your own account. Username or role changes may refresh your session."}
+                  </div>
+                )}
                 <div>
                   <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                     {t.username}
@@ -961,6 +1280,26 @@ export default function SettingsContent() {
                     autoComplete="username"
                     className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
                   />
+                  <p className="mt-1.5 text-xs text-slate-500 dark:text-slate-400">
+                    {language === "km"
+                      ? "ប្រើអក្សរតូច លេខ ចំណុច សញ្ញាដក ឬ underscore, 3-32 តួអក្សរ។"
+                      : "Use lowercase letters, numbers, dot, dash, or underscore, 3-32 characters."}
+                  </p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                    {t.role}
+                  </label>
+                  <select
+                    title={t.role}
+                    value={editRole}
+                    onChange={(e) => setEditRole(e.target.value as Role)}
+                    className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
+                  >
+                    {USER_ROLE_OPTIONS.map((role) => (
+                      <option key={role} value={role}>{formatRoleLabel(role)}</option>
+                    ))}
+                  </select>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
@@ -975,6 +1314,11 @@ export default function SettingsContent() {
                     autoComplete="new-password"
                     className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
                   />
+                  <p className="mt-1.5 text-xs text-slate-500 dark:text-slate-400">
+                    {language === "km"
+                      ? "ទុកទទេ ប្រសិនបើមិនប្តូរ។ បើប្តូរ ត្រូវមានយ៉ាងតិច 8 តួអក្សរ។"
+                      : "Leave blank to keep the current password. Use at least 8 characters when changing it."}
+                  </p>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
@@ -989,6 +1333,21 @@ export default function SettingsContent() {
                     autoComplete="new-password"
                     className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
                   />
+                  {editPassword || editConfirmPassword ? (
+                    <p className={`mt-1.5 text-xs ${
+                      editPassword === editConfirmPassword
+                        ? "text-emerald-600 dark:text-emerald-300"
+                        : "text-red-600 dark:text-red-300"
+                    }`}>
+                      {editPassword === editConfirmPassword
+                        ? (language === "km" ? "ពាក្យសម្ងាត់ត្រូវគ្នា។" : "Passwords match.")
+                        : t.passwordMismatch}
+                    </p>
+                  ) : (
+                    <p className="mt-1.5 text-xs text-slate-500 dark:text-slate-400">
+                      {language === "km" ? "ចាំបាច់តែពេលកំណត់ពាក្យសម្ងាត់ថ្មី។" : "Required only when setting a new password."}
+                    </p>
+                  )}
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">

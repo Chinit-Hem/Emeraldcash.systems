@@ -5,6 +5,7 @@
  */
 
 import { createErrorResponse, createSuccessResponse, withErrorHandling } from "@/lib/api-error-wrapper";
+import { auditEventFromRequest, recordAuditEvent } from "@/lib/audit-log";
 import { requirePermission } from "@/lib/auth-helpers";
 import { buildCorsHeaders } from "@/lib/cors";
 import { vehicleService } from "@/systems/vms/services/VehicleService";
@@ -195,13 +196,6 @@ const putHandler = withErrorHandling(async (req: NextRequest, { logger, requestI
     dbPayload.thumbnail_url = normalizedImages[0] || null;
   }
 
-  // Log incoming payload for debugging image update issues
-  console.log('[🚀 API UPDATE FULL PAYLOAD]:', JSON.stringify({
-    vehicleId: id,
-    dbPayload,
-    payloadKeys: Object.keys(payload)
-  }, null, 2));
-
   const hasImageUpdate = Object.prototype.hasOwnProperty.call(dbPayload, "image_id");
   const hasThumbnailUpdate = Object.prototype.hasOwnProperty.call(dbPayload, "thumbnail_url");
 
@@ -209,7 +203,6 @@ const putHandler = withErrorHandling(async (req: NextRequest, { logger, requestI
   // thumbnail_url in sync so server-rendered DB lists show the latest upload.
   if (!normalizedImages && dbPayload.image_id) {
     const normalizedImageId = await normalizeImageUrl(dbPayload.image_id);
-    console.log(`[API UPDATE ${id}] Image normalized: "${dbPayload.image_id.substring(0,30)}..." → "${normalizedImageId.substring(0,50)}..."`);
     dbPayload.image_id = normalizedImageId;
 
     dbPayload.thumbnail_url = hasThumbnailUpdate && dbPayload.thumbnail_url
@@ -234,7 +227,6 @@ const putHandler = withErrorHandling(async (req: NextRequest, { logger, requestI
     ["category", dbPayload.category],
     ["brand", dbPayload.brand],
     ["model", dbPayload.model],
-    ["plate", dbPayload.plate],
   ] as const;
 
   for (const [field, value] of requiredFields) {
@@ -245,22 +237,7 @@ const putHandler = withErrorHandling(async (req: NextRequest, { logger, requestI
 
   logger.debug("[UPDATE]", { vehicleId: id, plate: dbPayload.plate, hasImage: !!dbPayload.image_id });
 
-  console.error('[🚀 VEHICLE API UPDATE START]', {
-    vehicleId: id,
-    image_id: dbPayload.image_id ? `${dbPayload.image_id.substring(0,50)}...` : null,
-    image_format: dbPayload.image_id ? (dbPayload.image_id.startsWith('http') ? 'URL' : dbPayload.image_id.startsWith('data:') ? 'DATA' : 'PUBLIC_ID') : null,
-    plate: dbPayload.plate,
-    requestId
-  });
-
   const result = await vehicleService.updateVehicle(id, dbPayload);
-
-  console.error('[🚀 VEHICLE API UPDATE RESULT]', {
-    success: result.success,
-    error: result.error,
-    image_saved: dbPayload.image_id,
-    requestId
-  });
 
   if (!result.success) {
     const errorMsg = result.error || 'Unknown database error (no error message returned)';
@@ -293,6 +270,18 @@ const putHandler = withErrorHandling(async (req: NextRequest, { logger, requestI
   }
 
   clearCachedVehicles();
+  await recordAuditEvent(auditEventFromRequest(req, {
+    action: "vms.vehicle.update.success",
+    actorUsername: auth.session.username,
+    actorRole: auth.session.role,
+    resourceType: "vehicle",
+    resourceId: id,
+    status: "success",
+    metadata: {
+      updatedFields: Object.keys(dbPayload),
+      hasImageUpdate: Boolean(normalizedImages || hasImageUpdate || hasThumbnailUpdate),
+    },
+  }));
 
   return createSuccessResponse(
     result.data,
@@ -328,6 +317,15 @@ const deleteHandler = withErrorHandling(async (req: NextRequest, { logger, reque
   }
 
   logger.info("[DELETE OK]", { vehicleId: id });
+  clearCachedVehicles();
+  await recordAuditEvent(auditEventFromRequest(req, {
+    action: "vms.vehicle.delete.success",
+    actorUsername: auth.session.username,
+    actorRole: auth.session.role,
+    resourceType: "vehicle",
+    resourceId: id,
+    status: "success",
+  }));
 
   return new NextResponse(null, {
     status: 204,

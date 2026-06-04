@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowLeft, type LucideIcon } from "lucide-react";
+import { AlertCircle, ArrowLeft, type LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
 
 type SmsPageShellProps = {
@@ -13,6 +13,10 @@ type SmsPageHeaderProps = {
   icon: LucideIcon;
   tone?: "emerald" | "blue" | "slate" | "amber" | "purple";
   actions?: ReactNode;
+};
+
+type SmsFieldErrorProps = {
+  error?: string;
 };
 
 const headerTone = {
@@ -45,18 +49,31 @@ export const smsLoadingFieldClass =
 export const smsDropzoneClass =
   "rounded-lg border border-dashed border-gray-300 bg-gray-50 p-4 transition-colors hover:border-emerald-300 dark:border-gray-700 dark:bg-gray-800/50 dark:hover:border-emerald-700";
 export const smsDividerClass = "border-t border-gray-200 dark:border-gray-700";
+export const smsInvalidFieldClass =
+  "border-red-500 bg-red-50 focus:ring-red-500 dark:border-red-700 dark:bg-red-900/20 dark:focus:ring-red-500";
 export const smsModalPanelClass =
-  "max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white/95 shadow-2xl ring-1 ring-gray-200/80 backdrop-blur-xl dark:bg-gray-900/95 dark:ring-gray-800";
+  "flex max-h-[calc(100dvh-2rem)] w-full max-w-3xl flex-col overflow-hidden rounded-2xl bg-white/95 shadow-2xl ring-1 ring-gray-200/80 backdrop-blur-xl dark:bg-gray-900/95 dark:ring-gray-800";
 export const smsModalHeaderClass =
-  "sticky top-0 z-10 border-b border-gray-200 bg-white/95 p-4 backdrop-blur-lg dark:border-gray-800 dark:bg-gray-900/95 md:p-6";
+  "shrink-0 border-b border-gray-200 bg-white/95 p-4 backdrop-blur-lg dark:border-gray-800 dark:bg-gray-900/95 md:p-6";
 export const smsModalFooterClass =
-  "sticky bottom-0 -mx-5 flex flex-col gap-3 border-t border-gray-200 bg-white/95 px-5 py-4 backdrop-blur-lg dark:border-gray-800 dark:bg-gray-900/95 sm:-mx-6 sm:flex-row sm:px-6";
+  "shrink-0 flex flex-col gap-3 border-t border-gray-200 bg-white/95 px-5 py-4 backdrop-blur-lg dark:border-gray-800 dark:bg-gray-900/95 sm:flex-row sm:px-6";
 
 export function SmsPageShell({ children, maxWidth = "max-w-7xl" }: SmsPageShellProps) {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 px-4 py-5 sm:p-6 lg:p-8 dark:from-slate-950 dark:via-slate-950 dark:to-slate-900">
       <div className={`mx-auto ${maxWidth}`}>{children}</div>
     </div>
+  );
+}
+
+export function SmsFieldError({ error }: SmsFieldErrorProps) {
+  if (!error) return null;
+
+  return (
+    <p className={smsErrorTextClass}>
+      <AlertCircle className="h-4 w-4" />
+      {error}
+    </p>
   );
 }
 
@@ -72,6 +89,7 @@ export function SmsPageHeader({
       <div className="flex min-w-0 items-start gap-4">
         <Link
           href="/sms"
+          scroll={false}
           className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl bg-white text-gray-600 shadow-sm ring-1 ring-gray-200 transition-colors hover:bg-gray-50 hover:text-gray-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 dark:bg-gray-900 dark:text-gray-300 dark:ring-gray-700 dark:hover:bg-gray-800 dark:hover:text-white"
           aria-label="Back to SMS Dashboard"
         >

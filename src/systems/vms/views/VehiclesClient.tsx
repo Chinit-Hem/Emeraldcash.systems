@@ -1,6 +1,7 @@
 "use client";
 
 import { cn } from "@/shared/utils/ui";
+import { formatVehicleId } from "@/shared/utils/format";
 import { useAuthUser } from "@/shared/hooks/AuthContext";
 import DashboardHeader from "@/systems/vms/components/dashboard/DashboardHeader";
 import DeleteConfirmationModal from "@/systems/vms/components/dashboard/DeleteConfirmationModal";
@@ -194,7 +195,7 @@ function IOSVehicleCard({ vehicle, isAdmin, onEdit, onDelete }: IOSVehicleCardPr
           <div className="grid grid-cols-2 gap-3 text-sm">
             <div>
               <span className="text-gray-500 dark:text-gray-400">Vehicle ID:</span>
-              <p className="font-mono text-gray-900 dark:text-white">{vehicle.VehicleId || "-"}</p>
+              <p className="font-mono text-gray-900 dark:text-white">{formatVehicleId(vehicle.VehicleId)}</p>
             </div>
             <div>
               <span className="text-gray-500 dark:text-gray-400">Tax Type:</span>
@@ -229,7 +230,6 @@ function IOSVehicleCard({ vehicle, isAdmin, onEdit, onDelete }: IOSVehicleCardPr
               onClick={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                console.log('[iOS] View button clicked for vehicle:', vehicleId);
                 router.push(getVehicleViewHref(vehicleId));
               }}
               className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-emerald-50 dark:bg-emerald-900/35 text-emerald-700 dark:text-emerald-300 border border-emerald-200/70 dark:border-emerald-500/30 rounded-xl font-medium active:scale-[0.98] transition-transform touch-manipulation min-h-[44px]"
@@ -254,7 +254,6 @@ function IOSVehicleCard({ vehicle, isAdmin, onEdit, onDelete }: IOSVehicleCardPr
                   onClick={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
-                    console.log('[iOS] Edit button clicked for vehicle:', vehicleId);
                     onEdit(vehicle);
                   }}
                   className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 rounded-xl font-medium active:scale-[0.98] transition-transform touch-manipulation min-h-[44px]"
@@ -276,7 +275,6 @@ function IOSVehicleCard({ vehicle, isAdmin, onEdit, onDelete }: IOSVehicleCardPr
                   onClick={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
-                    console.log('[iOS] Delete button clicked for vehicle:', vehicleId);
                     onDelete(vehicle);
                   }}
                   className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 rounded-xl font-medium active:scale-[0.98] transition-transform touch-manipulation min-h-[44px]"
@@ -1076,12 +1074,6 @@ export default function VehiclesClient() {
       formData.append("image", imageFile);
     }
 
-    // Debug Log: See actual values being sent to Server
-    console.log("[handleSaveVehicle] Payload to be sent:");
-    for (const pair of formData.entries()) {
-      console.log(pair[0], pair[1]);
-    }
-
     const response = await fetch('/api/vehicles', {
       method: 'POST',
       body: formData,
@@ -1099,12 +1091,6 @@ export default function VehiclesClient() {
   const handleSubmitVehicle = async (data: Partial<Vehicle>, imageFile?: File | null): Promise<void> => {
     if (editingVehicle) {
       // UPDATE mode: Use updateVehicle with Cloudinary upload
-      console.log("[handleSubmitVehicle] UPDATE mode - using updateVehicle", {
-        vehicleId: editingVehicle.VehicleId,
-        hasImageFile: !!imageFile,
-        hasImageInData: !!data.Image,
-      });
-
       // Set optimistic update flag to prevent useEffect from overwriting
       optimisticUpdateInProgress.current = true;
 
@@ -1118,10 +1104,6 @@ export default function VehiclesClient() {
       setSelectedVehicle(null);
     } else {
       // ADD mode: Use handleSaveVehicle with FormData POST
-      console.log("[handleSubmitVehicle] ADD mode - using handleSaveVehicle", {
-        hasImageFile: !!imageFile,
-      });
-
       await handleSaveVehicle(data, imageFile ?? undefined);
 
       // Close modal and refresh vehicle list
@@ -1464,7 +1446,7 @@ export default function VehiclesClient() {
           />
           <NeuKpiCard
             category="tuktuks"
-            label="Tuk Tuks"
+            label="TukTuks"
             value={kpis.tukTuks.toLocaleString()}
             onClick={handleTukTuksClick}
             isActive={filters.category === "TukTuks"}

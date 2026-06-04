@@ -20,11 +20,22 @@ const isCloudinaryConfigured = !!(
   CLOUDINARY_API_KEY &&
   CLOUDINARY_API_SECRET
 );
+const shouldLogCloudinaryDebug = typeof window === "undefined" && process.env.NODE_ENV !== "production";
+
+function logCloudinaryDebug(message: string, meta?: unknown): void {
+  if (!shouldLogCloudinaryDebug) return;
+  if (meta === undefined) {
+    console.log(message);
+    return;
+  }
+
+  console.log(message, meta);
+}
 
 // Log configuration status for debugging
-if (typeof window === 'undefined') {
+if (shouldLogCloudinaryDebug) {
   // Server-side only
-  console.log('[Cloudinary] Configuration check:', {
+  logCloudinaryDebug('[Cloudinary] Configuration check:', {
     cloudName: CLOUDINARY_CLOUD_NAME ? 'SET' : 'NOT_SET',
     apiKey: CLOUDINARY_API_KEY ? 'SET' : 'NOT_SET',
     apiSecret: CLOUDINARY_API_SECRET ? 'SET' : 'NOT_SET',
@@ -161,11 +172,13 @@ export async function uploadImage(
   originalSize?: number; // Original size in bytes
   compressedSize?: number; // Compressed size in bytes
 }> {
-  console.log("[Cloudinary] uploadImage called, checking configuration...");
-  console.log("[Cloudinary] CLOUDINARY_CLOUD_NAME:", CLOUDINARY_CLOUD_NAME ? "SET" : "NOT SET");
-  console.log("[Cloudinary] CLOUDINARY_API_KEY:", CLOUDINARY_API_KEY ? "SET" : "NOT SET");
-  console.log("[Cloudinary] CLOUDINARY_API_SECRET:", CLOUDINARY_API_SECRET ? "SET" : "NOT SET");
-  console.log("[Cloudinary] isCloudinaryConfigured:", isCloudinaryConfigured);
+  logCloudinaryDebug("[Cloudinary] uploadImage called, checking configuration...");
+  logCloudinaryDebug("[Cloudinary] Configuration status:", {
+    cloudName: CLOUDINARY_CLOUD_NAME ? "SET" : "NOT SET",
+    apiKey: CLOUDINARY_API_KEY ? "SET" : "NOT SET",
+    apiSecret: CLOUDINARY_API_SECRET ? "SET" : "NOT SET",
+    isConfigured: isCloudinaryConfigured,
+  });
 
   if (!isCloudinaryConfigured) {
     console.error("[Cloudinary] Not configured - missing environment variables");
@@ -234,9 +247,9 @@ export async function uploadImage(
       const uploadPreset = options.uploadPreset;
       if (uploadPreset) {
         uploadOptions.upload_preset = uploadPreset;
-        console.log(`[Cloudinary] Using upload_preset: ${uploadPreset} (unsigned upload)`);
+        logCloudinaryDebug(`[Cloudinary] Using upload_preset: ${uploadPreset} (unsigned upload)`);
       } else {
-        console.log('[Cloudinary] Using signed upload with API credentials');
+        logCloudinaryDebug('[Cloudinary] Using signed upload with API credentials');
       }
 
       let result: UploadApiResponse;
@@ -646,8 +659,8 @@ Please verify your Cloudinary credentials:
 2. Go to Dashboard → Account Details
 3. Copy the correct values:
    - Cloud Name: ${CLOUDINARY_CLOUD_NAME || "NOT SET"}
-   - API Key: ${CLOUDINARY_API_KEY ? "****" + CLOUDINARY_API_KEY.slice(-4) : "NOT SET"}
-   - API Secret: ${CLOUDINARY_API_SECRET ? "****" + CLOUDINARY_API_SECRET.slice(-4) : "NOT SET"}
+   - API Key: ${CLOUDINARY_API_KEY ? "SET" : "NOT SET"}
+   - API Secret: ${CLOUDINARY_API_SECRET ? "SET" : "NOT SET"}
 
 4. Update your .env.local file with the correct credentials:
    CLOUDINARY_CLOUD_NAME=your_cloud_name

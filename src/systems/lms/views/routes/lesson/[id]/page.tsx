@@ -266,8 +266,11 @@ export default function LessonPlayerPage() {
       setLoading(true);
       setError(null);
       
-      // Fetch current lesson details
-      const lessonRes = await fetch(`/api/lms/lessons?id=${id}`);
+      const [lessonRes, catRes] = await Promise.all([
+        fetch(`/api/lms/lessons?id=${id}`),
+        fetch("/api/lms/categories"),
+      ]);
+
       if (!lessonRes.ok) throw new Error("Failed to fetch lesson");
       const lessonData = await lessonRes.json();
       
@@ -276,9 +279,8 @@ export default function LessonPlayerPage() {
       }
       
       const lesson: LmsLesson = lessonData.data;
-      
+
       // Fetch category info
-      const catRes = await fetch(`/api/lms/categories`);
       if (catRes.ok) {
         const catData = await catRes.json();
         if (catData.success) {
@@ -472,15 +474,30 @@ export default function LessonPlayerPage() {
   const goToAvailableLesson = () => {
     const firstUnlocked = categoryLessons.find(l => l.is_unlocked);
     if (firstUnlocked) {
-      router.push(`/lms/lesson/${firstUnlocked.id}`);
+      router.push(`/lms/lesson/${firstUnlocked.id}`, { scroll: false });
     } else {
-      router.push("/lms");
+      router.push("/lms", { scroll: false });
     }
   };
   
   // Calculate progress
-  const completedCount = categoryLessons.filter(l => l.is_completed).length;
-  const progressPercentage = Math.round((completedCount / (categoryLessons.length || 1)) * 100);
+  const totalLessonCount = categoryLessons.length || (currentLesson ? 1 : 0);
+  const completedCount = categoryLessons.length > 0
+    ? categoryLessons.filter(l => l.is_completed).length
+    : currentLesson?.is_completed
+      ? 1
+      : 0;
+  const progressPercentage = totalLessonCount > 0
+    ? Math.round((completedCount / totalLessonCount) * 100)
+    : 0;
+  const lessonPosition = hasCurrentLessonInCategory ? currentIndex + 1 : currentLesson ? 1 : 0;
+  const watchedPercentage = Math.min(100, Math.max(0, Math.floor(watchProgress.watchPercentage)));
+  const lessonStatusLabel =
+    currentLesson?.is_completed || watchProgress.isCompleted
+      ? "Completed"
+      : watchProgress.canComplete
+        ? "Ready to complete"
+        : `Watched ${watchedPercentage}%`;
   
   if (loading) {
     return (
@@ -501,7 +518,7 @@ export default function LessonPlayerPage() {
           <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
             {error || "Lesson not found"}
           </h2>
-          <GlassButton variant="primary" onClick={() => router.push("/lms")}>
+          <GlassButton variant="primary" onClick={() => router.push("/lms", { scroll: false })}>
             Back to Dashboard
           </GlassButton>
         </div>
@@ -527,7 +544,7 @@ export default function LessonPlayerPage() {
             <div className="flex min-w-0 items-center gap-3 sm:gap-4">
               <button
                 type="button"
-                onClick={() => router.push("/lms")}
+                onClick={() => router.push("/lms", { scroll: false })}
                 aria-label="Back to LMS"
                 title="Back to LMS"
                 className="flex-shrink-0 p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
@@ -544,44 +561,31 @@ export default function LessonPlayerPage() {
               </div>
             </div>
             
-            <div className="flex flex-wrap items-center gap-3 sm:flex-nowrap sm:justify-end">
-              {/* Progress Badge */}
-              <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-emerald-50 dark:bg-emerald-900/20 rounded-full">
-                <Trophy className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                <span className="text-sm font-medium text-emerald-700 dark:text-emerald-300">
-                  {progressPercentage}% Complete
-                </span>
+            <div className="flex flex-wrap items-center gap-2 sm:flex-nowrap sm:justify-end">
+              <div className="inline-flex items-center gap-2 rounded-full bg-gray-100 px-3 py-1.5 text-sm font-medium text-gray-700 dark:bg-gray-700/60 dark:text-gray-200">
+                <Clock className="h-4 w-4 text-gray-500 dark:text-gray-300" />
+                <span>{lessonPosition} / {totalLessonCount || 0} lessons</span>
               </div>
-              
-              {/* Mark Complete Button */}
-              <GlassButton
-                variant={currentLesson.is_completed ? "secondary" : "primary"}
-                onClick={() => {
-                  void handleMarkComplete();
-                }}
-                disabled={
-                  currentLesson.is_completed ||
-                  markingComplete ||
-                  !currentLesson.is_unlocked ||
-                  !watchProgress.canComplete
-                }
-                className={currentLesson.is_completed ? "bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300" : ""}
-                title={watchProgress.canComplete ? "Mark Complete" : "Watch 95% to unlock completion"}
+
+              <div className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1.5 text-sm font-medium text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300">
+                <Trophy className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                <span>Course {completedCount} / {totalLessonCount || 0}</span>
+              </div>
+
+              <div
+                className={`inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-sm font-medium ${
+                  currentLesson.is_completed || watchProgress.canComplete
+                    ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300"
+                    : "bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-300"
+                }`}
               >
-                {markingComplete ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : currentLesson.is_completed ? (
-                  <>
-                    <CheckCircle2 className="w-4 h-4 mr-1" />
-                    Completed
-                  </>
+                {currentLesson.is_completed || watchProgress.canComplete ? (
+                  <CheckCircle2 className="h-4 w-4" />
                 ) : (
-                  <>
-                    <CheckCircle2 className="w-4 h-4 mr-1" />
-                    Mark Complete
-                  </>
+                  <Play className="h-4 w-4" />
                 )}
-              </GlassButton>
+                <span>{lessonStatusLabel}</span>
+              </div>
             </div>
           </div>
         </div>
@@ -602,7 +606,6 @@ export default function LessonPlayerPage() {
             <VideoPlayer 
               lessonId={currentLesson.id}
               title={currentLesson.title}
-              description={currentLesson.description}
               youtubeUrl={currentLesson.youtube_url}
               youtubeVideoId={currentLesson.youtube_video_id}
               thumbnailUrl={currentLesson.thumbnail_url}
@@ -610,7 +613,6 @@ export default function LessonPlayerPage() {
               durationMinutes={currentLesson.duration_minutes}
               isCompleted={currentLesson.is_completed}
               onComplete={handleMarkComplete}
-              onBack={() => router.push("/lms")}
               onPrevious={goToPrev}
               onNext={goToNext}
               canGoPrevious={hasPrev}
@@ -622,16 +624,18 @@ export default function LessonPlayerPage() {
             <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800 sm:p-6">
               <div className="mb-4 flex items-start justify-between">
                 <div className="min-w-0">
-                  <h2 className="mb-2 break-words text-lg font-bold leading-snug text-gray-900 dark:text-white sm:text-xl">
-                    {currentLesson.title}
-                  </h2>
+                  <p className="mb-2 text-xs font-semibold uppercase tracking-normal text-gray-500 dark:text-gray-400">
+                    Lesson Details
+                  </p>
                   <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-500 dark:text-gray-400 sm:text-sm">
                     <span className="flex items-center gap-1">
                       <Clock className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                       {`${currentLesson.duration_minutes || 0} minutes`}
                     </span>
                     <span>•</span>
-                    <span>{`Lesson ${currentIndex + 1} of ${categoryLessons.length}`}</span>
+                    <span>{`Lesson ${lessonPosition} of ${totalLessonCount}`}</span>
+                    <span>•</span>
+                    <span>{`Watched ${watchedPercentage}%`}</span>
                     {!currentLesson.is_unlocked && (
                       <span className="text-amber-600 dark:text-amber-400 flex items-center gap-1">
                         <Lock className="w-3 h-3" />
@@ -678,14 +682,14 @@ export default function LessonPlayerPage() {
           
           {/* Right Column - Playlist */}
           <div className="lg:col-span-1">
-            <div className="sticky top-24">
+            <div className="lg:sticky lg:top-24">
               <GlassCard className="p-4">
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
                   <BookOpen className="w-5 h-5 text-emerald-500" />
                   Course Content
                 </h3>
                 
-                <div className="space-y-2 max-h-[calc(100vh-400px)] overflow-y-auto pr-2 custom-scrollbar">
+                <div className="space-y-2 pr-2 lg:max-h-[calc(100vh-320px)] lg:overflow-y-auto custom-scrollbar">
                   {categoryLessons.map((lesson, index) => (
                     <LessonPlaylistItem
                       key={lesson.id}
@@ -700,9 +704,9 @@ export default function LessonPlayerPage() {
                 {/* Progress Summary */}
                 <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
                   <div className="flex items-center justify-between text-sm mb-2">
-                    <span className="text-gray-500 dark:text-gray-400">Your Progress</span>
+                    <span className="text-gray-500 dark:text-gray-400">Course Progress</span>
                     <span className="font-semibold text-emerald-600 dark:text-emerald-400">
-                      {completedCount} / {categoryLessons.length} lessons
+                      {completedCount} / {totalLessonCount} lessons
                     </span>
                   </div>
                   <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2.5 mb-2">

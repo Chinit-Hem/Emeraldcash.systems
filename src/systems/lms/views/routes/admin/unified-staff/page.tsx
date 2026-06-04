@@ -94,7 +94,7 @@ export default function UnifiedStaffPage() {
 
   useEffect(() => {
     if (!isAdmin) {
-      router.push("/lms");
+      router.push("/lms", { scroll: false });
       return;
     }
     fetchData();
@@ -282,7 +282,7 @@ export default function UnifiedStaffPage() {
           <div className="flex items-center gap-4">
             <button
               type="button"
-              onClick={() => router.push("/lms")}
+              onClick={() => router.push("/lms", { scroll: false })}
               aria-label="Back to LMS"
               title="Back to LMS"
               className="p-2.5 rounded-xl bg-white shadow-[4px_4px_8px_#e2e8f0,-4px_-4px_8px_#ffffff] text-slate-600 hover:shadow-[6px_6px_12px_#e2e8f0,-6px_-6px_12px_#ffffff] transition-all active:scale-95"

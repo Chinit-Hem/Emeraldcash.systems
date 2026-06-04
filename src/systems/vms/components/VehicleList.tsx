@@ -406,7 +406,7 @@ export default function VehicleList({ category }: VehicleListProps) {
                   <option value="All">All Categories</option>
                   <option value="Cars">Cars</option>
                   <option value="Motorcycles">Motorcycles</option>
-                  <option value="Tuk Tuk">Tuk Tuk</option>
+                  <option value="TukTuks">TukTuks</option>
                 </select>
                 <div className="absolute right-6 top-1/2 -translate-y-1/2 text-[#718096] pointer-events-none">
                   {Icons.chevronDown}

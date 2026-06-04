@@ -5,6 +5,7 @@ import "../styles/globals.css";
 import { ThemeProvider } from "@/shared/hooks/theme-provider";
 import { LanguageProvider } from "@/shared/hooks/LanguageContext";
 import { NeuDashboardSkeleton } from "@/shared/components/skeletons/NeuDashboardSkeleton";
+import PwaLifecycle from "@/shared/components/PwaLifecycle";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -143,6 +144,8 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
+  maximumScale: 5,
+  userScalable: true,
   viewportFit: "cover",
   themeColor: "#ecfdf5",
 };
@@ -165,6 +168,7 @@ export default async function RootLayout({
         <script id="theme-init" dangerouslySetInnerHTML={{ __html: themeInitScript }} />
       </head>
       <body className="antialiased" suppressHydrationWarning>
+        <PwaLifecycle />
         <ThemeProvider>
           <LanguageProvider>
             <Suspense fallback={<NeuDashboardSkeleton />}>

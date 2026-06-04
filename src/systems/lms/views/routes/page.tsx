@@ -17,8 +17,8 @@ import { Metadata } from "next";
 import LmsClientShell from "@/systems/lms/views/LmsClientShell";
 
 export const metadata: Metadata = {
-  title: "Training Portal | Emerald Cash Systems",
-  description: "Staff training and certification portal",
+  title: "Learning Center | Emerald Cash Systems",
+  description: "Browse lessons, continue training, and track your progress.",
 };
 
 export default function LmsPage() {

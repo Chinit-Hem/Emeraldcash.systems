@@ -153,7 +153,6 @@ limit = 500, // Increased for dashboard pagination fix (total 1218 vehicles)
     const checkMutation = () => {
       const status = getCacheStatus();
       if (status.lastMutation && status.lastMutation !== lastMutationTimeRef.current) {
-        console.log("[useVehiclesNeon] Mutation detected, forcing refresh");
         lastMutationTimeRef.current = status.lastMutation;
         setForceRefreshKey(prev => prev + 1);
       }
@@ -175,7 +174,6 @@ limit = 500, // Increased for dashboard pagination fix (total 1218 vehicles)
   useEffect(() => {
     const unsubscribe = onVehicleCacheUpdate(() => {
       // Any cache update/invalidation should trigger immediate revalidation.
-      console.log("[useVehiclesNeon] Cache update detected, forcing refresh");
       setForceRefreshKey(prev => prev + 1);
     });
     return unsubscribe;

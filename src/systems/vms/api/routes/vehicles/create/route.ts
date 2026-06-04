@@ -44,7 +44,7 @@ const postHandler = withErrorHandling(async (req: NextRequest, { logger, request
   }
 
   // Validate required fields
-  const requiredFields = ["Category", "Brand", "Model", "Plate"];
+  const requiredFields = ["Category", "Brand", "Model"];
   for (const field of requiredFields) {
     if (!payload[field as keyof Vehicle]) {
       return createErrorResponse(
@@ -72,7 +72,7 @@ const postHandler = withErrorHandling(async (req: NextRequest, { logger, request
     brand: payload.Brand as string,
     model: payload.Model as string,
     year: payload.Year as number | null,
-    plate: payload.Plate as string,
+    plate: (payload.Plate || "") as string,
     market_price: payload.PriceNew as number,
     tax_type: payload.TaxType as string || null,
     condition: payload.Condition as string,

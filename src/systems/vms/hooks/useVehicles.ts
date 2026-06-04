@@ -161,9 +161,6 @@ export function useVehicles(options: UseVehiclesOptions = {}): UseVehiclesReturn
         if (isRetryable && !isLastAttempt) {
           retryCountRef.current++;
 
-          // No delay - immediate retry for maximum speed
-          console.log(`[useVehicles] Retry ${retryCountRef.current}/${MAX_RETRIES}`);
-
           // Retry
           return attemptFetch();
         }
@@ -263,18 +260,12 @@ export function useVehicles(options: UseVehiclesOptions = {}): UseVehiclesReturn
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
-    console.log('[useVehicles] Component mounted, checking cache...');
     const cacheAge = getCacheAge();
     if (cacheAge !== null) {
-      console.log(`[useVehicles] Current cache age: ${cacheAge}ms`);
-
       // Only clear cache if it's truly expired (older than 5 minutes)
       // This prevents aggressive cache clearing on every mount
       if (cacheAge > CACHE_STALE_TIME_MS) {
-        console.log(`[useVehicles] Cache is ${Math.round(cacheAge / 1000)}s old (expired), clearing...`);
         clearAllVehicleCache();
-      } else {
-        console.log(`[useVehicles] Cache is fresh (${Math.round(cacheAge / 1000)}s), keeping...`);
       }
     }
   }, []); // Empty dependency array - only run on mount
@@ -324,7 +315,6 @@ export function useVehicles(options: UseVehiclesOptions = {}): UseVehiclesReturn
     const unsubscribe = onVehicleCacheUpdate((updatedVehicles) => {
       // Skip refetch if we just updated the cache ourselves (prevents infinite loop)
       if (justUpdatedCacheRef.current) {
-        console.log('[useVehicles] Skipping cache update - we just updated it');
         return;
       }
 
@@ -340,11 +330,9 @@ export function useVehicles(options: UseVehiclesOptions = {}): UseVehiclesReturn
         currentVehicles.some(v => !updatedIds.has(v.VehicleId));
       // This is a loop.
       if (!hasChanges) {
-        console.log('[useVehicles] Cache updated but data unchanged, skipping refetch');
         return;
       }
 
-      console.log('[useVehicles] Cache updated by another component, refetching...');
       // Refetch when cache is updated by another component
       // Use ref to get current filters
       fetchVehicles({ currentFilters: filtersRef.current });

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { auditEventFromRequest, recordAuditEvent } from '@/lib/audit-log';
 import { requirePermission } from '@/lib/auth-helpers';
 import { smsService } from '@/systems/sms/services/SmsService';
 import type { SmsTransferEntity } from '@/systems/sms/services/SmsService';
@@ -47,6 +48,16 @@ export async function POST(
     }
 
     if (!canUpdateTransfer(transfer, userId, auth.session.role)) {
+      await recordAuditEvent(auditEventFromRequest(req, {
+        action: `sms.transfer.${action}.denied`,
+        actorUsername: auth.session.username,
+        actorRole: auth.session.role,
+        resourceType: 'sms_transfer',
+        resourceId: transferId,
+        status: 'denied',
+        severity: 'warning',
+      }));
+
       return NextResponse.json(
         { success: false, error: 'Only the receiver or an admin can accept or reject this transfer' },
         { status: 403 }
@@ -65,6 +76,16 @@ export async function POST(
     if (action === 'reject' && remark) {
       await smsService.logAudit(userId, 'reject_transfer_remark', { transferId, remark });
     }
+
+    await recordAuditEvent(auditEventFromRequest(req, {
+      action: `sms.transfer.${action}.success`,
+      actorUsername: auth.session.username,
+      actorRole: auth.session.role,
+      resourceType: 'sms_transfer',
+      resourceId: transferId,
+      status: 'success',
+      metadata: { status, hasRemark: Boolean(remark) },
+    }));
 
     return NextResponse.json({ success: true });
   } catch (error) {

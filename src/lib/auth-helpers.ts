@@ -68,14 +68,10 @@ export function requirePermission(req: NextRequest, permission: Permission): Per
  * Returns user info if authenticated, error message if not
  */
 export async function requireAuth(req?: NextRequest): Promise<AuthResult> {
-  // If no request provided, return mock auth for testing
   if (!req) {
     return {
-      success: true,
-      user: {
-        username: "admin",
-        role: "Admin",
-      },
+      success: false,
+      error: "Request context is required",
     };
   }
 

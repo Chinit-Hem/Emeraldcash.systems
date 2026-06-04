@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
     );
   }
 
-const parsedYear = yearStr ? parseInt(yearStr, 10) : null;
+  const parsedYear = yearStr ? parseInt(yearStr, 10) : null;
   const year = parsedYear !== null && !isNaN(parsedYear) ? parsedYear : null;
   const isValidYear = year !== null && !isNaN(year);
 
@@ -55,7 +55,6 @@ const parsedYear = yearStr ? parseInt(yearStr, 10) : null;
 
       // If no data found, fall back to estimation
       if (result.confidence === "Unknown") {
-        console.log(`No market data found for ${category} ${brand} ${model} ${year || ""}, using estimation`);
         result = estimatePriceRuleBased(brand, model, year, category);
         result.cacheHit = false;
       }

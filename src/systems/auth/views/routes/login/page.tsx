@@ -1,10 +1,33 @@
 "use client";
 
 import Image from "next/image";
+import Script from "next/script";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useLanguage } from "@/shared/hooks/LanguageContext";
 import { useTranslation } from "@/shared/utils/i18n";
 import React, { Suspense, useCallback, useEffect, useRef, useState } from "react";
+
+const SHOW_LOGIN_DEBUG = process.env.NODE_ENV !== "production";
+const TURNSTILE_SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY?.trim() || "";
+const TURNSTILE_ENABLED = Boolean(TURNSTILE_SITE_KEY);
+
+type TurnstileRenderOptions = {
+  sitekey: string;
+  theme?: "auto" | "light" | "dark";
+  callback?: (token: string) => void;
+  "expired-callback"?: () => void;
+  "error-callback"?: () => void;
+};
+
+declare global {
+  interface Window {
+    turnstile?: {
+      render: (container: HTMLElement, options: TurnstileRenderOptions) => string;
+      reset: (widgetId?: string) => void;
+      remove?: (widgetId: string) => void;
+    };
+  }
+}
 
 // Safe client-side only hook to prevent hydration mismatches
 function useIsMounted() {
@@ -42,6 +65,8 @@ function LoginForm() {
   const usernameInputId = "login-username";
   const passwordInputId = "login-password";
   const rememberInputId = "login-remember";
+  const turnstileContainerRef = useRef<HTMLDivElement | null>(null);
+  const turnstileWidgetIdRef = useRef<string | null>(null);
   
   const { language } = useLanguage();
   const { t } = useTranslation(language);
@@ -52,6 +77,8 @@ function LoginForm() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [turnstileScriptReady, setTurnstileScriptReady] = useState(false);
+  const [turnstileToken, setTurnstileToken] = useState("");
 
   const warmConnection = useConnectionWarmer();
 
@@ -69,7 +96,43 @@ function LoginForm() {
     }
   }, [isMounted]);
 
-  // Debug info for troubleshooting mobile cookie issues
+  useEffect(() => {
+    if (
+      !TURNSTILE_ENABLED ||
+      !isMounted ||
+      !turnstileScriptReady ||
+      !turnstileContainerRef.current ||
+      !window.turnstile ||
+      turnstileWidgetIdRef.current
+    ) {
+      return;
+    }
+
+    turnstileWidgetIdRef.current = window.turnstile.render(turnstileContainerRef.current, {
+      sitekey: TURNSTILE_SITE_KEY,
+      theme: "auto",
+      callback: (token) => {
+        setTurnstileToken(token);
+        setError("");
+      },
+      "expired-callback": () => {
+        setTurnstileToken("");
+      },
+      "error-callback": () => {
+        setTurnstileToken("");
+        setError("Security check failed to load. Please refresh and try again.");
+      },
+    });
+
+    return () => {
+      if (turnstileWidgetIdRef.current && window.turnstile?.remove) {
+        window.turnstile.remove(turnstileWidgetIdRef.current);
+      }
+      turnstileWidgetIdRef.current = null;
+    };
+  }, [isMounted, turnstileScriptReady]);
+
+  // Development-only session diagnostics, kept free of cookie values.
   const [debugInfo, setDebugInfo] = useState<string | null>(null);
 
   async function handleLogin(e: React.FormEvent) {
@@ -81,6 +144,9 @@ function LoginForm() {
 
     try {
       const trimmedUsername = username.trim();
+      if (TURNSTILE_ENABLED && !turnstileToken) {
+        throw new Error("Security check required. Please try again.");
+      }
       
       // Step 1: Login
       const loginRes = await fetch("/api/auth/login", {
@@ -88,7 +154,8 @@ function LoginForm() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ 
           username: trimmedUsername, 
-          password: password 
+          password,
+          ...(TURNSTILE_ENABLED ? { turnstileToken } : {}),
         }),
         credentials: "include",
       });
@@ -124,22 +191,24 @@ function LoginForm() {
         }
         
         lastError = meData.error || `HTTP ${meRes.status}`;
-        console.log(`[LOGIN] Session check attempt ${4 - retries} failed:`, lastError);
-        console.log(`[LOGIN] Current cookies:`, document.cookie);
+        if (SHOW_LOGIN_DEBUG) {
+          console.warn(`[LOGIN] Session check attempt ${4 - retries} failed:`, lastError);
+        }
         retries--;
       }
       
       if (retries === 0 && (!meRes?.ok || !meData?.ok)) {
-        // Build debug info for troubleshooting
-        const debug = {
-          userAgent: navigator.userAgent,
-          cookies: document.cookie,
-          loginResponse: loginData,
-          meResponse: meData,
-          lastError,
-          timestamp: new Date().toISOString(), // Safe: no arguments, creates current time
-        };
-        setDebugInfo(JSON.stringify(debug, null, 2));
+        if (SHOW_LOGIN_DEBUG) {
+          const debug = {
+            userAgent: navigator.userAgent,
+            loginStatus: loginRes.status,
+            meStatus: meRes?.status,
+            meOk: Boolean(meData?.ok),
+            lastError,
+            timestamp: new Date().toISOString(),
+          };
+          setDebugInfo(JSON.stringify(debug, null, 2));
+        }
         throw new Error(`Session verification failed: ${lastError}`);
       }
 
@@ -163,9 +232,12 @@ function LoginForm() {
         ? requestedRedirect
         : "/";
       const redirectTo = safeRedirect === "/dashboard" ? "/" : safeRedirect;
-      console.log(`[LOGIN] Redirecting to ${redirectTo}`);
       router.replace(redirectTo);
     } catch (err) {
+      if (TURNSTILE_ENABLED) {
+        setTurnstileToken("");
+        window.turnstile?.reset(turnstileWidgetIdRef.current ?? undefined);
+      }
       setError(err instanceof Error ? err.message : "Login failed");
       setLoading(false);
     }
@@ -308,6 +380,21 @@ function LoginForm() {
                 <span className="text-sm text-slate-500 dark:text-slate-400">{t.rememberMe}</span>
               </label>
 
+              {TURNSTILE_ENABLED && (
+                <>
+                  <Script
+                    src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit"
+                    strategy="afterInteractive"
+                    onReady={() => setTurnstileScriptReady(true)}
+                    onError={() => setError("Security check failed to load. Please refresh and try again.")}
+                  />
+                  <div
+                    ref={turnstileContainerRef}
+                    className="flex min-h-[70px] items-center justify-center"
+                  />
+                </>
+              )}
+
               {/* Success message */}
               {success && (
                 <div role="status" aria-live="polite" className="rounded-xl border border-emerald-200/70 bg-emerald-50/90 p-3 text-center text-sm text-emerald-700 backdrop-blur-sm dark:border-emerald-800/70 dark:bg-emerald-900/25 dark:text-emerald-300">
@@ -353,7 +440,7 @@ function LoginForm() {
               {/* Submit */}
               <button
                 type="submit"
-                disabled={loading}
+                disabled={loading || (TURNSTILE_ENABLED && !turnstileToken)}
                 className="w-full py-3 px-4 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white font-medium rounded-xl hover:from-emerald-600 hover:to-emerald-700 transition-all shadow-lg shadow-emerald-500/25 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {loading ? t.signingIn : t.signIn}

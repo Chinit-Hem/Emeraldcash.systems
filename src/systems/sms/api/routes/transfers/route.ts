@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { auditEventFromRequest, recordAuditEvent } from '@/lib/audit-log';
 import { requirePermission } from '@/lib/auth-helpers';
 import { smsService } from '@/systems/sms/services/SmsService';
 import type { SmsTransferEntity } from '@/systems/sms/services/SmsService';
+import type { TransferStatus } from '@/systems/sms/types/sms-types';
 import type { SessionPayload } from '@/lib/auth';
+
+const TRANSFER_STATUSES: readonly TransferStatus[] = ['pending', 'accepted', 'rejected', 'returned'];
 
 function isTimeoutError(error: string | undefined): boolean {
   if (!error) return false;
@@ -14,8 +18,8 @@ function resolveStatus(error: string | undefined): number {
 }
 
 function canViewTransfer(transfer: SmsTransferEntity, session: SessionPayload): boolean {
-  // Admin and Transfer roles can see all transfers
-  if (session.role === 'Admin' || session.role === 'Transfer') {
+  // Admin can see all transfers. Staff-like roles only see their own transfers.
+  if (session.role === 'Admin') {
     return true;
   }
   // Staff and other roles can only see their own transfers
@@ -23,6 +27,10 @@ function canViewTransfer(transfer: SmsTransferEntity, session: SessionPayload): 
     transfer.senderId === session.username ||
     transfer.receiverId === session.username
   );
+}
+
+function isTransferStatus(value: string | null | undefined): value is TransferStatus {
+  return TRANSFER_STATUSES.includes(value as TransferStatus);
 }
 
 export async function GET(req: NextRequest) {
@@ -33,9 +41,18 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const assetId = searchParams.get('assetId') || undefined;
     const statusParam = searchParams.get('status');
-    const status = statusParam === 'all' ? undefined : statusParam || 'pending';
+    const requestedStatus = statusParam === 'all' ? undefined : statusParam || 'pending';
+    const status = requestedStatus
+      ? isTransferStatus(requestedStatus)
+        ? requestedStatus
+        : null
+      : undefined;
 
-    const result = await smsService.getTransfers(assetId);
+    if (status === null) {
+      return NextResponse.json({ success: true, data: [], meta: { queryCount: 0 } });
+    }
+
+    const result = await smsService.getTransfers(assetId, status);
     if (!result.success) {
       return NextResponse.json(
         { success: false, error: result.error || 'Failed to fetch transfers' },
@@ -44,7 +61,6 @@ export async function GET(req: NextRequest) {
     }
 
     const visibleTransfers = (result.data || [])
-      .filter((transfer) => (status ? transfer.status === status : true))
       .filter((transfer) => canViewTransfer(transfer, auth.session));
 
     return NextResponse.json({ success: true, data: visibleTransfers, meta: result.meta });
@@ -64,7 +80,7 @@ export async function POST(req: NextRequest) {
 
     const { assetId, senderId, receiverId, location, remark, imageUrl } = await req.json();
     const resolvedSenderId =
-      auth.session.role === 'Admin' || auth.session.role === 'Transfer'
+      auth.session.role === 'Admin'
         ? String(senderId || auth.session.username)
         : auth.session.username;
 
@@ -83,6 +99,20 @@ export async function POST(req: NextRequest) {
         { status: resolveStatus(result.error) }
       );
     }
+
+    await recordAuditEvent(auditEventFromRequest(req, {
+      action: 'sms.transfer.create.success',
+      actorUsername: auth.session.username,
+      actorRole: auth.session.role,
+      resourceType: 'sms_transfer',
+      resourceId: result.data?.id ?? assetId,
+      status: 'success',
+      metadata: {
+        assetId,
+        senderId: resolvedSenderId,
+        receiverId: String(receiverId || ''),
+      },
+    }));
 
     return NextResponse.json({ success: true, data: result.data, meta: result.meta });
   } catch (error) {

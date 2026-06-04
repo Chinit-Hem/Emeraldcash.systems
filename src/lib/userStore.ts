@@ -5,6 +5,7 @@ import {
   isValidationError,
 } from "@/lib/errors";
 import { log } from "@/lib/logger";
+import { validatePasswordPolicy } from "@/lib/password-policy";
 import type { Role } from "@/shared/types/types";
 import {
   
@@ -13,6 +14,7 @@ import {
   ensureUsersTable,
   getUserByUsername,
   listUsersFromDB,
+  migrateUsersTable,
   updateUserInDB,
   type Role as DBRole,
   type UserDB,
@@ -63,8 +65,7 @@ export type UpdatePasswordResult =
 
 const DEMO_PASSWORD_HASH = "$2b$10$mc.blHBFe/9vs2VJMG/Dqe7PlwgrQAlnPUmNJ0bXIaQFnnSnarmvy"; // 1234
 const USERNAME_REGEX = /^[a-z0-9._-]{3,32}$/;
-const MIN_PASSWORD_LENGTH = 4;
-const MAX_PASSWORD_LENGTH = 72;
+const IS_PRODUCTION = process.env.NODE_ENV === "production";
 
 // Track if we've initialized the database
 let dbInitialized = false;
@@ -106,12 +107,30 @@ async function initializeDatabase(): Promise<void> {
   initPromise = (async () => {
     try {
       await ensureUsersTable();
+      await migrateUsersTable();
       const users = await listUsersFromDB();
       if (users.length === 0) {
-        const seeds = [
-          { username: "admin", role: "Admin" as DBRole, passwordHash: DEMO_PASSWORD_HASH },
-          { username: "staff", role: "Staff" as DBRole, passwordHash: DEMO_PASSWORD_HASH },
-        ];
+        const initialAdminPassword = process.env.INITIAL_ADMIN_PASSWORD?.trim() || "";
+        if (IS_PRODUCTION) {
+          const passwordError = validatePasswordPolicy(initialAdminPassword);
+          if (passwordError) {
+            throw new DatabaseError("INITIAL_ADMIN_PASSWORD must be configured with a secure password before seeding users.");
+          }
+        }
+
+        const seeds = IS_PRODUCTION
+          ? [
+              {
+                username: "admin",
+                role: "Admin" as DBRole,
+                passwordHash: await hashPassword(initialAdminPassword),
+              },
+            ]
+          : [
+              { username: "admin", role: "Admin" as DBRole, passwordHash: DEMO_PASSWORD_HASH },
+              { username: "staff", role: "Staff" as DBRole, passwordHash: DEMO_PASSWORD_HASH },
+            ];
+
         for (const seed of seeds) {
           try {
             await createUserInDB({
@@ -145,22 +164,6 @@ function validateUsername(username: string): string | null {
 
   if (!USERNAME_REGEX.test(normalized)) {
     return "Username must be 3-32 chars, lowercase letters, numbers, dot, dash, underscore only";
-  }
-
-  return null;
-}
-
-function validatePassword(password: string): string | null {
-  if (!password) {
-    return "Password is required";
-  }
-
-  if (password.length < MIN_PASSWORD_LENGTH) {
-    return `Password must be at least ${MIN_PASSWORD_LENGTH} characters`;
-  }
-
-  if (password.length > MAX_PASSWORD_LENGTH) {
-    return `Password must be ${MAX_PASSWORD_LENGTH} characters or less`;
   }
 
   return null;
@@ -280,6 +283,9 @@ export async function createUser(params: {
   password: string;
   role: Role;
   createdBy: string;
+  full_name?: string | null;
+  email?: string | null;
+  phone?: string | null;
 }): Promise<CreateUserResult> {
   log("INFO", "createUser() called", { username: params.username });
 
@@ -298,7 +304,7 @@ export async function createUser(params: {
     }
 
     // Validate password
-    const passwordError = validatePassword(params.password);
+    const passwordError = validatePasswordPolicy(params.password);
     if (passwordError) {
       log("INFO", "createUser() - password validation failed", { error: passwordError });
       return { ok: false, error: passwordError, code: "invalid_password" };
@@ -347,6 +353,9 @@ export async function createUser(params: {
       passwordHash,
       role,
       createdBy,
+      full_name: params.full_name,
+      email: params.email,
+      phone: params.phone,
     });
 
     log("INFO", "createUser() - SUCCESS", { username });
@@ -413,7 +422,7 @@ export async function updateUserPassword(
 
   try {
     // Validate password
-    const passwordError = validatePassword(newPassword);
+    const passwordError = validatePasswordPolicy(newPassword);
     if (passwordError) {
       log("INFO", "updateUserPassword() - validation failed", { error: passwordError });
       return { ok: false, error: passwordError, code: "invalid_password" };

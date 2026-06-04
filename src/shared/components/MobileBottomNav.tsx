@@ -1,74 +1,151 @@
 "use client";
 
-import { BookOpen, Boxes, Calculator, Car, Settings } from "lucide-react";
-import { usePathname } from "next/navigation";
-import { useMemo } from "react";
+import type { User } from "@/shared/types/types";
+import { BookOpen, Boxes, Calculator, Menu, Settings } from "lucide-react";
+import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useMemo } from "react";
 import type { LucideIcon } from "lucide-react";
 import { isIOSSafariBrowser } from "@/shared/utils/platform";
 import { useMounted } from "@/shared/hooks/useMounted";
 import { useLanguage } from "@/shared/hooks/LanguageContext";
 import { OptimizedLink } from "@/shared/components/OptimizedLink";
+import { hasAppPermission } from "@/shared/utils/permissions";
 
-type NavItem = {
+type NavLinkItem = {
+  id: "vms" | "lms" | "sms" | "settings";
   label: string;
   labelKm: string;
   href: string;
   icon: LucideIcon;
 };
 
-const navItems: NavItem[] = [
-  { label: "Vehicle Valuation", labelKm: "វាយតម្លៃយានយន្ត", href: "/", icon: Calculator },
-  { label: "LMS", labelKm: "ការបណ្តុះបណ្តាល", href: "/lms", icon: BookOpen },
-  { label: "SMS", labelKm: "គ្រប់គ្រងស្តុក", href: "/sms", icon: Boxes },
-  { label: "Vehicles", labelKm: "យានយន្ត", href: "/vehicles", icon: Car },
-  { label: "Settings", labelKm: "ការកំណត់", href: "/settings", icon: Settings },
-];
+type MobileBottomNavProps = {
+  user: User;
+  isMenuOpen?: boolean;
+  onOpenMenu: () => void;
+};
 
-export default function MobileBottomNav() {
+type NetworkInformationLike = {
+  effectiveType?: string;
+  saveData?: boolean;
+};
+
+export default function MobileBottomNav({
+  user,
+  isMenuOpen = false,
+  onOpenMenu,
+}: MobileBottomNavProps) {
+  const router = useRouter();
   const pathname = usePathname() || "/";
   const isIOSSafari = useMounted() && isIOSSafariBrowser();
   const { language } = useLanguage();
 
-  // Get translated nav items based on current language
   const translatedNavItems = useMemo(() => {
-    return navItems.map(item => ({
-      ...item,
-      displayLabel: language === 'km' ? item.labelKm : item.label
-    }));
-  }, [language]);
+    const navItems: NavLinkItem[] = [];
 
-  const isActive = (href: string) => {
-    if (href === "/") return pathname === "/" || pathname === "/dashboard";
-    return pathname.startsWith(href);
+    if (hasAppPermission(user.role, "vehicles:view")) {
+      navItems.push({ id: "vms", label: "VMS", labelKm: "VMS", href: "/", icon: Calculator });
+    }
+
+    if (hasAppPermission(user.role, "lms:view")) {
+      navItems.push({ id: "lms", label: "LMS", labelKm: "LMS", href: "/lms", icon: BookOpen });
+    }
+
+    if (hasAppPermission(user.role, "sms:view")) {
+      navItems.push({ id: "sms", label: "SMS", labelKm: "SMS", href: "/sms", icon: Boxes });
+    }
+
+    navItems.push({
+      id: "settings",
+      label: "Settings",
+      labelKm: "ការកំណត់",
+      href: "/settings",
+      icon: Settings,
+    });
+
+    return navItems.map((item) => ({
+      ...item,
+      displayLabel: language === "km" ? item.labelKm : item.label,
+    }));
+  }, [language, user.role]);
+
+  useEffect(() => {
+    if (isIOSSafari) return;
+
+    const connection = (navigator as Navigator & { connection?: NetworkInformationLike }).connection;
+    if (connection?.saveData || connection?.effectiveType === "2g") return;
+
+    const prefetchTimers: number[] = [];
+    const routes = translatedNavItems.map((item) => item.href);
+    const timer = window.setTimeout(() => {
+      routes.forEach((href, index) => {
+        prefetchTimers.push(window.setTimeout(() => router.prefetch(href), index * 120));
+      });
+    }, 900);
+
+    return () => {
+      window.clearTimeout(timer);
+      prefetchTimers.forEach((prefetchTimer) => window.clearTimeout(prefetchTimer));
+    };
+  }, [isIOSSafari, router, translatedNavItems]);
+
+  const isActive = (item: NavLinkItem) => {
+    if (item.id === "vms") {
+      return (
+        pathname === "/" ||
+        pathname === "/dashboard" ||
+        pathname.startsWith("/vehicles") ||
+        pathname.startsWith("/stock") ||
+        pathname.startsWith("/cleaned-vehicles")
+      );
+    }
+    if (item.id === "lms") return pathname.startsWith("/lms") || pathname.startsWith("/admin/lms");
+    if (item.id === "sms") return pathname.startsWith("/sms");
+    return pathname === "/settings";
   };
 
-  // iOS-safe nav class
   const navClass = isIOSSafari
-    ? "fixed inset-x-0 bottom-0 z-50 bg-neu-bg border-t border-neu-bg-dark shadow-lg"
-    : "neu-mobile-nav fixed inset-x-0 bottom-0 z-50";
+    ? "fixed inset-x-0 bottom-0 z-50 border-t border-neu-bg-dark bg-neu-bg shadow-lg xl:hidden"
+    : "neu-mobile-nav fixed inset-x-0 bottom-0 z-50 xl:hidden";
+  const menuLabel = language === "km" ? "ម៉ឺនុយ" : "Menu";
 
   return (
     <nav
       className={navClass}
       aria-label="Primary navigation"
     >
-      <div className="mx-auto flex h-16 max-w-2xl items-center justify-around px-2 sm:h-[70px]">
+      <div className="mx-auto flex h-[calc(4.25rem+env(safe-area-inset-bottom))] max-w-2xl items-start justify-around gap-1 px-2 pb-[max(env(safe-area-inset-bottom),0.35rem)] pt-2">
         {translatedNavItems.map((item) => {
-          const active = isActive(item.href);
+          const active = isActive(item);
           const Icon = item.icon;
 
           return (
             <OptimizedLink
-              key={item.label}
+              key={item.id}
               href={item.href}
-              className={`neu-mobile-nav-item ${active ? "active" : ""}`}
-              priority={active ? "high" : "normal"}
+              className={`neu-mobile-nav-item min-w-0 flex-1 !px-1 ${active ? "active" : ""}`}
+              prefetch={false}
+              priority="low"
             >
               <Icon className="h-5 w-5" strokeWidth={active ? 2.35 : 1.9} />
-              <span className="text-xs font-medium">{item.displayLabel}</span>
+              <span className="max-w-full truncate text-[11px] font-medium leading-tight sm:text-xs">
+                {item.displayLabel}
+              </span>
             </OptimizedLink>
           );
         })}
+        <button
+          type="button"
+          className={`neu-mobile-nav-item min-w-0 flex-1 !px-1 ${isMenuOpen ? "active" : ""}`}
+          onClick={onOpenMenu}
+          aria-label={language === "km" ? "បើកម៉ឺនុយ" : "Open menu"}
+          aria-expanded={isMenuOpen}
+        >
+          <Menu className="h-5 w-5" strokeWidth={isMenuOpen ? 2.35 : 1.9} />
+          <span className="max-w-full truncate text-[11px] font-medium leading-tight sm:text-xs">
+            {menuLabel}
+          </span>
+        </button>
       </div>
     </nav>
   );

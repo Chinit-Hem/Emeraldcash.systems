@@ -111,14 +111,6 @@ async function uploadImageToCloudinary(
   category: string,
   tempId: string
 ): Promise<string> {
-  console.log(`[uploadImageToCloudinary] Uploading via server API:`, {
-    url: UPLOAD_API_URL,
-    tempId,
-    category,
-    source: typeof image === "string" ? "url" : "file",
-    fileSize: typeof image === "string" ? undefined : `${(image.size / 1024).toFixed(2)}KB`,
-  });
-
   const requestInit: RequestInit = {
     method: "POST",
     credentials: "include",
@@ -162,12 +154,6 @@ async function uploadImageToCloudinary(
     throw new Error("Server response missing image URL");
   }
 
-  console.log(`[uploadImageToCloudinary] Success:`, {
-    url: result.data.url.substring(0, 100) + "...",
-    publicId: result.data.publicId,
-    folder: result.data.folder,
-  });
-
   return result.data.url;
 }
 
@@ -182,19 +168,12 @@ async function prepareImageForUpload(
     const fileSizeKB = imageFile.size / 1024;
 
     if (fileSizeKB < SKIP_COMPRESSION_THRESHOLD_KB) {
-      console.log(`[addVehicle] File already small (${fileSizeKB.toFixed(2)}KB < ${SKIP_COMPRESSION_THRESHOLD_KB}KB), skipping compression`);
       return imageFile;
     }
 
-    console.log(`[addVehicle] Compressing image file (${fileSizeKB.toFixed(2)}KB)...`);
     const compressedResult = await compressImage(imageFile, {
       maxWidth: COMPRESSION_MAX_WIDTH,
       quality: COMPRESSION_QUALITY,
-    });
-
-    console.log(`[addVehicle] Image compressed:`, {
-      originalSize: `${(imageFile.size / 1024).toFixed(2)}KB`,
-      compressedSize: `${(compressedResult.compressedSize / 1024).toFixed(2)}KB`,
     });
 
     return compressedResult.file;
@@ -268,8 +247,6 @@ export function useAddVehicleOptimistic(
         Images: [],
         Time: new Date().toISOString(),
       };
-
-      console.log(`[addVehicle] Starting optimistic add with temp ID: ${tempId}`);
 
       let pendingImage: File | string | null = null;
       const galleryImages = Array.isArray(data.Images) ? parseVehicleImages(data.Images) : [];
@@ -357,8 +334,6 @@ export function useAddVehicleOptimistic(
       while (attempts < MAX_RETRY_ATTEMPTS) {
         attempts++;
 
-        console.log(`[addVehicle] API call attempt ${attempts}/${MAX_RETRY_ATTEMPTS}`);
-
         try {
           const res = await fetch(`/api/vehicles`, {
             method: "POST",
@@ -368,8 +343,6 @@ export function useAddVehicleOptimistic(
             body: JSON.stringify(payload),
             credentials: "include",
           });
-
-          console.log(`[addVehicle] API response status: ${res.status}`);
 
           if (!res.ok) {
             const json = await res.json().catch(() => ({}));
@@ -386,12 +359,9 @@ export function useAddVehicleOptimistic(
           createdVehicle = (result.data || optimisticVehicle) as Vehicle;
           const finalVehicle = createdVehicle;
 
-          console.log(`[addVehicle] Add successful for vehicle ${finalVehicle.VehicleId || tempId}`);
-
           // Record mutation to trigger auto-refresh - ASYNC to not block success response
           setTimeout(() => {
             recordMutation();
-            console.log(`[addVehicle] Mutation recorded - VehicleList will auto-refresh`);
           }, 0);
 
           // Call success callback immediately (don't wait for cache)
@@ -408,7 +378,6 @@ export function useAddVehicleOptimistic(
 
           // Check if we should retry
           if (attempts < MAX_RETRY_ATTEMPTS && isRetryableError(lastError)) {
-            console.log(`[addVehicle] Retrying after ${RETRY_DELAY_MS}ms...`);
             await delay(RETRY_DELAY_MS); // Fixed minimal delay - no exponential backoff
             continue;
           }

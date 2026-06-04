@@ -66,7 +66,6 @@ class VehiclesLRUCache {
   invalidate(key: string): void {
     this.cache.delete(key);
     this.stats.misses++;
-    console.log(`[LRU Cache] Invalidated key: ${key}`);
   }
 
   getStats(): typeof this.stats {

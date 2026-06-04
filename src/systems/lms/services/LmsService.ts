@@ -503,6 +503,7 @@ export class LmsService extends BaseService<LmsCategoryEntity, LmsCategoryDB> {
 
     try {
       await this.lessonRepo.softDelete(id);
+      await this.lessonRepo.clearLearningProcessForLesson(id);
 
       return {
         success: true,

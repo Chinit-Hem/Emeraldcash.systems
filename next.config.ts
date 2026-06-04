@@ -1,21 +1,68 @@
 import type { NextConfig } from 'next';
 
+const isProduction = process.env.NODE_ENV === "production";
+const isDevelopment = !isProduction;
 const devLanIp = process.env.DEV_LAN_IP?.trim() || "192.168.0.68";
+
+const devConnectSources = isDevelopment
+  ? [
+      "http://localhost:*",
+      "http://127.0.0.1:*",
+      "http://[::1]:*",
+      `http://${devLanIp}:*`,
+      "ws://localhost:*",
+      "ws://127.0.0.1:*",
+      "ws://[::1]:*",
+      `ws://${devLanIp}:*`,
+    ]
+  : [];
 
 const contentSecurityPolicy = [
   "default-src 'self'",
   "base-uri 'self'",
   "frame-ancestors 'none'",
+  "manifest-src 'self'",
   "object-src 'none'",
   "form-action 'self'",
-  "script-src 'self' 'unsafe-inline' 'unsafe-eval' https: blob:",
+  [
+    "script-src",
+    "'self'",
+    "'unsafe-inline'",
+    ...(isDevelopment
+      ? ["'unsafe-eval'", "https:", "blob:"]
+      : [
+          "https://vercel.live",
+          "https://www.youtube.com",
+          "https://s.ytimg.com",
+          "https://challenges.cloudflare.com",
+        ]),
+  ].join(" "),
   "worker-src 'self' blob:",
   "style-src 'self' 'unsafe-inline' https:",
   "img-src 'self' data: blob: https:",
   "font-src 'self' data: https:",
-  "connect-src 'self' data: https://script.google.com https://script.googleusercontent.com https://*.googleapis.com https://*.googleusercontent.com https://api.cloudinary.com https://www.youtube.com https://*.youtube.com https: ws: wss: *.localhost:* localhost:*", // 🚀 FIX: Enhanced HMR and websocket support
-  "frame-src 'self' https://vercel.live https://www.youtube.com https://*.youtube.com https://www.youtube-nocookie.com https://*.youtube-nocookie.com",
-  "child-src 'self' https://vercel.live https://www.youtube.com https://*.youtube.com https://www.youtube-nocookie.com https://*.youtube-nocookie.com",
+  "media-src 'self' data: blob: https:",
+  [
+    "connect-src",
+    "'self'",
+    "data:",
+    "https://script.google.com",
+    "https://script.googleusercontent.com",
+    "https://*.googleapis.com",
+    "https://*.googleusercontent.com",
+    "https://api.cloudinary.com",
+    "https://res.cloudinary.com",
+    "https://www.youtube.com",
+    "https://*.youtube.com",
+    "https://*.youtube-nocookie.com",
+    "https://*.googlevideo.com",
+    "https://challenges.cloudflare.com",
+    "https://vitals.vercel-insights.com",
+    ...devConnectSources,
+  ].join(" "),
+  "frame-src 'self' https://vercel.live https://www.youtube.com https://*.youtube.com https://www.youtube-nocookie.com https://*.youtube-nocookie.com https://challenges.cloudflare.com",
+  "child-src 'self' https://vercel.live https://www.youtube.com https://*.youtube.com https://www.youtube-nocookie.com https://*.youtube-nocookie.com https://challenges.cloudflare.com",
+  ...(isProduction ? ["upgrade-insecure-requests"] : []),
 ].join("; ");
 
 const securityHeaders = [
@@ -23,9 +70,15 @@ const securityHeaders = [
   { key: "X-Content-Type-Options", value: "nosniff" },
   { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
   { key: "X-DNS-Prefetch-Control", value: "on" },
+  { key: "Cross-Origin-Opener-Policy", value: "same-origin" },
+  { key: "Cross-Origin-Resource-Policy", value: "same-origin" },
+  { key: "Origin-Agent-Cluster", value: "?1" },
+  { key: "X-Permitted-Cross-Domain-Policies", value: "none" },
   { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=(), payment=(), usb=()" },
-  { key: "Strict-Transport-Security", value: "max-age=31536000; includeSubDomains; preload" },
   { key: "Content-Security-Policy", value: contentSecurityPolicy },
+  ...(isProduction
+    ? [{ key: "Strict-Transport-Security", value: "max-age=31536000; includeSubDomains; preload" }]
+    : []),
 ];
 
 const authSensitivePageHeaders = [
@@ -103,6 +156,19 @@ const nextConfig: NextConfig = {
 
   async headers() {
     return [
+      {
+        source: "/sw.js",
+        headers: [
+          { key: "Cache-Control", value: "no-cache, no-store, must-revalidate" },
+          { key: "Service-Worker-Allowed", value: "/" },
+        ],
+      },
+      {
+        source: "/offline.html",
+        headers: [
+          { key: "Cache-Control", value: "public, max-age=0, must-revalidate" },
+        ],
+      },
       {
         source: "/(.*)",
         headers: securityHeaders,

@@ -12,6 +12,7 @@
 
 import Dashboard from "@/systems/vms/components/dashboard/Dashboard";
 import { vehicleService } from "@/systems/vms/services/VehicleService";
+import type { Vehicle } from "@/shared/types/types";
 import { headers } from "next/headers";
 
 // Disable ISR caching - always fetch fresh data
@@ -30,6 +31,54 @@ function isIOSSafariUserAgent(userAgent: string): boolean {
 
 function isMobileUserAgent(userAgent: string): boolean {
   return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini|Mobile/i.test(userAgent);
+}
+
+type DashboardMeta = {
+  total: number;
+  countsByCategory: {
+    Cars: number;
+    Motorcycles: number;
+    TukTuks: number;
+  };
+  countsByCondition: {
+    New: number;
+    Used: number;
+  };
+  noImageCount: number;
+  avgPrice: number;
+};
+
+function buildMetaFromFetchedVehicles(vehicles: Vehicle[]): DashboardMeta {
+  const prices: number[] = [];
+  const meta: DashboardMeta = {
+    total: vehicles.length,
+    countsByCategory: { Cars: 0, Motorcycles: 0, TukTuks: 0 },
+    countsByCondition: { New: 0, Used: 0 },
+    noImageCount: 0,
+    avgPrice: 0,
+  };
+
+  for (const vehicle of vehicles) {
+    const category = (vehicle.Category || "").toLowerCase();
+    if (category.includes("car")) meta.countsByCategory.Cars++;
+    if (category.includes("motor")) meta.countsByCategory.Motorcycles++;
+    if (category.includes("tuk")) meta.countsByCategory.TukTuks++;
+
+    const condition = (vehicle.Condition || "").toLowerCase();
+    if (condition === "new") meta.countsByCondition.New++;
+    if (condition === "used") meta.countsByCondition.Used++;
+
+    if (!vehicle.Image) meta.noImageCount++;
+
+    const price = Number(vehicle.PriceNew || 0);
+    if (price > 0) prices.push(price);
+  }
+
+  meta.avgPrice = prices.length
+    ? Math.round(prices.reduce((total, price) => total + price, 0) / prices.length)
+    : 0;
+
+  return meta;
 }
 
 /**
@@ -55,8 +104,12 @@ export default async function DashboardPage() {
   // Extract data or use defaults
   const vehicles = vehiclesResult.success ? vehiclesResult.data || [] : [];
   const stats = statsResult.success ? statsResult.data : null;
+  const statsError = statsResult.success
+    ? null
+    : statsResult.error || "Failed to load vehicle stats";
 
-// Build metadata for client - always provide valid meta, use defaults if stats is unavailable
+// Build metadata for client from DB stats. If stats fail, use the real fetched
+// vehicle rows only and pass an error instead of pretending the zeroes are DB data.
   const meta = stats
     ? {
         total: stats.total,
@@ -72,19 +125,18 @@ export default async function DashboardPage() {
         noImageCount: stats.noImageCount,
         avgPrice: stats.avgPrice,
       }
-    : {
-        total: 0,
-        countsByCategory: { Cars: 0, Motorcycles: 0, TukTuks: 0 },
-        countsByCondition: { New: 0, Used: 0 },
-        noImageCount: 0,
-        avgPrice: 0,
-      };
+    : buildMetaFromFetchedVehicles(vehicles);
+
+  const initialError = [
+    !vehiclesResult.success ? vehiclesResult.error || "Failed to load vehicles" : null,
+    statsError,
+  ].filter(Boolean).join(" | ") || null;
 
   return (
     <Dashboard
       initialVehicles={vehicles}
       initialMeta={meta}
-      initialError={!vehiclesResult.success ? vehiclesResult.error || "Failed to load vehicles" : null}
+      initialError={initialError}
       useMobileSafeCharts={useMobileSafeCharts}
     />
   );

@@ -63,14 +63,8 @@ async function parseFormData(request: NextRequest): Promise<{
     // First try multipart form-data
     const contentType = request.headers.get('content-type') || '';
     if (contentType.includes('multipart/form-data')) {
-      console.log("[Upload API] Processing multipart/form-data");
       const formData = await request.formData();
 
-      // Log all form fields for debugging
-      console.log("[Upload API] Form fields:");
-      for (const [key, value] of formData.entries()) {
-        console.log(`  ${key}:`, value instanceof File ? `${value.name} (${value.size} bytes, ${value.type})` : value);
-      }
       const file = formData.get("file") as File | null || formData.get("image") as File | null;
       const vehicleId = formData.get("vehicleId") as string | null;
       const category = formData.get("category") as string | null;
@@ -79,9 +73,7 @@ async function parseFormData(request: NextRequest): Promise<{
     }
 
     // Fallback: JSON with base64 data URL or remote image URL.
-    console.log("[Upload API] Processing JSON image source");
     const jsonBody = await request.json();
-    console.log("[Upload API] JSON body keys:", Object.keys(jsonBody ?? {}));
 
     const base64Image = (jsonBody.file || jsonBody.image || jsonBody.imageUrl || '').toString().trim();
     const vehicleId = (jsonBody.vehicleId || jsonBody.vehicle_id || '').toString() || null;
@@ -201,9 +193,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     // Parse form data
     const { file, base64Image, vehicleId, category, error: parseError } = await parseFormData(request);
 
-    // Additional debug log
-    console.log(`[Upload API ${requestId}] Parsed: file=${!!file}, base64Image=${!!base64Image}, vehicleId=${vehicleId}, category=${category}`);
-
     if (parseError) {
       return NextResponse.json(
         { ok: false, error: parseError },
@@ -223,8 +212,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     if (typeof imageData === 'string') {
       if (imageData.startsWith(BASE64_DATA_URL_PREFIX)) {
         // Base64 data URL upload (convert to File for stable upload path)
-        console.log(`[Upload API ${requestId}] Uploading base64 image (length: ${imageData.length})`);
-
         const base64FileName = vehicleId ? `vehicle_${vehicleId}` : `vehicle_${Date.now()}`;
         const { file: fileFromDataUrl, error: dataUrlError } = dataUrlToFile(imageData, base64FileName);
         if (dataUrlError || !fileFromDataUrl) {
@@ -260,7 +247,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           );
         }
 
-        console.log(`[Upload API ${requestId}] Uploading remote image URL`);
         uploadResult = await uploadImage(imageData, {
           category: category || "vehicles",
           publicId: vehicleId ? `vehicle_${vehicleId}` : undefined,
@@ -272,8 +258,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       }
     } else {
       // File upload
-      console.log(`[Upload API ${requestId}] Uploading file: ${file?.name} (${file?.size} bytes)`);
-
       // Validate file
       const validation = validateFile(file!);
       if (!validation.valid) {

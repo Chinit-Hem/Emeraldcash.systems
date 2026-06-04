@@ -1,5 +1,5 @@
 
-export type Role = "Admin" | "Staff" | "Accounting" | "Transfer" | string;
+export type Role = "Admin" | "Staff" | "Accounting" | string;
 
 // Role definition for custom roles
 export interface RoleDefinition {
@@ -65,12 +65,6 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<string, Permission[]> = {
     "users:view",
     "lms:view",
     "reports:view"
-  ],
-  Transfer: [
-    "lms:view",                // Can access LMS
-    "sms:view",                // Can view stock/assets
-    "sms:transfer",            // Can create and manage transfers
-    "users:view"               // Can view users for sender/receiver selection
   ]
 };
 
@@ -155,7 +149,32 @@ export const MOTORCYCLE_BRAND_OPTIONS = [
   "Yamaha",
   "Suzuki",
   "Kawasaki",
-  "Sym",
+  "KTM",
+  "Ducati",
+  "Bajaj",
+  "KR Motor",
+  "GPX",
+  "Keeway",
+  "Benelli",
+  "Stallion",
+  "BMW",
+  "UMG",
+  "Calypso",
+  "CFMOTO",
+  "SYM",
+  "Harley Davidson",
+  "Husqvarna",
+  "HYOSUNG",
+  "Italjet Dragster",
+  "Lambretta",
+  "Peugeot",
+  "Piaggio",
+  "Royal Enfield",
+  "Triumph",
+  "Vespa",
+  "YADEA",
+  "Zontes",
+  "Other - ផ្សេងៗ",
 ] as const;
 
 export const TUK_TUK_BRAND_OPTIONS = [
@@ -170,6 +189,282 @@ export const VEHICLE_BRAND_OPTIONS_BY_CATEGORY = {
   "Tuk Tuk": TUK_TUK_BRAND_OPTIONS,
   TukTuks: TUK_TUK_BRAND_OPTIONS,
 } as const;
+
+export const MOTORCYCLE_MODEL_OPTIONS_BY_BRAND = {
+  Honda: [
+    "Dream",
+    "Wave",
+    "Click",
+    "Scoopy",
+    "PCX",
+    "ADV",
+    "Air Blade",
+    "Winner X",
+    "Forza",
+    "CB",
+    "CBR",
+    "CRF",
+    "Other - ផ្សេងៗ",
+  ],
+  Yamaha: [
+    "NMAX",
+    "XMAX",
+    "Aerox",
+    "Exciter",
+    "Grand Filano",
+    "Fino",
+    "Mio",
+    "QBIX",
+    "R15",
+    "MT-15",
+    "FZ",
+    "Other - ផ្សេងៗ",
+  ],
+  Suzuki: [
+    "Smash",
+    "Nex",
+    "Address",
+    "Let's",
+    "Hayate",
+    "Raider",
+    "GSX-R150",
+    "GSX-S150",
+    "Burgman",
+    "V-Strom",
+    "Other - ផ្សេងៗ",
+  ],
+  Kawasaki: [
+    "Ninja",
+    "Z",
+    "KLX",
+    "D-Tracker",
+    "Versys",
+    "W175",
+    "Vulcan",
+    "Eliminator",
+    "Other - ផ្សេងៗ",
+  ],
+  KTM: [
+    "Duke",
+    "RC",
+    "Adventure",
+    "EXC",
+    "SX",
+    "Other - ផ្សេងៗ",
+  ],
+  Ducati: [
+    "Monster",
+    "Scrambler",
+    "Panigale",
+    "Multistrada",
+    "Diavel",
+    "Hypermotard",
+    "Streetfighter",
+    "Other - ផ្សេងៗ",
+  ],
+  Bajaj: [
+    "Pulsar",
+    "Dominar",
+    "Avenger",
+    "CT",
+    "Platina",
+    "Discover",
+    "RE",
+    "Qute",
+    "Other - ផ្សេងៗ",
+  ],
+  "KR Motor": [
+    "KR",
+    "KR EV",
+    "Other - ផ្សេងៗ",
+  ],
+  GPX: [
+    "Legend",
+    "Demon",
+    "Drone",
+    "Popz",
+    "Rock",
+    "Raptor",
+    "Other - ផ្សេងៗ",
+  ],
+  Keeway: [
+    "RKV",
+    "RKF",
+    "Superlight",
+    "K-Light",
+    "TX",
+    "Versilia",
+    "Sixties",
+    "Other - ផ្សេងៗ",
+  ],
+  Benelli: [
+    "TNT",
+    "TRK",
+    "Leoncino",
+    "Imperiale",
+    "302S",
+    "502C",
+    "Other - ផ្សេងៗ",
+  ],
+  Stallion: [
+    "Centaur",
+    "Buccaneer",
+    "Makina",
+    "SMX",
+    "Street",
+    "Other - ផ្សេងៗ",
+  ],
+  BMW: [
+    "G 310 R",
+    "G 310 GS",
+    "C 400 X",
+    "C 400 GT",
+    "F 750 GS",
+    "F 850 GS",
+    "R 1250 GS",
+    "S 1000 RR",
+    "Other - ផ្សេងៗ",
+  ],
+  UMG: [
+    "Other - ផ្សេងៗ",
+  ],
+  Calypso: [
+    "Other - ផ្សេងៗ",
+  ],
+  CFMOTO: [
+    "150NK",
+    "250NK",
+    "300NK",
+    "400NK",
+    "650NK",
+    "450SR",
+    "650MT",
+    "800MT",
+    "Other - ផ្សេងៗ",
+  ],
+  SYM: [
+    "Jet",
+    "Fiddle",
+    "Cruisym",
+    "Maxsym",
+    "Wolf",
+    "Other - ផ្សេងៗ",
+  ],
+  "Harley Davidson": [
+    "Sportster",
+    "Street",
+    "Softail",
+    "Dyna",
+    "Touring",
+    "Pan America",
+    "Other - ផ្សេងៗ",
+  ],
+  Husqvarna: [
+    "Svartpilen",
+    "Vitpilen",
+    "Norden",
+    "FE",
+    "TE",
+    "Other - ផ្សេងៗ",
+  ],
+  HYOSUNG: [
+    "GT",
+    "GV",
+    "GD",
+    "Aquila",
+    "Other - ផ្សេងៗ",
+  ],
+  "Italjet Dragster": [
+    "Dragster",
+    "Other - ផ្សេងៗ",
+  ],
+  Lambretta: [
+    "V50",
+    "V125",
+    "V200",
+    "X125",
+    "X300",
+    "Other - ផ្សេងៗ",
+  ],
+  Peugeot: [
+    "Django",
+    "Kisbee",
+    "Speedfight",
+    "Tweet",
+    "Metropolis",
+    "XP400",
+    "Other - ផ្សេងៗ",
+  ],
+  Piaggio: [
+    "Liberty",
+    "Medley",
+    "Beverly",
+    "MP3",
+    "Zip",
+    "Other - ផ្សេងៗ",
+  ],
+  "Royal Enfield": [
+    "Classic",
+    "Bullet",
+    "Hunter",
+    "Meteor",
+    "Himalayan",
+    "Interceptor",
+    "Continental GT",
+    "Other - ផ្សេងៗ",
+  ],
+  Triumph: [
+    "Bonneville",
+    "Street Twin",
+    "Speed Twin",
+    "Trident",
+    "Tiger",
+    "Rocket",
+    "Street Triple",
+    "Other - ផ្សេងៗ",
+  ],
+  Vespa: [
+    "Sprint",
+    "Primavera",
+    "GTS",
+    "LX",
+    "S",
+    "Sei Giorni",
+    "Other - ផ្សេងៗ",
+  ],
+  YADEA: [
+    "G5",
+    "G6",
+    "C1S",
+    "E8S",
+    "VoltGuard",
+    "Other - ផ្សេងៗ",
+  ],
+  Zontes: [
+    "155G",
+    "155U",
+    "310R",
+    "310T",
+    "350R",
+    "350T",
+    "Other - ផ្សេងៗ",
+  ],
+} as const;
+
+function getVehicleOptionKey(value: string) {
+  return value.trim().toLocaleLowerCase("en-US").replace(/[^a-z0-9]+/g, "");
+}
+
+export function getVehicleModelOptionsForBrand(brand?: string): readonly string[] {
+  const brandKey = getVehicleOptionKey(brand ?? "");
+  if (!brandKey) return [];
+
+  const match = Object.entries(MOTORCYCLE_MODEL_OPTIONS_BY_BRAND).find(
+    ([name]) => getVehicleOptionKey(name) === brandKey
+  );
+
+  return match?.[1] ?? [];
+}
 
 // Tax Type metadata with descriptions for static data
 export interface TaxTypeMetadata {

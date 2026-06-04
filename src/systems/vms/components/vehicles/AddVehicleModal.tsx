@@ -28,7 +28,7 @@ interface FormErrors {
   [key: string]: string;
 }
 
-type CategoryOption = "Cars" | "Motorcycles" | "Tuk Tuk";
+type CategoryOption = "Cars" | "Motorcycles" | "TukTuks";
 
 // Constants from project
 export const COLOR_OPTIONS = [
@@ -58,7 +58,7 @@ const CATEGORY_OPTIONS: { value: CategoryOption; label: string; icon: React.Reac
     color: "#8b5cf6",
   },
   {
-    value: "Tuk Tuk" as const,
+    value: "TukTuks" as const,
     label: "TukTuks",
     icon: <TukTukIcon className="w-6 h-6" />,
     color: "#f97316",
@@ -103,7 +103,7 @@ const BASIC_INFO_EXAMPLES: Record<CategoryOption, {
     plate: "1AB-1234",
     price: "1500",
   },
-  "Tuk Tuk": {
+  TukTuks: {
     brand: "Bajaj",
     model: "RE",
     year: "2022",
@@ -289,7 +289,6 @@ export default function AddVehicleModal({ isOpen, onClose, onSuccess }: AddVehic
     if (!formData.Brand?.trim()) newErrors.Brand = "Brand is required";
     if (!formData.Model?.trim()) newErrors.Model = "Model is required";
     if (!formData.Year || formData.Year < 1900 || formData.Year > new Date().getFullYear() + 1) newErrors.Year = "Valid year required";
-    if (!formData.Plate?.trim()) newErrors.Plate = "Plate is required";
     if (!formData.PriceNew || formData.PriceNew <= 0) newErrors.PriceNew = "Valid price required";
 
     setErrors(newErrors);
@@ -426,7 +425,7 @@ export default function AddVehicleModal({ isOpen, onClose, onSuccess }: AddVehic
                   placeholder={examples.year}
                 />
                 <FormInput
-                  label="Plate *"
+                  label="Plate"
                   placeholder={examples.plate}
                   value={formData.Plate || ""}
                   onChange={(e) => handleInputChange("Plate", e.target.value.toUpperCase())}
@@ -440,7 +439,7 @@ export default function AddVehicleModal({ isOpen, onClose, onSuccess }: AddVehic
             <FormSection title="Pricing" icon={DollarSign}>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <FormInput
-                  label="New Price *"
+                  label="Market Price *"
                   type="number"
                   placeholder={examples.price}
                   value={formData.PriceNew || ""}
@@ -451,6 +450,9 @@ export default function AddVehicleModal({ isOpen, onClose, onSuccess }: AddVehic
                 <FormInput label="40% Price" type="number" value={formData.Price40 || ""} disabled className="bg-slate-50" />
                 <FormInput label="70% Price" type="number" value={formData.Price70 || ""} disabled className="bg-slate-50" />
               </div>
+              <p className="text-xs text-slate-500">
+                DOC 40% and Vehicles 70% are calculated automatically from Market Price.
+              </p>
             </FormSection>
 
             {/* Image */}

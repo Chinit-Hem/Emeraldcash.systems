@@ -101,6 +101,15 @@ function getLessonAudienceFromBody(body: Record<string, unknown>) {
   return normalizeLessonAudienceRoles(body.allowedRoles ?? body.allowed_roles);
 }
 
+function withDashboardStatus<T extends LmsLesson & Partial<SequentialLesson>>(lessons: T[]) {
+  return lessons.map((lesson) => ({
+    ...lesson,
+    is_unlocked: lesson.is_unlocked ?? true,
+    is_completed: lesson.is_completed ?? false,
+    completed_at: lesson.completed_at ?? null,
+  }));
+}
+
 // ============================================================================
 // GET /api/lms/lessons?categoryId=1 or ?id=1 - Both Admin and Staff can view
 // ============================================================================
@@ -128,6 +137,8 @@ export async function GET(request: NextRequest) {
   const id = searchParams.get("id");
   const sequential = searchParams.get("sequential") === "true";
   const all = searchParams.get("all") === "true";
+  const includeInactive = searchParams.get("includeInactive") === "true";
+  const visibleAll = searchParams.get("visibleAll") === "true";
   const isAdmin = canManageLMS(session);
   const viewerRole = session.role;
 
@@ -161,7 +172,7 @@ export async function GET(request: NextRequest) {
     });
   }
 
-  // If all=true, fetch all lessons (for admin)
+  // If all=true, fetch admin lessons. Deleted/inactive lessons are hidden by default.
   if (all) {
     if (!isAdmin) {
       return NextResponse.json(
@@ -170,7 +181,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const result = await lmsService.getAllLessons({ includeInactive: true });
+    const result = await lmsService.getAllLessons({ includeInactive });
 
     if (!result.success) {
       return NextResponse.json(
@@ -187,6 +198,34 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       success: true,
       data: lessonsWithRoles,
+      meta: result.meta,
+    });
+  }
+
+  // Dashboard path: one request for all active lessons visible to the current role.
+  if (visibleAll) {
+    const result = await lmsService.getAllLessons();
+
+    if (!result.success) {
+      return NextResponse.json(
+        { success: false, error: result.error },
+        { status: 500 }
+      );
+    }
+
+    const legacyLessons = (result.data ?? []).map((lesson) =>
+      toLegacyLesson(lesson as LessonEntityLike)
+    );
+    const visibleLessons = withDashboardStatus(
+      await prepareLessonsForRole(legacyLessons, viewerRole)
+    ).sort((a, b) => {
+      if (a.category_id !== b.category_id) return a.category_id - b.category_id;
+      return a.order_index - b.order_index;
+    });
+
+    return NextResponse.json({
+      success: true,
+      data: visibleLessons,
       meta: result.meta,
     });
   }
@@ -216,7 +255,6 @@ export async function GET(request: NextRequest) {
 // If staffId is 0 (admin without staff profile), return all lessons as unlocked
     // Admins can access all lessons regardless of completion status
     if (staffId === 0) {
-      console.log('[LESSONS API] Admin without staff profile - all lessons unlocked');
       const cacheResult = await getCachedLessonsByCategory(categoryIdNum, viewerRole);
       let lessons: LmsLesson[];
 
@@ -268,17 +306,7 @@ export async function GET(request: NextRequest) {
     
     // CACHE MISS - Database fetch + cache result
     const result = await lmsService.getSequentialLessonsForStaff(categoryIdNum, staffId);
-    
-    if (result.success) {
-      const legacySequentialLessons = (result.data ?? []).map((lesson) =>
-        toLegacyLesson(lesson as LessonEntityLike)
-      ) as SequentialLesson[];
-      const visibleSequentialLessons = recomputeSequentialUnlocks(
-        await prepareLessonsForRole(legacySequentialLessons, viewerRole)
-      ) as SequentialLesson[];
-      await setCachedSequentialLessons(categoryIdNum, staffId, visibleSequentialLessons, viewerRole);
-    }
-    
+
     if (!result.success) {
       return NextResponse.json(
         { success: false, error: result.error },
@@ -286,12 +314,13 @@ export async function GET(request: NextRequest) {
       );
     }
 
-const legacySequentialLessons = (result.data ?? []).map((lesson) =>
+    const legacySequentialLessons = (result.data ?? []).map((lesson) =>
       toLegacyLesson(lesson as LessonEntityLike)
     ) as SequentialLesson[];
     const visibleSequentialLessons = recomputeSequentialUnlocks(
       await prepareLessonsForRole(legacySequentialLessons, viewerRole)
     ) as SequentialLesson[];
+    await setCachedSequentialLessons(categoryIdNum, staffId, visibleSequentialLessons, viewerRole);
 
     return NextResponse.json({
       success: true,
@@ -319,15 +348,7 @@ const legacySequentialLessons = (result.data ?? []).map((lesson) =>
   
   // CACHE MISS - DB + cache
   const result = await lmsService.getLessonsByCategory(categoryIdNum);
-  
-  if (result.success) {
-    const legacyLessons = (result.data ?? []).map((lesson) =>
-      toLegacyLesson(lesson as LessonEntityLike)
-    ) as LmsLesson[];
-    const visibleLessons = await prepareLessonsForRole(legacyLessons, viewerRole);
-    await setCachedLessonsByCategory(categoryIdNum, visibleLessons, viewerRole);
-  }
-  
+
   if (!result.success) {
     return NextResponse.json(
       { success: false, error: result.error },
@@ -337,8 +358,9 @@ const legacySequentialLessons = (result.data ?? []).map((lesson) =>
 
   const legacyLessons = (result.data ?? []).map((lesson) =>
     toLegacyLesson(lesson as LessonEntityLike)
-  );
+  ) as LmsLesson[];
   const visibleLessons = await prepareLessonsForRole(legacyLessons, viewerRole);
+  await setCachedLessonsByCategory(categoryIdNum, visibleLessons, viewerRole);
 
   return NextResponse.json({
     success: true,

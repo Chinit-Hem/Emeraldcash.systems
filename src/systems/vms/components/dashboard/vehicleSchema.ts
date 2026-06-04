@@ -6,7 +6,7 @@ export const vehicleSchema = z.object({
   Category: z.enum(['Cars', 'Motorcycles', 'TukTuks'] as const, {
     message: 'Select a category: Cars, Motorcycles, or TukTuks'
   }),
-  Plate: z.string().min(1, 'Plate number required').max(20, 'Plate too long'),
+  Plate: z.string().max(20, 'Plate too long'),
   Year: z.number().min(1900).max(new Date().getFullYear() + 2).nullable(),
   Color: z.string().min(1, 'Select a color'),
 

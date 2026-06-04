@@ -45,7 +45,7 @@ function VehicleDetailInner() {
   const userRole = user?.role || "Viewer";
 
   const handleBackToList = useCallback(() => {
-    router.push(listHref);
+    router.push(listHref, { scroll: false });
   }, [listHref, router]);
 
   // Load vehicle data (client-side only)
@@ -149,7 +149,7 @@ function VehicleDetailInner() {
       }
 
       await refreshVehicleCache();
-      router.push(listHref);
+      router.push(listHref, { scroll: false });
     } catch (err) {
       alert(err instanceof Error ? err.message : "Delete failed");
     } finally {
@@ -165,19 +165,17 @@ function VehicleDetailInner() {
     setIsSaving(true);
     try {
       let cloudinaryImageUrl: string | null = null;
-      
+
       // Step 1: Upload image to Cloudinary if provided
       if (formData.imageFile) {
-        console.log(`[handleSave] Uploading image to Cloudinary...`);
-        
         // Upload to Cloudinary using unsigned upload preset
         const CLOUDINARY_CLOUD_NAME = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
         const CLOUDINARY_UPLOAD_PRESET = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET;
-        
+
         if (!CLOUDINARY_CLOUD_NAME || !CLOUDINARY_UPLOAD_PRESET) {
           throw new Error("Cloudinary configuration missing");
         }
-        
+
         const url = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`;
         const uploadFormData = new FormData();
         uploadFormData.append("file", formData.imageFile);
@@ -188,18 +186,14 @@ function VehicleDetailInner() {
           method: "POST",
           body: uploadFormData,
         });
-        
+
         if (!uploadRes.ok) {
           const errorData = await uploadRes.json().catch(() => ({}));
           throw new Error(errorData.error?.message || "Failed to upload image to Cloudinary");
         }
-        
+
         const uploadData = await uploadRes.json();
         cloudinaryImageUrl = uploadData.secure_url;
-        
-        console.log(`[handleSave] Image uploaded to Cloudinary:`, {
-          url: typeof cloudinaryImageUrl === 'string' ? cloudinaryImageUrl.substring(0, 100) + "..." : String(cloudinaryImageUrl)
-        });
       }
 
       // Step 2: Prepare JSON payload with Cloudinary URL
@@ -217,11 +211,6 @@ function VehicleDetailInner() {
         // Include the Cloudinary URL if image was uploaded, otherwise keep existing
         Image: cloudinaryImageUrl || vehicle.Image,
       };
-
-      console.log(`[handleSave] Sending update to API:`, {
-        hasImage: !!cloudinaryImageUrl,
-        imageUrl: typeof cloudinaryImageUrl === 'string' ? cloudinaryImageUrl.substring(0, 100) + "..." : String(cloudinaryImageUrl)
-      });
 
       const res = await fetch(`/api/vehicles/${encodeURIComponent(vehicle.VehicleId)}`, {
         method: "PUT",
@@ -253,13 +242,7 @@ function VehicleDetailInner() {
         Price40: derivePrices(formData.PriceNew).Price40,
         Price70: derivePrices(formData.PriceNew).Price70,
       };
-      
-      console.log("[VehicleDetailPage] Vehicle updated:", {
-        id: updatedVehicle.VehicleId,
-        hasImage: !!updatedVehicle.Image,
-        imageUrl: typeof updatedVehicle.Image === 'string' ? updatedVehicle.Image.substring(0, 100) : String(updatedVehicle.Image)
-      });
-      
+
       setVehicle(updatedVehicle);
 
       // Update cache

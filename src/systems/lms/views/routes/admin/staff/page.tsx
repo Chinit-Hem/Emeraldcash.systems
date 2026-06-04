@@ -4,24 +4,22 @@ import { useAuthUser } from "@/shared/hooks/AuthContext";
 import type { Role } from "@/shared/types/types";
 import {
   ArrowLeft,
-  Building2,
   CheckCircle2,
   Clock,
-  Edit2,
+  Eye,
+  ListFilter,
   Loader2,
-  Mail,
   PlayCircle,
-  Plus,
   RefreshCw,
   Search,
   Shield,
   TrendingUp,
-  Trash2,
-  Users
+  Users,
+  X
 } from "lucide-react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 type ManagedUser = {
   username: string;
@@ -36,6 +34,9 @@ type ManagedUser = {
 };
 
 type TrainingStatus = "not_started" | "watching" | "ready_to_complete" | "completed";
+type TrackingStatusKey = "not_synced" | "not_started" | "in_progress" | "completed";
+type StatusFilter = "all" | TrackingStatusKey;
+type SortOption = "last_activity" | "progress_desc" | "progress_asc" | "name";
 
 interface StaffMember {
   id: number;
@@ -62,6 +63,15 @@ interface StaffMember {
   last_activity: string | null;
 }
 
+type StaffTrackingRow = {
+  managedUser: ManagedUser;
+  progress: StaffMember | null;
+  completionPercentage: number;
+  latestWatchPercentage: number;
+  statusKey: TrackingStatusKey;
+  status: ReturnType<typeof getTrainingStatus>;
+};
+
 function normalizeText(value?: string | null) {
   return value?.trim().toLowerCase() || "";
 }
@@ -78,12 +88,31 @@ function formatDate(value?: string | null) {
   return Number.isNaN(date.getTime()) ? "Never" : date.toLocaleDateString();
 }
 
+function getTime(value?: string | null) {
+  if (!value) return 0;
+  const time = new Date(value).getTime();
+  return Number.isNaN(time) ? 0 : time;
+}
+
+function getDisplayName(managedUser: ManagedUser) {
+  return managedUser.full_name || managedUser.username;
+}
+
+function getTrackingStatusKey(progress: StaffMember | null): TrackingStatusKey {
+  if (!progress) return "not_synced";
+  if (progress.training_status === "completed") return "completed";
+  if (progress.training_status === "watching" || progress.training_status === "ready_to_complete") {
+    return "in_progress";
+  }
+  return "not_started";
+}
+
 function getTrainingStatus(progress: StaffMember | null) {
   const status = progress?.training_status ?? "not_started";
 
   if (!progress) {
     return {
-      label: "Not synced",
+      label: "Not Synced",
       className: "bg-slate-100 text-slate-600",
     };
   }
@@ -97,20 +126,20 @@ function getTrainingStatus(progress: StaffMember | null) {
 
   if (status === "ready_to_complete") {
     return {
-      label: "Ready to complete",
+      label: "Ready to Complete",
       className: "bg-amber-100 text-amber-700",
     };
   }
 
   if (status === "watching") {
     return {
-      label: "Watching",
+      label: "Started",
       className: "bg-blue-100 text-blue-700",
     };
   }
 
   return {
-    label: "Not started",
+    label: "Not Started",
     className: "bg-slate-100 text-slate-600",
   };
 }
@@ -123,26 +152,14 @@ export default function StaffAdminPage() {
   const [users, setUsers] = useState<ManagedUser[]>([]);
   const [lmsStaff, setLmsStaff] = useState<StaffMember[]>([]);
   const [isUsersLoading, setIsUsersLoading] = useState(false);
-  const [isCreatingUser, setIsCreatingUser] = useState(false);
-  const [deletingUsername, setDeletingUsername] = useState<string | null>(null);
   const [userActionError, setUserActionError] = useState("");
   const [userActionSuccess, setUserActionSuccess] = useState("");
-  const [newUsername, setNewUsername] = useState("");
-  const [newPassword, setNewPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-  const [newRole, setNewRole] = useState<Role>("Staff");
   const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [roleFilter, setRoleFilter] = useState<Role | "all">("all");
+  const [sortOption, setSortOption] = useState<SortOption>("last_activity");
+  const [selectedRow, setSelectedRow] = useState<StaffTrackingRow | null>(null);
   const [isSyncingAll, setIsSyncingAll] = useState(false);
-  
-  // Edit user state
-  const [editingUser, setEditingUser] = useState<ManagedUser | null>(null);
-  const [editFullName, setEditFullName] = useState("");
-  const [editEmail, setEditEmail] = useState("");
-  const [editPhone, setEditPhone] = useState("");
-  const [editProfilePicture, setEditProfilePicture] = useState<string | null>(null);
-  const [isUpdatingUser, setIsUpdatingUser] = useState(false);
-  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Fetch both Settings users and LMS staff
   const loadData = useCallback(async () => {
@@ -183,7 +200,7 @@ export default function StaffAdminPage() {
 
   useEffect(() => {
     if (!isAdmin) {
-      router.push("/lms");
+      router.push("/lms", { scroll: false });
       return;
     }
     void loadData();
@@ -229,25 +246,6 @@ export default function StaffAdminPage() {
     }
   };
 
-  // Delete LMS staff by email
-  const deleteLMSStaff = async (email: string | null) => {
-    if (!email) return;
-    
-    try {
-      const staffRes = await fetch("/api/lms/staff", { cache: "no-store" });
-      const staffData = await staffRes.json().catch(() => ({ success: false, data: [] }));
-      
-      if (staffData.success && Array.isArray(staffData.data)) {
-        const staff = staffData.data.find((s: { email?: string | null }) => s.email === email);
-        if (staff) {
-          await fetch(`/api/lms/staff?id=${staff.id}`, { method: "DELETE" });
-        }
-      }
-    } catch (error) {
-      console.error("Failed to delete LMS staff:", error);
-    }
-  };
-
   // Sync all users to LMS
   const syncAllUsersToLMS = async () => {
     if (!isAdmin) return;
@@ -276,209 +274,6 @@ export default function StaffAdminPage() {
     }
   };
 
-  const handleCreateUser = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    setUserActionError("");
-    setUserActionSuccess("");
-
-    const username = newUsername.trim().toLowerCase();
-    if (!username) {
-      setUserActionError("Username is required");
-      return;
-    }
-
-    if (!newPassword) {
-      setUserActionError("Password is required");
-      return;
-    }
-
-    if (newPassword !== confirmPassword) {
-      setUserActionError("Password confirmation does not match");
-      return;
-    }
-
-    setIsCreatingUser(true);
-    try {
-      const res = await fetch("/api/auth/users", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          username,
-          password: newPassword,
-          role: newRole,
-        }),
-      });
-      const data = (await res.json().catch(() => ({}))) as {
-        ok?: boolean;
-        error?: string;
-      };
-      if (!res.ok || data.ok === false) {
-        throw new Error(data.error || "Failed to create user");
-      }
-
-      // Sync with LMS staff
-      await syncUserWithLMS(username, null, null, null, newRole);
-
-      setUserActionSuccess(`User "${username}" created successfully`);
-      setNewUsername("");
-      setNewPassword("");
-      setConfirmPassword("");
-      setNewRole("Staff");
-      await loadData();
-    } catch (error) {
-      setUserActionError(error instanceof Error ? error.message : "Failed to create user");
-    } finally {
-      setIsCreatingUser(false);
-    }
-  };
-
-  const handleDeleteUser = async (targetUsername: string) => {
-    const normalized = targetUsername.trim().toLowerCase();
-    if (!normalized) return;
-
-    setUserActionError("");
-    setUserActionSuccess("");
-
-    const confirmed = window.confirm(`Delete user "${normalized}"?`);
-    if (!confirmed) return;
-
-    setDeletingUsername(normalized);
-    try {
-      const res = await fetch("/api/auth/users", {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username: normalized }),
-      });
-
-      const data = (await res.json().catch(() => ({}))) as {
-        ok?: boolean;
-        error?: string;
-      };
-      if (!res.ok || data.ok === false) {
-        throw new Error(data.error || "Failed to delete user");
-      }
-
-      // Also delete from LMS if email exists
-      const userToDelete = users.find(u => u.username === normalized);
-      if (userToDelete?.email) {
-        await deleteLMSStaff(userToDelete.email);
-      }
-
-      setUserActionSuccess(`User "${normalized}" deleted successfully`);
-      await loadData();
-    } catch (error) {
-      setUserActionError(error instanceof Error ? error.message : "Failed to delete user");
-    } finally {
-      setDeletingUsername(null);
-    }
-  };
-
-  // Start editing a user
-  const startEditUser = (managedUser: ManagedUser) => {
-    setEditingUser(managedUser);
-    setEditFullName(managedUser.full_name || "");
-    setEditEmail(managedUser.email || "");
-    setEditPhone(managedUser.phone || "");
-    setEditProfilePicture(managedUser.profile_picture || null);
-    setUserActionError("");
-    setUserActionSuccess("");
-  };
-
-  // Cancel editing
-  const cancelEditUser = () => {
-    setEditingUser(null);
-    setEditFullName("");
-    setEditEmail("");
-    setEditPhone("");
-    setEditProfilePicture(null);
-  };
-
-  // Handle avatar upload
-  const handleAvatarUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file || !editingUser) return;
-
-    setIsUploadingAvatar(true);
-    setUserActionError("");
-    try {
-      const formData = new FormData();
-      formData.append("file", file);
-
-      const res = await fetch("/api/auth/upload-avatar", {
-        method: "POST",
-        body: formData,
-      });
-
-      const data = await res.json();
-
-      if (data.ok && data.url) {
-        setEditProfilePicture(data.url);
-        setUserActionSuccess("Photo uploaded successfully");
-      } else {
-        const errorMsg = data.details || data.error || `Failed to upload photo (HTTP ${res.status})`;
-        setUserActionError(errorMsg);
-      }
-    } catch (error) {
-      const errorMsg = error instanceof Error ? error.message : "Failed to upload photo";
-      setUserActionError(errorMsg);
-    } finally {
-      setIsUploadingAvatar(false);
-    }
-  };
-
-  // Update user profile
-  const handleUpdateUser = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    if (!editingUser) return;
-
-    setUserActionError("");
-    setUserActionSuccess("");
-    setIsUpdatingUser(true);
-
-    try {
-      const res = await fetch("/api/auth/users", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          username: editingUser.username,
-          full_name: editFullName.trim() || null,
-          email: editEmail.trim() || null,
-          phone: editPhone.trim() || null,
-          profile_picture: editProfilePicture,
-        }),
-      });
-
-      const data = (await res.json().catch(() => ({}))) as {
-        ok?: boolean;
-        error?: string;
-      };
-
-      if (!res.ok || data.ok === false) {
-        throw new Error(data.error || "Failed to update user");
-      }
-
-      // Sync with LMS staff
-      await syncUserWithLMS(
-        editingUser.username,
-        editFullName.trim() || null,
-        editEmail.trim() || null,
-        editPhone.trim() || null,
-        editingUser.role
-      );
-
-      setUserActionSuccess(`User "${editingUser.username}" updated successfully`);
-      setEditingUser(null);
-      setEditFullName("");
-      setEditEmail("");
-      setEditPhone("");
-      await loadData();
-    } catch (error) {
-      setUserActionError(error instanceof Error ? error.message : "Failed to update user");
-    } finally {
-      setIsUpdatingUser(false);
-    }
-  };
-
   // Get LMS progress for a user - MEMOIZED for performance
   const getLMSProgress = useCallback((managedUser: ManagedUser) => {
     const email = normalizeText(managedUser.email);
@@ -496,32 +291,112 @@ export default function StaffAdminPage() {
     }) ?? null;
   }, [lmsStaff]);
 
+  const usersWithProgress = useMemo(() => {
+    return users.map((managedUser) => {
+      const progress = getLMSProgress(managedUser);
+      const statusKey = getTrackingStatusKey(progress);
+      return {
+        managedUser,
+        progress,
+        completionPercentage: clampPercentage(progress?.completion_percentage),
+        latestWatchPercentage: clampPercentage(progress?.latest_watch_percentage),
+        statusKey,
+        status: getTrainingStatus(progress),
+      };
+    });
+  }, [getLMSProgress, users]);
+
   const staffSummary = useMemo(() => {
-    const progressRows = users
-      .map((managedUser) => getLMSProgress(managedUser))
+    const progressRows = usersWithProgress
+      .map((row) => row.progress)
       .filter((progress): progress is StaffMember => Boolean(progress));
+    const totalLessons = progressRows.reduce((sum, progress) => sum + (Number(progress.total_lessons) || 0), 0);
+    const completedLessons = progressRows.reduce((sum, progress) => sum + (Number(progress.completed_lessons_count) || 0), 0);
 
     return {
       totalUsers: users.length,
       syncedUsers: progressRows.length,
-      startedUsers: progressRows.filter((progress) =>
-        progress.watched_lessons_count > 0 || progress.completed_lessons_count > 0
-      ).length,
+      notSyncedUsers: usersWithProgress.filter((row) => row.statusKey === "not_synced").length,
+      notStartedUsers: usersWithProgress.filter((row) => row.statusKey === "not_started").length,
+      inProgressUsers: usersWithProgress.filter((row) => row.statusKey === "in_progress").length,
       completedUsers: progressRows.filter((progress) => progress.training_status === "completed").length,
+      needFollowUpUsers: usersWithProgress.filter((row) =>
+        row.statusKey === "not_synced" ||
+        row.statusKey === "not_started" ||
+        (row.statusKey === "in_progress" && row.completionPercentage < 50)
+      ).length,
+      completedLessons,
+      totalLessons,
+      overallCompletion: totalLessons > 0 ? clampPercentage((completedLessons / totalLessons) * 100) : 0,
     };
-  }, [getLMSProgress, users]);
+  }, [users.length, usersWithProgress]);
 
-  // Filter users based on search - MEMOIZED to avoid recomputation on every render
-  const filteredUsers = useMemo(() => {
-    if (!searchQuery) return users;
-    const query = searchQuery.toLowerCase();
-    return users.filter((managedUser) => (
-      managedUser.username.toLowerCase().includes(query) ||
-      (managedUser.full_name && managedUser.full_name.toLowerCase().includes(query)) ||
-      (managedUser.email && managedUser.email.toLowerCase().includes(query)) ||
-      (managedUser.phone && managedUser.phone.toLowerCase().includes(query))
-    ));
-  }, [users, searchQuery]);
+  const learningMonitorRows = useMemo(() => {
+    return usersWithProgress
+      .filter((row) => row.progress)
+      .sort((a, b) => {
+        const aTime = a.progress?.last_activity ? new Date(a.progress.last_activity).getTime() : 0;
+        const bTime = b.progress?.last_activity ? new Date(b.progress.last_activity).getTime() : 0;
+        return bTime - aTime || b.completionPercentage - a.completionPercentage;
+      })
+      .slice(0, 4);
+  }, [usersWithProgress]);
+
+  const attentionRows = useMemo(() => {
+    return usersWithProgress
+      .filter((row) => row.statusKey === "not_synced" || row.statusKey === "not_started" || row.completionPercentage < 50)
+      .sort((a, b) => a.completionPercentage - b.completionPercentage)
+      .slice(0, 4);
+  }, [usersWithProgress]);
+
+  const roleOptions = useMemo(() => {
+    return Array.from(new Set(users.map((managedUser) => managedUser.role))).sort();
+  }, [users]);
+
+  const filteredTrackingRows = useMemo(() => {
+    const query = normalizeText(searchQuery);
+
+    return usersWithProgress
+      .filter((row) => {
+        const managedUser = row.managedUser;
+        const progress = row.progress;
+        const matchesSearch = !query || [
+          managedUser.username,
+          managedUser.full_name,
+          managedUser.email,
+          managedUser.phone,
+          managedUser.role,
+          progress?.last_watched_lesson_title,
+        ].some((value) => normalizeText(value).includes(query));
+
+        const matchesStatus = statusFilter === "all" || row.statusKey === statusFilter;
+        const matchesRole = roleFilter === "all" || managedUser.role === roleFilter;
+
+        return matchesSearch && matchesStatus && matchesRole;
+      })
+      .sort((a, b) => {
+        const aName = getDisplayName(a.managedUser);
+        const bName = getDisplayName(b.managedUser);
+
+        if (sortOption === "name") {
+          return aName.localeCompare(bName);
+        }
+
+        if (sortOption === "progress_desc") {
+          return b.completionPercentage - a.completionPercentage || aName.localeCompare(bName);
+        }
+
+        if (sortOption === "progress_asc") {
+          return a.completionPercentage - b.completionPercentage || aName.localeCompare(bName);
+        }
+
+        return (
+          getTime(b.progress?.last_activity) - getTime(a.progress?.last_activity) ||
+          b.completionPercentage - a.completionPercentage ||
+          aName.localeCompare(bName)
+        );
+      });
+  }, [roleFilter, searchQuery, sortOption, statusFilter, usersWithProgress]);
 
   if (!isAdmin) return null;
 
@@ -533,7 +408,7 @@ export default function StaffAdminPage() {
           <div className="flex items-center gap-4">
             <button
               type="button"
-              onClick={() => router.push("/lms")}
+              onClick={() => router.push("/lms", { scroll: false })}
               aria-label="Back to LMS"
               title="Back to LMS"
               className="p-2.5 rounded-xl bg-white shadow-[4px_4px_8px_#e2e8f0,-4px_-4px_8px_#ffffff] text-slate-600 hover:shadow-[6px_6px_12px_#e2e8f0,-6px_-6px_12px_#ffffff] transition-all active:scale-95"
@@ -545,8 +420,8 @@ export default function StaffAdminPage() {
                 <Users className="w-6 h-6 text-white" />
               </div>
               <div>
-                <h1 className="text-2xl font-bold text-slate-800">Manage Staff</h1>
-                <p className="text-sm text-slate-500">Create users and sync to LMS</p>
+                <h1 className="text-2xl font-bold text-slate-800">Staff Tracking</h1>
+                <p className="text-sm text-slate-500">Track staff learning process and LMS completion</p>
               </div>
             </div>
           </div>
@@ -574,10 +449,10 @@ export default function StaffAdminPage() {
           </div>
         )}
 
-        <div className="grid gap-4 mb-8 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="mb-8 grid gap-4 min-[420px]:grid-cols-2 lg:grid-cols-6">
           <div className="rounded-2xl bg-white p-4 shadow-[4px_4px_12px_#e2e8f0,-4px_-4px_12px_#ffffff]">
             <div className="flex items-center justify-between">
-              <p className="text-sm font-medium text-slate-500">Users</p>
+              <p className="text-sm font-medium text-slate-500">Total Staff</p>
               <Users className="h-4 w-4 text-slate-400" />
             </div>
             <p className="mt-2 text-2xl font-bold text-slate-800">{staffSummary.totalUsers}</p>
@@ -585,456 +460,475 @@ export default function StaffAdminPage() {
           </div>
           <div className="rounded-2xl bg-white p-4 shadow-[4px_4px_12px_#e2e8f0,-4px_-4px_12px_#ffffff]">
             <div className="flex items-center justify-between">
-              <p className="text-sm font-medium text-slate-500">LMS Synced</p>
+              <p className="text-sm font-medium text-slate-500">Synced to LMS</p>
               <CheckCircle2 className="h-4 w-4 text-emerald-500" />
             </div>
             <p className="mt-2 text-2xl font-bold text-slate-800">{staffSummary.syncedUsers}</p>
-            <p className="mt-1 text-xs text-slate-500">Ready for training</p>
+            <p className="mt-1 text-xs text-slate-500">{staffSummary.notSyncedUsers} not synced</p>
           </div>
           <div className="rounded-2xl bg-white p-4 shadow-[4px_4px_12px_#e2e8f0,-4px_-4px_12px_#ffffff]">
             <div className="flex items-center justify-between">
-              <p className="text-sm font-medium text-slate-500">Watching</p>
+              <p className="text-sm font-medium text-slate-500">Not Started</p>
+              <Clock className="h-4 w-4 text-amber-500" />
+            </div>
+            <p className="mt-2 text-2xl font-bold text-slate-800">{staffSummary.notStartedUsers}</p>
+            <p className="mt-1 text-xs text-slate-500">Need follow-up</p>
+          </div>
+          <div className="rounded-2xl bg-white p-4 shadow-[4px_4px_12px_#e2e8f0,-4px_-4px_12px_#ffffff]">
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-medium text-slate-500">In Progress</p>
               <PlayCircle className="h-4 w-4 text-blue-500" />
             </div>
-            <p className="mt-2 text-2xl font-bold text-slate-800">{staffSummary.startedUsers}</p>
-            <p className="mt-1 text-xs text-slate-500">Opened at least one video</p>
+            <p className="mt-2 text-2xl font-bold text-slate-800">{staffSummary.inProgressUsers}</p>
+            <p className="mt-1 text-xs text-slate-500">Started learning</p>
           </div>
           <div className="rounded-2xl bg-white p-4 shadow-[4px_4px_12px_#e2e8f0,-4px_-4px_12px_#ffffff]">
             <div className="flex items-center justify-between">
               <p className="text-sm font-medium text-slate-500">Completed</p>
-              <TrendingUp className="h-4 w-4 text-purple-500" />
+              <CheckCircle2 className="h-4 w-4 text-emerald-500" />
             </div>
             <p className="mt-2 text-2xl font-bold text-slate-800">{staffSummary.completedUsers}</p>
             <p className="mt-1 text-xs text-slate-500">Finished all lessons</p>
           </div>
+          <div className="rounded-2xl bg-white p-4 shadow-[4px_4px_12px_#e2e8f0,-4px_-4px_12px_#ffffff]">
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-medium text-slate-500">Overall</p>
+              <TrendingUp className="h-4 w-4 text-purple-500" />
+            </div>
+            <p className="mt-2 text-2xl font-bold text-slate-800">{staffSummary.overallCompletion}%</p>
+            <p className="mt-1 text-xs text-slate-500">{staffSummary.completedLessons}/{staffSummary.totalLessons} lessons</p>
+          </div>
         </div>
 
-        {/* Create User Form */}
-        <div className="mb-8 p-6 bg-white rounded-3xl shadow-[8px_8px_24px_#e2e8f0,-8px_-8px_24px_#ffffff]">
-          <h2 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
-            <Plus className="w-5 h-5 text-purple-600" />
-            Create New User
-          </h2>
-          
-          <form onSubmit={handleCreateUser} className="grid gap-4 sm:grid-cols-2">
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Username</label>
-              <input
-                type="text"
-                title="Username"
-                value={newUsername}
-                onChange={(e) => setNewUsername(e.target.value)}
-                placeholder="e.g. employee01"
-                className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500"
+        {/* Staff Learning Process Monitor */}
+        <div className="mb-8 rounded-3xl bg-white p-6 shadow-[8px_8px_24px_#e2e8f0,-8px_-8px_24px_#ffffff]">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div className="min-w-0">
+              <h2 className="flex items-center gap-2 text-lg font-bold text-slate-800">
+                <TrendingUp className="h-5 w-5 text-purple-600" />
+                Staff Learning Process
+              </h2>
+              <p className="mt-1 text-sm text-slate-500">
+                Monitor who has started, who is progressing, and who needs follow-up.
+              </p>
+            </div>
+            <div className="rounded-2xl bg-purple-50 px-4 py-3 text-right">
+              <p className="text-xs font-semibold uppercase tracking-wide text-purple-600">Overall completion</p>
+              <p className="mt-1 text-2xl font-bold text-purple-700">{staffSummary.overallCompletion}%</p>
+            </div>
+          </div>
+
+          <div className="mt-5">
+            <div className="flex items-center justify-between text-xs font-medium text-slate-600">
+              <span>{staffSummary.completedLessons} of {staffSummary.totalLessons} lessons completed</span>
+              <span>{staffSummary.syncedUsers} synced staff</span>
+            </div>
+            <div className="mt-2 h-3 overflow-hidden rounded-full bg-slate-100">
+              <div
+                className="h-full rounded-full bg-gradient-to-r from-purple-500 to-emerald-500"
+                style={{ width: `${staffSummary.overallCompletion}%` }}
               />
             </div>
+          </div>
 
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Role</label>
-              <select
-                title="User role"
-                value={newRole}
-                onChange={(e) => setNewRole(e.target.value as Role)}
-                className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500"
-              >
-                <option value="Staff">Staff</option>
-                <option value="Admin">Admin</option>
-              </select>
+          <div className="mt-5 grid gap-3 sm:grid-cols-3">
+            <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-semibold text-slate-700">In Progress</p>
+                <PlayCircle className="h-4 w-4 text-blue-500" />
+              </div>
+              <p className="mt-2 text-2xl font-bold text-slate-800">{staffSummary.inProgressUsers}</p>
+              <p className="mt-1 text-xs text-slate-500">Started or ready to complete</p>
+            </div>
+            <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-semibold text-slate-700">Not started</p>
+                <Clock className="h-4 w-4 text-amber-500" />
+              </div>
+              <p className="mt-2 text-2xl font-bold text-slate-800">{staffSummary.notStartedUsers}</p>
+              <p className="mt-1 text-xs text-slate-500">Need follow-up</p>
+            </div>
+            <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-semibold text-slate-700">Completed</p>
+                <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+              </div>
+              <p className="mt-2 text-2xl font-bold text-slate-800">{staffSummary.completedUsers}</p>
+              <p className="mt-1 text-xs text-slate-500">Finished all assigned lessons</p>
+            </div>
+          </div>
+
+          <div className="mt-5 grid gap-4 lg:grid-cols-2">
+            <div className="rounded-2xl border border-slate-100 p-4">
+              <h3 className="text-sm font-bold text-slate-800">Latest learning activity</h3>
+              <div className="mt-3 space-y-3">
+                {learningMonitorRows.length > 0 ? learningMonitorRows.map(({ managedUser, progress, completionPercentage }) => (
+                  <div key={managedUser.username} className="flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold text-slate-700">{managedUser.full_name || managedUser.username}</p>
+                      <p className="truncate text-xs text-slate-500">{progress?.last_watched_lesson_title || "No lesson activity"}</p>
+                    </div>
+                    <div className="shrink-0 text-right">
+                      <p className="text-sm font-bold text-slate-800">{completionPercentage}%</p>
+                      <p className="text-xs text-slate-500">{formatDate(progress?.last_activity)}</p>
+                    </div>
+                  </div>
+                )) : (
+                  <p className="text-sm text-slate-500">No learning activity yet.</p>
+                )}
+              </div>
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Password</label>
-              <input
-                type="password"
-                title="Password"
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-                placeholder="Minimum 4 characters"
-                className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500"
-              />
+            <div className="rounded-2xl border border-slate-100 p-4">
+              <h3 className="text-sm font-bold text-slate-800">Need Follow-up</h3>
+              <div className="mt-3 space-y-3">
+                {attentionRows.length > 0 ? attentionRows.map(({ managedUser, progress, completionPercentage }) => (
+                  <div key={managedUser.username} className="flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold text-slate-700">{managedUser.full_name || managedUser.username}</p>
+                      <p className="truncate text-xs text-slate-500">
+                        {!progress ? "Not synced to LMS" : progress.training_status === "not_started" ? "Not started learning" : "Low completion progress"}
+                      </p>
+                    </div>
+                    <span className="shrink-0 rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700">
+                      {completionPercentage}%
+                    </span>
+                  </div>
+                )) : (
+                  <p className="text-sm text-slate-500">Everyone is on track.</p>
+                )}
+              </div>
             </div>
-
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Confirm Password</label>
-              <input
-                type="password"
-                title="Confirm password"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                placeholder="Repeat password"
-                className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500"
-              />
-            </div>
-
-            <div className="sm:col-span-2 flex items-center gap-3">
-              <button
-                type="submit"
-                disabled={isCreatingUser}
-                className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-purple-500 to-purple-600 text-white font-medium rounded-xl shadow-lg shadow-purple-500/30 hover:shadow-xl transition-all active:scale-95 disabled:opacity-50"
-              >
-                {isCreatingUser ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
-                {isCreatingUser ? "Creating..." : "Create User"}
-              </button>
-            </div>
-          </form>
+          </div>
         </div>
 
-        {/* Search and Sync */}
-        <div className="flex flex-col sm:flex-row gap-4 mb-6">
-          <div className="relative flex-1">
+        {/* Search, Filters, and Sync */}
+        <div className="mb-6 grid gap-3 rounded-3xl bg-white p-4 shadow-[8px_8px_24px_#e2e8f0,-8px_-8px_24px_#ffffff] lg:grid-cols-[minmax(0,1fr)_170px_150px_190px_auto]">
+          <div className="relative">
             <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
               <Search className="w-5 h-5 text-slate-400" />
             </div>
             <input
               type="text"
-              title="Search users"
-              placeholder="Search users by name, email, or phone..."
+              title="Search staff"
+              placeholder="Search name, email, phone, or lesson..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-12 pr-4 py-3 rounded-2xl bg-white shadow-[4px_4px_12px_#e2e8f0,-4px_-4px_12px_#ffffff] text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500/20"
+              className="h-12 w-full rounded-2xl border border-slate-100 bg-slate-50 pl-12 pr-4 text-sm text-slate-700 placeholder-slate-400 focus:border-purple-300 focus:outline-none focus:ring-2 focus:ring-purple-500/20"
             />
           </div>
+          <div className="relative">
+            <ListFilter className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <select
+              title="Filter by status"
+              aria-label="Filter by status"
+              value={statusFilter}
+              onChange={(event) => setStatusFilter(event.target.value as StatusFilter)}
+              className="h-12 w-full appearance-none rounded-2xl border border-slate-100 bg-slate-50 pl-10 pr-4 text-sm font-medium text-slate-700 focus:border-purple-300 focus:outline-none focus:ring-2 focus:ring-purple-500/20"
+            >
+              <option value="all">All Status</option>
+              <option value="not_synced">Not Synced</option>
+              <option value="not_started">Not Started</option>
+              <option value="in_progress">In Progress</option>
+              <option value="completed">Completed</option>
+            </select>
+          </div>
+          <select
+            title="Filter by role"
+            aria-label="Filter by role"
+            value={roleFilter}
+            onChange={(event) => setRoleFilter(event.target.value as Role | "all")}
+            className="h-12 rounded-2xl border border-slate-100 bg-slate-50 px-4 text-sm font-medium text-slate-700 focus:border-purple-300 focus:outline-none focus:ring-2 focus:ring-purple-500/20"
+          >
+            <option value="all">All Roles</option>
+            {roleOptions.map((roleOption) => (
+              <option key={roleOption} value={roleOption}>{roleOption}</option>
+            ))}
+          </select>
+          <select
+            title="Sort staff"
+            aria-label="Sort staff"
+            value={sortOption}
+            onChange={(event) => setSortOption(event.target.value as SortOption)}
+            className="h-12 rounded-2xl border border-slate-100 bg-slate-50 px-4 text-sm font-medium text-slate-700 focus:border-purple-300 focus:outline-none focus:ring-2 focus:ring-purple-500/20"
+          >
+            <option value="last_activity">Last Activity</option>
+            <option value="progress_desc">Progress High</option>
+            <option value="progress_asc">Progress Low</option>
+            <option value="name">Name</option>
+          </select>
           <button
             type="button"
             onClick={syncAllUsersToLMS}
             disabled={isSyncingAll || isUsersLoading}
-            className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white font-medium rounded-xl shadow-lg shadow-emerald-500/30 hover:shadow-xl transition-all active:scale-95 disabled:opacity-50"
+            className="flex h-12 items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-emerald-500 to-emerald-600 px-5 text-sm font-semibold text-white shadow-lg shadow-emerald-500/30 transition-all hover:shadow-xl active:scale-95 disabled:opacity-50"
           >
             {isSyncingAll ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
-            {isSyncingAll ? "Syncing..." : `Sync All to LMS (${users.length})`}
+            {isSyncingAll ? "Syncing..." : `Sync Staff to LMS (${users.length})`}
           </button>
         </div>
 
-        {/* Users List */}
-        <div className="grid gap-4">
+        {/* Staff Tracking Table */}
+        <div className="overflow-hidden rounded-3xl bg-white shadow-[8px_8px_24px_#e2e8f0,-8px_-8px_24px_#ffffff]">
+          <div className="flex flex-col gap-2 border-b border-slate-100 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 className="text-lg font-bold text-slate-800">Staff Progress Table</h2>
+              <p className="text-sm text-slate-500">
+                Showing {filteredTrackingRows.length} of {usersWithProgress.length} staff accounts
+              </p>
+            </div>
+            <p className="text-sm font-medium text-slate-500">{staffSummary.needFollowUpUsers} need follow-up</p>
+          </div>
+
           {isUsersLoading ? (
-            <div className="text-center py-12 bg-white rounded-3xl shadow-[8px_8px_24px_#e2e8f0,-8px_-8px_24px_#ffffff]">
-              <Loader2 className="w-8 h-8 mx-auto animate-spin text-purple-600" />
+            <div className="py-12 text-center">
+              <Loader2 className="mx-auto h-8 w-8 animate-spin text-purple-600" />
               <p className="mt-4 text-slate-500">Loading users...</p>
             </div>
           ) : userActionError && userActionError.includes("Access denied") ? (
-            <div className="text-center py-12 bg-white rounded-3xl shadow-[8px_8px_24px_#e2e8f0,-8px_-8px_24px_#ffffff]">
-              <Shield className="w-12 h-12 mx-auto mb-4 text-amber-500" />
-              <h3 className="text-lg font-semibold text-slate-800 mb-2">Admin Access Required</h3>
-              <p className="text-slate-500 mb-4">{userActionError}</p>
-              <div className="mb-4 p-4 rounded-xl bg-amber-50 border border-amber-200 max-w-md mx-auto">
-                <p className="text-sm text-amber-700">
-                  <strong>Default Admin Credentials:</strong><br />
-                  <code className="bg-amber-100 px-2 py-1 rounded">admin / 1234</code>
-                </p>
-              </div>
+            <div className="py-12 text-center">
+              <Shield className="mx-auto mb-4 h-12 w-12 text-amber-500" />
+              <h3 className="mb-2 text-lg font-semibold text-slate-800">Admin Access Required</h3>
+              <p className="mb-4 text-slate-500">{userActionError}</p>
               <button
                 type="button"
-                onClick={() => router.push("/settings")}
-                className="px-4 py-2 rounded-xl bg-amber-100 text-amber-700 font-medium hover:bg-amber-200 transition-colors"
+                onClick={() => router.push("/settings", { scroll: false })}
+                className="rounded-xl bg-amber-100 px-4 py-2 font-medium text-amber-700 transition-colors hover:bg-amber-200"
               >
                 Go to Settings
               </button>
             </div>
-          ) : filteredUsers.length === 0 ? (
-            <div className="text-center py-12 bg-white rounded-3xl shadow-[8px_8px_24px_#e2e8f0,-8px_-8px_24px_#ffffff]">
-              <Users className="w-12 h-12 mx-auto mb-4 text-slate-300" />
-              <h3 className="text-lg font-semibold text-slate-800 mb-2">No Users Found</h3>
-              <p className="text-slate-500">Create your first user to get started</p>
+          ) : filteredTrackingRows.length === 0 ? (
+            <div className="py-12 text-center">
+              <Users className="mx-auto mb-4 h-12 w-12 text-slate-300" />
+              <h3 className="mb-2 text-lg font-semibold text-slate-800">No Staff Found</h3>
+              <p className="text-slate-500">No staff accounts match the current filters</p>
             </div>
           ) : (
-            filteredUsers.map((managedUser) => {
-              const lmsProgress = getLMSProgress(managedUser);
-              const isSynced = !!lmsProgress;
-              const completionPercentage = clampPercentage(lmsProgress?.completion_percentage);
-              const latestWatchPercentage = clampPercentage(lmsProgress?.latest_watch_percentage);
-              const status = getTrainingStatus(lmsProgress);
+            <>
+              <div className="hidden overflow-x-auto lg:block">
+                <table className="w-full min-w-[960px]">
+                  <thead>
+                    <tr className="border-b border-slate-100 bg-slate-50/80">
+                      <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Staff</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Role</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Status</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Progress</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Lessons</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Last Activity</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Last Lesson</th>
+                      <th className="px-5 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {filteredTrackingRows.map((row) => {
+                      const { managedUser, progress, completionPercentage, status } = row;
 
-              return (
-                <div
-                  key={managedUser.username}
-                  className="flex flex-col gap-4 p-6 bg-white rounded-3xl shadow-[8px_8px_24px_#e2e8f0,-8px_-8px_24px_#ffffff] hover:shadow-[12px_12px_32px_#e2e8f0,-12px_-12px_32px_#ffffff] transition-all lg:flex-row lg:items-center lg:justify-between"
-                >
-                  <div className="flex min-w-0 flex-1 items-start gap-4">
-                    {/* Avatar */}
-                    <div className="relative shrink-0">
-                      {managedUser.profile_picture ? (
-
-                        <Image
-                          src={managedUser.profile_picture}
-                          alt={managedUser.username}
-                          width={56}
-                          height={56}
-                          className="h-14 w-14 rounded-2xl object-cover border-2 border-slate-200"
-                        />
-                      ) : (
-                        <div className="h-14 w-14 rounded-2xl bg-gradient-to-br from-purple-500 to-purple-600 flex items-center justify-center text-white font-bold text-lg shadow-lg">
-                          {(managedUser.full_name || managedUser.username).charAt(0).toUpperCase()}
-                        </div>
-                      )}
-                      {isSynced && (
-                        <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-emerald-500 rounded-full flex items-center justify-center border-2 border-white">
-                          <CheckCircle2 className="w-3 h-3 text-white" />
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <h3 className="truncate text-lg font-bold text-slate-800">
-                        {managedUser.full_name || managedUser.username}
-                      </h3>
-                      {managedUser.username.toLowerCase() === (user?.username || "").toLowerCase() && (
-                        <span className="px-2 py-0.5 rounded-full text-xs bg-blue-100 text-blue-700 font-medium">
-                          You
-                        </span>
-                      )}
-                      <span className={`px-2 py-0.5 rounded-full text-xs ${
-                        managedUser.role === "Admin" 
-                          ? "bg-purple-100 text-purple-700" 
-                          : "bg-slate-100 text-slate-600"
-                      }`}>
-                        {managedUser.role === "Admin" && <Shield className="w-3 h-3 inline mr-1" />}
-                        {managedUser.role}
-                      </span>
-                      {isSynced && (
-                        <span className="px-2 py-0.5 rounded-full text-xs bg-emerald-100 text-emerald-700">
-                          Synced to LMS
-                        </span>
-                      )}
-                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${status.className}`}>
-                        {status.label}
-                      </span>
-                    </div>
-                      
-                      <div className="flex flex-wrap items-center gap-3 text-sm text-slate-500 mt-1">
-                        {managedUser.email && (
-                          <span className="flex items-center gap-1">
-                            <Mail className="w-3 h-3" />
-                            {managedUser.email}
-                          </span>
-                        )}
-                        {managedUser.phone && (
-                          <span className="flex items-center gap-1">
-                            <Building2 className="w-3 h-3" />
-                            {managedUser.phone}
-                          </span>
-                        )}
-                        <span className="text-slate-400">
-                          Created by {managedUser.createdBy}
-                        </span>
-                      </div>
-
-                      {/* LMS Progress */}
-                      {lmsProgress && (
-                        <div className="mt-3 rounded-2xl border border-slate-100 bg-slate-50/80 p-3">
-                          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                            <div className="min-w-0 flex-1">
-                              <div className="flex items-center justify-between gap-3 text-xs font-medium text-slate-600">
-                                <span>LMS completion</span>
-                                <span>{completionPercentage}%</span>
-                              </div>
-                              <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-slate-200">
-                                <div
-                                  className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-emerald-600"
-                                  style={{ width: `${completionPercentage}%` }}
+                      return (
+                        <tr key={managedUser.username} className="transition-colors hover:bg-slate-50/80">
+                          <td className="px-5 py-4">
+                            <div className="flex min-w-0 items-center gap-3">
+                              {managedUser.profile_picture ? (
+                                <Image
+                                  src={managedUser.profile_picture}
+                                  alt={managedUser.username}
+                                  width={40}
+                                  height={40}
+                                  className="h-10 w-10 shrink-0 rounded-xl border border-slate-200 object-cover"
                                 />
+                              ) : (
+                                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-purple-500 to-purple-600 text-sm font-bold text-white">
+                                  {getDisplayName(managedUser).charAt(0).toUpperCase()}
+                                </div>
+                              )}
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-2">
+                                  <p className="truncate text-sm font-bold text-slate-800">{getDisplayName(managedUser)}</p>
+                                  {managedUser.username.toLowerCase() === (user?.username || "").toLowerCase() && (
+                                    <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700">You</span>
+                                  )}
+                                </div>
+                                <p className="truncate text-xs text-slate-500">{managedUser.email || managedUser.username}</p>
                               </div>
                             </div>
-                            <div className="flex flex-wrap gap-2 text-xs text-slate-600">
-                              <span className="inline-flex items-center gap-1 rounded-full bg-white px-2.5 py-1">
-                                <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
-                                {lmsProgress.completed_lessons_count}/{lmsProgress.total_lessons} complete
-                              </span>
-                              <span className="inline-flex items-center gap-1 rounded-full bg-white px-2.5 py-1">
-                                <PlayCircle className="h-3.5 w-3.5 text-blue-500" />
-                                {lmsProgress.watched_lessons_count} watched
-                              </span>
-                              <span className="inline-flex items-center gap-1 rounded-full bg-white px-2.5 py-1">
-                                <Clock className="h-3.5 w-3.5 text-amber-500" />
-                                {latestWatchPercentage}% latest
-                              </span>
+                          </td>
+                          <td className="px-4 py-4">
+                            <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${
+                              managedUser.role === "Admin"
+                                ? "bg-purple-100 text-purple-700"
+                                : "bg-slate-100 text-slate-600"
+                            }`}>
+                              {managedUser.role}
+                            </span>
+                          </td>
+                          <td className="px-4 py-4">
+                            <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${status.className}`}>{status.label}</span>
+                          </td>
+                          <td className="px-4 py-4">
+                            <div className="min-w-[140px]">
+                              <div className="mb-1 flex justify-between text-xs text-slate-500">
+                                <span>Completion</span>
+                                <span className="font-semibold text-slate-700">{completionPercentage}%</span>
+                              </div>
+                              <div className="h-2 overflow-hidden rounded-full bg-slate-200">
+                                <div className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-emerald-600" style={{ width: `${completionPercentage}%` }} />
+                              </div>
                             </div>
-                          </div>
-                          <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500">
-                            <span>Last active: {formatDate(lmsProgress.last_activity)}</span>
-                            {lmsProgress.last_watched_lesson_title && (
-                              <span className="truncate">Last video: {lmsProgress.last_watched_lesson_title}</span>
-                            )}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
+                          </td>
+                          <td className="px-4 py-4 text-sm text-slate-600">
+                            {progress ? `${progress.completed_lessons_count}/${progress.total_lessons}` : "0/0"}
+                          </td>
+                          <td className="px-4 py-4 text-sm text-slate-500">{formatDate(progress?.last_activity)}</td>
+                          <td className="max-w-[220px] truncate px-4 py-4 text-sm text-slate-500">
+                            {progress?.last_watched_lesson_title || "No lesson activity"}
+                          </td>
+                          <td className="px-5 py-4 text-right">
+                            <button
+                              type="button"
+                              onClick={() => setSelectedRow(row)}
+                              className="inline-flex items-center gap-1.5 rounded-xl bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-200"
+                            >
+                              <Eye className="h-3.5 w-3.5" />
+                              View
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
 
-                  <div className="flex shrink-0 items-center gap-2 self-end lg:self-center">
-                    <button
-                      type="button"
-                      onClick={() => startEditUser(managedUser)}
-                      disabled={editingUser !== null}
-                      aria-label={`Edit ${managedUser.full_name || managedUser.username}`}
-                      className="p-2.5 rounded-xl bg-blue-50 text-blue-600 hover:bg-blue-100 transition-all active:scale-95 disabled:opacity-50"
-                      title="Edit user"
-                    >
-                      <Edit2 className="w-5 h-5" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleDeleteUser(managedUser.username)}
-                      disabled={deletingUsername === managedUser.username || managedUser.username.toLowerCase() === (user?.username || "").toLowerCase() || editingUser !== null}
-                      aria-label={`Delete ${managedUser.full_name || managedUser.username}`}
-                      className="p-2.5 rounded-xl bg-red-50 text-red-600 hover:bg-red-100 transition-all active:scale-95 disabled:opacity-50"
-                      title={managedUser.username.toLowerCase() === (user?.username || "").toLowerCase() ? "You cannot delete your own account" : "Delete user"}
-                    >
-                      {deletingUsername === managedUser.username ? (
-                        <Loader2 className="w-5 h-5 animate-spin" />
-                      ) : (
-                        <Trash2 className="w-5 h-5" />
-                      )}
-                    </button>
-                  </div>
-                </div>
-              );
-            })
+              <div className="grid gap-4 p-4 lg:hidden">
+                {filteredTrackingRows.map((row) => {
+                  const { managedUser, progress, completionPercentage, latestWatchPercentage, status } = row;
+
+                  return (
+                    <div key={managedUser.username} className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
+                      <div className="flex items-start gap-3">
+                        {managedUser.profile_picture ? (
+                          <Image
+                            src={managedUser.profile_picture}
+                            alt={managedUser.username}
+                            width={48}
+                            height={48}
+                            className="h-12 w-12 shrink-0 rounded-xl border border-slate-200 object-cover"
+                          />
+                        ) : (
+                          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-purple-500 to-purple-600 text-base font-bold text-white">
+                            {getDisplayName(managedUser).charAt(0).toUpperCase()}
+                          </div>
+                        )}
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <h3 className="truncate text-base font-bold text-slate-800">{getDisplayName(managedUser)}</h3>
+                            <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${status.className}`}>{status.label}</span>
+                          </div>
+                          <p className="mt-1 truncate text-xs text-slate-500">{managedUser.email || managedUser.username}</p>
+                        </div>
+                      </div>
+                      <div className="mt-4">
+                        <div className="mb-1 flex justify-between text-xs text-slate-500">
+                          <span>Progress</span>
+                          <span className="font-semibold text-slate-700">{completionPercentage}%</span>
+                        </div>
+                        <div className="h-2 overflow-hidden rounded-full bg-slate-200">
+                          <div className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-emerald-600" style={{ width: `${completionPercentage}%` }} />
+                        </div>
+                      </div>
+                      <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-slate-600">
+                        <span>{managedUser.role}</span>
+                        <span className="text-right">{progress ? `${progress.completed_lessons_count}/${progress.total_lessons} lessons` : "Not synced"}</span>
+                        <span>Last: {formatDate(progress?.last_activity)}</span>
+                        <span className="text-right">{latestWatchPercentage}% latest</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedRow(row)}
+                        className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm transition-colors hover:bg-slate-100"
+                      >
+                        <Eye className="h-4 w-4" />
+                        View Details
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            </>
           )}
         </div>
 
-        {/* Edit User Modal */}
-        {editingUser && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
-            <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
-              <div className="flex items-center justify-between mb-4">
-                <div>
-                  <p className="text-lg font-bold text-slate-800">Edit Profile</p>
-                  <p className="text-sm text-slate-500">{editingUser.username}</p>
+        {selectedRow && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-sm">
+            <div className="w-full max-w-3xl overflow-hidden rounded-3xl bg-white shadow-2xl">
+              <div className="flex items-start justify-between gap-4 border-b border-slate-100 px-6 py-5">
+                <div className="min-w-0">
+                  <h3 className="truncate text-xl font-bold text-slate-800">{getDisplayName(selectedRow.managedUser)}</h3>
+                  <p className="mt-1 text-sm text-slate-500">{selectedRow.managedUser.email || selectedRow.managedUser.username}</p>
                 </div>
                 <button
                   type="button"
-                  onClick={cancelEditUser}
-                  aria-label="Close edit profile"
-                  title="Close edit profile"
-                  className="rounded-full p-2 text-slate-400 hover:bg-slate-100"
+                  onClick={() => setSelectedRow(null)}
+                  className="rounded-xl p-2 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
+                  aria-label="Close staff tracking details"
+                  title="Close"
                 >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
+                  <X className="h-5 w-5" />
                 </button>
               </div>
-              
-              {/* Profile Picture Upload */}
-              <div className="flex flex-col items-center mb-6">
-                <div className="relative">
-                  {editProfilePicture ? (
-                     
-                    <Image
-                      src={editProfilePicture}
-                      alt="Profile"
-                      width={96}
-                      height={96}
-                      className="h-24 w-24 rounded-2xl object-cover border-4 border-white shadow-lg"
-                    />
-                  ) : (
-                    <div className="h-24 w-24 rounded-2xl bg-gradient-to-br from-purple-500 to-purple-600 flex items-center justify-center text-white font-bold text-2xl border-4 border-white shadow-lg">
-                      {(editFullName || editingUser.username).charAt(0).toUpperCase()}
-                    </div>
-                  )}
-                  {isUploadingAvatar && (
-                    <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-2xl">
-                      <Loader2 className="w-8 h-8 text-white animate-spin" />
-                    </div>
-                  )}
+              <div className="px-6 py-5">
+                <div className="grid gap-3 sm:grid-cols-4">
+                  <div className="rounded-2xl bg-slate-50 p-4">
+                    <p className="text-xs font-medium text-slate-500">Status</p>
+                    <span className={`mt-2 inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${selectedRow.status.className}`}>
+                      {selectedRow.status.label}
+                    </span>
+                  </div>
+                  <div className="rounded-2xl bg-emerald-50 p-4">
+                    <p className="text-xs font-medium text-emerald-700">Completion</p>
+                    <p className="mt-2 text-2xl font-bold text-emerald-800">{selectedRow.completionPercentage}%</p>
+                  </div>
+                  <div className="rounded-2xl bg-blue-50 p-4">
+                    <p className="text-xs font-medium text-blue-700">Completed</p>
+                    <p className="mt-2 text-2xl font-bold text-blue-800">
+                      {selectedRow.progress ? `${selectedRow.progress.completed_lessons_count}/${selectedRow.progress.total_lessons}` : "0/0"}
+                    </p>
+                  </div>
+                  <div className="rounded-2xl bg-amber-50 p-4">
+                    <p className="text-xs font-medium text-amber-700">Latest Watch</p>
+                    <p className="mt-2 text-2xl font-bold text-amber-800">{selectedRow.latestWatchPercentage}%</p>
+                  </div>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={isUploadingAvatar}
-                  className="mt-3 inline-flex items-center gap-2 rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-200 transition-colors disabled:opacity-50"
-                >
-                  {isUploadingAvatar ? "Uploading..." : "Change Photo"}
-                </button>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  title="Profile photo"
-                  accept="image/jpeg,image/png,image/webp,image/gif"
-                  onChange={handleAvatarUpload}
-                  disabled={isUploadingAvatar}
-                  className="sr-only"
-                />
+
+                <div className="mt-5 rounded-2xl border border-slate-100 p-4">
+                  <div className="mb-2 flex items-center justify-between text-sm">
+                    <span className="font-medium text-slate-600">Overall progress</span>
+                    <span className="font-bold text-slate-800">{selectedRow.completionPercentage}%</span>
+                  </div>
+                  <div className="h-3 overflow-hidden rounded-full bg-slate-200">
+                    <div className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-emerald-600" style={{ width: `${selectedRow.completionPercentage}%` }} />
+                  </div>
+                </div>
+
+                <div className="mt-5 grid gap-4 text-sm sm:grid-cols-2">
+                  <div className="rounded-2xl border border-slate-100 p-4">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Contact</p>
+                    <div className="mt-3 space-y-2 text-slate-600">
+                      <p>Role: {selectedRow.managedUser.role}</p>
+                      <p>Email: {selectedRow.managedUser.email || "No email"}</p>
+                      <p>Phone: {selectedRow.managedUser.phone || "No phone"}</p>
+                    </div>
+                  </div>
+                  <div className="rounded-2xl border border-slate-100 p-4">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Learning Activity</p>
+                    <div className="mt-3 space-y-2 text-slate-600">
+                      <p>Last activity: {formatDate(selectedRow.progress?.last_activity)}</p>
+                      <p>Last lesson: {selectedRow.progress?.last_watched_lesson_title || "No lesson activity"}</p>
+                      <p>Watched videos: {selectedRow.progress?.watched_lessons_count ?? 0}</p>
+                    </div>
+                  </div>
+                </div>
               </div>
-
-              {userActionError && (
-                <div className="mb-4 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">
-                  {userActionError}
-                </div>
-              )}
-              {userActionSuccess && (
-                <div className="mb-4 rounded-lg bg-emerald-50 px-3 py-2 text-xs text-emerald-700">
-                  {userActionSuccess}
-                </div>
-              )}
-              
-              <form onSubmit={handleUpdateUser} className="space-y-4">
-                <div>
-                  <label className="mb-1.5 block text-sm font-medium text-slate-700">Full Name</label>
-                  <input
-                    type="text"
-                    title="Full name"
-                    value={editFullName}
-                    onChange={(e) => setEditFullName(e.target.value)}
-                    placeholder="e.g. John Doe"
-                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="mb-1.5 block text-sm font-medium text-slate-700">Email</label>
-                  <input
-                    type="email"
-                    title="Email"
-                    value={editEmail}
-                    onChange={(e) => setEditEmail(e.target.value)}
-                    placeholder="e.g. user@example.com"
-                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="mb-1.5 block text-sm font-medium text-slate-700">Phone</label>
-                  <input
-                    type="tel"
-                    title="Phone"
-                    value={editPhone}
-                    onChange={(e) => setEditPhone(e.target.value)}
-                    placeholder="e.g. +1 234 567 890"
-                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500"
-                  />
-                </div>
-
-                <div className="flex items-center gap-3 pt-2">
-                  <button
-                    type="submit"
-                    disabled={isUpdatingUser}
-                    className="flex-1 inline-flex items-center justify-center rounded-xl bg-purple-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-purple-500 disabled:opacity-50"
-                  >
-                    {isUpdatingUser ? (
-                      <>
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        Updating...
-                      </>
-                    ) : (
-                      "Save Changes"
-                    )}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={cancelEditUser}
-                    disabled={isUpdatingUser}
-                    className="flex-1 inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </form>
-              
-              <p className="mt-4 text-xs text-center text-slate-500">
-                Changes will sync with LMS staff automatically
-              </p>
             </div>
           </div>
         )}

@@ -17,7 +17,10 @@
 // In-memory cache (1 hour TTL)
 import { globalLogger } from "@/lib/logger";
 const memoryCache = new Map<string, CacheEntry>();
+const pendingFetches = new Map<string, Promise<MarketPriceResult>>();
 const CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
+const MARKET_PRICE_FETCH_TIMEOUT_MS = 8000;
+const MAX_MARKET_PRICE_CACHE_ENTRIES = 250;
 
 interface CacheEntry {
   data: Omit<MarketPriceResult, "fetchedAt" | "cacheHit" | "cachedUntil">;
@@ -106,6 +109,18 @@ export function getCachedPrice(input: MarketPriceInput): MarketPriceResult | nul
   return null;
 }
 
+function rememberMarketPrice(key: string, data: MarketPriceResultCore) {
+  if (memoryCache.size >= MAX_MARKET_PRICE_CACHE_ENTRIES) {
+    const oldestKey = memoryCache.keys().next().value;
+    if (oldestKey) memoryCache.delete(oldestKey);
+  }
+
+  memoryCache.set(key, {
+    data,
+    timestamp: Date.now(),
+  });
+}
+
 /**
  * Clear memory cache
  */
@@ -152,24 +167,35 @@ export async function fetchMarketPrices(input: MarketPriceInput): Promise<Market
     return cached;
   }
 
-  // Fetch from external sources
-  const results = await fetchFromKhmer24(input);
+  const pendingFetch = pendingFetches.get(overrideKey);
+  if (pendingFetch) {
+    return pendingFetch;
+  }
 
-  // Calculate price ranges
-  const result = calculatePriceRanges(results);
+  const fetchPromise = (async () => {
+    // Fetch from external sources
+    const results = await fetchFromKhmer24(input);
 
-  // Cache the result (without metadata fields)
-  const key = getCacheKey(input);
-  memoryCache.set(key, {
-    data: result,
-    timestamp: Date.now(),
-  });
+    // Calculate price ranges
+    const result = calculatePriceRanges(results);
 
-  return {
-    ...result,
-    fetchedAt: new Date().toISOString(),
-    cacheHit: false,
-  };
+    // Cache the result (without metadata fields)
+    rememberMarketPrice(overrideKey, result);
+
+    return {
+      ...result,
+      fetchedAt: new Date().toISOString(),
+      cacheHit: false,
+    };
+  })();
+
+  pendingFetches.set(overrideKey, fetchPromise);
+
+  try {
+    return await fetchPromise;
+  } finally {
+    pendingFetches.delete(overrideKey);
+  }
 }
 
 /**
@@ -417,8 +443,7 @@ async function fetchFromKhmer24(input: MarketPriceInput): Promise<{ price: numbe
         "User-Agent": "VMS-MarketPriceBot/1.0 (Educational)",
         Accept: "text/html,application/xhtml+xml",
       },
-      // 30 second timeout
-      signal: AbortSignal.timeout(30000),
+      signal: AbortSignal.timeout(MARKET_PRICE_FETCH_TIMEOUT_MS),
     });
 
     if (!response.ok) {
@@ -473,7 +498,7 @@ function buildKhmer24Query(input: MarketPriceInput): string {
     parts.push("car", "vehicle");
   } else if (input.category === "Motorcycles") {
     parts.push("motorcycle", "bike");
-  } else if (input.category === "Tuk Tuk") {
+  } else if (input.category === "TukTuks" || input.category === "Tuk Tuk") {
     parts.push("tuk", "tuktuk", "remork");
   }
 
@@ -734,6 +759,7 @@ export function estimatePriceRuleBased(
   const basePrices: Record<string, number> = {
     "Cars": 25000,
     "Motorcycles": 1500,
+    "TukTuks": 3500,
     "Tuk Tuk": 3500,
   };
 

@@ -6,6 +6,8 @@ import { getClientIp, getClientUserAgent } from "@/lib/network";
 // Session configuration
 const SESSION_MAX_AGE_MS = 8 * 60 * 60 * 1000; // 8 hours
 const SESSION_VERSION = 1;
+const MIN_SESSION_SECRET_LENGTH = 32;
+const revokedSessionUsernames = new Map<string, number>();
 
 export type SessionPayload = {
   username: string;
@@ -129,7 +131,35 @@ export function validateSession(payload: SessionPayload): boolean {
   // Check version
   if (payload.version !== SESSION_VERSION) return false;
 
+  if (isUserSessionRevoked(payload.username, payload.ts)) {
+    globalLogger.debug("[AUTH] Session revoked", { username: payload.username });
+    return false;
+  }
+
   return true;
+}
+
+export function revokeUserSessions(username: string): void {
+  const normalizedUsername = username.trim().toLowerCase();
+  if (!normalizedUsername) return;
+
+  revokedSessionUsernames.set(normalizedUsername, Date.now());
+  pruneExpiredSessionRevocations();
+}
+
+function isUserSessionRevoked(username: string, sessionIssuedAt: number): boolean {
+  const normalizedUsername = username.trim().toLowerCase();
+  const revokedAt = revokedSessionUsernames.get(normalizedUsername);
+  return revokedAt !== undefined && sessionIssuedAt <= revokedAt;
+}
+
+function pruneExpiredSessionRevocations(): void {
+  const now = Date.now();
+  for (const [username, revokedAt] of revokedSessionUsernames) {
+    if (now - revokedAt > SESSION_MAX_AGE_MS) {
+      revokedSessionUsernames.delete(username);
+    }
+  }
 }
 
 /**
@@ -227,7 +257,13 @@ export function requireSession(req: {
 
 function getSessionSecret_(): string {
   const secret = process.env.SESSION_SECRET?.trim();
-  if (secret) return secret;
+  if (secret) {
+    if (process.env.NODE_ENV === "production" && secret.length < MIN_SESSION_SECRET_LENGTH) {
+      throw new Error(`SESSION_SECRET must be at least ${MIN_SESSION_SECRET_LENGTH} characters in production`);
+    }
+
+    return secret;
+  }
 
   // Only use dev secret in development
   if (process.env.NODE_ENV === "development") {
@@ -293,7 +329,6 @@ const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
   Admin: ["read", "create", "update", "delete", "admin"],
   Staff: ["read", "create", "update"],
   Accounting: ["read", "create", "update"],
-  Transfer: ["read", "create", "update"],
 };
 
 export function hasPermission(role: Role, permission: Permission): boolean {

@@ -4,8 +4,15 @@ import { NextRequest, NextResponse } from "next/server";
 
 export const dynamic = 'force-dynamic';
 
-function debugEndpointDisabled() {
-  return process.env.NODE_ENV === "production" && process.env.ENABLE_AUTH_DEBUG !== "true";
+const noStoreHeaders = {
+  "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
+  "Pragma": "no-cache",
+  "Expires": "0",
+  "X-Content-Type-Options": "nosniff",
+};
+
+function authDebugEnabled() {
+  return process.env.NODE_ENV !== "production" && process.env.ENABLE_AUTH_DEBUG === "true";
 }
 
 /**
@@ -19,8 +26,8 @@ function debugEndpointDisabled() {
  * - cookies: info about session cookie presence
  */
 export async function GET(req: NextRequest) {
-  if (debugEndpointDisabled()) {
-    return NextResponse.json({ ok: false, error: "Not found" }, { status: 404 });
+  if (!authDebugEnabled()) {
+    return NextResponse.json({ ok: false, error: "Not found" }, { status: 404, headers: noStoreHeaders });
   }
 
   const requestId = `${Date.now()}-${Math.random().toString(36).substring(2, 15)}`;
@@ -50,14 +57,11 @@ export async function GET(req: NextRequest) {
       },
     };
 
-    log("INFO", "Debug session check", debugInfo);
+    log("INFO", "Debug session check", { requestId, authenticated: !!session });
 
     return NextResponse.json(debugInfo, {
       status: 200,
-      headers: {
-        "Content-Type": "application/json",
-        "Cache-Control": "no-store, no-cache, must-revalidate",
-      },
+      headers: noStoreHeaders,
     });
   } catch (error) {
     log("ERROR", "Debug session check failed", {
@@ -69,9 +73,8 @@ export async function GET(req: NextRequest) {
       {
         requestId,
         error: "Failed to check session",
-        details: error instanceof Error ? error.message : String(error),
       },
-      { status: 500 }
+      { status: 500, headers: noStoreHeaders }
     );
   }
 }

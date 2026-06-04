@@ -3,6 +3,7 @@ import type { Role } from "@/shared/types/types";
 // Session configuration
 const SESSION_MAX_AGE_MS = 8 * 60 * 60 * 1000;
 const SESSION_VERSION = 1;
+const MIN_SESSION_SECRET_LENGTH = 32;
 
 export type EdgeSessionPayload = {
   username: string;
@@ -16,7 +17,13 @@ export type EdgeSessionPayload = {
 
 function getSessionSecret(): string {
   const secret = process.env.SESSION_SECRET?.trim();
-  if (secret) return secret;
+  if (secret) {
+    if (process.env.NODE_ENV === "production" && secret.length < MIN_SESSION_SECRET_LENGTH) {
+      throw new Error(`SESSION_SECRET must be at least ${MIN_SESSION_SECRET_LENGTH} characters in production`);
+    }
+
+    return secret;
+  }
 
   if (process.env.NODE_ENV === "development") {
     return "ec-vms-dev-secret-2024-do-not-use-in-production-ever-64chars-long!!";

@@ -165,7 +165,7 @@ export function VehicleDetailsCard({
   };
 
   const handleBackToList = () => {
-    router.push(listHref);
+    router.push(listHref, { scroll: false });
   };
 
   // Helper to get proper image URL
@@ -267,10 +267,10 @@ export function VehicleDetailsCard({
                 "px-4 py-2 rounded-full text-sm font-semibold shadow-sm",
                 vehicle.Category === "Cars" && "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300",
                 vehicle.Category === "Motorcycles" && "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300",
-                vehicle.Category === "Tuk-tuks" && "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300",
-                !["Cars", "Motorcycles", "Tuk-tuks"].includes(vehicle.Category || "") && "bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-300"
+                vehicle.Category?.toLowerCase().includes("tuk") && "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300",
+                !["Cars", "Motorcycles"].includes(vehicle.Category || "") && !vehicle.Category?.toLowerCase().includes("tuk") && "bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-300"
               )}>
-                {vehicle.Category}
+                {vehicle.Category?.toLowerCase().includes("tuk") ? "TukTuks" : vehicle.Category}
               </span>
             </div>
           </div>

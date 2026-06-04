@@ -160,6 +160,29 @@ export class LmsLessonRepository extends BaseRepository<LmsLessonDB> {
     const result = await this.executeQuery<{ count: string }>(query, [categoryId]);
     return parseInt(result.data[0]?.count || "0");
   }
+
+  public async clearLearningProcessForLesson(lessonId: number): Promise<void> {
+    const cleanupQueries = [
+      "DELETE FROM lms_lesson_progress WHERE lesson_id = $1",
+      "DELETE FROM lms_lesson_completions WHERE lesson_id = $1",
+      "DELETE FROM lms_last_watched WHERE lesson_id = $1",
+      "DELETE FROM lms_lesson_role_access WHERE lesson_id = $1",
+    ];
+
+    for (const query of cleanupQueries) {
+      try {
+        await this.executeQuery(query, [lessonId], {
+          operationName: "lms_lessons.clearLearningProcess",
+        });
+      } catch (error) {
+        const message = error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase();
+        if (message.includes("does not exist") || message.includes("relation")) {
+          continue;
+        }
+        throw error;
+      }
+    }
+  }
 }
 
 // ============================================================================
@@ -367,8 +390,16 @@ export class LmsDashboardRepository {
         (SELECT COUNT(*) FROM lms_staff WHERE is_active = true AND created_at >= CURRENT_DATE - INTERVAL '7 days') as staff_added_this_week,
         (SELECT COUNT(*) FROM lms_categories WHERE is_active = true) as total_categories,
         (SELECT COUNT(*) FROM lms_lessons WHERE is_active = true) as total_lessons,
-        (SELECT COUNT(DISTINCT staff_id) FROM lms_lesson_completions) as staff_with_completions,
-        (SELECT COUNT(*) FROM lms_lesson_completions) as completed_lessons_total
+        (
+          SELECT COUNT(DISTINCT lc.staff_id)
+          FROM lms_lesson_completions lc
+          JOIN lms_lessons l ON l.id = lc.lesson_id AND l.is_active = true
+        ) as staff_with_completions,
+        (
+          SELECT COUNT(*)
+          FROM lms_lesson_completions lc
+          JOIN lms_lessons l ON l.id = lc.lesson_id AND l.is_active = true
+        ) as completed_lessons_total
     `;
 
     const result = await this.executeQuery<{
@@ -417,8 +448,9 @@ export class LmsDashboardRepository {
           staff_id,
           COUNT(*) as completed_count,
           MAX(completed_at) as last_completed_at
-        FROM lms_lesson_completions
-        GROUP BY staff_id
+        FROM lms_lesson_completions lc
+        JOIN lms_lessons l ON l.id = lc.lesson_id AND l.is_active = true
+        GROUP BY lc.staff_id
       ),
       watch_summary AS (
         SELECT
@@ -427,8 +459,9 @@ export class LmsDashboardRepository {
           COUNT(*) FILTER (WHERE watch_percentage > 0 AND watch_percentage < 95) as in_progress_lessons_count,
           ROUND(AVG(NULLIF(watch_percentage, 0))) as average_watch_percentage,
           MAX(last_watched_at) as last_watched_at
-        FROM lms_lesson_progress
-        GROUP BY staff_id
+        FROM lms_lesson_progress lp
+        JOIN lms_lessons l ON l.id = lp.lesson_id AND l.is_active = true
+        GROUP BY lp.staff_id
       ),
       latest_watch AS (
         SELECT DISTINCT ON (lp.staff_id)
@@ -437,7 +470,7 @@ export class LmsDashboardRepository {
           lp.watch_percentage as latest_watch_percentage,
           lp.last_watched_at
         FROM lms_lesson_progress lp
-        LEFT JOIN lms_lessons l ON l.id = lp.lesson_id
+        JOIN lms_lessons l ON l.id = lp.lesson_id AND l.is_active = true
         WHERE lp.watch_percentage > 0
         ORDER BY lp.staff_id, lp.last_watched_at DESC NULLS LAST, lp.updated_at DESC NULLS LAST
       )

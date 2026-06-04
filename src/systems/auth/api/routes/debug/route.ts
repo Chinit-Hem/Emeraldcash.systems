@@ -1,8 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireSessionFromRequest, getClientIp, getClientUserAgent } from "@/lib/auth";
 
-function debugEndpointDisabled() {
-  return process.env.NODE_ENV === "production" && process.env.ENABLE_AUTH_DEBUG !== "true";
+const noStoreHeaders = {
+  "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
+  "Pragma": "no-cache",
+  "Expires": "0",
+  "X-Content-Type-Options": "nosniff",
+};
+
+function authDebugEnabled() {
+  return process.env.NODE_ENV !== "production" && process.env.ENABLE_AUTH_DEBUG === "true";
 }
 
 /**
@@ -10,8 +17,8 @@ function debugEndpointDisabled() {
  * Helps verify cookie presence and session validity on mobile browsers
  */
 export async function GET(req: NextRequest) {
-  if (debugEndpointDisabled()) {
-    return NextResponse.json({ ok: false, error: "Not found" }, { status: 404 });
+  if (!authDebugEnabled()) {
+    return NextResponse.json({ ok: false, error: "Not found" }, { status: 404, headers: noStoreHeaders });
   }
 
   const ip = getClientIp(req.headers);
@@ -40,7 +47,6 @@ export async function GET(req: NextRequest) {
         exists: !!sessionCookie,
         name: sessionCookie?.name,
         valueLength: sessionCookie?.value?.length || 0,
-        valuePrefix: sessionCookie?.value?.substring(0, 20) + "..." || null,
       },
     },
     session: session ? {
@@ -66,9 +72,6 @@ export async function GET(req: NextRequest) {
     },
   };
 
-  // Log to server console for server-side debugging
-  console.log("[AUTH_DEBUG] Debug request:", JSON.stringify(debugInfo, null, 2));
-
   // Return debug info
   return NextResponse.json({
     ok: !!session,
@@ -76,15 +79,15 @@ export async function GET(req: NextRequest) {
     message: session
       ? "Session is valid"
       : "No valid session found. Check debug info for details.",
-  });
+  }, { headers: noStoreHeaders });
 }
 
 /**
  * POST endpoint to test cookie setting
  */
 export async function POST(req: NextRequest) {
-  if (debugEndpointDisabled()) {
-    return NextResponse.json({ ok: false, error: "Not found" }, { status: 404 });
+  if (!authDebugEnabled()) {
+    return NextResponse.json({ ok: false, error: "Not found" }, { status: 404, headers: noStoreHeaders });
   }
 
   const body = await req.json().catch(() => ({}));
@@ -94,7 +97,7 @@ export async function POST(req: NextRequest) {
     ok: true,
     message: "Test cookie set",
     testValue,
-  });
+  }, { headers: noStoreHeaders });
 
   // Set a test cookie with same options as session (matching login route)
   // IMPORTANT: Do NOT set domain - let browser use default (current domain)
@@ -113,14 +116,6 @@ export async function POST(req: NextRequest) {
   };
 
   res.cookies.set("auth_test", testValue, cookieOptions);
-
-  console.log("[AUTH_DEBUG] Test cookie set:", {
-    ...cookieOptions,
-    value: testValue,
-    protocol: forwardedProto || req.nextUrl.protocol,
-    isHttps,
-  });
-
 
   return res;
 }

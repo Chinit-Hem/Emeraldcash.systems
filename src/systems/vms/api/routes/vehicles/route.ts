@@ -13,6 +13,7 @@
  */
 
 import { createErrorResponse, createSuccessResponse, withErrorHandling } from "@/lib/api-error-wrapper";
+import { auditEventFromRequest, recordAuditEvent } from "@/lib/audit-log";
 import { requirePermission } from "@/lib/auth-helpers";
 import type { VehicleFilters, VehicleStats } from "@/systems/vms/services/VehicleService";
 import { vehicleService } from "@/systems/vms/services/VehicleService";
@@ -439,7 +440,6 @@ const postHandler = withErrorHandling(async (req, { logger, requestId, startTime
     ["brand", brandValue],
     ["model", modelValue],
     ["year", yearValue],
-    ["plate", plateValue],
   ] as const;
   const missingFields = requiredFields.filter(([, value]) => !value).map(([field]) => field);
 
@@ -520,7 +520,7 @@ const postHandler = withErrorHandling(async (req, { logger, requestId, startTime
     brand: String(brandValue),
     model: String(modelValue),
     year: year,
-    plate: String(plateValue),
+    plate: String(plateValue ?? ""),
     market_price: marketPrice,
     tax_type: normalizeOptionalString(firstDefined(vehicleData.tax_type, vehicleData.taxType, vehicleData.TaxType)),
     condition: String(firstDefined(vehicleData.condition, vehicleData.Condition) || "Other") as "New" | "Used" | "Other",
@@ -568,6 +568,21 @@ const postHandler = withErrorHandling(async (req, { logger, requestId, startTime
     result.data.Images = normalizedImages;
     result.data.Image = normalizedImages[0] || result.data.Image;
   }
+
+  await recordAuditEvent(auditEventFromRequest(req, {
+    action: "vms.vehicle.create.success",
+    actorUsername: auth.session.username,
+    actorRole: auth.session.role,
+    resourceType: "vehicle",
+    resourceId: result.data?.VehicleId,
+    status: "success",
+    metadata: {
+      plate: result.data?.Plate,
+      category: result.data?.Category,
+      brand: result.data?.Brand,
+      model: result.data?.Model,
+    },
+  }));
 
   // Invalidate LRU cache on create
   import('@/systems/vms/api/vehicles-cache').then(({ clearCachedVehicles }) => {
@@ -641,6 +656,14 @@ const deleteHandler = withErrorHandling(async (req, { logger, requestId, startTi
   }
 
   logger.info("Vehicle deleted successfully", { vehicleId: id });
+  await recordAuditEvent(auditEventFromRequest(req, {
+    action: "vms.vehicle.delete.success",
+    actorUsername: auth.session.username,
+    actorRole: auth.session.role,
+    resourceType: "vehicle",
+    resourceId: id,
+    status: "success",
+  }));
 
   // Invalidate LRU cache on delete
   import('@/systems/vms/api/vehicles-cache').then(({ clearCachedVehicles }) => {

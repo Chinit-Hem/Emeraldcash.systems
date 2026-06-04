@@ -6,6 +6,7 @@ import { useTranslation } from "@/shared/utils/i18n";
 import { derivePrices } from "@/systems/vms/utils/pricing";
 import type { Vehicle } from "@/shared/types/types";
 import { cn } from "@/shared/utils/ui";
+import { formatVehicleId } from "@/shared/utils/format";
 import { useRouter } from "next/navigation";
 import { useState, useRef, useEffect, useCallback } from "react";
 import { formatPrice, getVehicleThumbnailUrl } from "@/systems/vms/utils/vehicle-helpers";
@@ -689,7 +690,7 @@ export default function VehicleTable({
               >
                 {visibleColumns.includes('id') && (
                   <td className="px-4 py-3 whitespace-nowrap text-sm font-mono text-[#4a4a5a]">
-                    {vehicle.VehicleId || "-"}
+                    {formatVehicleId(vehicle.VehicleId)}
                   </td>
                 )}
 

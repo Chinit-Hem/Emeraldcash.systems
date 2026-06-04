@@ -91,8 +91,8 @@ export function useVehicleFormUnified(options: UseVehicleFormOptions) {
   const derivedPrices = useMemo(() => derivePrices(state.formData.PriceNew ?? null), [state.formData.PriceNew]);
   const categoryOptions = useMemo(() => {
     const cat = state.formData.Category || "";
-    const isStandard = ["Cars", "Motorcycles", "Tuk Tuk"].includes(cat);
-    return isStandard ? ["Cars", "Motorcycles", "Tuk Tuk"] : [cat, "Cars", "Motorcycles", "Tuk Tuk"];
+    const isStandard = ["Cars", "Motorcycles", "TukTuks"].includes(cat);
+    return isStandard ? ["Cars", "Motorcycles", "TukTuks"] : [cat, "Cars", "Motorcycles", "TukTuks"];
   }, [state.formData.Category]);
 
   const hasChanges = useMemo(() => {

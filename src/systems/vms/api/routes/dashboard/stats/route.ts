@@ -17,28 +17,21 @@ export async function GET(request: NextRequest) {
   const timeoutId = setTimeout(() => controller.abort(), 10000);
 
   try {
-    console.time('[DashboardStats]');
-
     const result = await Promise.race([
       vehicleService.getVehicleStats(),
       new Promise<never>((_, reject) => controller.signal.addEventListener('abort', () => reject(new Error('Stats timeout (10s)'))))
     ]);
 
     clearTimeout(timeoutId);
-    console.timeEnd('[DashboardStats]');
 
     if (!result.success || !result.data) {
       console.error(`[DashboardStats] Service error (${Date.now() - startTime}ms):`, result.error);
       return NextResponse.json(
         {
+          success: false,
           error: 'Failed to fetch stats',
-          fallback: {
-            total: 0,
-            countsByCategory: { Cars: 0, Motorcycles: 0, TukTuks: 0 },
-            countsByCondition: { New: 0, Used: 0 },
-            noImageCount: 0,
-            avgPrice: 0
-          }
+          details: result.error,
+          meta: { durationMs: Date.now() - startTime }
         },
         { status: 500 }
       );
@@ -60,10 +53,6 @@ export async function GET(request: NextRequest) {
       avgPrice: result.data.avgPrice || 0,
     };
 
-
-    // 🚀 Enhanced logging
-    console.log(`[DashboardStats] ✅ Success: ${dashboardMeta.total} vehicles, ${result.meta?.durationMs || Date.now() - startTime}ms, cache: ${!!result.meta?.cacheHit}`);
-
     return NextResponse.json({
       success: true,
       data: dashboardMeta,
@@ -76,7 +65,6 @@ export async function GET(request: NextRequest) {
 
   } catch (error) {
     clearTimeout(timeoutId);
-    console.timeEnd('[DashboardStats]');
 
     const duration = Date.now() - startTime;
     const errorMsg = error instanceof Error ? error.message : String(error);
@@ -84,15 +72,9 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(
       {
+        success: false,
         error: 'Internal server error',
         details: errorMsg,
-        fallback: {
-          total: 0,
-          countsByCategory: { Cars: 0, Motorcycles: 0, TukTuks: 0 },
-          countsByCondition: { New: 0, Used: 0 },
-          noImageCount: 0,
-          avgPrice: 0
-        },
         meta: { durationMs: duration }
       },
       { status: 500 }

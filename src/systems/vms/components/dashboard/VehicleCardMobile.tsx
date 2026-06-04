@@ -4,6 +4,7 @@ import { derivePrices } from "@/systems/vms/utils/pricing";
 import type { Vehicle } from "@/shared/types/types";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
+import { formatVehicleId } from "@/shared/utils/format";
 import { formatPrice, getVehicleThumbnailUrl } from "@/systems/vms/utils/vehicle-helpers";
 import { getVehicleEditHref, getVehicleViewHref } from "@/systems/vms/utils/vehicleListState";
 
@@ -138,7 +139,7 @@ export default function VehicleCardMobile({
           <div className="pt-3 grid grid-cols-2 gap-3 text-sm">
             <div>
               <span className="text-[#4a4a5a]">Vehicle ID:</span>
-              <p className="font-mono text-[#1a1a2e]">{vehicle.VehicleId || "-"}</p>
+              <p className="font-mono text-[#1a1a2e]">{formatVehicleId(vehicle.VehicleId)}</p>
             </div>
             <div>
               <span className="text-[#4a4a5a]">Plate:</span>

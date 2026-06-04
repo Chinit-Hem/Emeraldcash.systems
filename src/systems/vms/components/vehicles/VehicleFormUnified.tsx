@@ -424,6 +424,7 @@ const PricingSection: React.FC<{
           error={touched.PriceNew ? errors.PriceNew : undefined}
           disabled={isSubmitting}
           placeholder="0.00"
+          helperText="DOC 40% and Vehicles 70% are calculated automatically."
         />
         <div>
           <label className="block text-sm font-medium text-gray-500 dark:text-gray-400 mb-1.5">

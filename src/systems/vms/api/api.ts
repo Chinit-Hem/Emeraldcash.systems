@@ -11,8 +11,10 @@ const _RETRY_DELAY_MS = 1000;
 const REQUEST_TIMEOUT_MS = 65000; // 65 seconds for apiRequest (for POST/PUT/DELETE)
 const FETCH_TIMEOUT_MS = 35000; // 35 seconds for fetchJSON (for GET requests)
 
-// Auth configuration - support both Bearer header and query token
-const USE_QUERY_TOKEN = process.env.NEXT_PUBLIC_USE_QUERY_TOKEN === "true";
+// Auth configuration - never place bearer tokens in production URLs.
+const USE_QUERY_TOKEN =
+  process.env.NODE_ENV !== "production" &&
+  process.env.NEXT_PUBLIC_USE_QUERY_TOKEN === "true";
 
 // Global flag to prevent multiple simultaneous redirects
 let isRedirecting = false;
@@ -657,7 +659,6 @@ export const vehicleApi = {
         method: "PUT",
         body: JSON.stringify(vehicleData),
       });
-      console.log('[api.updateVehicle] SUCCESS - recording mutation');
       // Record mutation to invalidate client-side cache
       recordMutation();
       return result;

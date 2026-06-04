@@ -422,13 +422,7 @@ export function useUpdateVehicleOptimistic(
           reportProgress('compressing', 50);
           
           const cleanedImage = cleanBase64DataUrl(data.Image);
-          
-          console.log("[useUpdateVehicleOptimistic] Converting base64 image:", {
-            originalLength: data.Image.length,
-            cleanedLength: cleanedImage.length,
-            imagePreview: cleanedImage.substring(0, 100),
-          });
-          
+
           const { file: fileFromBase64, error: conversionError } = safeBase64ToFile(
             cleanedImage, 
             `vehicle_${vehicleId}_${Date.now()}.jpg`
@@ -441,12 +435,7 @@ export function useUpdateVehicleOptimistic(
             onError?.(error, originalVehicle);
             throw error;
           }
-          
-          console.log("[useUpdateVehicleOptimistic] Base64 conversion successful:", {
-            fileSize: fileFromBase64.size,
-            fileType: fileFromBase64.type,
-          });
-          
+
           reportProgress('compressing', 100);
 
           reportProgress('uploading', 0);
@@ -551,14 +540,7 @@ export function useUpdateVehicleOptimistic(
 
         try {
           reportProgress('saving', 0);
-          console.log('[🚀 SENDING PAYLOAD]:', JSON.stringify(payload, null, 2));
-          console.log('[🚀 SENDING UPDATE PAYLOAD]:', {
-            vehicleId,
-            payloadKeys: Object.keys(payload),
-            hasImage: !!payload.image_id,
-            imagePreview: payload.image_id ? String(payload.image_id).substring(0, 50) : null
-          });
-          
+
           const res = await fetch(`/api/vehicles/${encodeURIComponent(vehicleId)}`, {
             method: "PUT",
             headers: {
@@ -575,14 +557,6 @@ export function useUpdateVehicleOptimistic(
           }
 
           const result = await res.json();
-          
-          console.log('[🚀 API RESPONSE]:', {
-            success: result.success,
-            ok: result.ok,
-            error: result.error,
-            hasData: !!result.data,
-            vehicleId
-          });
 
           // ✅ FIXED: Check both success AND ok for compatibility
           if (!result.success && !result.ok) {

@@ -42,6 +42,20 @@ function toNumber(value: unknown, fallback = 0) {
   return Number.isFinite(numberValue) ? numberValue : fallback;
 }
 
+async function isActiveLesson(lessonId: number) {
+  const rows = await dbManager.executeUnsafe<{ id: number }>(
+    `
+      SELECT id
+      FROM lms_lessons
+      WHERE id = $1 AND is_active = true
+      LIMIT 1
+    `,
+    [lessonId]
+  );
+
+  return rows.length > 0;
+}
+
 function getAllowedProgressAdvance(previous: ProgressRow | undefined) {
   if (!previous) return MAX_INITIAL_PROGRESS_SECONDS;
 
@@ -253,7 +267,7 @@ export async function GET(request: NextRequest) {
           recent_lessons.watched_at,
           lp.watch_percentage
         FROM recent_lessons
-        JOIN lms_lessons l ON l.id = recent_lessons.lesson_id
+        JOIN lms_lessons l ON l.id = recent_lessons.lesson_id AND l.is_active = true
         LEFT JOIN lms_categories c ON c.id = l.category_id
         LEFT JOIN lms_lesson_progress lp
           ON lp.staff_id = $1
@@ -295,7 +309,7 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  if (!(await canAccessLessonForRole(lessonId, session.role))) {
+  if (!(await isActiveLesson(lessonId)) || !(await canAccessLessonForRole(lessonId, session.role))) {
     return NextResponse.json(
       { success: false, error: "Lesson not found" },
       { status: 404 }
@@ -387,7 +401,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  if (!(await canAccessLessonForRole(lessonId, session.role))) {
+  if (!(await isActiveLesson(lessonId)) || !(await canAccessLessonForRole(lessonId, session.role))) {
     return NextResponse.json(
       { success: false, error: "Lesson not found" },
       { status: 404 }
@@ -422,7 +436,7 @@ const staffContext = await resolveLmsStaffContext(
     `
       SELECT duration_minutes
       FROM lms_lessons
-      WHERE id = $1
+      WHERE id = $1 AND is_active = true
       LIMIT 1
     `,
     [lessonId]

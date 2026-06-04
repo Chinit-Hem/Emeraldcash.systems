@@ -17,8 +17,9 @@
 import { useState, useCallback, useMemo, useEffect } from "react";
 import dynamic from "next/dynamic";
 import type { Vehicle } from "@/shared/types/types";
-import { useDebouncedValue } from "@/shared/hooks/useDebouncedValue";
+import { useDashboardVehicleSearch } from "@/systems/vms/hooks/useDashboardVehicleSearch";
 import { CATEGORY_COLORS } from "@/systems/vms/utils/categoryColors";
+import { VEHICLE_LIST_ALL_HREF } from "@/systems/vms/utils/vehicleListState";
 import { safeGetMonthKey } from "@/shared/utils/safeDate";
 import { MotorcycleIcon } from "@/shared/components/icons/MotorcycleIcon";
 import { TukTukIcon } from "@/shared/components/icons/TukTukIcon";
@@ -378,48 +379,17 @@ export default function Dashboard({
   const [searchQuery, setSearchQuery] = useState("");
   const [vehicles, setVehicles] = useState<Vehicle[]>(initialVehicles);
   const [meta, setMeta] = useState<DashboardMeta>(initialMeta);
-  const [searchResults, setSearchResults] = useState<Vehicle[]>([]);
-  const [isSearching, setIsSearching] = useState(false);
-
-  const debouncedSearch = useDebouncedValue(searchQuery, 300);
+  const { debouncedSearch, searchResults, isSearching } = useDashboardVehicleSearch({
+    searchQuery,
+    limit: useMobileSafeCharts ? 300 : 2000,
+    logLabel: "Dashboard",
+  });
 
   useEffect(() => {
     setVehicles(initialVehicles);
     setMeta(initialMeta);
     setError(initialError);
   }, [initialVehicles, initialMeta, initialError]);
-
-  // Real data search: query API across 100% of database when user types
-  useEffect(() => {
-    if (!debouncedSearch.trim()) {
-      setSearchResults([]);
-      setIsSearching(false);
-      return;
-    }
-
-    async function fetchSearchResults() {
-      setIsSearching(true);
-      try {
-        const searchLimit = useMobileSafeCharts ? 300 : 2000;
-        const url = `/api/vehicles?searchTerm=${encodeURIComponent(debouncedSearch)}&limit=${searchLimit}`;
-        const res = await fetch(url, { cache: "no-store" });
-        if (!res.ok) throw new Error("Search failed");
-        const data = await res.json();
-        if (data.success) {
-          setSearchResults(data.data || []);
-        } else {
-          setSearchResults([]);
-        }
-      } catch (err) {
-        console.error("[Dashboard] Search error:", err);
-        setSearchResults([]);
-      } finally {
-        setIsSearching(false);
-      }
-    }
-
-    fetchSearchResults();
-  }, [debouncedSearch, useMobileSafeCharts]);
 
   const aggregatedStats = useMemo(() => {
     if (!vehicles.length) return null;
@@ -483,7 +453,7 @@ export default function Dashboard({
     return [
       { name: "Cars", value: meta.countsByCategory.Cars || 0, color: CATEGORY_COLORS.Cars },
       { name: "Motorcycles", value: meta.countsByCategory.Motorcycles || 0, color: CATEGORY_COLORS.Motorcycles },
-      { name: "Tuk Tuks", value: meta.countsByCategory.TukTuks || 0, color: CATEGORY_COLORS.TukTuks },
+      { name: "TukTuks", value: meta.countsByCategory.TukTuks || 0, color: CATEGORY_COLORS.TukTuks },
     ].filter((item) => item.value > 0);
   }, [meta]);
 
@@ -590,7 +560,7 @@ export default function Dashboard({
           icon={Icons.totalVehicles}
           color="emerald"
           isLoading={isRefreshing}
-          href="/vehicles"
+          href={VEHICLE_LIST_ALL_HREF}
         />
         <DashboardStatCard
           title="Cars"
@@ -611,13 +581,13 @@ export default function Dashboard({
           href="/vehicles?category=Motorcycles"
         />
         <DashboardStatCard
-          title="Tuk Tuks"
+          title="TukTuks"
           value={tukTuksCount.toLocaleString()}
           subtitle="All tuk tuk types"
           icon={Icons.tuk}
           color="orange"
           isLoading={isRefreshing}
-          href="/vehicles?category=Tuk+Tuk"
+          href="/vehicles?category=tuktuks"
         />
         <DashboardStatCard
           title="No Images"

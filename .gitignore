@@ -38,7 +38,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 tsconfig.tsbuildinfo
-next-env.d.ts
 
 # IDE
 .idea/
@@ -80,6 +79,7 @@ build.log
 
 # Scripts
 /scripts/*
+!/scripts/README.md
 !/scripts/dev-reset.mjs
 !/scripts/test-neon-connection.mjs
 !/scripts/backup-verification/
@@ -92,9 +92,10 @@ build.log
 # Apps Script (Google integration)
 /apps-script/
 
-# Codex logs
+# Local AI/tooling artifacts
 .codex/
 .codex-logs/
+.sixth/
 
 # Local AI tool settings
 blackbox_mcp_settings.json

@@ -13,7 +13,7 @@
 
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
   ChevronLeft,
@@ -157,35 +157,35 @@ export default function CourseOverviewPage() {
       setLoading(true);
       setError(null);
       
-      // Fetch category info
-      const catRes = await fetch("/api/lms/categories");
+      const [catRes, lessonsRes, compRes] = await Promise.all([
+        fetch("/api/lms/categories"),
+        fetch(`/api/lms/lessons?categoryId=${categoryId}`),
+        fetch(`/api/lms/completions?categoryId=${categoryId}`),
+      ]);
+
       if (!catRes.ok) throw new Error("Failed to fetch categories");
-      const catData = await catRes.json();
-      
+      if (!lessonsRes.ok) throw new Error("Failed to fetch lessons");
+
+      const [catData, lessonsData, compData] = await Promise.all([
+        catRes.json(),
+        lessonsRes.json(),
+        compRes.ok ? compRes.json() : Promise.resolve(null),
+      ]);
+
       if (catData.success) {
         const cat = catData.data.find((c: LmsCategory) => c.id === categoryId);
         if (!cat) throw new Error("Category not found");
         setCategory(cat);
       }
-      
-      // Fetch lessons in this category
-      const lessonsRes = await fetch(`/api/lms/lessons?categoryId=${categoryId}`);
-      if (!lessonsRes.ok) throw new Error("Failed to fetch lessons");
-      const lessonsData = await lessonsRes.json();
-      
+
       if (lessonsData.success) {
         // Sort by order_index
         const sorted = lessonsData.data.sort((a: LmsLesson, b: LmsLesson) => a.order_index - b.order_index);
         setLessons(sorted);
       }
-      
-      // Fetch completions
-      const compRes = await fetch(`/api/lms/completions?categoryId=${categoryId}`);
-      if (compRes.ok) {
-        const compData = await compRes.json();
-        if (compData.success) {
-          setCompletions(compData.data || []);
-        }
+
+      if (compData?.success) {
+        setCompletions(compData.data || []);
       }
       
     } catch (err) {
@@ -199,10 +199,16 @@ export default function CourseOverviewPage() {
     fetchCourseData();
   }, [fetchCourseData]);
   
+  const completedLessonIds = useMemo(
+    () => new Set(completions.map((completion) => completion.lesson_id)),
+    [completions]
+  );
+
   // Check if lesson is completed
-  const isLessonCompleted = (lessonId: number) => {
-    return completions.some(c => c.lesson_id === lessonId);
-  };
+  const isLessonCompleted = useCallback(
+    (lessonId: number) => completedLessonIds.has(lessonId),
+    [completedLessonIds]
+  );
   
   // Calculate progress
   const completedCount = lessons.filter(l => isLessonCompleted(l.id)).length;
@@ -215,14 +221,14 @@ export default function CourseOverviewPage() {
   
   // Handle lesson click
   const handleLessonClick = (lessonId: number) => {
-    router.push(`/lms/lesson/${lessonId}`);
+    router.push(`/lms/lesson/${lessonId}`, { scroll: false });
   };
   
   // Handle continue/start learning
   const handleContinueLearning = () => {
     const targetLesson = firstIncompleteLesson || lessons[0];
     if (targetLesson) {
-      router.push(`/lms/lesson/${targetLesson.id}`);
+      router.push(`/lms/lesson/${targetLesson.id}`, { scroll: false });
     }
   };
   
@@ -248,7 +254,7 @@ export default function CourseOverviewPage() {
           <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
             {error || "Course not found"}
           </h2>
-          <GlassButton variant="primary" onClick={() => router.push("/lms")}>
+          <GlassButton variant="primary" onClick={() => router.push("/lms", { scroll: false })}>
             Back to Dashboard
           </GlassButton>
         </div>
@@ -263,7 +269,7 @@ export default function CourseOverviewPage() {
         <div className="max-w-[1400px] mx-auto px-4 sm:px-6 py-6 sm:py-12">
           {/* Back Button */}
           <button
-            onClick={() => router.push("/lms")}
+            onClick={() => router.push("/lms", { scroll: false })}
             className="flex items-center gap-2 text-gray-600 dark:text-gray-400 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors mb-6"
           >
             <ChevronLeft className="w-5 h-5" />

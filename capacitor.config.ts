@@ -1,6 +1,7 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 
 const productionUrl = 'https://emeraldcash-systems.vercel.app';
+const isProduction = process.env.NODE_ENV === 'production';
 const serverUrl =
   process.env.CAPACITOR_SERVER_URL?.trim() ||
   `${productionUrl}/login`;
@@ -10,7 +11,7 @@ const config: CapacitorConfig = {
   appName: 'Emerald Cash Systems',
   webDir: '.next/server/app',
   android: {
-    webContentsDebuggingEnabled: true,
+    webContentsDebuggingEnabled: !isProduction && process.env.CAPACITOR_WEB_DEBUGGING !== 'false',
   },
   ...(serverUrl
     ? {

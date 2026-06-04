@@ -1,4 +1,5 @@
 import { getSession, hasAppPermission, requirePermission } from "@/lib/auth-helpers";
+import { auditEventFromRequest, recordAuditEvent } from "@/lib/audit-log";
 import {
   createSessionCookie,
   getClientIp,
@@ -10,15 +11,14 @@ import {
   isValidationError,
 } from "@/lib/errors";
 import { generateRequestId, log } from "@/lib/logger";
-import type { Role } from "@/shared/types/types";
+import { validatePasswordPolicy } from "@/lib/password-policy";
 import { createUser, deleteUser, hashPassword, invalidateUsersCache, listUsers } from "@/lib/userStore";
 import { NextRequest, NextResponse } from "next/server";
 
 // Validation constants
 const USERNAME_REGEX = /^[a-z0-9._-]{3,32}$/;
-const MIN_PASSWORD_LENGTH = 4;
-const MAX_PASSWORD_LENGTH = 72;
-const VALID_ROLES: Role[] = ["Admin", "Staff", "Accounting"];
+type SystemRole = "Admin" | "Staff" | "Accounting";
+const VALID_ROLES: SystemRole[] = ["Admin", "Staff", "Accounting"];
 
 // Security headers for all responses
 const securityHeaders = {
@@ -67,28 +67,25 @@ function validatePassword(password: unknown): ValidationResult<string> {
   if (!password || typeof password !== "string") {
     return { valid: false, error: "Password is required and must be a string" };
   }
-  
-  if (password.length < MIN_PASSWORD_LENGTH) {
-    return { valid: false, error: `Password must be at least ${MIN_PASSWORD_LENGTH} characters` };
-  }
-  
-  if (password.length > MAX_PASSWORD_LENGTH) {
-    return { valid: false, error: `Password must be ${MAX_PASSWORD_LENGTH} characters or less` };
+
+  const passwordError = validatePasswordPolicy(password);
+  if (passwordError) {
+    return { valid: false, error: passwordError };
   }
   
   return { valid: true, value: password };
 }
 
-function validateRole(role: unknown): ValidationResult<Role> {
+function validateRole(role: unknown): ValidationResult<SystemRole> {
   if (!role || typeof role !== "string") {
     return { valid: false, error: "Role is required and must be a string" };
   }
   
-  if (!VALID_ROLES.includes(role)) {
+  if (!VALID_ROLES.includes(role as SystemRole)) {
     return { valid: false, error: `Role must be one of: ${VALID_ROLES.join(", ")}` };
   }
   
-  return { valid: true, value: role };
+  return { valid: true, value: role as SystemRole };
 }
 
 // Helper to create error response
@@ -116,12 +113,13 @@ function createSuccessResponse(data: Record<string, unknown>, status: number = 2
 function getSessionCookieOptions(req: NextRequest) {
   const forwardedProto = req.headers.get("x-forwarded-proto")?.split(",")[0]?.trim().toLowerCase();
   const isActuallyHttps = forwardedProto === "https" || req.nextUrl.protocol === "https:";
-  const forceInsecureCookies = process.env.ALLOW_HTTP_COOKIES === "true";
+  const isProduction = process.env.NODE_ENV === "production";
+  const allowInsecureCookies = !isProduction && process.env.ALLOW_HTTP_COOKIES === "true";
 
   return {
     httpOnly: true,
     sameSite: "lax" as const,
-    secure: isActuallyHttps && !forceInsecureCookies,
+    secure: (isProduction || isActuallyHttps) && !allowInsecureCookies,
     path: "/",
     maxAge: 60 * 60 * 8,
   };
@@ -165,6 +163,12 @@ export async function POST(req: NextRequest) {
         requestId, 
         cookies: req.cookies.get("session")?.value ? "present" : "missing",
       });
+      await recordAuditEvent(auditEventFromRequest(req, {
+        action: "user.create.denied",
+        resourceType: "user",
+        status: "denied",
+        severity: "warning",
+      }));
       return auth.response;
     }
     const session = auth.session;
@@ -229,6 +233,9 @@ export async function POST(req: NextRequest) {
       password: passwordValidation.value,
       role: roleValidation.value,
       createdBy: session.username,
+      full_name: typeof body.full_name === "string" ? body.full_name.trim() || null : null,
+      email: typeof body.email === "string" ? body.email.trim() || null : null,
+      phone: typeof body.phone === "string" ? body.phone.trim() || null : null,
     });
 
     if (result.ok === false) {
@@ -263,6 +270,15 @@ export async function POST(req: NextRequest) {
       role: result.user.role,
       createdBy: session.username
     });
+    await recordAuditEvent(auditEventFromRequest(req, {
+      action: "user.create.success",
+      actorUsername: session.username,
+      actorRole: session.role,
+      resourceType: "user",
+      resourceId: result.user.username,
+      status: "success",
+      metadata: { role: result.user.role },
+    }));
 
     return createSuccessResponse({ user: result.user }, 201);
   } catch (error) {
@@ -344,7 +360,18 @@ export async function PUT(req: NextRequest) {
       }
     }
 
-    const hasAccountUpdate = nextUsername !== targetUsername || hasPasswordUpdate;
+    const rawRole = body.role ?? body.newRole ?? body.new_role;
+    const hasRoleUpdate = rawRole !== undefined;
+    let nextRole: SystemRole | undefined;
+    if (hasRoleUpdate) {
+      const roleValidation = validateRole(rawRole);
+      if (roleValidation.valid === false) {
+        return createErrorResponse(roleValidation.error, "invalid_role", 400);
+      }
+      nextRole = roleValidation.value;
+    }
+
+    const hasAccountUpdate = nextUsername !== targetUsername || hasPasswordUpdate || hasRoleUpdate;
     
     // Users can only update their own profile unless their role can edit users.
     if (sessionUsername !== targetUsername && !hasAppPermission(session.role, "users:edit")) {
@@ -353,7 +380,35 @@ export async function PUT(req: NextRequest) {
         username: session.username,
         targetUsername
       });
+      await recordAuditEvent(auditEventFromRequest(req, {
+        action: "user.update.denied",
+        actorUsername: session.username,
+        actorRole: session.role,
+        resourceType: "user",
+        resourceId: targetUsername,
+        status: "denied",
+        severity: "warning",
+        metadata: { reason: "not_own_profile" },
+      }));
       return createErrorResponse("Can only update your own profile", "forbidden", 403);
+    }
+
+    if (hasRoleUpdate && !hasAppPermission(session.role, "users:edit")) {
+      log("WARN", "PUT /api/auth/users - Forbidden: role update requires users:edit", {
+        requestId,
+        username: session.username,
+        targetUsername,
+      });
+      await recordAuditEvent(auditEventFromRequest(req, {
+        action: "user.role_update.denied",
+        actorUsername: session.username,
+        actorRole: session.role,
+        resourceType: "user",
+        resourceId: targetUsername,
+        status: "denied",
+        severity: "warning",
+      }));
+      return createErrorResponse("Only admins can update roles", "forbidden", 403);
     }
 
     if (hasAccountUpdate && !hasAppPermission(session.role, "users:edit")) {
@@ -362,7 +417,16 @@ export async function PUT(req: NextRequest) {
         username: session.username,
         targetUsername,
       });
-      return createErrorResponse("Only admins can update usernames or passwords here", "forbidden", 403);
+      await recordAuditEvent(auditEventFromRequest(req, {
+        action: "user.account_update.denied",
+        actorUsername: session.username,
+        actorRole: session.role,
+        resourceType: "user",
+        resourceId: targetUsername,
+        status: "denied",
+        severity: "warning",
+      }));
+      return createErrorResponse("Only admins can update usernames, passwords, or roles here", "forbidden", 403);
     }
 
     log("DEBUG", "PUT /api/auth/users - Ensuring table migrated", { requestId });
@@ -376,6 +440,7 @@ export async function PUT(req: NextRequest) {
       targetUsername,
       nextUsername,
       hasPasswordUpdate,
+      hasRoleUpdate,
       requestedBy: session.username
     });
 
@@ -389,6 +454,7 @@ export async function PUT(req: NextRequest) {
       currentUsername: targetUsername,
       username: nextUsername,
       passwordHash,
+      role: nextRole,
       full_name: body.full_name as string | undefined,
       email: body.email as string | undefined,
       phone: body.phone as string | undefined,
@@ -402,6 +468,20 @@ export async function PUT(req: NextRequest) {
       requestId,
       username: updatedUser.username
     });
+    await recordAuditEvent(auditEventFromRequest(req, {
+      action: hasAccountUpdate ? "user.account_update.success" : "user.profile_update.success",
+      actorUsername: session.username,
+      actorRole: session.role,
+      resourceType: "user",
+      resourceId: updatedUser.username,
+      status: "success",
+      metadata: {
+        previousUsername: targetUsername,
+        roleChanged: hasRoleUpdate,
+        passwordChanged: hasPasswordUpdate,
+        usernameChanged: nextUsername !== targetUsername,
+      },
+    }));
 
     const response = createSuccessResponse({
       user: {
@@ -415,7 +495,7 @@ export async function PUT(req: NextRequest) {
       }
     });
 
-    if (sessionUsername === targetUsername && updatedUser.username !== sessionUsername) {
+    if (sessionUsername === targetUsername && (updatedUser.username !== sessionUsername || updatedUser.role !== session.role)) {
       const userAgent = getClientUserAgent(req.headers);
       const ip = getClientIp(req.headers);
       const sessionCookie = createSessionCookie(
@@ -466,6 +546,12 @@ export async function DELETE(req: NextRequest) {
     log("WARN", "DELETE /api/auth/users - Insufficient permission", {
       cookies: req.cookies.get("session")?.value ? "present" : "missing",
     });
+    await recordAuditEvent(auditEventFromRequest(req, {
+      action: "user.delete.denied",
+      resourceType: "user",
+      status: "denied",
+      severity: "warning",
+    }));
     return auth.response;
   }
   const session = auth.session;
@@ -500,6 +586,15 @@ export async function DELETE(req: NextRequest) {
   }
 
   invalidateUsersCache();
+  await recordAuditEvent(auditEventFromRequest(req, {
+    action: "user.delete.success",
+    actorUsername: session.username,
+    actorRole: session.role,
+    resourceType: "user",
+    resourceId: result.user.username,
+    status: "success",
+    metadata: { role: result.user.role },
+  }));
 
   return createSuccessResponse({ user: result.user });
 }

@@ -79,7 +79,7 @@ function normalizeCategoryFromSheet(value: unknown): string {
 
   if (normalized === "car" || normalized === "cars") return "Cars";
   if (normalized === "motorcycle" || normalized === "motorcycles") return "Motorcycles";
-  if (normalized === "tuktuk" || normalized === "tuk tuk" || normalized === "tuk-tuk") return "Tuk Tuk";
+  if (normalized === "tuktuk" || normalized === "tuk tuk" || normalized === "tuk-tuk") return "TukTuks";
 
   return raw;
 }
@@ -184,4 +184,3 @@ export function toVehicle(row: Record<string, unknown>): Vehicle {
     MarketPriceUpdatedAt: marketPriceUpdatedAt || null,
   };
 }
-

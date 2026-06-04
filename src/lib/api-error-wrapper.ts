@@ -25,6 +25,22 @@ import { NextRequest, NextResponse } from "next/server";
 import { Logger, createRequestLogger } from "@/lib/logger";
 import { buildCorsHeaders } from "@/lib/cors";
 
+const SENSITIVE_QUERY_PARAM_PATTERN = /(password|token|secret|cookie|authorization|api[_-]?key|session)/i;
+
+function redactSearchParams(search: string): string {
+  if (!search) return "";
+
+  const params = new URLSearchParams(search);
+  for (const key of params.keys()) {
+    if (SENSITIVE_QUERY_PARAM_PATTERN.test(key)) {
+      params.set(key, "[REDACTED]");
+    }
+  }
+
+  const redacted = params.toString();
+  return redacted ? `?${redacted}` : "";
+}
+
 // Interface for handler context
 export interface HandlerContext {
   logger: Logger;
@@ -206,7 +222,7 @@ export function withErrorHandling(
     contextualLogger.info(`API ${req.method} ${req.nextUrl.pathname} started`, {
       method: req.method,
       path: req.nextUrl.pathname,
-      query: req.nextUrl.search,
+      query: redactSearchParams(req.nextUrl.search),
       userAgent: req.headers.get("user-agent"),
       ip: req.headers.get("x-forwarded-for") || req.headers.get("x-real-ip"),
     });
@@ -278,6 +294,7 @@ export function withErrorHandling(
       const corsHeaders = buildCorsHeaders(req);
       corsHeaders.set("X-Request-ID", requestId);
       corsHeaders.set("Content-Type", "application/json");
+      corsHeaders.set("Cache-Control", "no-store");
 
       return new NextResponse(JSON.stringify(errorResponse), {
         status: statusCode, headers: Object.fromEntries(corsHeaders.entries()),

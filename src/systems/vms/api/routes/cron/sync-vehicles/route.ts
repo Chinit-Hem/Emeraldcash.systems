@@ -161,7 +161,7 @@ async function fetchVehiclesFromDB(): Promise<{ vehicles: Vehicle[]; meta: Vehic
       countsByCategory: {
         Cars: validVehicles.filter(v => v.Category === "Cars").length,
         Motorcycles: validVehicles.filter(v => v.Category === "Motorcycles").length,
-        TukTuks: validVehicles.filter(v => v.Category === "Tuk Tuk").length,
+        TukTuks: validVehicles.filter(v => String(v.Category || "").toLowerCase().includes("tuk")).length,
       },
       avgPrice: validVehicles.length > 0
         ? validVehicles.reduce((sum, v) => sum + (v.PriceNew || 0), 0) / validVehicles.length

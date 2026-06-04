@@ -5,6 +5,7 @@ import Image from "next/image";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Suspense, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import MobileBottomNav from "@/shared/components/MobileBottomNav";
 import Sidebar from "@/shared/components/Sidebar";
 import { AuthUserProvider } from "@/shared/hooks/AuthContext";
 import { UIProvider } from "@/shared/hooks/UIContext";
@@ -19,7 +20,7 @@ function useDesktopSidebar() {
   const [isDesktop, setIsDesktop] = useState(false);
 
   useEffect(() => {
-    const mediaQuery = window.matchMedia("(min-width: 1024px)");
+    const mediaQuery = window.matchMedia("(min-width: 1280px)");
     const update = () => setIsDesktop(mediaQuery.matches);
 
     update();
@@ -90,13 +91,10 @@ function AppShellContent({ children }: AppShellProps) {
 
         if (!res.ok || !data?.ok || !data?.user) {
           clearCachedUser();
-          // Only redirect if we don't have a cached user showing
-          if (!cached) {
-            setUser(null);
-            if (!hasRedirected.current) {
-              hasRedirected.current = true;
-              router.replace("/login");
-            }
+          setUser(null);
+          if (!hasRedirected.current) {
+            hasRedirected.current = true;
+            router.replace("/login");
           }
           return;
         }
@@ -178,7 +176,7 @@ function AppShellContent({ children }: AppShellProps) {
     const restoreTimer = window.setTimeout(() => {
       try {
         const saved = sessionStorage.getItem(scrollKey);
-        if (saved != null) el.scrollTop = Number(saved) || 0;
+        el.scrollTop = saved != null ? Number(saved) || 0 : 0;
       } catch {
         // ignore
       }
@@ -198,7 +196,7 @@ function AppShellContent({ children }: AppShellProps) {
   const loadingCardClass = "neu-card max-w-md w-full";
 
   // Mobile-first header with Neumorphism
-  const mobileHeaderClass = "lg:hidden fixed top-0 left-0 right-0 z-40 neu-card-sm !rounded-none !rounded-b-neu !p-0 safe-area-top";
+  const mobileHeaderClass = "xl:hidden fixed top-0 left-0 right-0 z-40 neu-card-sm !rounded-none !rounded-b-neu !p-0 safe-area-top";
 
   // Loading state - Neumorphism
   if (loading) {
@@ -239,11 +237,11 @@ function AppShellContent({ children }: AppShellProps) {
   }
 
   return (
-    <div className="flex min-h-screen bg-transparent pb-safe lg:pb-0">
+    <div className="flex h-dvh min-h-screen overflow-hidden bg-transparent pb-safe xl:pb-0">
       <AuthUserProvider user={user}>
         {/* Desktop sidebar */}
         {isDesktopSidebar && (
-          <div className="hidden lg:block">
+          <div className="hidden xl:block">
               <Suspense fallback={null}>
               <Sidebar user={user} mode="desktop" />
             </Suspense>
@@ -252,7 +250,7 @@ function AppShellContent({ children }: AppShellProps) {
 
         {/* Mobile drawer */}
         <div
-          className={`fixed inset-0 z-[60] lg:hidden ${isSidebarOpen ? "visible pointer-events-auto" : "invisible pointer-events-none"}`}
+          className={`fixed inset-0 z-[60] xl:hidden ${isSidebarOpen ? "visible pointer-events-auto" : "invisible pointer-events-none"}`}
           onKeyDown={(e) => {
             if (e.key === "Escape") closeSidebar();
           }}
@@ -283,13 +281,13 @@ function AppShellContent({ children }: AppShellProps) {
           </div>
         </div>
 
-        <div className="flex-1 min-w-0 flex flex-col pt-14 lg:pt-0">
+        <div className="flex min-h-0 flex-1 min-w-0 flex-col pt-14 xl:pt-0">
           {/* Mobile header - Fixed position with safe area support */}
           <header className={mobileHeaderClass}>
             <div className="h-14 px-4 flex items-center justify-between max-w-[100vw]">
               <button
                 onClick={openSidebar}
-                className="neu-icon-btn touch-target touch-manipulation"
+                className="neu-icon-btn touch-target touch-manipulation translate-y-1"
                 aria-label="Open navigation menu"
                 aria-controls={drawerId}
                 aria-expanded={isSidebarOpen}
@@ -300,7 +298,7 @@ function AppShellContent({ children }: AppShellProps) {
                 </svg>
               </button>
 
-              <div className="flex items-center gap-3 min-w-0 flex-1 justify-center">
+              <div className="flex min-w-0 flex-1 translate-y-1 items-center justify-center gap-3">
                 <div className="relative w-9 h-9 flex items-center justify-center overflow-hidden flex-shrink-0 neu-icon-btn !rounded-full !bg-white dark:!bg-white">
                   <Image
                     src="/logo.png"
@@ -321,10 +319,16 @@ function AppShellContent({ children }: AppShellProps) {
           </header>
 
           {/* Main content - Add padding-top to account for fixed header on mobile */}
-          <main ref={mainRef} className="flex-1 overflow-y-auto overflow-x-hidden pt-4 lg:pt-0">
+          <main
+            ref={mainRef}
+            data-app-scroll-container="true"
+            className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden pt-0"
+          >
             {children}
           </main>
         </div>
+
+        <MobileBottomNav user={user} isMenuOpen={isSidebarOpen} onOpenMenu={openSidebar} />
       </AuthUserProvider>
     </div>
   );

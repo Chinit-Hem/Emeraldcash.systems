@@ -7,57 +7,74 @@ import {
 import { getUserByUsername } from "@/lib/user-db";
 import { NextRequest, NextResponse } from "next/server";
 
+const noStoreHeaders = {
+  "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
+  "Pragma": "no-cache",
+  "Expires": "0",
+  "X-Content-Type-Options": "nosniff",
+};
+
 export async function GET(req: NextRequest) {
   try {
+    const isProduction = process.env.NODE_ENV === "production";
+    const isHttps =
+      req.nextUrl.protocol === "https:" || req.headers.get("x-forwarded-proto") === "https";
+    const allowInsecureCookies = !isProduction && process.env.ALLOW_HTTP_COOKIES === "true";
     const ip = getClientIp(req.headers);
     const userAgent = getClientUserAgent(req.headers);
     const sessionCookie = req.cookies.get("session")?.value;
 
-    const isMobile = /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(userAgent);
-
     if (!sessionCookie) {
-      const res = NextResponse.json({ ok: false, error: "No session cookie" });
-      // Add debug header for mobile troubleshooting
-      res.headers.set("X-Auth-Debug", "no-cookie");
-      return res;
+      return NextResponse.json(
+        { ok: false, error: "No session cookie" },
+        { status: 401, headers: noStoreHeaders }
+      );
     }
 
     const session = getSessionFromRequest(userAgent, ip, sessionCookie);
     if (!session || !validateSession(session)) {
-      const res = NextResponse.json({ ok: false, error: "Invalid or expired session" });
-      res.headers.set("X-Auth-Debug", "invalid-session");
-      return res;
+      return NextResponse.json(
+        { ok: false, error: "Invalid or expired session" },
+        { status: 401, headers: noStoreHeaders }
+      );
     }
 
     // Get full user profile from database
     const userProfile = await getUserByUsername(session.username);
+    if (!userProfile) {
+      const response = NextResponse.json(
+        { ok: false, error: "User account no longer exists" },
+        { status: 401, headers: noStoreHeaders }
+      );
+      response.cookies.set("session", "", {
+        httpOnly: true,
+        sameSite: "lax",
+        secure: (isProduction || isHttps) && !allowInsecureCookies,
+        path: "/",
+        maxAge: 0,
+      });
+      return response;
+    }
 
-    const res = NextResponse.json({
+    return NextResponse.json({
       ok: true,
       user: {
         username: session.username,
         role: session.role,
-        full_name: userProfile?.full_name || null,
-        email: userProfile?.email || null,
-        phone: userProfile?.phone || null,
-        bio: userProfile?.bio || null,
-        profile_picture: userProfile?.profile_picture || null,
-        created_at: userProfile?.created_at || null,
-        updated_at: userProfile?.updated_at || null,
+        full_name: userProfile.full_name || null,
+        email: userProfile.email || null,
+        phone: userProfile.phone || null,
+        bio: userProfile.bio || null,
+        profile_picture: userProfile.profile_picture || null,
+        created_at: userProfile.created_at || null,
+        updated_at: userProfile.updated_at || null,
       },
-    });
-
-    // Add debug headers for mobile
-    if (isMobile) {
-      res.headers.set("X-Auth-Debug", "success");
-      res.headers.set("X-User-Role", session.role);
-    }
-
-    return res;
+    }, { headers: noStoreHeaders });
   } catch (err) {
     void err;
-    const res = NextResponse.json({ ok: false, error: "Internal error" });
-    res.headers.set("X-Auth-Debug", "error");
-    return res;
+    return NextResponse.json(
+      { ok: false, error: "Internal error" },
+      { status: 500, headers: noStoreHeaders }
+    );
   }
 }

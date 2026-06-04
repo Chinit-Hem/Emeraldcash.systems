@@ -45,7 +45,7 @@ const getImageUrl = (imageUrl: unknown): string | null => {
 };
 
 // Category options
-type CategoryOption = "Cars" | "Motorcycles" | "Tuk Tuk";
+type CategoryOption = "Cars" | "Motorcycles" | "TukTuks";
 
 const CATEGORY_OPTIONS: { value: CategoryOption; label: string; icon: React.ReactNode; color: string; bgClass?: string }[] = [
   {
@@ -63,7 +63,7 @@ const CATEGORY_OPTIONS: { value: CategoryOption; label: string; icon: React.Reac
     bgClass: "bg-[#8b5cf6]/15 text-[#8b5cf6]",
   },
   {
-    value: "Tuk Tuk",
+    value: "TukTuks",
     label: "TukTuks",
     icon: <TukTukIcon className="w-6 h-6" />,
     color: "#f97316",
@@ -431,13 +431,13 @@ function ViewVehicleInner() {
   const descriptionInputId = useId();
 
   const handleBackToList = useCallback(() => {
-    router.push(listHref);
+    router.push(listHref, { scroll: false });
   }, [listHref, router]);
 
   // Redirect to vehicles list if ID is a reserved word
   useEffect(() => {
     if (isReservedId) {
-      router.push(listHref);
+      router.push(listHref, { scroll: false });
     }
   }, [isReservedId, listHref, router]);
   
@@ -606,7 +606,6 @@ function ViewVehicleInner() {
     if (!formData.Brand?.trim()) newErrors.Brand = "Brand is required";
     if (!formData.Model?.trim()) newErrors.Model = "Model is required";
     if (!formData.Year) newErrors.Year = "Year is required";
-    if (!formData.Plate?.trim()) newErrors.Plate = "Plate number is required";
     if (!formData.Category) newErrors.Category = "Category is required";
     
     setErrors(newErrors);
@@ -687,7 +686,7 @@ function ViewVehicleInner() {
   const handleDeleteSuccess = () => {
     success("Vehicle deleted successfully");
     setIsDeleteModalOpen(false);
-    router.push(listHref);
+    router.push(listHref, { scroll: false });
   };
 
   const handleDeleteError = (err: string) => {

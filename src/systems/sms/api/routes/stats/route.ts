@@ -8,31 +8,33 @@ export async function GET(request: NextRequest) {
     const auth = requirePermission(request, 'sms:view');
     if (auth.response) return auth.response;
 
-    const result = await smsService.getAssetStats();
+    const shouldScopePendingTransfers = auth.session.role !== 'Admin';
+    const [result, notificationsResult, scopedPendingResult] = await Promise.all([
+      smsService.getAssetStats(),
+      smsService.getNotifications(auth.session.username, { limit: 1 }),
+      shouldScopePendingTransfers
+        ? smsService.getPendingTransferCountForUser(auth.session.username)
+        : Promise.resolve(null),
+    ]);
     const duration = Date.now() - startTime;
 
     if (result.success) {
       let data = result.data;
-      const notificationsResult = await smsService.getNotifications(auth.session.username, { limit: 1 });
       const unreadNotifications = notificationsResult.success
         ? notificationsResult.data?.unreadCount || 0
         : 0;
 
-      if (auth.session.role !== 'Admin' && data) {
-        const transfersResult = await smsService.getTransfers();
-        if (!transfersResult.success) {
+      if (shouldScopePendingTransfers && data) {
+        if (!scopedPendingResult?.success) {
           return NextResponse.json({
             success: false,
-            error: transfersResult.error || 'Failed to fetch transfer stats'
+            error: scopedPendingResult?.error || 'Failed to fetch transfer stats'
           }, { status: 500 });
         }
 
         data = {
           ...data,
-          pendingTransfers: (transfersResult.data || []).filter((transfer) =>
-            transfer.status === 'pending' &&
-            (transfer.senderId === auth.session.username || transfer.receiverId === auth.session.username)
-          ).length,
+          pendingTransfers: scopedPendingResult.data || 0,
         };
       }
 

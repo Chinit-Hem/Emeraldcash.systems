@@ -14,6 +14,8 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import ImageModal from '@/systems/sms/components/assets/ImageModal';
+import { useSmsUsers } from '@/systems/sms/hooks/useSmsUsers';
+import type { SmsSettingsUser } from '@/systems/sms/utils/smsUsers';
 import {
   SmsPageHeader,
   SmsPageShell,
@@ -22,16 +24,6 @@ import {
   smsPrimaryButtonClass,
   smsSecondaryButtonClass,
 } from '@/systems/sms/components/SmsShared';
-
-interface LocalUser {
-  username: string;
-  full_name?: string;
-  role?: string;
-  email?: string;
-  phone?: string;
-  profile_picture?: string;
-  staff_id?: number;
-}
 
 interface LocalPendingTransfer {
   id: string;
@@ -46,7 +38,7 @@ interface LocalPendingTransfer {
   createdAt: string;
 }
 
-const UserAvatar = ({ userId, users }: { userId: string; users: LocalUser[] }) => {
+const UserAvatar = ({ userId, users }: { userId: string; users: SmsSettingsUser[] }) => {
   if (userId === 'stock') {
     return (
       <div className="flex h-10 w-10 items-center justify-center rounded-md border border-emerald-200 bg-emerald-50 text-emerald-700 shadow-sm">
@@ -85,33 +77,24 @@ function isReturnRequest(transfer: Pick<LocalPendingTransfer, 'receiverId'>) {
 export default function PendingPage() {
   const currentUser = useAuthUser();
   const [pending, setPending] = useState<LocalPendingTransfer[]>([]);
-  const [users, setUsers] = useState<LocalUser[]>([]);
+  const { users } = useSmsUsers();
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<Record<string, boolean>>({});
   const [rejectRemarks, setRejectRemarks] = useState<Record<string, string>>({});
   const [rejectErrors, setRejectErrors] = useState<Record<string, string>>({});
   const { toasts, removeToast, success: toastSuccess, error: toastError } = useToast();
   const [viewImage, setViewImage] = useState<{ src: string; alt: string } | null>(null);
-
-
-  const fetchUsers = useCallback(async () => {
-    try {
-      const res = await fetch('/api/auth/users');
-      const data = await res.json();
-      if (data.ok && Array.isArray(data.users)) {
-        setUsers(data.users);
-      }
-    } catch (_error) {
-      console.error('Failed to fetch users', _error);
-    }
-  }, []);
+  const usersByUsername = useMemo(
+    () => new Map(users.map((user) => [user.username, user])),
+    [users]
+  );
 
   const getUserDisplay = useCallback((userId: string) => {
     if (userId === 'stock') return 'Stock';
 
-    const user = users.find(u => u.username === userId);
+    const user = usersByUsername.get(userId);
     return user ? (user.full_name || user.username || userId) : userId;
-  }, [users]);
+  }, [usersByUsername]);
 
   const fetchPending = useCallback(async () => {
     try {
@@ -129,11 +112,8 @@ export default function PendingPage() {
   }, [toastError]);
 
   useEffect(() => {
-    const loadData = async () => {
-      await Promise.all([fetchUsers(), fetchPending()]);
-    };
-    loadData();
-  }, [fetchUsers, fetchPending]);
+    void fetchPending();
+  }, [fetchPending]);
 
   const validateRejectForm = (transferId: string): boolean => {
     const remark = rejectRemarks[transferId] || '';
@@ -249,8 +229,8 @@ export default function PendingPage() {
   return (
     <SmsPageShell maxWidth="max-w-5xl">
       <SmsPageHeader
-        title="Review Requests"
-        description={`Pending SMS asset transfers (${stats.total})`}
+        title="Transfer Requests"
+        description="Review pending SMS asset handovers and return requests."
         icon={Clock}
         tone="slate"
         actions={
@@ -275,19 +255,20 @@ export default function PendingPage() {
       />
 
         {/* Stats Card */}
-        {stats.total > 0 && (
-          <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-3">
-            <div className={`${smsPanelClass} p-5`}>
-              <div className="flex items-center gap-4">
-                <div className="rounded-md bg-slate-100 p-3">
-                  <Users className="w-6 h-6 text-slate-700" />
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-slate-500">Pending Requests</p>
-                  <div className="text-3xl font-semibold text-slate-900">{stats.total}</div>
-                </div>
+        <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-3">
+          <div className={`${smsPanelClass} p-5`}>
+            <div className="flex items-center gap-4">
+              <div className="rounded-md bg-slate-100 p-3">
+                <Users className="w-6 h-6 text-slate-700" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-slate-500">Pending</p>
+                <div className="text-3xl font-semibold text-slate-900">{stats.total}</div>
               </div>
             </div>
+          </div>
+          {stats.total > 0 && (
+            <>
             <div className={`${smsPanelClass} p-5`}>
               <div className="flex items-center gap-4">
                 <div className="rounded-md bg-emerald-50 p-3">
@@ -312,8 +293,9 @@ export default function PendingPage() {
                 </div>
               </div>
             </div>
-          </div>
-        )}
+            </>
+          )}
+        </div>
 
         {/* Content */}
         <div className="space-y-6">
@@ -323,10 +305,10 @@ export default function PendingPage() {
                 <CheckCircle2 className="h-9 w-9 text-emerald-600" />
               </div>
               <h2 className="mb-3 text-2xl font-semibold text-slate-900">
-                No Pending Requests
+                No Pending Transfer Requests
               </h2>
               <p className="mx-auto mb-6 max-w-md text-sm leading-6 text-slate-500">
-                All SMS asset transfers are processed and approved.
+                All SMS asset handovers and return requests are processed.
               </p>
               <div className="flex flex-col sm:flex-row gap-4 justify-center">
                 <Link

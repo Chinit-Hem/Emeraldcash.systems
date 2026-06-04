@@ -45,6 +45,8 @@ import {
   smsPrimaryButtonClass,
   smsSecondaryButtonClass,
 } from "@/systems/sms/components/SmsShared";
+import { useSmsUsers } from "@/systems/sms/hooks/useSmsUsers";
+import type { SmsSettingsUser } from "@/systems/sms/utils/smsUsers";
 
 // ============================================================================
 // Types
@@ -76,16 +78,6 @@ interface AssetHistory {
   assetName: string;
   totalEvents: number;
   events: HistoryEvent[];
-}
-
-interface LocalUser {
-  username: string;
-  full_name?: string;
-  role?: string;
-  email?: string;
-  phone?: string;
-  profile_picture?: string;
-  staff_id?: number;
 }
 
 function formatRelativeTime(value: string) {
@@ -153,7 +145,7 @@ const UserAvatar = ({
   users,
 }: {
   userId?: string;
-  users: LocalUser[];
+  users: SmsSettingsUser[];
 }) => {
   const user = users.find((u) => u.username === userId);
   const initial = user
@@ -197,10 +189,25 @@ export default function HistoryPage() {
   const { language } = useLanguage();
   const { t } = useTranslation(language);
   const isAdmin = user?.role === "Admin";
+  const historyTitle = language === "km" ? "ប្រវត្តិចលនា" : "Movement History";
+  const historyDescription = isAdmin
+    ? language === "km"
+      ? "ប្រវត្តិចលនាទ្រព្យសម្បត្តិ និងកំណត់ហេតុសវនកម្មទាំងអស់"
+      : "Complete asset movement history and audit trail"
+    : language === "km"
+      ? "ប្រវត្តិចលនាទ្រព្យសម្បត្តិ និងកំណត់ហេតុសវនកម្មរបស់អ្នក"
+      : "Your asset movement history and audit trail";
+  const scopeLabel = isAdmin
+    ? language === "km"
+      ? "ព្រឹត្តិការណ៍ទាំងអស់"
+      : "All company events"
+    : language === "km"
+      ? "តែព្រឹត្តិការណ៍របស់ខ្ញុំ"
+      : "My events only";
 
   // -- Data State --
   const [assets, setAssets] = useState<SmsAsset[]>([]);
-  const [users, setUsers] = useState<LocalUser[]>([]);
+  const { users } = useSmsUsers();
   const [selectedAsset, setSelectedAsset] = useState<string>("");
   const [history, setHistory] = useState<AssetHistory | null>(null);
 
@@ -213,19 +220,6 @@ export default function HistoryPage() {
   const [expandedEvents, setExpandedEvents] = useState<Set<string>>(new Set());
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [clearingHistory, setClearingHistory] = useState(false);
-
-  // -- Fetch Users --
-  const fetchUsers = useCallback(async () => {
-    try {
-      const res = await fetch("/api/auth/users");
-      const data = await res.json();
-      if (data.ok && Array.isArray(data.users)) {
-        setUsers(data.users);
-      }
-    } catch (_e) {
-      // Silently fail user fetch
-    }
-  }, []);
 
   // -- Fetch Assets --
   const fetchAssets = useCallback(async () => {
@@ -268,8 +262,7 @@ export default function HistoryPage() {
 
   useEffect(() => {
     fetchAssets();
-    fetchUsers();
-  }, [fetchAssets, fetchUsers]);
+  }, [fetchAssets]);
 
   // -- Memoized Filtered Assets --
   const filteredAssets = useMemo(() => {
@@ -289,6 +282,17 @@ export default function HistoryPage() {
     if (eventFilter === "all") return history.events;
     return history.events.filter((e) => e.type === eventFilter);
   }, [history, eventFilter]);
+  const usersByUsername = useMemo(
+    () => new Map(users.map((user) => [user.username, user])),
+    [users]
+  );
+
+  // -- Relative time ticker --
+  const [nowTick, setNowTick] = useState(0);
+  useEffect(() => {
+    const id = window.setInterval(() => setNowTick((x) => x + 1), 60000);
+    return () => window.clearInterval(id);
+  }, []);
 
   // -- Stats --
   const stats = useMemo(() => {
@@ -304,7 +308,7 @@ export default function HistoryPage() {
         ? formatRelativeTime(lastEvent.timestamp)
         : null,
     };
-  }, [history]);
+  }, [history, nowTick]);
 
   // -- Handlers --
   const handleAssetSelect = (assetId: string) => {
@@ -332,7 +336,7 @@ export default function HistoryPage() {
   };
 
   const getUserDisplay = (userId?: string) => {
-    const user = users.find((u) => u.username === userId);
+    const user = userId ? usersByUsername.get(userId) : null;
     return user ? user.full_name || user.username || userId : userId || "—";
   };
 
@@ -340,9 +344,13 @@ export default function HistoryPage() {
     if (!selectedAsset || !history || clearingHistory) return;
 
     const confirmed = window.confirm(
-      `Clear transfer history and audit logs for "${history.assetName}"?\n\nThis is Admin-only and will keep one cleanup audit entry.`
+      `Clear transfer history and audit logs for "${history.assetName}"?\n\nThis is Admin-only and will keep one cleanup audit entry. This action cannot be undone.`
     );
     if (!confirmed) return;
+    const confirmationText = window.prompt(
+      `Type CLEAR to permanently clear history for "${history.assetName}".`
+    );
+    if (confirmationText?.trim() !== "CLEAR") return;
 
     setClearingHistory(true);
     setError(null);
@@ -362,34 +370,38 @@ export default function HistoryPage() {
     }
   };
 
-  // -- Real-time relative time ticker --
-  const [nowTick, setNowTick] = useState(0);
-  useEffect(() => {
-    const id = window.setInterval(() => setNowTick((x) => x + 1), 1000);
-    return () => window.clearInterval(id);
-  }, []);
-  void nowTick;
-
   // -- Render --
   return (
     <SmsPageShell>
       <SmsPageHeader
-        title={t.history || "History"}
-        description={t.auditTrail || "Complete transfer history and audit logs"}
+        title={historyTitle}
+        description={historyDescription}
         icon={History}
         tone="purple"
         actions={
-          <Button
-            variant="outline"
-            onClick={fetchAssets}
-            disabled={assetsLoading}
-            className={smsSecondaryButtonClass}
-          >
-            <RefreshCw
-              className={`w-4 h-4 ${assetsLoading ? "animate-spin" : ""}`}
-            />
-            {t.refresh}
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge
+              variant="outline"
+              className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                isAdmin
+                  ? "border-purple-200 bg-purple-50 text-purple-700"
+                  : "border-blue-200 bg-blue-50 text-blue-700"
+              }`}
+            >
+              {scopeLabel}
+            </Badge>
+            <Button
+              variant="outline"
+              onClick={fetchAssets}
+              disabled={assetsLoading}
+              className={smsSecondaryButtonClass}
+            >
+              <RefreshCw
+                className={`w-4 h-4 ${assetsLoading ? "animate-spin" : ""}`}
+              />
+              {t.refresh}
+            </Button>
+          </div>
         }
       />
 
@@ -659,21 +671,6 @@ export default function HistoryPage() {
                         : t.events || "events"}
                     </span>
                   </div>
-                  {isAdmin && (
-                    <Button
-                      variant="outline"
-                      onClick={clearSelectedHistory}
-                      disabled={clearingHistory || !history.events.length}
-                      className={smsDangerButtonClass}
-                    >
-                      {clearingHistory ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                      ) : (
-                        <Trash2 className="w-4 h-4" />
-                      )}
-                      Clear history
-                    </Button>
-                  )}
                 </div>
 
                 {/* Timeline */}
@@ -917,6 +914,39 @@ export default function HistoryPage() {
                           }
                         )}
                       </div>
+                    </div>
+                  </div>
+                )}
+
+                {isAdmin && (
+                  <div className="rounded-lg border border-red-200 bg-red-50 p-5 shadow-sm">
+                    <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                      <div className="min-w-0">
+                        <div className="mb-1 flex items-center gap-2">
+                          <Trash2 className="h-4 w-4 text-red-600" />
+                          <h3 className="font-semibold text-red-900">
+                            {language === "km" ? "តំបន់គ្រោះថ្នាក់" : "Danger Zone"}
+                          </h3>
+                        </div>
+                        <p className="text-sm leading-6 text-red-700">
+                          {language === "km"
+                            ? "សម្អាតប្រវត្តិផ្ទេរ និងកំណត់ហេតុសវនកម្មសម្រាប់ទ្រព្យសម្បត្តិនេះ។ ប្រព័ន្ធនឹងរក្សាកំណត់ហេតុសម្អាតមួយសម្រាប់តាមដាន។"
+                            : "Clear transfer history and audit logs for this asset. The system keeps one cleanup audit entry for traceability."}
+                        </p>
+                      </div>
+                      <Button
+                        variant="outline"
+                        onClick={clearSelectedHistory}
+                        disabled={clearingHistory || !history.events.length}
+                        className={smsDangerButtonClass}
+                      >
+                        {clearingHistory ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Trash2 className="w-4 h-4" />
+                        )}
+                        {language === "km" ? "សម្អាតប្រវត្តិ" : "Clear history"}
+                      </Button>
                     </div>
                   </div>
                 )}

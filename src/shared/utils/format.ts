@@ -119,6 +119,7 @@ export function capitalizeWords(text: string | null | undefined): string {
  */
 export function formatVehicleId(id: string | null | undefined): string {
   if (!id) return "—";
+  if (id.startsWith("temp-")) return "Saving...";
   if (id.length <= 12) return id;
   return `${id.slice(0, 6)}...${id.slice(-4)}`;
 }

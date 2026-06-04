@@ -173,31 +173,19 @@ export function useUpdateVehicle(
 
         // Step 1: Upload image to Cloudinary if provided
         if (imageFile) {
-          console.log("[useUpdateVehicle] Uploading image to Cloudinary...");
-          console.log("[useUpdateVehicle] Cloudinary config:", {
-            cloudName: CLOUDINARY_CLOUD_NAME ? "SET" : "MISSING (will use signed upload)",
-            uploadPreset: CLOUDINARY_UPLOAD_PRESET ? "SET" : "MISSING"
-          });
-
           // Check if we should skip compression (file already small enough)
           const fileSizeKB = imageFile.size / 1024;
           let fileToUpload: File;
-          
+
           if (fileSizeKB < SKIP_COMPRESSION_THRESHOLD_KB) {
-            console.log(`[useUpdateVehicle] File already small (${fileSizeKB.toFixed(2)}KB < ${SKIP_COMPRESSION_THRESHOLD_KB}KB), skipping compression`);
             fileToUpload = imageFile;
           } else {
             // Compress image first
-            console.log("[useUpdateVehicle] Compressing image...");
             const compressedResult = await compressImage(imageFile, {
               maxWidth: 1280,
               quality: 0.75,
               targetMinSizeKB: 250,
               targetMaxSizeKB: 800,
-            });
-            console.log("[useUpdateVehicle] Image compressed:", {
-              originalSize: compressedResult.originalSize,
-              compressedSize: compressedResult.compressedSize
             });
             fileToUpload = compressedResult.file;
           }
@@ -205,17 +193,11 @@ export function useUpdateVehicle(
           // Choose upload method based on configuration
           if (CLOUDINARY_CLOUD_NAME) {
             // Use direct unsigned upload
-            console.log("[useUpdateVehicle] Using direct unsigned upload");
             cloudinaryImageUrl = await uploadImageToCloudinaryDirect(fileToUpload);
           } else {
             // Use signed upload via server API
-            console.log("[useUpdateVehicle] Using signed upload via server API");
             cloudinaryImageUrl = await uploadImageToCloudinarySigned(fileToUpload, data.VehicleId);
           }
-          
-          console.log("[useUpdateVehicle] Image uploaded to Cloudinary:", {
-            url: cloudinaryImageUrl?.substring(0, 100) + "..."
-          });
         }
 
         // Step 2: Prepare JSON payload with Cloudinary URL
@@ -254,10 +236,6 @@ export function useUpdateVehicle(
         }
 
         const body = JSON.stringify(mappedData);
-        console.log("[useUpdateVehicle] Sending update to API:", {
-          hasImage: !!cloudinaryImageUrl,
-          imageUrl: cloudinaryImageUrl?.substring(0, 100) + "..."
-        });
 
         const res = await fetch(`/api/vehicles/${encodeURIComponent(data.VehicleId)}`, {
           method: "PUT",
@@ -286,11 +264,7 @@ export function useUpdateVehicle(
 
         // Get the updated vehicle data from the response (includes new image URL)
         const updatedVehicle = json.data as Vehicle;
-        console.log("[useUpdateVehicle] Updated vehicle received:", {
-          vehicleId: updatedVehicle.VehicleId,
-          imageUrl: updatedVehicle.Image?.substring(0, 100) + "..."
-        });
-        
+
         // Update local cache immediately with the new data
         try {
           const cached = localStorage.getItem("vms-vehicles");
@@ -302,7 +276,6 @@ export function useUpdateVehicle(
                 // Use the server-returned data which includes the new image URL
                 parsed[index] = updatedVehicle;
                 writeVehicleCache(parsed);
-                console.log("[useUpdateVehicle] Cache updated with new image URL");
               }
             }
           }

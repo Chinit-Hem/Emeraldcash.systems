@@ -17,7 +17,7 @@ import {
 } from "@/shared/types/types";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 
-const CATEGORY_OPTIONS = ["Cars", "Motorcycles", "Tuk Tuk"] as const;
+const CATEGORY_OPTIONS = ["Cars", "Motorcycles", "TukTuks"] as const;
 
 interface VehicleFormProps {
   vehicle: Vehicle;

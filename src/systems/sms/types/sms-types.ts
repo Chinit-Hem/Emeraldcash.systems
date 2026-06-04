@@ -20,6 +20,7 @@ export type SmsAsset = {
   quantity?: number | null;
   location?: string | null;
   assignedTo?: string | null;
+  createdBy?: string | null;
   imageUrl?: string | null;
   documentUrl?: string | null;
   description?: string | null;

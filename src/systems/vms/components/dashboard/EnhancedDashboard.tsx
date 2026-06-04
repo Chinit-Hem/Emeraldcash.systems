@@ -16,9 +16,10 @@
 import ChartErrorBoundary from "@/systems/vms/components/dashboard/ChartErrorBoundary";
 import { useLanguage } from "@/shared/hooks/LanguageContext";
 import { CATEGORY_COLORS } from "@/systems/vms/utils/categoryColors";
+import { VEHICLE_LIST_ALL_HREF } from "@/systems/vms/utils/vehicleListState";
 import { useTranslation } from "@/shared/utils/i18n";
 import type { Vehicle } from "@/shared/types/types";
-import { useDebouncedValue } from "@/shared/hooks/useDebouncedValue";
+import { useDashboardVehicleSearch } from "@/systems/vms/hooks/useDashboardVehicleSearch";
 import { safeGetMonthKey } from "@/shared/utils/safeDate";
 import { TukTukIcon } from "@/shared/components/icons/TukTukIcon";
 import {
@@ -174,7 +175,7 @@ const VEHICLE_CATEGORIES = {
     ringColor: "ring-violet-500/20",
   },
   tuktuks: {
-    label: "Tuk Tuks",
+    label: "TukTuks",
     icon: TukTukIcon,
     color: "#f59e0b",
     gradient: "from-amber-500 to-orange-600",
@@ -404,51 +405,20 @@ export default function EnhancedDashboard({
   const [vehicles, setVehicles] = useState<Vehicle[]>(initialVehicles);
   const [meta, setMeta] = useState<DashboardMeta>(initialMeta);
   const [activeFilter, setActiveFilter] = useState<string | null>(null);
-  const [searchResults, setSearchResults] = useState<Vehicle[]>([]);
-  const [isSearching, setIsSearching] = useState(false);
 
   const { language, toggleLanguage } = useLanguage();
   const { t } = useTranslation(language);
-
-  const debouncedSearch = useDebouncedValue(searchQuery, 300);
+  const { debouncedSearch, searchResults, isSearching } = useDashboardVehicleSearch({
+    searchQuery,
+    limit: isIOSSafari ? 300 : 2000,
+    logLabel: "EnhancedDashboard",
+  });
 
   useEffect(() => {
     setVehicles(initialVehicles);
     setMeta(initialMeta);
     setError(initialError);
   }, [initialVehicles, initialMeta, initialError]);
-
-  // Real data search: query API across 100% of database when user types
-  useEffect(() => {
-    if (!debouncedSearch.trim()) {
-      setSearchResults([]);
-      setIsSearching(false);
-      return;
-    }
-
-    async function fetchSearchResults() {
-      setIsSearching(true);
-      try {
-        const searchLimit = isIOSSafari ? 300 : 2000;
-        const url = `/api/vehicles?searchTerm=${encodeURIComponent(debouncedSearch)}&limit=${searchLimit}`;
-        const res = await fetch(url, { cache: "no-store" });
-        if (!res.ok) throw new Error("Search failed");
-        const data = await res.json();
-        if (data.success) {
-          setSearchResults(data.data || []);
-        } else {
-          setSearchResults([]);
-        }
-      } catch (err) {
-        console.error("[EnhancedDashboard] Search error:", err);
-        setSearchResults([]);
-      } finally {
-        setIsSearching(false);
-      }
-    }
-
-    fetchSearchResults();
-  }, [debouncedSearch, isIOSSafari]);
 
   // Compute aggregated stats from real vehicle data
   const aggregatedStats = useMemo(() => {
@@ -490,7 +460,7 @@ export default function EnhancedDashboard({
     return [
       { name: "Cars", value: meta.countsByCategory.Cars || 0, color: CATEGORY_COLORS.Cars },
       { name: "Motorcycles", value: meta.countsByCategory.Motorcycles || 0, color: CATEGORY_COLORS.Motorcycles },
-      { name: "Tuk Tuks", value: meta.countsByCategory.TukTuks || 0, color: CATEGORY_COLORS.TukTuks },
+      { name: "TukTuks", value: meta.countsByCategory.TukTuks || 0, color: CATEGORY_COLORS.TukTuks },
     ].filter((item) => item.value > 0);
   }, [meta]);
 
@@ -621,13 +591,13 @@ export default function EnhancedDashboard({
 
       <div className="mx-auto w-full max-w-[1600px] min-w-0 px-3 py-8 sm:px-6 lg:px-8">
         <div className="space-y-8 animate-fade-in">
-          {/* Quick Filters - Beautiful Vehicle Category Cards */}
+          {/* Vehicle category overview */}
           <div className="space-y-6">
             {/* Section Header */}
             <div className="flex flex-wrap items-end justify-between gap-3">
               <div className="min-w-0">
-                <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-100">Quick Filters</h2>
-                <p className="text-sm text-slate-500 mt-1 dark:text-slate-400">Filter vehicles by category</p>
+                <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-100">Vehicle Categories</h2>
+                <p className="text-sm text-slate-500 mt-1 dark:text-slate-400">Browse inventory by category</p>
               </div>
               <div className="flex flex-shrink-0 items-center gap-2">
                 <span className="text-sm text-slate-400 dark:text-slate-500">Total Inventory</span>
@@ -639,7 +609,7 @@ export default function EnhancedDashboard({
             <div className="grid min-w-0 grid-cols-2 gap-3 sm:gap-6 lg:grid-cols-4">
               {/* All Vehicles Card */}
               <Link
-                href="/vehicles"
+                href={VEHICLE_LIST_ALL_HREF}
                 className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-white to-slate-50 p-4 shadow-sm transition-all duration-500 hover:-translate-y-1 hover:bg-slate-50 dark:from-slate-900 dark:to-slate-800 dark:ring-1 dark:ring-slate-800 dark:hover:bg-slate-800 sm:rounded-3xl sm:p-6"
               >
                 {/* Animated Background Gradient */}
@@ -679,7 +649,7 @@ export default function EnhancedDashboard({
 
               {/* Cars Card */}
               <Link
-                href="/vehicles?category=Cars"
+                href="/vehicles?category=cars"
                 className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-white to-blue-50/30 p-4 shadow-sm transition-all duration-500 hover:-translate-y-1 hover:bg-slate-50 dark:from-slate-900 dark:to-slate-800 dark:ring-1 dark:ring-slate-800 dark:hover:bg-slate-800 sm:rounded-3xl sm:p-6"
               >
                 <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 via-indigo-500/5 to-violet-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
@@ -716,7 +686,7 @@ export default function EnhancedDashboard({
 
               {/* Motorcycles Card */}
               <Link
-                href="/vehicles?category=Motorcycles"
+                href="/vehicles?category=motorcycles"
                 className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-white to-violet-50/30 p-4 shadow-sm transition-all duration-500 hover:-translate-y-1 hover:bg-slate-50 dark:from-slate-900 dark:to-slate-800 dark:ring-1 dark:ring-slate-800 dark:hover:bg-slate-800 sm:rounded-3xl sm:p-6"
               >
                 <div className="absolute inset-0 bg-gradient-to-br from-violet-500/5 via-purple-500/5 to-fuchsia-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
@@ -751,9 +721,9 @@ export default function EnhancedDashboard({
                 </div>
               </Link>
 
-              {/* Tuk Tuks Card */}
+              {/* TukTuks Card */}
               <Link
-                href="/vehicles?category=Tuk+Tuk"
+                href="/vehicles?category=tuktuks"
                 className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-white to-amber-50/30 p-4 shadow-sm transition-all duration-500 hover:-translate-y-1 hover:bg-slate-50 dark:from-slate-900 dark:to-slate-800 dark:ring-1 dark:ring-slate-800 dark:hover:bg-slate-800 sm:rounded-3xl sm:p-6"
               >
                 <div className="absolute inset-0 bg-gradient-to-br from-amber-500/5 via-orange-500/5 to-red-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
@@ -771,7 +741,7 @@ export default function EnhancedDashboard({
                   </div>
 
                   <div>
-                    <h3 className="mb-1 text-base font-bold text-slate-800 dark:text-slate-100 sm:text-lg">Tuk Tuks</h3>
+                    <h3 className="mb-1 text-base font-bold text-slate-800 dark:text-slate-100 sm:text-lg">TukTuks</h3>
                     <p className="mb-3 text-xs text-slate-500 dark:text-slate-400 sm:text-sm">Three-wheelers</p>
 
                     <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden dark:bg-slate-800">

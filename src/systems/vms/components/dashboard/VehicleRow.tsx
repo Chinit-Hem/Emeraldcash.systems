@@ -4,6 +4,7 @@ import { useLanguage } from "@/shared/hooks/LanguageContext";
 import { derivePrices } from "@/systems/vms/utils/pricing";
 import type { Vehicle } from "@/shared/types/types";
 import { cn } from "@/shared/utils/ui";
+import { formatVehicleId } from "@/shared/utils/format";
 import type { AppRouterInstance } from "next/dist/shared/lib/app-router-context.shared-runtime";
 import { useState, useCallback, useEffect, type CSSProperties, type Dispatch, type SetStateAction } from "react";
 import { formatPrice, getVehicleThumbnailUrl } from "@/systems/vms/utils/vehicle-helpers";
@@ -85,7 +86,7 @@ export default function VehicleRow({
     >
       {visibleColumns.includes('id') && (
         <div className="px-4 py-3 whitespace-nowrap text-sm font-mono text-[#4a4a5a] w-20 flex-shrink-0">
-          {vehicle.VehicleId || "-"}
+          {formatVehicleId(vehicle.VehicleId)}
         </div>
       )}
 

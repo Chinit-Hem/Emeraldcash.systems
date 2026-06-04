@@ -35,26 +35,20 @@ export async function GET(req: NextRequest) {
     const auth = requirePermission(req, "vehicles:view");
     if (auth.response) return auth.response;
 
-    console.log("[API /vehicles/stats] Fetching full vehicle stats...");
     const result = await vehicleService.getVehicleStats();
     const stats = result.data || EMPTY_STATS;
     const categoryTotal = sumCounts(stats.byCategory);
     const conditionTotal = sumCounts(stats.byCondition);
 
-    console.log("[API /vehicles/stats] Full stats response:", {
-      success: result.success,
-      total: stats.total,
-      categoryTotal,
-      conditionTotal,
-      byCategory: stats.byCategory,
-      byCondition: stats.byCondition,
-      unaccountedByCategory: Math.max(0, stats.total - categoryTotal),
-    });
-
     return NextResponse.json({
       success: result.success,
       data: stats,
-      meta: result.meta
+      meta: {
+        ...result.meta,
+        categoryTotal,
+        conditionTotal,
+        unaccountedByCategory: Math.max(0, stats.total - categoryTotal),
+      },
     });
   } catch (error) {
     console.error("[API /vehicles/stats] Error:", error);

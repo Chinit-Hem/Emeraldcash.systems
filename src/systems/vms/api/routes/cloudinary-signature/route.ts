@@ -20,6 +20,11 @@ const CLOUDINARY_API_KEY = process.env.CLOUDINARY_API_KEY;
 const CLOUDINARY_API_SECRET = process.env.CLOUDINARY_API_SECRET;
 const CLOUDINARY_CLOUD_NAME = process.env.CLOUDINARY_CLOUD_NAME;
 const CLOUDINARY_UPLOAD_PRESET = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET || "vehicle_uploads";
+const IS_PRODUCTION = process.env.NODE_ENV === "production";
+const SAFE_CLOUDINARY_FOLDER_PATTERN = /^[A-Za-z0-9][A-Za-z0-9/_-]{0,120}$/;
+const SAFE_CLOUDINARY_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]{0,120}$/;
+const ALLOWED_VEHICLE_FOLDERS = new Set(["Cars", "Motorcycles", "TukTuks", "vehicle_images", "vehicles"]);
+const ALLOWED_SMS_FOLDER_PREFIXES = ["sms/assets/images", "sms/returns/images", "sms/transfers/images"];
 
 /**
  * Generate Cloudinary upload signature
@@ -63,6 +68,27 @@ function getRequiredPermission(folder: string): Permission {
   return folder.startsWith("sms/") ? "sms:create" : "vehicles:create";
 }
 
+function isAllowedFolder(folder: string): boolean {
+  if (!SAFE_CLOUDINARY_FOLDER_PATTERN.test(folder) || folder.includes("..")) {
+    return false;
+  }
+
+  return (
+    ALLOWED_VEHICLE_FOLDERS.has(folder) ||
+    ALLOWED_SMS_FOLDER_PREFIXES.some((prefix) => folder === prefix || folder.startsWith(`${prefix}/`))
+  );
+}
+
+function isAllowedPublicId(publicId: string | undefined): boolean {
+  return !publicId || (SAFE_CLOUDINARY_ID_PATTERN.test(publicId) && !publicId.includes(".."));
+}
+
+function isAllowedTags(tags: unknown): tags is string[] | undefined {
+  if (tags === undefined) return true;
+  if (!Array.isArray(tags) || tags.length > 10) return false;
+  return tags.every((tag) => typeof tag === "string" && SAFE_CLOUDINARY_ID_PATTERN.test(tag));
+}
+
 export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
     // Parse request body
@@ -73,9 +99,16 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       // No body or invalid JSON, use defaults
     }
 
-    const folder = (body.folder as string) || "vehicles";
-    const publicId = body.public_id as string | undefined;
-    const tags = body.tags as string[] | undefined;
+    const folder = typeof body.folder === "string" ? body.folder.trim() : "vehicles";
+    const publicId = typeof body.public_id === "string" ? body.public_id.trim() : undefined;
+    const tags = body.tags;
+
+    if (!isAllowedFolder(folder) || !isAllowedPublicId(publicId) || !isAllowedTags(tags)) {
+      return NextResponse.json(
+        { ok: false, error: "Invalid upload parameters", code: "INVALID_UPLOAD_PARAMS" },
+        { status: 400 }
+      );
+    }
 
     const auth = requirePermission(request, getRequiredPermission(folder));
     if (auth.response) return auth.response;
@@ -86,7 +119,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       return NextResponse.json(
         {
           ok: false,
-          error: configValidation.error,
+          error: IS_PRODUCTION ? "Cloudinary is not configured" : configValidation.error,
           code: "CONFIG_ERROR"
         },
         { status: 500 }

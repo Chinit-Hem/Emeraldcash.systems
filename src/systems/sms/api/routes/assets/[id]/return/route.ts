@@ -19,7 +19,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     }
 
     const body = await req.json().catch(() => ({}));
-    const canChooseReturner = auth.session.role === 'Admin' || auth.session.role === 'Transfer';
+    const canChooseReturner = auth.session.role === 'Admin';
     const returnedBy =
       canChooseReturner && typeof body.returnedBy === 'string' && body.returnedBy.trim()
         ? body.returnedBy.trim()

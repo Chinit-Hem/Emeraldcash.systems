@@ -35,6 +35,7 @@ export default function EditVehiclePage() {
 
 // Reserved words that cannot be used as vehicle IDs
 const RESERVED_IDS = ['edit', 'add', 'view', 'new', 'create', 'delete'];
+const VEHICLE_NAVIGATION_FETCH_LIMIT = 2000;
 
 function EditVehicleInner() {
   const router = useRouter();
@@ -54,13 +55,13 @@ function EditVehicleInner() {
   const userRole = user?.role || "Viewer";
 
   const handleBackToList = useCallback(() => {
-    router.push(listHref);
+    router.push(listHref, { scroll: false });
   }, [listHref, router]);
 
   // Redirect to vehicles list if ID is a reserved word
   useEffect(() => {
     if (isReservedId) {
-      router.push(listHref);
+      router.push(listHref, { scroll: false });
     }
   }, [isReservedId, listHref, router]);
 
@@ -82,8 +83,8 @@ function EditVehicleInner() {
   // Use vehicle directly - no local sync delay
   const currentVehicle = vehicle;
 
-  // Fetch all vehicles for navigation - use high limit to ensure current vehicle is included
-  const { vehicles: allVehicles } = useVehicles({ noCache: true, limit: 10000 });
+  // Fetch enough vehicles for next/previous navigation without pulling a huge dataset on every edit.
+  const { vehicles: allVehicles } = useVehicles({ limit: VEHICLE_NAVIGATION_FETCH_LIMIT });
 
   const navigationVehicles = useMemo(() => {
     if (groupBy === "none" || !vehicle) return allVehicles;
@@ -133,7 +134,7 @@ function EditVehicleInner() {
   const handleDeleteSuccess = useCallback(() => {
     success("Vehicle deleted successfully");
     setIsDeleteModalOpen(false);
-    router.push(listHref);
+    router.push(listHref, { scroll: false });
   }, [success, router, listHref]);
 
   const handleDeleteError = useCallback((err: string) => {

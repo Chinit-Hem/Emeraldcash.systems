@@ -12,9 +12,12 @@ export function buildCorsHeaders(req: NextRequest): Headers {
       ? vercelUrl
       : `https://${vercelUrl}`
     : "";
-  const requestOrigin = req.headers.get("origin") || "";
+  const requestOrigin = req.headers.get("origin")?.trim().replace(/\/+$/, "") || "";
+  const trustedOrigins = process.env.TRUSTED_ORIGINS?.split(",") ?? [];
   const allowedOrigins = new Set(
-    [appOrigin, vercelOrigin].filter((origin): origin is string => Boolean(origin))
+    [appOrigin, vercelOrigin, ...trustedOrigins]
+      .map((origin) => origin?.trim().replace(/\/+$/, ""))
+      .filter((origin): origin is string => Boolean(origin))
   );
 
   if (process.env.NODE_ENV !== "production") {

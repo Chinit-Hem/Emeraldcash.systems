@@ -2,13 +2,30 @@ import type { Vehicle } from "@/shared/types/types";
 
 export const VEHICLE_GROUP_BY_OPTIONS = ["none", "category", "brand", "year", "condition", "color"] as const;
 export const VEHICLE_LIST_PATH = "/vehicles";
+export const VEHICLE_LIST_ALL_HREF = `${VEHICLE_LIST_PATH}?category=all`;
+export const VEHICLE_LIST_VIEW_PARAM = "view";
 export const VEHICLE_LIST_PAGE_PARAM = "page";
 export const VEHICLE_LIST_PAGE_SIZE_PARAM = "pageSize";
 export const VEHICLE_LIST_FOCUS_PARAM = "focusVehicle";
 export const VEHICLE_LIST_RETURN_PARAM = "from";
 export const VEHICLE_LIST_RETURN_STORAGE_KEY = "vms-vehicle-list-return-href";
+export const VEHICLE_LIST_SCROLL_STORAGE_KEY = "vms-vehicle-list-scroll-position";
+export const VEHICLE_LIST_SCROLL_SNAPSHOT_STORAGE_PREFIX = "vms-vehicle-list-scroll-snapshot:";
+export const VEHICLE_LIST_URL_CHANGE_EVENT = "vms-vehicle-list-url-change";
+
+export type VehicleListScrollSnapshot = {
+  scrollX: number;
+  scrollY: number;
+};
+
+export type VehicleListScrollPosition = VehicleListScrollSnapshot & {
+  focusVehicleId: string;
+  href: string;
+  updatedAt: number;
+};
 
 export type VehicleGroupByOption = (typeof VEHICLE_GROUP_BY_OPTIONS)[number];
+export type VehicleListViewMode = "grid" | "list";
 
 type SearchParamsLike = Pick<URLSearchParams, "get" | "getAll" | "toString">;
 type VehicleListQueryKey =
@@ -16,8 +33,8 @@ type VehicleListQueryKey =
   | "withoutImage"
   | "noImage"
   | "groupBy"
+  | typeof VEHICLE_LIST_VIEW_PARAM
   | typeof VEHICLE_LIST_PAGE_PARAM
-  | typeof VEHICLE_LIST_PAGE_SIZE_PARAM
   | typeof VEHICLE_LIST_FOCUS_PARAM;
 
 const VEHICLE_LIST_QUERY_KEYS: VehicleListQueryKey[] = [
@@ -25,8 +42,8 @@ const VEHICLE_LIST_QUERY_KEYS: VehicleListQueryKey[] = [
   "withoutImage",
   "noImage",
   "groupBy",
+  VEHICLE_LIST_VIEW_PARAM,
   VEHICLE_LIST_PAGE_PARAM,
-  VEHICLE_LIST_PAGE_SIZE_PARAM,
   VEHICLE_LIST_FOCUS_PARAM,
 ];
 
@@ -35,13 +52,17 @@ const VEHICLE_LIST_CONTEXT_KEYS: VehicleListQueryKey[] = [
   "withoutImage",
   "noImage",
   "groupBy",
-  VEHICLE_LIST_PAGE_SIZE_PARAM,
+  VEHICLE_LIST_VIEW_PARAM,
 ];
 
 export function parseVehicleGroupByParam(value: string | null | undefined): VehicleGroupByOption {
   return VEHICLE_GROUP_BY_OPTIONS.includes(value as VehicleGroupByOption)
     ? (value as VehicleGroupByOption)
     : "none";
+}
+
+export function parseVehicleListViewParam(value: string | null | undefined): VehicleListViewMode {
+  return value === "list" ? "list" : "grid";
 }
 
 export function parseVehicleListPageParam(value: string | null | undefined): number {
@@ -98,6 +119,125 @@ export function rememberVehicleListHref(href: string): void {
     window.sessionStorage.setItem(VEHICLE_LIST_RETURN_STORAGE_KEY, safeHref);
   } catch {
     // Best-effort navigation handoff only.
+  }
+}
+
+export function clearStoredVehicleListState(): void {
+  if (typeof window === "undefined") return;
+
+  try {
+    window.sessionStorage.removeItem(VEHICLE_LIST_RETURN_STORAGE_KEY);
+    window.sessionStorage.removeItem(VEHICLE_LIST_SCROLL_STORAGE_KEY);
+  } catch {
+    // Best-effort list context reset only.
+  }
+}
+
+export function rememberVehicleListScrollPosition(
+  href: string,
+  focusVehicleId: string,
+  position?: { scrollX?: number; scrollY?: number }
+): void {
+  if (typeof window === "undefined") return;
+
+  const safeHref = normalizeVehicleListHref(href);
+  if (!safeHref || !focusVehicleId) return;
+
+  const scrollPosition: VehicleListScrollPosition = {
+    focusVehicleId,
+    href: safeHref,
+    scrollX: Number.isFinite(position?.scrollX) ? Number(position?.scrollX) : window.scrollX,
+    scrollY: Number.isFinite(position?.scrollY) ? Number(position?.scrollY) : window.scrollY,
+    updatedAt: Date.now(),
+  };
+
+  try {
+    window.sessionStorage.setItem(VEHICLE_LIST_SCROLL_STORAGE_KEY, JSON.stringify(scrollPosition));
+  } catch {
+    // Best-effort scroll restoration only.
+  }
+}
+
+function getVehicleListScrollSnapshotStorageKey(href: string): string | null {
+  const safeHref = normalizeVehicleListHref(href);
+  return safeHref ? `${VEHICLE_LIST_SCROLL_SNAPSHOT_STORAGE_PREFIX}${safeHref}` : null;
+}
+
+export function rememberVehicleListScrollSnapshot(
+  href: string,
+  position?: { scrollX?: number; scrollY?: number }
+): void {
+  if (typeof window === "undefined") return;
+
+  const safeHref = normalizeVehicleListHref(href);
+  const storageKey = safeHref ? getVehicleListScrollSnapshotStorageKey(safeHref) : null;
+  if (!safeHref || !storageKey) return;
+
+  const scrollSnapshot = {
+    href: safeHref,
+    scrollX: Number.isFinite(position?.scrollX) ? Number(position?.scrollX) : window.scrollX,
+    scrollY: Number.isFinite(position?.scrollY) ? Number(position?.scrollY) : window.scrollY,
+    updatedAt: Date.now(),
+  };
+
+  try {
+    window.sessionStorage.setItem(storageKey, JSON.stringify(scrollSnapshot));
+  } catch {
+    // Best-effort scroll restoration only.
+  }
+}
+
+export function getStoredVehicleListScrollSnapshot(href: string): VehicleListScrollSnapshot | null {
+  if (typeof window === "undefined") return null;
+
+  const safeHref = normalizeVehicleListHref(href);
+  const storageKey = safeHref ? getVehicleListScrollSnapshotStorageKey(safeHref) : null;
+  if (!safeHref || !storageKey) return null;
+
+  try {
+    const rawValue = window.sessionStorage.getItem(storageKey);
+    if (!rawValue) return null;
+
+    const parsed = JSON.parse(rawValue) as Partial<VehicleListScrollSnapshot & { href: string; updatedAt: number }>;
+    if (normalizeVehicleListHref(parsed.href) !== safeHref) return null;
+    if (!Number.isFinite(parsed.scrollY) || !Number.isFinite(parsed.scrollX)) return null;
+
+    return {
+      scrollX: Number(parsed.scrollX),
+      scrollY: Number(parsed.scrollY),
+    };
+  } catch {
+    return null;
+  }
+}
+
+export function getStoredVehicleListScrollPosition(
+  href: string,
+  focusVehicleId: string
+): VehicleListScrollPosition | null {
+  if (typeof window === "undefined" || !focusVehicleId) return null;
+
+  const safeHref = normalizeVehicleListHref(href);
+  if (!safeHref) return null;
+
+  try {
+    const rawValue = window.sessionStorage.getItem(VEHICLE_LIST_SCROLL_STORAGE_KEY);
+    if (!rawValue) return null;
+
+    const parsed = JSON.parse(rawValue) as Partial<VehicleListScrollPosition>;
+    if (parsed.focusVehicleId !== focusVehicleId) return null;
+    if (normalizeVehicleListHref(parsed.href) !== safeHref) return null;
+    if (!Number.isFinite(parsed.scrollY) || !Number.isFinite(parsed.scrollX)) return null;
+
+    return {
+      focusVehicleId,
+      href: safeHref,
+      scrollX: Number(parsed.scrollX),
+      scrollY: Number(parsed.scrollY),
+      updatedAt: Number.isFinite(parsed.updatedAt) ? Number(parsed.updatedAt) : 0,
+    };
+  } catch {
+    return null;
   }
 }
 
@@ -206,7 +346,7 @@ function mergeVehicleListSearchParams(
   return merged;
 }
 
-function getVehicleListSearchParamsWithFallback(
+export function getVehicleListSearchParamsWithFallback(
   searchParams: SearchParamsLike | null | undefined
 ): URLSearchParams {
   const current = getVehicleListSearchParams(searchParams);
@@ -298,8 +438,8 @@ export function getVehicleListPageFromHref(href: string): number {
   }
 }
 
-export function getVehicleListBackLabel(href: string): string {
-  return `Back to List ${getVehicleListPageFromHref(href)}`;
+export function getVehicleListBackLabel(_href: string): string {
+  return "Back to List";
 }
 
 export function withVehicleListQueryFallback(path: string, searchParams: SearchParamsLike | null | undefined): string {

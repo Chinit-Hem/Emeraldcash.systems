@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
+import { LmsContentManagerTabs } from "../LmsContentManagerTabs";
 
 export default function CategoriesAdminPage() {
   const router = useRouter();
@@ -61,7 +62,7 @@ export default function CategoriesAdminPage() {
 
   useEffect(() => {
     if (!isAdmin) {
-      router.push("/lms");
+      router.push("/lms", { scroll: false });
       return;
     }
     fetchCategories();
@@ -204,7 +205,7 @@ export default function CategoriesAdminPage() {
         <div className="mb-6 flex items-start gap-3 sm:mb-8 sm:items-center sm:gap-4">
           <button
             type="button"
-            onClick={() => router.push("/lms")}
+            onClick={() => router.push("/lms", { scroll: false })}
             aria-label="Back to LMS"
             title="Back to LMS"
             className="flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-xl bg-white text-slate-600 shadow-[4px_4px_8px_#e2e8f0,-4px_-4px_8px_#ffffff] transition-all hover:shadow-[6px_6px_12px_#e2e8f0,-6px_-6px_12px_#ffffff] active:scale-95"
@@ -221,6 +222,8 @@ export default function CategoriesAdminPage() {
             </div>
           </div>
         </div>
+
+        <LmsContentManagerTabs activeTab="categories" />
 
         {/* Error Message */}
         {error && (

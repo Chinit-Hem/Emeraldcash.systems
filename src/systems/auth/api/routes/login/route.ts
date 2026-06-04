@@ -3,118 +3,194 @@ import {
   getClientIp,
   getClientUserAgent,
 } from "@/lib/auth";
+import { auditEventFromRequest, recordAuditEvent } from "@/lib/audit-log";
+import { clearRateLimit, consumeRateLimit } from "@/lib/rate-limit";
 import { findLmsStaffForSession } from "@/systems/lms/utils/lms-auth";
 import { authenticateUser } from "@/lib/userStore";
 import { NextRequest, NextResponse } from "next/server";
 
 // ============ Rate Limiting ============
-interface RateLimitEntry {
-  count: number;
-  firstAttempt: number;
-}
-
-const loginAttempts = new Map<string, RateLimitEntry>();
 const MAX_ATTEMPTS = 5;
-const LOCKOUT_WINDOW_MS = 15 * 60 * 1000; // 15 minutes
+const LOCKOUT_WINDOW_SECONDS = 15 * 60; // 15 minutes
+const MAX_LOGIN_BODY_BYTES = 4 * 1024;
+const MAX_PASSWORD_LENGTH = 72;
+const IS_PRODUCTION = process.env.NODE_ENV === "production";
+const TURNSTILE_VERIFY_URL = "https://challenges.cloudflare.com/turnstile/v0/siteverify";
+const TURNSTILE_SECRET_KEY = process.env.TURNSTILE_SECRET_KEY?.trim();
+const TURNSTILE_REQUIRED =
+  Boolean(TURNSTILE_SECRET_KEY) || (IS_PRODUCTION && process.env.REQUIRE_TURNSTILE === "true");
+
+const noStoreHeaders = {
+  "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
+  "Pragma": "no-cache",
+  "Expires": "0",
+  "X-Content-Type-Options": "nosniff",
+};
 
 function getRateLimitKey(ip: string, username: string): string {
-  return `${ip}:${username.toLowerCase()}`;
-}
-
-function isRateLimited(key: string): { limited: boolean; remaining?: number; resetTime?: number } {
-  const entry = loginAttempts.get(key);
-  const now = Date.now();
-
-  if (!entry) {
-    return { limited: false, remaining: MAX_ATTEMPTS };
-  }
-
-  if (now - entry.firstAttempt < LOCKOUT_WINDOW_MS) {
-    if (entry.count >= MAX_ATTEMPTS) {
-      const remaining = Math.ceil((LOCKOUT_WINDOW_MS - (now - entry.firstAttempt)) / 1000);
-      return { limited: true, remaining, resetTime: entry.firstAttempt + LOCKOUT_WINDOW_MS };
-    }
-    return { limited: false, remaining: MAX_ATTEMPTS - entry.count };
-  }
-
-  loginAttempts.delete(key);
-  return { limited: false, remaining: MAX_ATTEMPTS };
-}
-
-function recordFailedAttempt(key: string): void {
-  const now = Date.now();
-  const existing = loginAttempts.get(key);
-
-  if (existing && now - existing.firstAttempt < LOCKOUT_WINDOW_MS) {
-    existing.count += 1;
-  } else {
-    loginAttempts.set(key, { count: 1, firstAttempt: now });
-  }
-}
-
-function recordSuccessfulAttempt(key: string): void {
-  loginAttempts.delete(key);
+  return `auth:login:${ip}:${username.toLowerCase()}`;
 }
 
 // ============ Password Validation ============
-function validatePasswordStrength(password: string): { valid: boolean; message?: string } {
-  if (password.length < 4) {
-    return { valid: false, message: "Password must be at least 4 characters" };
+function validateLoginPassword(password: string): { valid: boolean; message?: string } {
+  if (password.length > MAX_PASSWORD_LENGTH) {
+    return { valid: false, message: "Invalid username/password" };
   }
   return { valid: true };
+}
+
+function getContentLength(req: NextRequest): number | null {
+  const rawLength = req.headers.get("content-length");
+  if (!rawLength) return null;
+
+  const parsedLength = Number(rawLength);
+  if (!Number.isFinite(parsedLength) || parsedLength < 0) {
+    return null;
+  }
+
+  return parsedLength;
+}
+
+async function verifyTurnstileToken(token: string, ip: string): Promise<boolean> {
+  if (!TURNSTILE_REQUIRED) return true;
+  if (!TURNSTILE_SECRET_KEY || !token) return false;
+
+  const formData = new FormData();
+  formData.append("secret", TURNSTILE_SECRET_KEY);
+  formData.append("response", token);
+  formData.append("remoteip", ip);
+
+  try {
+    const response = await fetch(TURNSTILE_VERIFY_URL, {
+      method: "POST",
+      body: formData,
+      cache: "no-store",
+    });
+
+    if (!response.ok) return false;
+
+    const result = await response.json().catch(() => ({})) as { success?: boolean };
+    return result.success === true;
+  } catch {
+    return false;
+  }
 }
 
 export async function POST(req: NextRequest) {
   const ip = getClientIp(req.headers);
   const userAgent = getClientUserAgent(req.headers);
+  const contentLength = getContentLength(req);
+
+  if (contentLength && contentLength > MAX_LOGIN_BODY_BYTES) {
+    return NextResponse.json(
+      { ok: false, error: "Request body too large" },
+      { status: 413, headers: noStoreHeaders }
+    );
+  }
 
   const body = await req.json().catch(() => ({}));
   const username = typeof body?.username === "string" ? body.username.trim() : "";
   const password = typeof body?.password === "string" ? body.password : "";
-
-  console.log(`[LOGIN_API] Attempt for user: ${username}`);
+  const turnstileToken = typeof body?.turnstileToken === "string" ? body.turnstileToken : "";
 
   if (!username || !password) {
+    await recordAuditEvent(auditEventFromRequest(req, {
+      action: "auth.login.validation_failed",
+      actorUsername: username || null,
+      resourceType: "auth",
+      status: "failure",
+      severity: "warning",
+      metadata: { reason: "missing_credentials" },
+    }));
+
     return NextResponse.json(
       { ok: false, error: "Username and password required" },
-      { status: 400 }
+      { status: 400, headers: noStoreHeaders }
     );
   }
 
   const rateLimitKey = getRateLimitKey(ip, username);
-  const rateLimit = isRateLimited(rateLimitKey);
+  const rateLimit = await consumeRateLimit(rateLimitKey, MAX_ATTEMPTS, LOCKOUT_WINDOW_SECONDS);
 
   if (rateLimit.limited) {
+    await recordAuditEvent(auditEventFromRequest(req, {
+      action: "auth.login.rate_limited",
+      actorUsername: username,
+      resourceType: "auth",
+      status: "denied",
+      severity: "warning",
+      metadata: { attempts: rateLimit.count, retryAfter: rateLimit.retryAfter },
+    }));
+
     return NextResponse.json(
       {
         ok: false,
         error: "Too many failed attempts. Please try again later.",
-        retryAfter: rateLimit.remaining,
+        retryAfter: rateLimit.retryAfter,
       },
-      { status: 429 }
+      {
+        status: 429,
+        headers: {
+          ...noStoreHeaders,
+          "Retry-After": String(rateLimit.retryAfter ?? LOCKOUT_WINDOW_SECONDS),
+        },
+      }
     );
   }
 
-  const passwordValidation = validatePasswordStrength(password);
+  const passwordValidation = validateLoginPassword(password);
   if (!passwordValidation.valid) {
-    recordFailedAttempt(rateLimitKey);
+    await recordAuditEvent(auditEventFromRequest(req, {
+      action: "auth.login.failed",
+      actorUsername: username,
+      resourceType: "auth",
+      status: "failure",
+      severity: "warning",
+      metadata: { reason: "invalid_password_format" },
+    }));
+
     return NextResponse.json(
       { ok: false, error: passwordValidation.message },
-      { status: 400 }
+      { status: 401, headers: noStoreHeaders }
+    );
+  }
+
+  const turnstileOk = await verifyTurnstileToken(turnstileToken, ip);
+  if (!turnstileOk) {
+    await recordAuditEvent(auditEventFromRequest(req, {
+      action: "auth.login.security_check_failed",
+      actorUsername: username,
+      resourceType: "auth",
+      status: "failure",
+      severity: "warning",
+      metadata: { reason: "turnstile_failed" },
+    }));
+
+    return NextResponse.json(
+      { ok: false, error: "Security check failed. Please refresh and try again." },
+      { status: 400, headers: noStoreHeaders }
     );
   }
 
   const authenticatedUser = await authenticateUser(username, password);
   if (!authenticatedUser) {
-    recordFailedAttempt(rateLimitKey);
+    await recordAuditEvent(auditEventFromRequest(req, {
+      action: "auth.login.failed",
+      actorUsername: username,
+      resourceType: "auth",
+      status: "failure",
+      severity: "warning",
+      metadata: { reason: "invalid_credentials" },
+    }));
+
     return NextResponse.json(
       { ok: false, error: "Invalid username/password" },
-      { status: 401 }
+      { status: 401, headers: noStoreHeaders }
     );
   }
 
   // Successful login
-  recordSuccessfulAttempt(rateLimitKey);
+  await clearRateLimit(rateLimitKey);
 
   const user = { username: authenticatedUser.username, role: authenticatedUser.role };
   let sessionCookie = "";
@@ -135,12 +211,20 @@ export async function POST(req: NextRequest) {
       userAgent,
       ip
     );
-    console.log(`[LOGIN_API] Session created for ${username}`);
   } catch (err) {
     console.error("[LOGIN_API] Failed to create session:", err);
+    await recordAuditEvent(auditEventFromRequest(req, {
+      action: "auth.login.session_create_failed",
+      actorUsername: authenticatedUser.username,
+      actorRole: authenticatedUser.role,
+      resourceType: "auth",
+      status: "failure",
+      severity: "critical",
+    }));
+
     return NextResponse.json(
       { ok: false, error: "Failed to create session" },
-      { status: 500 }
+      { status: 500, headers: noStoreHeaders }
     );
   }
 
@@ -150,21 +234,14 @@ export async function POST(req: NextRequest) {
   const forwardedProto = req.headers.get("x-forwarded-proto")?.split(",")[0]?.trim().toLowerCase();
   const isActuallyHttps = forwardedProto === "https" || req.nextUrl.protocol === "https:";
   
-  // Allow override via env var for special deployments
-  const forceInsecureCookies = process.env.ALLOW_HTTP_COOKIES === "true";
-  const isSecureEnvironment = isActuallyHttps && !forceInsecureCookies;
-
-  // Get host for debugging.
-  const host = req.headers.get("host") || "";
-
-  // Detect mobile browser for debugging
-  const isMobile = /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(userAgent);
+  const allowInsecureCookies = !IS_PRODUCTION && process.env.ALLOW_HTTP_COOKIES === "true";
+  const isSecureEnvironment = (IS_PRODUCTION || isActuallyHttps) && !allowInsecureCookies;
 
   const res = NextResponse.json({
     ok: true,
     user,
     message: "Login successful"
-  });
+  }, { headers: noStoreHeaders });
 
   // Cookie options for maximum compatibility including Safari ITP (Intelligent Tracking Prevention)
   // - httpOnly: prevents JavaScript access (security)
@@ -188,18 +265,13 @@ export async function POST(req: NextRequest) {
   
   res.cookies.set("session", sessionCookie, cookieOptions);
 
-  console.log(`[LOGIN_API] Cookie set for ${username}`);
-  console.log(`[LOGIN_API] Cookie options:`, {
-    httpOnly: cookieOptions.httpOnly,
-    sameSite: cookieOptions.sameSite,
-    secure: cookieOptions.secure,
-    path: cookieOptions.path,
-    maxAge: cookieOptions.maxAge,
-    valueLength: sessionCookie.length,
-  });
-  console.log(
-    `[LOGIN_API] Host: ${host}, protocol=${forwardedProto || req.nextUrl.protocol}, isSecure: ${isSecureEnvironment}, isMobile: ${isMobile}`
-  );
+  await recordAuditEvent(auditEventFromRequest(req, {
+    action: "auth.login.success",
+    actorUsername: authenticatedUser.username,
+    actorRole: authenticatedUser.role,
+    resourceType: "auth",
+    status: "success",
+  }));
 
   return res;
 }

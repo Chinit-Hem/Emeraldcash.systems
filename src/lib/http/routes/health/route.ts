@@ -3,6 +3,7 @@ import { withErrorHandling, createSuccessResponse } from "@/lib/api-error-wrappe
 import { getConnectionStats, testConnection } from "@/lib/db-singleton";
 import { getCachedVehicles } from "@/systems/vms/api/vehicles-cache";
 import { testCloudinaryConnection } from "@/lib/cloudinary";
+import { requirePermission } from "@/lib/auth-helpers";
 
 interface HealthMetrics {
   timestamp: string;
@@ -50,6 +51,9 @@ function updateSyncStatus(success: boolean, error?: string) {
 // POST handler to update sync status via API call
 export async function POST(req: NextRequest) {
   try {
+    const auth = requirePermission(req, "settings:manage");
+    if (auth.response) return auth.response;
+
     const body = await req.json();
     const { success, error: syncError } = body;
 
@@ -85,6 +89,9 @@ export async function POST(req: NextRequest) {
  * - Google Sheets connectivity
  */
 const healthHandler = withErrorHandling(async (req, { logger, requestId, startTime }) => {
+  const auth = requirePermission(req, "settings:manage");
+  if (auth.response) return auth.response;
+
   logger.info("Health check started");
 
   // Check Neon PostgreSQL connection

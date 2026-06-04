@@ -11,6 +11,8 @@
  */
 
 export type LogLevel = "INFO" | "DEBUG" | "ERROR" | "WARN";
+const IS_PRODUCTION = process.env.NODE_ENV === "production";
+const SENSITIVE_KEY_PATTERN = /(password|token|secret|cookie|authorization|api[_-]?key|session)/i;
 
 /**
  * Logger interface for type safety
@@ -23,6 +25,35 @@ export interface Logger {
   fatal: (message: string, error?: Error | Record<string, unknown>, meta?: Record<string, unknown>) => void;
   getRequestId: () => string;
   child: (_meta: Record<string, unknown>) => Logger;
+}
+
+function shouldLog(level: LogLevel): boolean {
+  if (IS_PRODUCTION && level === "DEBUG" && process.env.ENABLE_DEBUG_LOGS !== "true") {
+    return false;
+  }
+
+  return true;
+}
+
+function redactValue(value: unknown, depth = 0): unknown {
+  if (!value || depth > 3) return value;
+  if (Array.isArray(value)) return value.map((item) => redactValue(item, depth + 1));
+
+  if (typeof value === "object" && !(value instanceof Error)) {
+    const redacted: Record<string, unknown> = {};
+    for (const [key, childValue] of Object.entries(value as Record<string, unknown>)) {
+      redacted[key] = SENSITIVE_KEY_PATTERN.test(key)
+        ? "[REDACTED]"
+        : redactValue(childValue, depth + 1);
+    }
+    return redacted;
+  }
+
+  return value;
+}
+
+function redactMeta(meta: Record<string, unknown>): Record<string, unknown> {
+  return redactValue(meta) as Record<string, unknown>;
 }
 
 /**
@@ -39,11 +70,13 @@ export function log(
   meta?: Record<string, unknown>,
   requestId?: string
 ): void {
+  if (!shouldLog(level)) return;
+
   const timestamp = new Date().toISOString();
   const prefix = requestId ? `[${timestamp}] [${level}] [${requestId}]` : `[${timestamp}] [${level}]`;
-  
+
   if (meta && Object.keys(meta).length > 0) {
-    console.log(prefix, message, meta);
+    console.log(prefix, message, redactMeta(meta));
   } else {
     console.log(prefix, message);
   }

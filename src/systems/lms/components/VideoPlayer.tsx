@@ -12,7 +12,6 @@ import {
   Cast,
   CheckCircle2,
   ChevronDown,
-  ChevronLeft,
   ChevronRight,
   Clock,
   FileText,
@@ -30,11 +29,45 @@ import {
 } from "lucide-react";
 import { GlassButton } from "@/shared/components/ui/glass/GlassButton";
 import { GlassCard } from "@/shared/components/ui/glass/GlassCard";
+import {
+  COMPLETE_END_TOLERANCE_SECONDS,
+  DOUBLE_TAP_WINDOW_MS,
+  MAX_PLAYBACK_RATE,
+  PLAYBACK_RATES,
+  PROGRESS_POLL_INTERVAL_MS,
+  PROGRESS_SAVE_INTERVAL_MS,
+  SEEK_FEEDBACK_HIDE_DELAY_MS,
+  SEEK_GRACE_SECONDS,
+  SEEK_JUMP_SECONDS,
+  SEEK_SETTLE_LOCK_MS,
+  SEEK_SETTLE_TOLERANCE_SECONDS,
+  SMOOTH_PROGRESS_FRAME_MS,
+  TOUCH_CLICK_SUPPRESS_MS,
+  VIDEO_CONTROLS_HIDE_DELAY_MS,
+  clamp,
+  exitFullscreenElement,
+  formatTime,
+  getActiveFullscreenElement,
+  getSeekGestureDirection,
+  isIOSMobileBrowser,
+  isMobileViewport,
+  loadYouTubeIframeApi,
+  lockLandscapeOrientation,
+  parseInstructionSteps,
+  requestFullscreenElement,
+  unlockScreenOrientation,
+  type ProgressResponse,
+  type SeekFeedbackState,
+  type SeekJumpDirection,
+  type SurfaceTapState,
+  type VideoProgressSnapshot,
+  type YouTubePlayer,
+  type YouTubePlayerEvent,
+} from "@/systems/lms/utils/videoPlayerUtils";
 
 interface VideoPlayerProps {
   lessonId: number;
   title: string;
-  description: string | null;
   youtubeUrl: string;
   youtubeVideoId: string;
   stepByStepInstructions: string | null;
@@ -44,334 +77,11 @@ interface VideoPlayerProps {
   thumbnailUrl?: string | null;
   completionThreshold?: number;
   onComplete: (progress?: VideoProgressSnapshot) => void | Promise<boolean | void>;
-  onBack: () => void;
   onPrevious?: () => void;
   onNext?: () => void;
   canGoPrevious?: boolean;
   canGoNext?: boolean;
   onProgressChange?: (progress: VideoProgressSnapshot) => void;
-}
-
-type VideoProgressSnapshot = {
-  watchPercentage: number;
-  canComplete: boolean;
-  currentTimeSeconds: number;
-  maxWatchedSeconds: number;
-  isCompleted: boolean;
-  completedAt: string | null;
-};
-
-interface YouTubePlayer {
-  playVideo: () => void;
-  pauseVideo: () => void;
-  seekTo: (seconds: number, allowSeekAhead?: boolean) => void;
-  getCurrentTime: () => number;
-  getDuration: () => number;
-  getPlaybackRate: () => number;
-  setPlaybackRate: (suggestedRate: number) => void;
-  destroy: () => void;
-}
-
-interface YouTubePlayerEvent {
-  data: number;
-  target: YouTubePlayer;
-}
-
-interface YouTubeNamespace {
-  Player: new (
-    element: HTMLElement | string,
-    options: {
-      videoId: string;
-      playerVars: Record<string, number>;
-      events: {
-        onReady: (event: YouTubePlayerEvent) => void;
-        onStateChange: (event: YouTubePlayerEvent) => void;
-        onPlaybackRateChange: (event: YouTubePlayerEvent) => void;
-        onError: () => void;
-      };
-    }
-  ) => YouTubePlayer;
-  PlayerState: {
-    PLAYING: number;
-    PAUSED: number;
-    ENDED: number;
-  };
-}
-
-type FullscreenCapableElement = HTMLElement & {
-  webkitRequestFullscreen?: () => Promise<void> | void;
-  mozRequestFullScreen?: () => Promise<void> | void;
-  msRequestFullscreen?: () => Promise<void> | void;
-};
-
-type FullscreenCapableDocument = Document & {
-  webkitFullscreenElement?: Element | null;
-  webkitExitFullscreen?: () => Promise<void> | void;
-  mozFullScreenElement?: Element | null;
-  mozCancelFullScreen?: () => Promise<void> | void;
-  msFullscreenElement?: Element | null;
-  msExitFullscreen?: () => Promise<void> | void;
-};
-
-type OrientationController = {
-  lock?: (orientation: "landscape" | "portrait" | "any" | "natural") => Promise<void>;
-  unlock?: () => void;
-};
-
-declare global {
-  interface Window {
-    YT?: YouTubeNamespace;
-    onYouTubeIframeAPIReady?: () => void;
-  }
-}
-
-type ProgressResponse = {
-  success: boolean;
-  data?: {
-    staffName?: string;
-    isCompleted?: boolean;
-    completedAt?: string | null;
-    currentTimeSeconds: number;
-    maxWatchedSeconds: number;
-    durationSeconds: number;
-    watchPercentage: number;
-    canComplete: boolean;
-  };
-};
-
-const YOUTUBE_IFRAME_API_SRC = "https://www.youtube.com/iframe_api";
-const PROGRESS_SAVE_INTERVAL_MS = 10_000;
-const PROGRESS_POLL_INTERVAL_MS = 1_000;
-const SMOOTH_PROGRESS_FRAME_MS = 90;
-const VIDEO_CONTROLS_HIDE_DELAY_MS = 2_200;
-const TOUCH_CLICK_SUPPRESS_MS = 600;
-const DOUBLE_TAP_WINDOW_MS = 320;
-const SEEK_JUMP_SECONDS = 15;
-const SEEK_FEEDBACK_HIDE_DELAY_MS = 700;
-const SEEK_SETTLE_LOCK_MS = 8_000;
-const SEEK_SETTLE_TOLERANCE_SECONDS = 0.75;
-const MAX_PLAYBACK_RATE = 1.25;
-const SEEK_GRACE_SECONDS = 2;
-const COMPLETE_END_TOLERANCE_SECONDS = 5;
-const PLAYBACK_RATES = [0.5, 1, 1.25, 1.5, 2];
-
-let youtubeApiPromise: Promise<YouTubeNamespace> | null = null;
-
-type SeekJumpDirection = "backward" | "forward";
-
-type SurfaceTapState = {
-  direction: SeekJumpDirection;
-  time: number;
-};
-
-type SeekFeedbackState = {
-  direction: SeekJumpDirection;
-  key: number;
-};
-
-function loadYouTubeIframeApi() {
-  if (window.YT?.Player) {
-    return Promise.resolve(window.YT);
-  }
-
-  if (youtubeApiPromise) {
-    return youtubeApiPromise;
-  }
-
-  youtubeApiPromise = new Promise<YouTubeNamespace>((resolve, reject) => {
-    const previousReady = window.onYouTubeIframeAPIReady;
-
-    window.onYouTubeIframeAPIReady = () => {
-      previousReady?.();
-
-      if (window.YT?.Player) {
-        resolve(window.YT);
-      } else {
-        reject(new Error("YouTube iframe API loaded without YT.Player."));
-      }
-    };
-
-    const existingScript = document.querySelector<HTMLScriptElement>(
-      `script[src="${YOUTUBE_IFRAME_API_SRC}"]`
-    );
-
-    if (existingScript) {
-      existingScript.addEventListener("error", () =>
-        reject(new Error("Unable to load YouTube iframe API."))
-      );
-      return;
-    }
-
-    const script = document.createElement("script");
-    script.src = YOUTUBE_IFRAME_API_SRC;
-    script.async = true;
-    script.onerror = () => reject(new Error("Unable to load YouTube iframe API."));
-
-    const firstScript = document.getElementsByTagName("script")[0];
-    firstScript?.parentNode?.insertBefore(script, firstScript);
-  });
-
-  return youtubeApiPromise;
-}
-
-function parseInstructionSteps(instructions: string | null) {
-  if (!instructions) {
-    return [];
-  }
-
-  return instructions
-    .split("\n")
-    .map((line) =>
-      line
-        .replace(/^#{1,6}\s*/, "")
-        .replace(/^\d+\.\s*/, "")
-        .replace(/^[-*]\s*/, "")
-        .trim()
-    )
-    .filter(Boolean);
-}
-
-function formatTime(seconds: number) {
-  if (!Number.isFinite(seconds) || seconds <= 0) {
-    return "0:00";
-  }
-
-  const minutes = Math.floor(seconds / 60);
-  const remainingSeconds = Math.floor(seconds % 60)
-    .toString()
-    .padStart(2, "0");
-
-  return `${minutes}:${remainingSeconds}`;
-}
-
-function clamp(value: number, min: number, max: number) {
-  return Math.min(max, Math.max(min, value));
-}
-
-function getSeekGestureDirection(clientX: number, element: HTMLElement): SeekJumpDirection {
-  const rect = element.getBoundingClientRect();
-  const midpoint = rect.left + rect.width / 2;
-
-  return clientX < midpoint ? "backward" : "forward";
-}
-
-function getActiveFullscreenElement() {
-  const fullscreenDocument = document as FullscreenCapableDocument;
-
-  return (
-    document.fullscreenElement ??
-    fullscreenDocument.webkitFullscreenElement ??
-    fullscreenDocument.mozFullScreenElement ??
-    fullscreenDocument.msFullscreenElement ??
-    null
-  );
-}
-
-async function requestFullscreenElement(element: HTMLElement) {
-  const fullscreenElement = element as FullscreenCapableElement;
-
-  try {
-    if (element.requestFullscreen) {
-      await element.requestFullscreen({ navigationUI: "hide" } as FullscreenOptions);
-      return true;
-    }
-
-    if (fullscreenElement.webkitRequestFullscreen) {
-      await fullscreenElement.webkitRequestFullscreen();
-      return true;
-    }
-
-    if (fullscreenElement.mozRequestFullScreen) {
-      await fullscreenElement.mozRequestFullScreen();
-      return true;
-    }
-
-    if (fullscreenElement.msRequestFullscreen) {
-      await fullscreenElement.msRequestFullscreen();
-      return true;
-    }
-  } catch {
-    return false;
-  }
-
-  return false;
-}
-
-async function exitFullscreenElement() {
-  const fullscreenDocument = document as FullscreenCapableDocument;
-
-  try {
-    if (document.exitFullscreen && document.fullscreenElement) {
-      await document.exitFullscreen();
-      return;
-    }
-
-    if (fullscreenDocument.webkitExitFullscreen && fullscreenDocument.webkitFullscreenElement) {
-      await fullscreenDocument.webkitExitFullscreen();
-      return;
-    }
-
-    if (fullscreenDocument.mozCancelFullScreen && fullscreenDocument.mozFullScreenElement) {
-      await fullscreenDocument.mozCancelFullScreen();
-      return;
-    }
-
-    if (fullscreenDocument.msExitFullscreen && fullscreenDocument.msFullscreenElement) {
-      await fullscreenDocument.msExitFullscreen();
-    }
-  } catch {
-    // The app-level fullscreen fallback is still closed by local state.
-  }
-}
-
-async function lockLandscapeOrientation() {
-  if (typeof screen === "undefined") {
-    return false;
-  }
-
-  const orientation = screen.orientation as OrientationController | undefined;
-
-  if (!orientation?.lock) {
-    return false;
-  }
-
-  try {
-    await orientation.lock("landscape");
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-function unlockScreenOrientation() {
-  if (typeof screen === "undefined") {
-    return;
-  }
-
-  try {
-    (screen.orientation as OrientationController | undefined)?.unlock?.();
-  } catch {
-    // Some mobile browsers expose unlock but reject outside native fullscreen.
-  }
-}
-
-function isMobileViewport() {
-  if (typeof window === "undefined") {
-    return false;
-  }
-
-  return window.matchMedia("(pointer: coarse)").matches || window.innerWidth < 900;
-}
-
-function isIOSMobileBrowser() {
-  if (typeof navigator === "undefined") {
-    return false;
-  }
-
-  return (
-    /\b(iPad|iPhone|iPod)\b/i.test(navigator.userAgent) ||
-    (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1)
-  );
 }
 
 function InstructionsPanel({
@@ -686,7 +396,6 @@ function MobileTranscriptSheet({
 export function VideoPlayer({
   lessonId,
   title,
-  description,
   youtubeUrl,
   youtubeVideoId,
   stepByStepInstructions,
@@ -696,7 +405,6 @@ export function VideoPlayer({
   thumbnailUrl,
   completionThreshold = 95,
   onComplete,
-  onBack,
   onPrevious,
   onNext,
   canGoPrevious = false,
@@ -770,6 +478,12 @@ export function VideoPlayer({
 
   const completionAllowed = isCompleted || watchPercentage >= completionThreshold;
   const playbackUnlocked = completionAllowed;
+  const normalizedWatchPercentage = clamp(watchPercentage, 0, 100);
+  const displayedWatchPercentage = Math.floor(normalizedWatchPercentage);
+  const remainingCompletionPercentage = Math.max(
+    0,
+    Math.ceil(completionThreshold - normalizedWatchPercentage)
+  );
   const currentProgressPercent =
     videoDuration > 0 ? clamp((smoothCurrentTime / videoDuration) * 100, 0, 100) : 0;
   const progressPercent = seekPreviewPercent ?? currentProgressPercent;
@@ -1932,52 +1646,6 @@ useEffect(() => {
   return (
     <div className="bg-gray-50 p-0 dark:bg-gray-900 sm:p-0 lms-lesson-page">
       <div className="mx-auto max-w-[1600px] space-y-4 sm:space-y-6">
-        <header className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex min-w-0 items-start gap-3 sm:gap-4">
-            <button
-              type="button"
-              onClick={onBack}
-              className="rounded-lg p-1.5 transition-colors hover:bg-gray-200 dark:hover:bg-gray-800 sm:p-2"
-              aria-label="Back to course"
-            >
-              <ChevronLeft className="h-5 w-5 text-gray-600 dark:text-gray-400 sm:h-6 sm:w-6" />
-            </button>
-
-            <div className="min-w-0">
-              <h1 className="break-words text-base font-bold leading-snug text-gray-900 dark:text-white sm:text-2xl">
-                {title}
-              </h1>
-              {description && (
-                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400 sm:text-sm">
-                  {description}
-                </p>
-              )}
-            </div>
-          </div>
-
-          {isCompleted ? (
-            <div className="inline-flex items-center gap-1.5 self-start rounded-lg bg-emerald-100 px-3 py-1.5 text-sm font-medium text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 sm:self-auto sm:gap-2 sm:px-4 sm:py-2 sm:text-base">
-              <CheckCircle2 className="h-4 w-4 sm:h-5 sm:w-5" />
-              Completed
-            </div>
-          ) : (
-            <GlassButton
-              variant="primary"
-              onClick={handleComplete}
-              disabled={!completionAllowed}
-              className="w-full sm:w-auto"
-              title={
-                completionAllowed
-                  ? "Mark lesson complete"
-                  : `Watch ${completionThreshold}% to unlock completion`
-              }
-            >
-              <CheckCircle2 className="mr-2 h-4 w-4" />
-              Mark Complete
-            </GlassButton>
-          )}
-        </header>
-
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
           <section className="space-y-4 lg:col-span-2">
             <div
@@ -2486,14 +2154,16 @@ useEffect(() => {
         )}
 
         {!isCompleted && (
-          <GlassCard className="rounded-2xl border-emerald-200 bg-gradient-to-r from-emerald-50 to-teal-50 p-6 dark:border-emerald-800 dark:from-emerald-900/20 dark:to-teal-900/20">
+          <GlassCard className="rounded-2xl border-emerald-200 bg-emerald-50 p-5 dark:border-emerald-800 dark:bg-emerald-900/20 sm:p-6">
             <div className="flex flex-col items-center justify-between gap-4 sm:flex-row">
-              <div>
+              <div className="w-full min-w-0 text-center sm:text-left">
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                  Finished the lesson?
+                  Complete this lesson
                 </h3>
                 <p className="text-sm text-gray-600 dark:text-gray-400">
-                  Watch at least {completionThreshold}% to unlock completion.
+                  {completionAllowed
+                    ? "You watched enough of this lesson. Mark it complete to unlock the next lesson."
+                    : `Watched ${displayedWatchPercentage}%. Watch ${remainingCompletionPercentage}% more to unlock completion.`}
                 </p>
               </div>
               <GlassButton
@@ -2501,9 +2171,15 @@ useEffect(() => {
                 size="lg"
                 onClick={handleComplete}
                 disabled={!completionAllowed}
+                className="w-full sm:w-auto"
+                title={
+                  completionAllowed
+                    ? "Mark lesson complete"
+                    : `Watch ${remainingCompletionPercentage}% more to unlock completion`
+                }
               >
                 <CheckCircle2 className="mr-2 h-5 w-5" />
-                Mark as Complete
+                {completionAllowed ? "Mark Complete" : `Watch ${remainingCompletionPercentage}% more`}
               </GlassButton>
             </div>
           </GlassCard>

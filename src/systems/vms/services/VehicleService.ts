@@ -31,7 +31,7 @@ import type { VehicleFilters } from "@/systems/vms/types/vehicle";
 // Re-export VehicleFilters for backwards compatibility
 export type { VehicleFilters };
 import { BaseService, ServiceResult } from "@/shared/utils/services/BaseService";
-import { deleteImage, extractCloudinaryPublicId, isCloudinaryPublicId } from "@/lib/cloudinary";
+import { deleteImage, extractCloudinaryPublicId } from "@/lib/cloudinary";
 import { getVehicleThumbnailUrl, mergeVehicleImages } from "@/systems/vms/utils/vehicle-helpers";
 
 
@@ -840,8 +840,6 @@ conditions.push(`(NULLIF(TRIM(COALESCE(image_id, '')), '') IS NULL AND NULLIF(TR
         )
       `;
 
-      console.log(`[VehicleService] Notification created: ${notification.title} for ${notification.recipientId}`);
-
       return {
         success: true,
         data: true,
@@ -1254,16 +1252,9 @@ conditions.push(`(NULLIF(TRIM(COALESCE(image_id, '')), '') IS NULL AND NULLIF(TR
   /**
    * Get a single vehicle by ID
    * Returns legacy Vehicle format for backward compatibility
-   * ✅ FIXED: Added logging for debugging 500 errors
    */
   public async getVehicleById(id: number): Promise<ServiceResult<Vehicle>> {
-    console.log(`[VehicleService] Looking up vehicle ID: ${id}`);
     const result = await this.getById(id);
-    if (!result.success) {
-      console.info(`[VehicleService] Vehicle ID ${id} NOT FOUND`);
-    } else if (result.data) {
-      console.info(`[VehicleService] Vehicle ID ${id} FOUND: ${result.data.Plate || 'N/A'}`);
-    }
     if (result.success && result.data) {
       const vehicle = this.toVehicle(result.data);
       const galleryResult = await this.getVehicleImages(id);
@@ -1362,24 +1353,11 @@ conditions.push(`(NULLIF(TRIM(COALESCE(image_id, '')), '') IS NULL AND NULLIF(TR
     vehicle: Partial<VehicleDB>
   ): Promise<ServiceResult<Vehicle>> {
     const logPrefix = `[VehicleService.updateVehicle #${id}]`;
-    console.error(`${logPrefix} INPUT:`, { 
-      image_id: vehicle.image_id ? vehicle.image_id.substring(0, 100) + '...' : null, 
-      keys: Object.keys(vehicle),
-      plate: vehicle.plate 
-    });
-    
+
     // 🚀 IMAGE SAVE FIX: Accept public_id/URL/data URL (sync validation)
     if (vehicle.image_id != null) {
       const img = String(vehicle.image_id).trim();
-      
-      console.log(`${logPrefix} IMAGE SAVE:`, {
-        length: img.length,
-        format: img.startsWith('http') ? 'URL' : 
-                img.startsWith('data:') ? 'DATA' : 
-                isCloudinaryPublicId(img) ? 'PUBLIC_ID' : 'RAW',
-        preview: img.substring(0, 50)
-      });
-      
+
       // Store raw: public_id, full URL, or data URL - toEntity() will normalize on read
       if (img.length > 1000) {
         const err = `Image ID too long (${img.length}/1000 chars max)`;
@@ -1397,14 +1375,8 @@ conditions.push(`(NULLIF(TRIM(COALESCE(image_id, '')), '') IS NULL AND NULLIF(TR
       : vehicle;
 
     try {
-      console.error(`${logPrefix} Calling base update...`);
       const result = await this.update(id, data);
-      console.error(`${logPrefix} Base result:`, { 
-        success: result.success, 
-        error: result.error,
-        affectedRows: (result.meta as typeof result.meta & { affectedRows?: number })?.affectedRows 
-      });
-      
+
       if (result.success && result.data) {
         return {
           ...result,
@@ -1469,18 +1441,13 @@ conditions.push(`(NULLIF(TRIM(COALESCE(image_id, '')), '') IS NULL AND NULLIF(TR
       if (!forceRefresh) {
         const cached = await this.getFromCache<VehicleStats>(cacheKey);
         if (cached) {
-          console.log("[VehicleService.getVehicleStats] Cache hit:", cached);
           return {
             success: true,
             data: cached,
             meta: { durationMs: Date.now() - startTime, queryCount: 0 },
           };
         }
-      } else {
-        console.log("[VehicleService.getVehicleStats] Force refresh requested, skipping cache");
       }
-
-      const sql = dbManager.getClient();
 
       // Build and execute the stats query
       // 🚀 FIX: no_image_count now checks BOTH image_id AND thumbnail_url
@@ -1507,9 +1474,6 @@ AVG(CASE WHEN market_price > 0 THEN market_price ELSE NULL END)::numeric as avg_
       `;
 
 
-      console.log("[VehicleService.getVehicleStats] Executing query...");
-      console.log("[VehicleService.getVehicleStats] Query:", query.substring(0, 200) + "...");
-
       // Use dbManager.executeUnsafe for raw SQL queries
       let statsResult: Array<{
         total: string | number;
@@ -1531,60 +1495,14 @@ AVG(CASE WHEN market_price > 0 THEN market_price ELSE NULL END)::numeric as avg_
         statsResult = await dbManager.executeUnsafe(query);
       } catch (queryError) {
         console.error("[VehicleService.getVehicleStats] Query execution error:", queryError);
-        // Return fallback stats instead of throwing
-        // 🚀 SIMPLIFIED: Minimal fallback - forces API retry
-        const fallbackStats: VehicleStats = {
-          total: 0,
-          byCategory: { Cars: 0, Motorcycles: 0, TukTuks: 0 },
-          byCondition: { New: 0, Used: 0 },
-          avgPrice: 0,
-          noImageCount: 0,
-        };
-
-        return {
-          success: true, // Return success with fallback data
-          data: fallbackStats,
-          meta: { durationMs: Date.now() - startTime, queryCount: 1 },
-        };
-      }
-
-      if (process.env.NODE_ENV === 'development') {
-        // 🚀 PERF: Remove verbose logging in production
-        console.log("[VehicleService.getVehicleStats] Raw result type:", typeof statsResult);
-        console.log("[VehicleService.getVehicleStats] Raw result isArray:", Array.isArray(statsResult)); // Guarded for dev
-        console.log("[VehicleService.getVehicleStats] Raw result:", JSON.stringify(statsResult).substring(0, 500));
+        const message = queryError instanceof Error ? queryError.message : "Unknown stats query error";
+        throw new Error(`Vehicle stats query failed: ${message}`);
       }
 
       // Ensure statsResult is an array and has at least one row
       const resultArray = Array.isArray(statsResult) ? statsResult : [statsResult];
       if (resultArray.length === 0 || !resultArray[0]) {
-        console.warn("[VehicleService.getVehicleStats] Empty result from database, using fallback");
-        // Return fallback stats instead of throwing
-        const fallbackStats: VehicleStats = {
-          total: 0,
-          byCategory: {
-            Cars: 0,
-            Motorcycles: 0,
-            TukTuks: 0,
-            Trucks: 0,
-            Vans: 0,
-            Buses: 0,
-            Other: 0,
-          },
-          byCondition: {
-            New: 0,
-            Used: 0,
-            Other: 0,
-          },
-          avgPrice: 0,
-          noImageCount: 0,
-        };
-
-        return {
-          success: true,
-          data: fallbackStats,
-          meta: { durationMs: Date.now() - startTime, queryCount: 1 },
-        };
+        throw new Error("Vehicle stats query returned no rows");
       }
 
       const row = resultArray[0] as {
@@ -1623,9 +1541,6 @@ AVG(CASE WHEN market_price > 0 THEN market_price ELSE NULL END)::numeric as avg_
         noImageCount: parseInt(String(row.no_image_count)) || 0,
       };
 
-      console.log("[VehicleService.getVehicleStats] ✅ FIXED: Parsed result:", result);
-
-
       // 🚀 FIX: Reduced cache TTL from 5 minutes to 30 seconds for fresher stats
       const STATS_CACHE_TTL_MS = 30000; // 30 seconds
       await this.setCache(cacheKey, result, STATS_CACHE_TTL_MS);
@@ -1660,7 +1575,6 @@ AVG(CASE WHEN market_price > 0 THEN market_price ELSE NULL END)::numeric as avg_
     if (!noCache) {
       const cached = await this.getFromCache<{ total: number }>(cacheKey);
       if (cached) {
-        console.log(`[VehicleService.getVehicleStatsLite] Cache hit: ${cached.total}`);
         return {
           success: true,
           data: cached,
@@ -1671,18 +1585,13 @@ AVG(CASE WHEN market_price > 0 THEN market_price ELSE NULL END)::numeric as avg_
 
     try {
       const query = `SELECT COUNT(*) as count, COUNT(id) as id_count FROM ${this.tableName}`;
-      console.log(`[VehicleService.getVehicleStatsLite] Executing: ${query}`);
       const result = await dbManager.executeUnsafe<{ count: string | number; id_count: string | number }>(query);
 
-      if (process.env.NODE_ENV === 'development') {
-        console.log(`[VehicleService.getVehicleStatsLite] Raw result:`, JSON.stringify(result[0] || {}, null, 2)); // Guarded for dev
-      }
       const row = result[0] || { count: 0, id_count: 0 };
       const totalCount = parseInt(String(row.count)) || 0;
       const idCount = parseInt(String(row.id_count)) || 0;
 
       const total = Math.max(totalCount, idCount);
-      console.log(`[VehicleService.getVehicleStatsLite] Parsed total: ${total} (count=${totalCount}, id_count=${idCount})`);
 
       const data = { total };
 

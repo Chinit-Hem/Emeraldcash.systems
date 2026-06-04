@@ -6,7 +6,7 @@
  *
  * Features:
  * - Full CRUD for sms_assets table
- * - SMS-specific filtering (search, status, assigned_to)
+ * - SMS-specific filtering (search, status, assigned_to, created_by)
  * - Transfer management (create, update status)
  * - Audit logging
  * - Compatible with existing API routes
@@ -41,6 +41,7 @@ export interface SmsAssetDB {
   quantity: number | null;
   location: string | null;
   assigned_to: string | null;
+  created_by?: string | null;
   image_url: string | null;
   document_url: string | null;
   description: string | null;
@@ -67,6 +68,7 @@ export interface SmsAssetEntity {
   quantity: number | null;
   location: string | null;
   assignedTo: string | null;
+  createdBy: string | null;
   imageUrl: string | null;
   documentUrl: string | null;
   description: string | null;
@@ -110,8 +112,12 @@ export interface SmsFilters extends BaseFilters {
   search?: string;
   status?: SmsStatus;
   assigned_to?: string;
+  created_by?: string;
   category?: string;
+  type?: string;
+  location?: string;
   assetId?: string;
+  sort?: string;
 }
 
 /**
@@ -149,6 +155,8 @@ interface SmsNotificationDB {
 
 export class SmsAssetService extends BaseService<SmsAssetEntity, SmsAssetDB> {
   private static instance: SmsAssetService | null = null;
+  private static assetMetadataColumnsReady = false;
+  private static assetMetadataColumnsPromise: Promise<void> | null = null;
 
   public readonly tableName = "sms_assets";
 
@@ -161,6 +169,35 @@ export class SmsAssetService extends BaseService<SmsAssetEntity, SmsAssetDB> {
       SmsAssetService.instance = new SmsAssetService();
     }
     return SmsAssetService.instance;
+  }
+
+  private async ensureAssetMetadataColumns(): Promise<void> {
+    if (SmsAssetService.assetMetadataColumnsReady) {
+      return;
+    }
+
+    if (!SmsAssetService.assetMetadataColumnsPromise) {
+      SmsAssetService.assetMetadataColumnsPromise = (async () => {
+        await dbManager.executeUnsafe(
+          `ALTER TABLE sms_assets ADD COLUMN IF NOT EXISTS created_by VARCHAR(128)`,
+          [],
+          5000
+        );
+
+        await dbManager.executeUnsafe(
+          `CREATE INDEX IF NOT EXISTS idx_sms_assets_created_by ON sms_assets(created_by)`,
+          [],
+          5000
+        );
+
+        SmsAssetService.assetMetadataColumnsReady = true;
+      })().catch((error) => {
+        SmsAssetService.assetMetadataColumnsPromise = null;
+        throw error;
+      });
+    }
+
+    await SmsAssetService.assetMetadataColumnsPromise;
   }
 
   private async ensureNotificationsTable(): Promise<void> {
@@ -356,6 +393,7 @@ export class SmsAssetService extends BaseService<SmsAssetEntity, SmsAssetDB> {
       quantity: dbAsset.quantity,
       location: dbAsset.location,
       assignedTo: dbAsset.assigned_to,
+      createdBy: dbAsset.created_by ?? null,
       imageUrl: dbAsset.image_url,
       documentUrl: dbAsset.document_url,
       description: dbAsset.description,
@@ -380,10 +418,39 @@ export class SmsAssetService extends BaseService<SmsAssetEntity, SmsAssetDB> {
     filters: SmsFilters,
     params: (string | number | null)[]
   ): { query: string; params: (string | number | null)[]; _paramIndex: number } {
-    const conditions: string[] = [];
-
+    const filterResult = this.buildAssetFilterConditions(filters, params, 1);
     let _query = baseQuery;
-    let paramIndex = 1;
+
+    if (filterResult.conditions.length > 0) {
+      _query += ` WHERE ${filterResult.conditions.join(" AND ")}`;
+    }
+
+    _query += this.getAssetSortClause(filters?.sort);
+
+    let paramIndex = filterResult.paramIndex;
+
+    // Append LIMIT and OFFSET outside the WHERE clause for correct pagination
+    if (filters.limit) {
+      _query += ` LIMIT $${paramIndex}`;
+      params.push(filters.limit);
+      paramIndex++;
+    }
+    if (filters.offset) {
+      _query += ` OFFSET $${paramIndex}`;
+      params.push(filters.offset);
+      paramIndex++;
+    }
+
+    return { query: _query, params, _paramIndex: paramIndex };
+  }
+
+  private buildAssetFilterConditions(
+    filters: SmsFilters,
+    params: (string | number | null)[],
+    startParamIndex = 1
+  ): { conditions: string[]; paramIndex: number } {
+    const conditions: string[] = [];
+    let paramIndex = startParamIndex;
 
     // Search across the fields visible in the asset inventory table.
     if (filters?.search) {
@@ -396,6 +463,7 @@ export class SmsAssetService extends BaseService<SmsAssetEntity, SmsAssetDB> {
         OR category ILIKE $${paramIndex}
         OR location ILIKE $${paramIndex}
         OR assigned_to ILIKE $${paramIndex}
+        OR created_by ILIKE $${paramIndex}
       )`);
       params.push(searchPattern);
       paramIndex++;
@@ -415,10 +483,28 @@ export class SmsAssetService extends BaseService<SmsAssetEntity, SmsAssetDB> {
       paramIndex++;
     }
 
+    if (filters?.created_by) {
+      conditions.push(`created_by ILIKE $${paramIndex}`);
+      params.push(SmsAssetService.buildIlikePattern(filters.created_by));
+      paramIndex++;
+    }
+
     // Category filter
     if (filters?.category) {
       conditions.push(`category ILIKE $${paramIndex}`);
       params.push(SmsAssetService.buildIlikePattern(filters.category));
+      paramIndex++;
+    }
+
+    if (filters?.type) {
+      conditions.push(`type ILIKE $${paramIndex}`);
+      params.push(SmsAssetService.buildIlikePattern(filters.type));
+      paramIndex++;
+    }
+
+    if (filters?.location) {
+      conditions.push(`location ILIKE $${paramIndex}`);
+      params.push(SmsAssetService.buildIlikePattern(filters.location));
       paramIndex++;
     }
 
@@ -429,23 +515,25 @@ export class SmsAssetService extends BaseService<SmsAssetEntity, SmsAssetDB> {
       paramIndex++;
     }
 
-    if (conditions.length > 0) {
-      _query += ` WHERE ${conditions.join(" AND ")}`;
-    }
+    return { conditions, paramIndex };
+  }
 
-    // Append LIMIT and OFFSET outside the WHERE clause for correct pagination
-    if (filters.limit) {
-      _query += ` LIMIT $${paramIndex}`;
-      params.push(filters.limit);
-      paramIndex++;
+  private getAssetSortClause(sort?: string) {
+    switch (sort) {
+      case "name_asc":
+        return " ORDER BY name ASC, updated_at DESC";
+      case "status_asc":
+        return " ORDER BY status ASC, updated_at DESC";
+      case "quantity_desc":
+        return " ORDER BY quantity DESC NULLS LAST, updated_at DESC";
+      case "location_asc":
+        return " ORDER BY location ASC NULLS LAST, name ASC";
+      case "created_desc":
+        return " ORDER BY created_at DESC, updated_at DESC";
+      case "updated_desc":
+      default:
+        return " ORDER BY updated_at DESC, created_at DESC";
     }
-    if (filters.offset) {
-      _query += ` OFFSET $${paramIndex}`;
-      params.push(filters.offset);
-      paramIndex++;
-    }
-
-    return { query: _query, params, _paramIndex: paramIndex };
   }
 
   /**
@@ -454,6 +542,7 @@ export class SmsAssetService extends BaseService<SmsAssetEntity, SmsAssetDB> {
   public async getAsset(id: string): Promise<ServiceResult<SmsAssetEntity | null>> {
     const startTime = Date.now();
     try {
+      await this.ensureAssetMetadataColumns();
       const cacheKey = `${this.serviceName}:v2:${id}`;
       const cached = await this.getFromCache<SmsAssetEntity>(cacheKey);
       if (cached) {
@@ -479,6 +568,7 @@ export class SmsAssetService extends BaseService<SmsAssetEntity, SmsAssetDB> {
   public async updateAsset(id: string, data: Partial<Omit<SmsAssetDB, 'id' | 'created_at' | 'updated_at'>>): Promise<ServiceResult<SmsAssetEntity>> {
     const startTime = Date.now();
     try {
+      await this.ensureAssetMetadataColumns();
       const columns = Object.keys(data);
       if (columns.length === 0) {
         return { success: false, error: 'No fields to update', meta: { durationMs: 0, queryCount: 0 } };
@@ -552,13 +642,41 @@ export class SmsAssetService extends BaseService<SmsAssetEntity, SmsAssetDB> {
    * Get assets with SMS-specific filters (used by API)
    */
   public async getAssets(filters?: SmsFilters): Promise<ServiceResult<SmsAssetEntity[]>> {
+    await this.ensureAssetMetadataColumns();
     return this.getAll(filters);
+  }
+
+  public async countAssets(filters?: SmsFilters): Promise<ServiceResult<number>> {
+    const startTime = Date.now();
+
+    try {
+      await this.ensureAssetMetadataColumns();
+
+      const params: (string | number | null)[] = [];
+      const filterResult = this.buildAssetFilterConditions(filters || {}, params, 1);
+      let query = `SELECT COUNT(*)::integer AS total FROM ${this.tableName}`;
+
+      if (filterResult.conditions.length > 0) {
+        query += ` WHERE ${filterResult.conditions.join(" AND ")}`;
+      }
+
+      const rows = await dbManager.executeUnsafe<{ total: number }>(query, params);
+
+      return {
+        success: true,
+        data: Number(rows[0]?.total || 0),
+        meta: { durationMs: Date.now() - startTime, queryCount: 1 },
+      };
+    } catch (error) {
+      return this.handleError(error, "countAssets");
+    }
   }
 
   /**
    * Create new SMS asset (used by API)
    */
   public async createAsset(assetData: Omit<SmsAssetDB, "id" | "created_at" | "updated_at">): Promise<ServiceResult<SmsAssetEntity>> {
+    await this.ensureAssetMetadataColumns();
     const data: Omit<SmsAssetDB, "id" | "created_at" | "updated_at"> = { ...assetData, status: assetData.status || 'Available' };
     const result = await this.create(data);
     if (result.success) {
@@ -572,7 +690,10 @@ export class SmsAssetService extends BaseService<SmsAssetEntity, SmsAssetDB> {
   /**
    * Get SMS transfers with optional asset filter
    */
-  public async getTransfers(assetId?: string): Promise<ServiceResult<SmsTransferEntity[]>> {
+  public async getTransfers(
+    assetId?: string,
+    status?: TransferStatus
+  ): Promise<ServiceResult<SmsTransferEntity[]>> {
     const startTime = Date.now();
     try {
       await this.ensureTransferImagesTable();
@@ -593,13 +714,24 @@ export class SmsAssetService extends BaseService<SmsAssetEntity, SmsAssetDB> {
         ) transfer_image ON true
       `;
 
+      const conditions: string[] = [];
       const params: string[] = [];
       let paramIndex = 1;
 
       if (assetId) {
-        query += ` WHERE st.asset_id = $${paramIndex}`;
+        conditions.push(`st.asset_id = $${paramIndex}`);
         params.push(assetId);
         paramIndex++;
+      }
+
+      if (status) {
+        conditions.push(`st.status = $${paramIndex}`);
+        params.push(status);
+        paramIndex++;
+      }
+
+      if (conditions.length > 0) {
+        query += ` WHERE ${conditions.join(' AND ')}`;
       }
 
       query += ` ORDER BY st.created_at DESC`;
@@ -628,6 +760,36 @@ export class SmsAssetService extends BaseService<SmsAssetEntity, SmsAssetDB> {
       };
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to fetch transfers';
+      return {
+        success: false,
+        error: errorMessage,
+        meta: { durationMs: Date.now() - startTime, queryCount: 1 },
+      };
+    }
+  }
+
+  public async getPendingTransferCountForUser(username: string): Promise<ServiceResult<number>> {
+    const startTime = Date.now();
+
+    try {
+      const result = await dbManager.executeUnsafe<{ count: number | string }>(
+        `
+          SELECT COUNT(*)::integer AS count
+          FROM sms_transfers
+          WHERE status = 'pending'
+            AND (sender_id = $1 OR receiver_id = $1)
+        `,
+        [username],
+        5000
+      );
+
+      return {
+        success: true,
+        data: Number(result[0]?.count) || 0,
+        meta: { durationMs: Date.now() - startTime, queryCount: 1 },
+      };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to count pending transfers';
       return {
         success: false,
         error: errorMessage,

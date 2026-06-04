@@ -166,10 +166,8 @@ const limit = parseInt(searchParams.get("limit") || "500"); // Increased for pag
     }
 
     // Get accurate total count with no-cache (force fresh data)
-    console.log('[API/cleaned-vehicles] Fetching fresh total count...');
     const totalResult = await vehicleService.getTotalCount(true); // noCache=true
-const total = totalResult.success ? totalResult.data ?? 0 : 0;
-    console.log(`[API/cleaned-vehicles] DB total: ${total} (filters: category=${category}, brand=${brand})`);
+    const total = totalResult.success ? totalResult.data ?? 0 : 0;
 
     // Add performance headers for monitoring + total debug header
     const responseHeaders = new Headers(buildCorsHeaders(req));

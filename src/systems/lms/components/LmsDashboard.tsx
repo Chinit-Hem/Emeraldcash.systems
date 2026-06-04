@@ -16,12 +16,11 @@
 import { useLanguage } from "@/shared/hooks/LanguageContext";
 import { useTranslation } from "@/shared/utils/i18n";
 
-import React, { useState, useEffect, useCallback, useMemo, Suspense } from "react";
-import { useRouter } from "next/navigation";
+import React, { useState, useEffect, useLayoutEffect, useCallback, useMemo } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   GraduationCap,
   BookOpen,
-  Users,
   Trophy,
   PlayCircle,
   BarChart3,
@@ -30,31 +29,40 @@ import {
   Circle,
   Lock,
   RefreshCw,
-  Download,
-  Eye,
   Search,
-  Trash2,
   Award,
   TrendingUp,
   ChevronRight,
   Target,
   Zap,
-  LucideIcon,
-  X
+  LucideIcon
 } from "lucide-react";
 
 import {
   LmsDashboardStats,
   LmsCategory,
   LessonWithStatus,
-  StaffProgress,
   InitialLmsData
 } from "@/systems/lms/types/lms-types";
 import { useAuthUser } from "@/shared/hooks/AuthContext";
 import { useDebouncedValue } from "@/shared/hooks/useDebouncedValue";
+import {
+  getRememberedAppScrollSnapshot,
+  rememberAppScrollSnapshot,
+  rememberAppShellRouteScrollPosition,
+  restoreAppScrollSnapshot,
+} from "@/shared/utils/appScroll";
 import LmsErrorBoundary from "@/systems/lms/components/LmsErrorBoundary";
 
-type TabType = "learning" | "progress" | "achievements" | "my-process";
+type TabType = "learning" | "progress" | "achievements";
+const LMS_DASHBOARD_SCROLL_STORAGE_KEY = "lms_dashboard_scroll";
+const LMS_TAB_QUERY_PARAM = "tab";
+const LMS_TAB_IDS: readonly TabType[] = ["learning", "progress", "achievements"];
+
+function getDashboardTabFromSearchParams(searchParams: { get(name: string): string | null } | null): TabType {
+  const tab = searchParams?.get(LMS_TAB_QUERY_PARAM);
+  return LMS_TAB_IDS.includes(tab as TabType) ? (tab as TabType) : "learning";
+}
 
 // Type for last watched lesson
 type LastWatchedLesson = {
@@ -125,24 +133,18 @@ class LmsApiService {
     }
   }
 
-  static async fetchAllLessons(categories: LmsCategory[]): Promise<LessonWithStatus[]> {
-    if (!categories.length) return [];
-    const lessonPromises = categories.map(async (category) => {
-      const response = await this.fetchWithTimeout(`${this.BASE_URL}/lessons?categoryId=${category.id}&sequential=true`);
+  static async fetchVisibleLessons(): Promise<LessonWithStatus[]> {
+    try {
+      const response = await this.fetchWithTimeout(`${this.BASE_URL}/lessons?visibleAll=true`);
       if (!response.ok) return [];
       const data = await response.json();
-      const lessons = data.success ? data.data : [];
-      return lessons.map((lesson: LessonWithStatus) => ({
-        ...lesson,
-        category_name: category.name,
-        category_color: category.color,
-      }));
-    });
-    const allLessonsArrays = await Promise.all(lessonPromises);
-    return allLessonsArrays.flat().sort((a, b) => {
-      if (a.category_id !== b.category_id) return a.category_id - b.category_id;
-      return a.order_index - b.order_index;
-    });
+      const lessons = Array.isArray(data.data) ? data.data : [];
+
+      return data.success ? lessons : [];
+    } catch (error) {
+      console.error("Lessons fetch error:", error);
+      return [];
+    }
   }
 
   // Fetch last watched lesson - enables "Continue Learning" to show last video user watched
@@ -163,16 +165,6 @@ class LmsApiService {
     }
   }
 
-  static async deleteStaff(staffId: number): Promise<void> {
-    const response = await this.fetchWithTimeout(`${this.BASE_URL}/staff?id=${staffId}`, {
-      method: "DELETE",
-    });
-
-    const data = await response.json().catch(() => ({})) as { success?: boolean; error?: string };
-    if (!response.ok || data.success === false) {
-      throw new Error(data.error || "Failed to delete LMS staff record");
-    }
-  }
 }
 
 // Stat Card Component
@@ -237,6 +229,7 @@ function CategoryCard({
   lessonCount: number;
   onClick: () => void;
 }) {
+  const hasLessons = lessonCount > 0;
   const colorMap: Record<string, string> = {
     emerald: "from-emerald-500 to-emerald-600",
     blue: "from-blue-500 to-blue-600",
@@ -247,25 +240,35 @@ function CategoryCard({
   };
 
   const gradientColor = colorMap[category.color || "emerald"] || colorMap.emerald;
+  const lessonCountLabel = lessonCount === 1 ? "1 lesson" : `${lessonCount} lessons`;
 
   return (
     <button
       onClick={onClick}
-      className="w-full text-left group relative overflow-hidden rounded-3xl p-6 bg-gradient-to-br from-[#f0f4f8] to-[#e6e9ef] shadow-sm hover:bg-slate-50 transition-all duration-300 hover:-translate-y-1"
+      disabled={!hasLessons}
+      className={`w-full text-left group relative overflow-hidden rounded-3xl p-6 bg-gradient-to-br from-[#f0f4f8] to-[#e6e9ef] shadow-sm transition-all duration-300 ${
+        hasLessons
+          ? "hover:-translate-y-1 hover:bg-slate-50"
+          : "cursor-not-allowed opacity-75"
+      }`}
     >
       <div className={`absolute top-0 right-0 w-24 h-24 bg-gradient-to-br ${gradientColor} opacity-10 rounded-full blur-2xl transform translate-x-8 -translate-y-8`} />
       <div className="relative">
         <div className="flex items-start justify-between mb-4">
-          <div className={`p-3 rounded-2xl bg-gradient-to-br ${gradientColor} text-white shadow-lg transform transition-transform group-hover:scale-110`}>
+          <div className={`p-3 rounded-2xl bg-gradient-to-br ${gradientColor} text-white shadow-lg transform transition-transform ${hasLessons ? "group-hover:scale-110" : ""}`}>
             <BookOpen className="w-6 h-6" />
           </div>
-          {completionRate === 100 ? (
+          {!hasLessons ? (
+            <div className="flex items-center gap-1 text-slate-400 text-sm font-medium">
+              <Lock className="w-4 h-4" />No lessons
+            </div>
+          ) : completionRate === 100 ? (
             <div className="flex items-center gap-1 text-emerald-600 text-sm font-medium">
               <CheckCircle2 className="w-4 h-4" />Done
             </div>
           ) : completionRate > 0 ? (
             <div className="flex items-center gap-1 text-amber-600 text-sm font-medium">
-              <Clock className="w-4 h-4" />{completionRate}%
+              <Clock className="w-4 h-4" />{completionRate}% complete
             </div>
           ) : (
             <div className="flex items-center gap-1 text-slate-400 text-sm font-medium">
@@ -276,10 +279,12 @@ function CategoryCard({
         <h3 className="text-lg font-bold text-slate-800 mb-1">{category.name}</h3>
         <p className="text-sm text-slate-500 mb-4 line-clamp-2">{category.description}</p>
         <div className="flex items-center justify-between">
-          <span className="text-xs text-slate-400">{lessonCount} lessons</span>
-          <ChevronRight className="w-5 h-5 text-slate-400 transform transition-transform group-hover:translate-x-1" />
+          <span className="text-xs text-slate-400">{lessonCountLabel}</span>
+          {hasLessons && (
+            <ChevronRight className="w-5 h-5 text-slate-400 transform transition-transform group-hover:translate-x-1" />
+          )}
         </div>
-        {completionRate > 0 && completionRate < 100 && (
+        {hasLessons && completionRate > 0 && completionRate < 100 && (
           <div className="mt-4">
             <div className="w-full h-2 bg-slate-200 rounded-full overflow-hidden">
               <div className={`h-full bg-gradient-to-r ${gradientColor} rounded-full transition-all duration-500`} style={{ width: `${completionRate}%` }} />
@@ -347,156 +352,6 @@ function AchievementCard({
   );
 }
 
-// Export to CSV
-function exportToCSV(data: StaffProgress[], filename: string) {
-  const headers = [
-    "Staff Name",
-    "Branch",
-    "Status",
-    "Completed Lessons",
-    "Watched Videos",
-    "Latest Watch %",
-    "Completion %",
-    "Last Activity",
-    "Last Video",
-  ];
-  const rows = data.map((staff) => [
-    staff.staff_name,
-    staff.branch || "N/A",
-    getStaffLearningStatus(staff).label,
-    `${staff.completed_lessons_count}/${staff.total_lessons}`,
-    staff.watched_lessons_count,
-    `${staff.latest_watch_percentage}%`,
-    `${staff.completion_percentage}%`,
-    formatLmsDate(staff.last_activity),
-    staff.last_watched_lesson_title || "",
-  ]);
-  const csvContent = [headers.join(","), ...rows.map((row) => row.join(","))].join("\n");
-  const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-  const link = document.createElement("a");
-  const url = URL.createObjectURL(blob);
-  link.setAttribute("href", url);
-  link.setAttribute("download", filename);
-  link.style.visibility = "hidden";
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-}
-
-function clampPercent(value?: number | null) {
-  const numberValue = Number(value);
-  if (!Number.isFinite(numberValue)) return 0;
-  return Math.min(100, Math.max(0, Math.round(numberValue)));
-}
-
-function formatLmsDate(value?: string | null) {
-  if (!value) return "Never";
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? "Never" : date.toLocaleDateString();
-}
-
-function getStaffLearningStatus(staff: StaffProgress) {
-  if (staff.training_status === "completed") {
-    return { label: "Completed", className: "bg-emerald-100 text-emerald-700" };
-  }
-
-  if (staff.training_status === "ready_to_complete") {
-    return { label: "Ready to complete", className: "bg-amber-100 text-amber-700" };
-  }
-
-  if (staff.training_status === "watching") {
-    return { label: "Watching", className: "bg-blue-100 text-blue-700" };
-  }
-
-  return { label: "Not started", className: "bg-slate-100 text-slate-600" };
-}
-
-type GroupedStaffProgress = StaffProgress & {
-  staff_count: number;
-  watched_staff_count: number;
-  records: StaffProgress[];
-};
-
-function normalizeStaffGroupName(name: string) {
-  return name.trim().replace(/\s+/g, " ").toLowerCase();
-}
-
-function getDateTime(value?: string | null) {
-  if (!value) return 0;
-  const time = new Date(value).getTime();
-  return Number.isNaN(time) ? 0 : time;
-}
-
-function latestStaffRecord(records: StaffProgress[]) {
-  return [...records].sort((a, b) => getDateTime(b.last_activity) - getDateTime(a.last_activity))[0];
-}
-
-function getGroupedTrainingStatus(records: StaffProgress[]): GroupedStaffProgress["training_status"] {
-  const completedCount = records.filter((record) => record.training_status === "completed").length;
-
-  if (completedCount === records.length && records.length > 0) return "completed";
-  if (records.some((record) => record.training_status === "ready_to_complete")) return "ready_to_complete";
-  if (records.some((record) =>
-    record.training_status === "watching" ||
-    record.watched_lessons_count > 0 ||
-    record.completed_lessons_count > 0
-  )) {
-    return "watching";
-  }
-
-  return "not_started";
-}
-
-function summarizeStaffProgress(data: StaffProgress[]): GroupedStaffProgress[] {
-  const grouped = new Map<string, StaffProgress[]>();
-
-  data.forEach((staff) => {
-    const key = normalizeStaffGroupName(staff.staff_name) || `staff-${staff.staff_id}`;
-    const records = grouped.get(key) ?? [];
-    records.push(staff);
-    grouped.set(key, records);
-  });
-
-  return Array.from(grouped.values())
-    .map((records) => {
-      const latest = latestStaffRecord(records);
-      const completedLessons = records.reduce((sum, record) => sum + (Number(record.completed_lessons_count) || 0), 0);
-      const totalLessons = records.reduce((sum, record) => sum + (Number(record.total_lessons) || 0), 0);
-      const watchedStaffCount = records.filter((record) =>
-        record.watched_lessons_count > 0 ||
-        record.latest_watch_percentage > 0 ||
-        record.completed_lessons_count > 0
-      ).length;
-      const branches = Array.from(new Set(records.map((record) => record.branch).filter(Boolean)));
-      const roles = Array.from(new Set(records.map((record) => record.role).filter(Boolean)));
-      const latestWatchPercentage = Math.max(...records.map((record) => clampPercent(record.latest_watch_percentage)), 0);
-
-      return {
-        ...latest,
-        branch: branches.length > 1 ? "Multiple branches" : latest.branch,
-        role: roles.length > 1 ? "Multiple roles" : latest.role,
-        completed_lessons_count: completedLessons,
-        total_lessons: totalLessons,
-        completion_percentage: totalLessons > 0 ? Math.round((completedLessons / totalLessons) * 100) : 0,
-        watched_lessons_count: records.reduce((sum, record) => sum + (Number(record.watched_lessons_count) || 0), 0),
-        in_progress_lessons_count: records.reduce((sum, record) => sum + (Number(record.in_progress_lessons_count) || 0), 0),
-        average_watch_percentage: Math.round(
-          records.reduce((sum, record) => sum + clampPercent(record.average_watch_percentage), 0) / records.length
-        ),
-        latest_watch_percentage: latestWatchPercentage,
-        last_completed_at: latest.last_completed_at,
-        last_watched_at: latest.last_watched_at,
-        last_watched_lesson_title: latest.last_watched_lesson_title,
-        training_status: getGroupedTrainingStatus(records),
-        last_activity: latest.last_activity,
-        staff_count: records.length,
-        watched_staff_count: watchedStaffCount,
-        records: [...records].sort((a, b) => getDateTime(b.last_activity) - getDateTime(a.last_activity)),
-      };
-    })
-    .sort((a, b) => getDateTime(b.last_activity) - getDateTime(a.last_activity));
-}
-
 // Main LMS Dashboard Component
 interface LmsDashboardProps {
   initialData?: InitialLmsData | null;
@@ -504,6 +359,7 @@ interface LmsDashboardProps {
 
 function LmsDashboard({ initialData }: LmsDashboardProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { language } = useLanguage();
   const { t } = useTranslation(language);
   const [stats, setStats] = useState<LmsDashboardStats | null>(initialData?.stats || null);
@@ -512,14 +368,11 @@ function LmsDashboard({ initialData }: LmsDashboardProps) {
   const [lastWatched, setLastWatched] = useState<LastWatchedLesson | null>(null);
   const [lastWatchedLoaded, setLastWatchedLoaded] = useState(false);
   const [loading, setLoading] = useState(!initialData);
-  const [_activeTab, _setActiveTab] = useState<TabType>("learning");
-  const [isExporting, setIsExporting] = useState(false);
+  const [_activeTab, _setActiveTab] = useState<TabType>(() =>
+    getDashboardTabFromSearchParams(searchParams)
+  );
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [selectedStaffGroup, setSelectedStaffGroup] = useState<GroupedStaffProgress | null>(null);
-  const [deletingStaffId, setDeletingStaffId] = useState<number | null>(null);
-  const [staffProgressError, setStaffProgressError] = useState("");
   const activeTab = _activeTab;
-  const setActiveTab = _setActiveTab;
 
   const user = useAuthUser();
   const isAdmin = user?.role === "Admin";
@@ -536,6 +389,7 @@ function LmsDashboard({ initialData }: LmsDashboardProps) {
     }
 
     try {
+      const lessonsPromise = LmsApiService.fetchVisibleLessons();
       const [statsData, categoriesData, lastWatchedData] = await Promise.all([
         LmsApiService.fetchDashboardData(),
         LmsApiService.fetchCategories(),
@@ -550,15 +404,22 @@ function LmsDashboard({ initialData }: LmsDashboardProps) {
         setLoading(false);
       }
 
-      if (categoriesData.length > 0) {
-        void LmsApiService.fetchAllLessons(categoriesData)
-          .then(setLessons)
-          .catch((lessonError) => {
-            console.error("Error loading LMS lessons:", lessonError);
-          });
-      } else {
-        setLessons([]);
-      }
+      void lessonsPromise
+        .then((lessonsData) => {
+          const categoriesById = new Map(categoriesData.map((category) => [category.id, category]));
+          setLessons(lessonsData.map((lesson) => {
+            const category = categoriesById.get(lesson.category_id);
+            return {
+              ...lesson,
+              category_name: category?.name ?? lesson.category_name,
+              category_color: category?.color ?? lesson.category_color,
+            };
+          }));
+        })
+        .catch((lessonError) => {
+          console.error("Error loading LMS lessons:", lessonError);
+          setLessons([]);
+        });
     } catch (error) {
       console.error("Error loading dashboard data:", error);
       setLastWatchedLoaded(true);
@@ -597,6 +458,11 @@ function LmsDashboard({ initialData }: LmsDashboardProps) {
   }, [initialData, loadData]);
 
   useEffect(() => {
+    const nextTab = getDashboardTabFromSearchParams(searchParams);
+    _setActiveTab((currentTab) => (currentTab === nextTab ? currentTab : nextTab));
+  }, [searchParams]);
+
+  useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === "k") {
         e.preventDefault();
@@ -616,100 +482,94 @@ function LmsDashboard({ initialData }: LmsDashboardProps) {
     }
   }, [loadData]);
 
-  const handleExport = useCallback(() => {
-    if (!stats?.staff_progress) return;
-    setIsExporting(true);
-    setTimeout(() => {
-      exportToCSV(stats.staff_progress, `staff-progress-${new Date().toISOString().split("T")[0]}.csv`);
-      setIsExporting(false);
-    }, 500);
-  }, [stats?.staff_progress]);
+  const rememberDashboardScroll = useCallback(() => {
+    rememberAppScrollSnapshot(LMS_DASHBOARD_SCROLL_STORAGE_KEY);
+    rememberAppShellRouteScrollPosition("/lms");
+  }, []);
 
-  const isOwnStaffRecord = useCallback((staff: StaffProgress) => {
-    const staffName = normalizeStaffGroupName(staff.staff_name);
-    const currentUserNames = [
-      user?.username,
-      user?.full_name,
-      user?.email,
-    ]
-      .map((value) => normalizeStaffGroupName(value ?? ""))
-      .filter(Boolean);
+  const handleTabChange = useCallback((tab: TabType) => {
+    rememberDashboardScroll();
+    _setActiveTab(tab);
 
-    return currentUserNames.includes(staffName);
-  }, [user?.email, user?.full_name, user?.username]);
-
-  const handleDeleteStaffRecord = useCallback(async (staff: StaffProgress) => {
-    if (!isAdmin) {
-      setStaffProgressError("Only admins can delete LMS staff records.");
-      return;
+    const nextParams = new URLSearchParams(searchParams?.toString() ?? "");
+    if (tab === "learning") {
+      nextParams.delete(LMS_TAB_QUERY_PARAM);
+    } else {
+      nextParams.set(LMS_TAB_QUERY_PARAM, tab);
     }
 
-    if (isOwnStaffRecord(staff)) {
-      setStaffProgressError("You cannot delete your own LMS staff record while signed in.");
-      return;
-    }
+    const query = nextParams.toString();
+    router.replace(query ? `/lms?${query}` : "/lms", { scroll: false });
+  }, [rememberDashboardScroll, router, searchParams]);
 
-    const confirmed = window.confirm(
-      `Delete LMS staff record #${staff.staff_id} for "${staff.staff_name}"? This removes it from Staff Progress.`
-    );
-    if (!confirmed) return;
+  useLayoutEffect(() => {
+    if (loading) return;
 
-    setDeletingStaffId(staff.staff_id);
-    setStaffProgressError("");
+    const snapshot = getRememberedAppScrollSnapshot(LMS_DASHBOARD_SCROLL_STORAGE_KEY);
+    if (!snapshot) return;
 
-    try {
-      await LmsApiService.deleteStaff(staff.staff_id);
-
-      setStats((currentStats) => currentStats
-        ? {
-            ...currentStats,
-            staff_progress: currentStats.staff_progress.filter((record) => record.staff_id !== staff.staff_id),
-          }
-        : currentStats
-      );
-
-      setSelectedStaffGroup((currentGroup) => {
-        if (!currentGroup) return currentGroup;
-        const remainingRecords = currentGroup.records.filter((record) => record.staff_id !== staff.staff_id);
-        return remainingRecords.length > 0 ? summarizeStaffProgress(remainingRecords)[0] : null;
-      });
-
-      await loadData({ showSkeleton: false });
-    } catch (error) {
-      setStaffProgressError(error instanceof Error ? error.message : "Failed to delete LMS staff record");
-    } finally {
-      setDeletingStaffId(null);
-    }
-  }, [isAdmin, isOwnStaffRecord, loadData]);
+    restoreAppScrollSnapshot(snapshot);
+  }, [activeTab, categories.length, lessons.length, loading]);
 
   const handleCategoryClick = useCallback((categoryId: number) => {
-    router.push(`/lms/course/${categoryId}`);
-  }, [router]);
+    rememberDashboardScroll();
+    router.push(`/lms/course/${categoryId}`, { scroll: false });
+  }, [rememberDashboardScroll, router]);
 
   const handleResumeLesson = useCallback((lessonId: number) => {
-    router.push(`/lms/lesson/${lessonId}`);
-  }, [router]);
+    rememberDashboardScroll();
+    router.push(`/lms/lesson/${lessonId}`, { scroll: false });
+  }, [rememberDashboardScroll, router]);
 
   const completedLessons = useMemo(() => lessons.filter((l) => l.is_completed).length, [lessons]);
   const totalLessons = lessons.length;
   const overallProgress = totalLessons > 0 ? Math.round((completedLessons / totalLessons) * 100) : 0;
-  const staffAddedTrend = (dashboardStats.staff_added_this_week ?? 0) > 0
-    ? `+${dashboardStats.staff_added_this_week} this week`
-    : undefined;
-  const groupedStaffProgress = useMemo(
-    () => summarizeStaffProgress(dashboardStats.staff_progress),
-    [dashboardStats.staff_progress]
+  const unlockedLessons = useMemo(() => lessons.filter((l) => l.is_unlocked), [lessons]);
+  const inProgressLessons = useMemo(
+    () => lessons.filter((l) => l.is_unlocked && !l.is_completed),
+    [lessons]
   );
-  const completionRateSubtitle =
-    dashboardStats.completed_lessons_total !== undefined && dashboardStats.total_possible_completions !== undefined
-      ? `${dashboardStats.completed_lessons_total} of ${dashboardStats.total_possible_completions} staff-lessons`
-      : undefined;
+  const lockedLessons = useMemo(() => lessons.filter((l) => !l.is_unlocked), [lessons]);
+  const categoryProgressById = useMemo(() => {
+    const progressById = new Map<number, { completed: number; total: number; progress: number }>();
+
+    categories.forEach((category) => {
+      const categoryLessons = lessons.filter((lesson) => lesson.category_id === category.id);
+      const total = categoryLessons.length;
+      const completed = categoryLessons.filter((lesson) => lesson.is_completed).length;
+      progressById.set(category.id, {
+        completed,
+        total,
+        progress: total > 0 ? Math.round((completed / total) * 100) : 0,
+      });
+    });
+
+    return progressById;
+  }, [categories, lessons]);
+  const maxCategoryProgress = useMemo(() => {
+    const categoryProgressValues = Array.from(categoryProgressById.values())
+      .filter((categoryProgress) => categoryProgress.total > 0)
+      .map((categoryProgress) => categoryProgress.progress);
+
+    return categoryProgressValues.length > 0 ? Math.max(...categoryProgressValues) : 0;
+  }, [categoryProgressById]);
 
   const filteredCategories = useMemo(() => {
     if (!debouncedSearch.trim()) return categories;
     const query = debouncedSearch.toLowerCase();
     return categories.filter((cat) => cat.name.toLowerCase().includes(query) || (cat.description && cat.description.toLowerCase().includes(query)));
   }, [categories, debouncedSearch]);
+  const lessonCountByCategoryId = useMemo(() => {
+    const counts = new Map<number, number>();
+    lessons.forEach((lesson) => {
+      counts.set(lesson.category_id, (counts.get(lesson.category_id) || 0) + 1);
+    });
+    return counts;
+  }, [lessons]);
+  const learningCategories = useMemo(
+    () => filteredCategories.filter((category) => (lessonCountByCategoryId.get(category.id) || 0) > 0),
+    [filteredCategories, lessonCountByCategoryId]
+  );
 
   const currentLesson = useMemo(() => lessons.find((l) => l.is_unlocked && !l.is_completed), [lessons]);
   const continueLesson = lastWatched || (lastWatchedLoaded ? currentLesson : null);
@@ -741,10 +601,10 @@ function LmsDashboard({ initialData }: LmsDashboardProps) {
                 href="/lms/admin/categories"
                 className="block w-full max-w-sm mx-auto px-8 py-4 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white font-semibold rounded-2xl shadow-lg hover:shadow-xl hover:from-emerald-600 hover:to-emerald-700 transition-all text-center"
               >
-                🏗️ Add First Training Category
+                Open Content Manager
               </a>
               <p className="text-sm text-slate-500 dark:text-slate-400 text-center">
-                Admin: Create categories → lessons → assign staff
+                Admin: create categories and lessons in Content Manager.
               </p>
             </div>
           ) : (
@@ -756,7 +616,7 @@ function LmsDashboard({ initialData }: LmsDashboardProps) {
                 onClick={handleRefresh}
                 className="px-8 py-3 bg-slate-200 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 font-semibold rounded-2xl shadow-sm transition-all hover:bg-slate-300 dark:hover:bg-slate-600 mx-auto block"
               >
-                🔄 Refresh
+                Refresh
               </button>
             </div>
           )}
@@ -766,10 +626,9 @@ function LmsDashboard({ initialData }: LmsDashboardProps) {
   }
 
   const tabs = [
-    { id: "learning" as TabType, label: "Learning", icon: BookOpen },
-    { id: "progress" as TabType, label: "Progress", icon: BarChart3 },
+    { id: "learning" as TabType, label: "Lessons", icon: BookOpen },
+    { id: "progress" as TabType, label: "My Progress", icon: BarChart3 },
     { id: "achievements" as TabType, label: "Achievements", icon: Award },
-    { id: "my-process" as TabType, label: "My Process", icon: Clock },
   ];
 
   return (
@@ -796,23 +655,14 @@ function LmsDashboard({ initialData }: LmsDashboardProps) {
             <button onClick={handleRefresh} disabled={isRefreshing} className="p-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 transition-all active:scale-95 disabled:opacity-50" title="Refresh data">
               <RefreshCw className={`w-5 h-5 ${isRefreshing ? 'animate-spin' : ''}`} />
             </button>
-            {isAdmin && (
-              <button onClick={handleExport} disabled={isExporting} className="hidden sm:flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 font-medium transition-all active:scale-95 disabled:opacity-50">
-                <Download className="w-4 h-4" />
-                {isExporting ? 'Exporting...' : 'Export'}
-              </button>
-            )}
           </div>
         </div>
 
         {/* Stats Grid */}
-        <div className={`grid gap-4 sm:gap-6 ${isAdmin ? 'grid-cols-1 min-[420px]:grid-cols-2 lg:grid-cols-4' : 'grid-cols-1 min-[420px]:grid-cols-2 lg:grid-cols-3'}`}>
-          {isAdmin && (
-            <StatCard title="Total Staff" value={dashboardStats.total_staff} icon={Users} color="blue" trend={staffAddedTrend} trendUp={true} />
-          )}
+        <div className="grid grid-cols-1 gap-4 sm:gap-6 min-[420px]:grid-cols-2 lg:grid-cols-3">
           <StatCard title="Categories" value={dashboardStats.total_categories} subtitle={`${categories.length} active`} icon={BookOpen} color="emerald" />
+          <StatCard title="Lessons" value={totalLessons} subtitle={`${unlockedLessons.length} available`} icon={PlayCircle} color="blue" />
           <StatCard title="Your Progress" value={`${overallProgress}%`} subtitle={`${completedLessons} of ${totalLessons} lessons`} icon={Trophy} color="purple" />
-          <StatCard title="Completion Rate" value={`${dashboardStats.overall_completion_rate}%`} subtitle={completionRateSubtitle} icon={TrendingUp} color="amber" />
         </div>
 
         {/* Tab Navigation */}
@@ -821,51 +671,16 @@ function LmsDashboard({ initialData }: LmsDashboardProps) {
             const Icon = tab.icon;
             const isActive = activeTab === tab.id;
             return (
-              <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`flex shrink-0 items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all ${isActive ? 'bg-gradient-to-r from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/30' : 'text-slate-600 hover:bg-slate-100'}`}>
+              <button
+                key={tab.id}
+                onClick={() => handleTabChange(tab.id)}
+                className={`flex shrink-0 items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all ${isActive ? 'bg-gradient-to-r from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/30' : 'text-slate-600 hover:bg-slate-100'}`}
+              >
                 <Icon className="w-4 h-4" />{tab.label}
               </button>
             );
           })}
         </div>
-
-        {/* Admin Actions Bar */}
-        {isAdmin && (
-          <div className="flex flex-wrap gap-3 p-4 bg-gradient-to-r from-emerald-50 to-blue-50 rounded-2xl border border-emerald-200/50">
-            <span className="text-sm font-semibold text-slate-700 flex items-center gap-2">
-              <GraduationCap className="w-4 h-4 text-emerald-600" />
-              Admin Controls:
-            </span>
-            <button
-              onClick={() => router.push("/lms/admin/categories")}
-              className="flex items-center gap-2 px-4 py-2 bg-white rounded-xl shadow-sm text-sm font-medium text-emerald-700 hover:bg-slate-50 transition-all active:scale-95"
-            >
-              <BookOpen className="w-4 h-4" />
-              Manage Categories
-            </button>
-            <button
-              onClick={() => router.push("/lms/admin/lessons")}
-              className="flex items-center gap-2 px-4 py-2 bg-white rounded-xl shadow-sm text-sm font-medium text-blue-700 hover:bg-slate-50 transition-all active:scale-95"
-            >
-              <PlayCircle className="w-4 h-4" />
-              Manage Lessons
-            </button>
-            <button
-              onClick={() => router.push("/lms/admin/staff")}
-              className="flex items-center gap-2 px-4 py-2 bg-white rounded-xl shadow-sm text-sm font-medium text-purple-700 hover:bg-slate-50 transition-all active:scale-95"
-            >
-              <Users className="w-4 h-4" />
-              Manage Staff
-            </button>
-            <button
-              onClick={() => router.push("/settings")}
-              className="flex items-center gap-2 px-4 py-2 bg-white rounded-xl shadow-sm text-sm font-medium text-orange-700 hover:bg-slate-50 transition-all active:scale-95 border-l-4 border-orange-400"
-              title="Go to Settings to sync users with LMS staff"
-            >
-              <RefreshCw className="w-4 h-4" />
-              Sync from Settings
-            </button>
-          </div>
-        )}
 
         {/* Tab Content */}
         {activeTab === "learning" && (
@@ -920,13 +735,19 @@ function LmsDashboard({ initialData }: LmsDashboardProps) {
               <h2 className="text-xl font-bold text-slate-800 mb-4 flex items-center gap-2">
                 <Target className="w-5 h-5 text-emerald-500" />Training Categories
               </h2>
-              {filteredCategories.length > 0 ? (
+              {learningCategories.length > 0 ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                  {filteredCategories.map((category) => {
-                    const completion = dashboardStats.category_completion.find((c) => c.category_id === category.id);
-                    const categoryLessons = lessons.filter((l) => l.category_id === category.id);
+                  {learningCategories.map((category) => {
+                    const categoryLessonsCount = lessonCountByCategoryId.get(category.id) || 0;
+                    const categoryProgress = categoryProgressById.get(category.id)?.progress ?? 0;
                     return (
-                      <CategoryCard key={category.id} category={category} completionRate={completion?.completion_rate || 0} lessonCount={categoryLessons.length} onClick={() => handleCategoryClick(category.id)} />
+                      <CategoryCard
+                        key={category.id}
+                        category={category}
+                        completionRate={categoryProgress}
+                        lessonCount={categoryLessonsCount}
+                        onClick={() => handleCategoryClick(category.id)}
+                      />
                     );
                   })}
                 </div>
@@ -934,14 +755,18 @@ function LmsDashboard({ initialData }: LmsDashboardProps) {
                 <div className="text-center py-12 bg-white rounded-3xl shadow-sm">
                   <Search className="w-12 h-12 mx-auto mb-4 text-slate-300" />
                   <h3 className="text-lg font-semibold text-slate-800 mb-2">
-                    {loading ? "Loading Training Content" : "No Categories Found"}
+                    {loading
+                      ? "Loading Training Content"
+                      : debouncedSearch.trim()
+                        ? "No Categories Found"
+                        : "No Lessons Available"}
                   </h3>
                   <p className="text-slate-500">
                     {loading
                       ? "Your LMS data will appear here as soon as it finishes loading."
                       : debouncedSearch.trim()
                         ? "Try adjusting your search query"
-                        : "No training categories are available yet."}
+                        : "No published lessons are available yet."}
                   </p>
                 </div>
               )}
@@ -951,20 +776,19 @@ function LmsDashboard({ initialData }: LmsDashboardProps) {
 
         {activeTab === "progress" && (
           <div className="space-y-6">
-            {/* Overall Progress */}
             <div className="p-6 bg-white rounded-3xl shadow-sm">
-              <h3 className="text-lg font-bold text-slate-800 mb-6">Overall Progress</h3>
+              <h3 className="text-lg font-bold text-slate-800 mb-6">My Progress</h3>
               <div className="grid grid-cols-1 min-[520px]:grid-cols-3 gap-4 mb-6">
                 <div className="text-center p-4 bg-emerald-50 rounded-2xl">
                   <p className="text-3xl font-bold text-emerald-600">{completedLessons}</p>
                   <p className="text-sm text-slate-600">Completed</p>
                 </div>
                 <div className="text-center p-4 bg-blue-50 rounded-2xl">
-                  <p className="text-3xl font-bold text-blue-600">{lessons.filter((l) => l.is_unlocked && !l.is_completed).length}</p>
+                  <p className="text-3xl font-bold text-blue-600">{inProgressLessons.length}</p>
                   <p className="text-sm text-slate-600">In Progress</p>
                 </div>
                 <div className="text-center p-4 bg-slate-100 rounded-2xl">
-                  <p className="text-3xl font-bold text-slate-600">{lessons.filter((l) => !l.is_unlocked).length}</p>
+                  <p className="text-3xl font-bold text-slate-600">{lockedLessons.length}</p>
                   <p className="text-sm text-slate-600">Locked</p>
                 </div>
               </div>
@@ -979,159 +803,63 @@ function LmsDashboard({ initialData }: LmsDashboardProps) {
               </div>
             </div>
 
-            {/* Staff Progress Table */}
-            {isAdmin && (
-              <div className="p-6 bg-white rounded-3xl shadow-sm">
-                <div className="flex items-center justify-between mb-4">
-                  <div>
-                    <h3 className="text-lg font-bold text-slate-800">Staff Progress</h3>
-                    <p className="text-sm text-slate-500">
-                      {groupedStaffProgress.length} names shown from {dashboardStats.staff_progress.length} LMS staff records
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => router.push("/settings")}
-                    className="text-sm text-emerald-600 hover:text-emerald-700 font-medium flex items-center gap-1"
-                  >
-                    <RefreshCw className="w-4 h-4" />
-                    Sync from Settings
-                  </button>
-                </div>
-                {staffProgressError && (
-                  <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-                    {staffProgressError}
-                  </div>
-                )}
-                {groupedStaffProgress.length > 0 ? (
-                  <Suspense fallback={<div className="space-y-3"><div className="h-16 bg-slate-100 rounded-2xl animate-pulse" /><div className="h-16 bg-slate-100 rounded-2xl animate-pulse" /></div>}>
-                    <div className="overflow-x-auto">
-                      <table className="w-full">
-                        <thead>
-                          <tr className="border-b border-slate-200">
-                            <th className="text-left py-3 px-4 text-sm font-semibold text-slate-600">Staff Name</th>
-                            <th className="text-left py-3 px-4 text-sm font-semibold text-slate-600">Process</th>
-                            <th className="text-left py-3 px-4 text-sm font-semibold text-slate-600">Completion</th>
-                            <th className="text-left py-3 px-4 text-sm font-semibold text-slate-600">Last Activity</th>
-                            <th className="text-right py-3 px-4 text-sm font-semibold text-slate-600">Details</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100">
-                          {groupedStaffProgress.map((staff) => {
-                            const completionPercentage = clampPercent(staff.completion_percentage);
-                            const latestWatchPercentage = clampPercent(staff.latest_watch_percentage);
-                            const status = getStaffLearningStatus(staff);
-                            const isOnlyOwnRecords = staff.records.every((record) => isOwnStaffRecord(record));
-                            const isDeletingGroup = staff.records.some((record) => deletingStaffId === record.staff_id);
+            <div className="p-6 bg-white rounded-3xl shadow-sm">
+              <h3 className="text-lg font-bold text-slate-800 mb-4">Category Progress</h3>
+              <div className="space-y-4">
+                {categories.map((category) => {
+                  const categoryProgress = categoryProgressById.get(category.id);
+                  const totalInCategory = categoryProgress?.total ?? 0;
 
-                            return (
-                              <tr key={`${normalizeStaffGroupName(staff.staff_name)}-${staff.staff_id}`} className="hover:bg-slate-50/50">
-                                <td className="py-3 px-4">
-                                  <div className="flex items-center gap-3">
-                                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-emerald-500 to-emerald-600 flex items-center justify-center text-white text-sm font-medium">
-                                      {staff.staff_name.charAt(0)}
-                                    </div>
-                                    <div>
-                                      <span className="font-medium text-slate-800">{staff.staff_name}</span>
-                                      <div className="mt-0.5 text-xs text-slate-500">
-                                        {staff.branch || "No branch"} • {staff.role}
-                                      </div>
-                                      {staff.staff_count > 1 && (
-                                        <div className="mt-0.5 text-xs font-medium text-emerald-600">
-                                          {staff.staff_count} staff records under this name
-                                        </div>
-                                      )}
-                                    </div>
-                                  </div>
-                                </td>
-                                <td className="py-3 px-4">
-                                  <div className="flex flex-col gap-1.5">
-                                    <span className={`w-fit rounded-full px-2.5 py-1 text-xs font-medium ${status.className}`}>
-                                      {status.label}
-                                    </span>
-                                    <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-500">
-                                      <span>{staff.watched_staff_count}/{staff.staff_count} staff watched</span>
-                                      <span>{staff.in_progress_lessons_count} in progress</span>
-                                      <span>{latestWatchPercentage}% latest</span>
-                                    </div>
-                                  </div>
-                                </td>
-                                <td className="py-3 px-4">
-                                  <div className="flex min-w-[160px] flex-col gap-1.5">
-                                    <div className="flex items-center justify-between gap-3 text-xs text-slate-500">
-                                      <span>{staff.completed_lessons_count}/{staff.total_lessons} lessons</span>
-                                      <span className="font-semibold text-slate-700">{completionPercentage}%</span>
-                                    </div>
-                                    <div className="h-2 w-full overflow-hidden rounded-full bg-slate-200">
-                                      <div className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-emerald-600" style={{ width: `${completionPercentage}%` }} />
-                                    </div>
-                                  </div>
-                                </td>
-                                <td className="py-3 px-4 text-sm text-slate-500">
-                                  <div>{formatLmsDate(staff.last_activity)}</div>
-                                  {staff.last_watched_lesson_title && (
-                                    <div className="mt-0.5 max-w-[220px] truncate text-xs text-slate-400">
-                                      {staff.last_watched_lesson_title}
-                                    </div>
-                                  )}
-                                </td>
-                                <td className="py-3 px-4 text-right">
-                                  <div className="flex justify-end gap-2">
-                                    <button
-                                      type="button"
-                                      onClick={() => setSelectedStaffGroup(staff)}
-                                      className="inline-flex items-center gap-1.5 rounded-lg bg-slate-100 px-3 py-2 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-200"
-                                    >
-                                      <Eye className="h-3.5 w-3.5" />
-                                      View
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        if (staff.staff_count > 1) {
-                                          setSelectedStaffGroup(staff);
-                                          return;
-                                        }
+                  if (totalInCategory === 0) {
+                    return null;
+                  }
 
-                                        void handleDeleteStaffRecord(staff.records[0]);
-                                      }}
-                                      disabled={isOnlyOwnRecords || isDeletingGroup}
-                                      title={
-                                        isOnlyOwnRecords
-                                          ? "You cannot delete your own LMS staff record"
-                                          : staff.staff_count > 1
-                                            ? "Open details to delete the exact staff record"
-                                            : "Delete LMS staff record"
-                                      }
-                                      className="inline-flex items-center gap-1.5 rounded-lg bg-red-50 px-3 py-2 text-xs font-medium text-red-600 transition-colors hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
-                                    >
-                                      <Trash2 className="h-3.5 w-3.5" />
-                                      {isDeletingGroup ? "Deleting" : isOnlyOwnRecords ? "Own" : "Delete"}
-                                    </button>
-                                  </div>
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
+                  return (
+                    <div key={category.id} className="p-4 bg-slate-50 rounded-2xl">
+                      <div className="flex items-center justify-between gap-3 mb-2">
+                        <span className="min-w-0 break-words font-medium text-slate-800">{category.name}</span>
+                        <span className="shrink-0 text-sm text-slate-500">{categoryProgress?.completed ?? 0}/{totalInCategory}</span>
+                      </div>
+                      <div className="w-full h-2 bg-slate-200 rounded-full overflow-hidden">
+                        <div className="h-full bg-gradient-to-r from-emerald-500 to-emerald-600 rounded-full transition-all duration-500" style={{ width: `${categoryProgress?.progress ?? 0}%` }} />
+                      </div>
+                      <p className="text-xs text-slate-500 mt-1">{categoryProgress?.progress ?? 0}% complete</p>
                     </div>
-                  </Suspense>
-                ) : (
-                  <div className="text-center py-8 bg-slate-50 rounded-2xl">
-                    <Users className="w-12 h-12 mx-auto mb-3 text-slate-300" />
-                    <p className="text-slate-600 font-medium mb-1">No staff data available</p>
-                    <p className="text-sm text-slate-500 mb-4">Staff from Settings need to be synced to LMS</p>
-                    <button
-                      onClick={() => router.push("/settings")}
-                      className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors"
-                    >
-                      <RefreshCw className="w-4 h-4" />
-                      Go to Settings to Sync
-                    </button>
+                  );
+                })}
+                {categories.every((category) => lessons.every((lesson) => lesson.category_id !== category.id)) && (
+                  <div className="text-center p-4 text-slate-500">
+                    No category progress yet.
                   </div>
                 )}
               </div>
-            )}
+            </div>
+
+            <div className="p-6 bg-white rounded-3xl shadow-sm">
+              <h3 className="text-lg font-bold text-slate-800 mb-4">Recent Activity</h3>
+              <div className="space-y-3">
+                {lessons
+                  .filter((l) => l.is_completed)
+                  .slice(0, 5)
+                  .map((lesson) => (
+                    <div key={lesson.id} className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl">
+                      <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="break-words text-sm font-medium text-slate-800">{lesson.title}</p>
+                        <p className="break-words text-xs text-slate-500">{lesson.category_name}</p>
+                      </div>
+                      <span className="shrink-0 text-xs text-slate-400">Completed</span>
+                    </div>
+                  ))}
+                {lessons.filter((l) => l.is_completed).length === 0 && (
+                  <div className="text-center p-4 text-slate-500">
+                    {loading ? "Loading recent activity..." : "No completed lessons yet. Start learning to see your progress."}
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
         )}
 
@@ -1149,8 +877,8 @@ function LmsDashboard({ initialData }: LmsDashboardProps) {
               title="Category Master"
               description="Complete all lessons in a category"
               icon={Target}
-              unlocked={dashboardStats.category_completion.some((c) => c.completion_rate === 100)}
-              progress={dashboardStats.category_completion.length ? Math.max(...dashboardStats.category_completion.map((c) => c.completion_rate), 0) : 0}
+              unlocked={Array.from(categoryProgressById.values()).some((categoryProgress) => categoryProgress.total > 0 && categoryProgress.progress === 100)}
+              progress={maxCategoryProgress}
               color="blue"
             />
             <AchievementCard
@@ -1164,244 +892,6 @@ function LmsDashboard({ initialData }: LmsDashboardProps) {
           </div>
         )}
 
-        {activeTab === "my-process" && (
-          <div className="space-y-6">
-            {/* My Process Overview */}
-            <div className="p-6 bg-white rounded-3xl shadow-sm">
-              <div className="flex items-center gap-4 mb-6">
-                <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-emerald-500 to-emerald-600 shadow-lg shadow-emerald-500/30 flex items-center justify-center">
-                  <Clock className="w-8 h-8 text-white" />
-                </div>
-                <div>
-                  <h3 className="text-xl font-bold text-slate-800">My Training Process</h3>
-                  <p className="text-sm text-slate-500">Track your personal learning journey</p>
-                </div>
-              </div>
-
-              {/* Personal Stats */}
-              <div className="grid grid-cols-1 min-[420px]:grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-                <div className="text-center p-4 bg-emerald-50 rounded-2xl">
-                  <p className="text-2xl font-bold text-emerald-600">{completedLessons}</p>
-                  <p className="text-sm text-slate-600">Completed</p>
-                </div>
-                <div className="text-center p-4 bg-blue-50 rounded-2xl">
-                  <p className="text-2xl font-bold text-blue-600">{lessons.filter((l) => l.is_unlocked && !l.is_completed).length}</p>
-                  <p className="text-sm text-slate-600">In Progress</p>
-                </div>
-                <div className="text-center p-4 bg-amber-50 rounded-2xl">
-                  <p className="text-2xl font-bold text-amber-600">{lessons.filter((l) => !l.is_unlocked).length}</p>
-                  <p className="text-sm text-slate-600">Locked</p>
-                </div>
-                <div className="text-center p-4 bg-purple-50 rounded-2xl">
-                  <p className="text-2xl font-bold text-purple-600">{overallProgress}%</p>
-                  <p className="text-sm text-slate-600">Overall</p>
-                </div>
-              </div>
-
-              {/* Current Status */}
-              <div className="p-4 bg-slate-50 rounded-2xl">
-                <h4 className="font-semibold text-slate-800 mb-3">Current Status</h4>
-                {currentLesson ? (
-                  <div className="flex flex-col gap-3 p-3 bg-white rounded-xl shadow-sm sm:flex-row sm:items-center sm:justify-between">
-                    <div className="flex min-w-0 items-center gap-3">
-                      <div className="w-10 h-10 rounded-lg bg-emerald-100 flex items-center justify-center">
-                        <PlayCircle className="w-5 h-5 text-emerald-600" />
-                      </div>
-                      <div>
-                        <p className="font-medium text-slate-800 text-sm">{currentLesson.title}</p>
-                        <p className="text-xs text-slate-500">{currentLesson.category_name}</p>
-                      </div>
-                    </div>
-                      <span className="self-start whitespace-nowrap text-xs px-2 py-1 bg-emerald-100 text-emerald-700 rounded-full sm:self-auto">In Progress</span>
-                  </div>
-                ) : loading ? (
-                  <div className="text-center p-4 text-slate-500">
-                    Loading your current training status...
-                  </div>
-                ) : (
-                  <div className="text-center p-4 text-slate-500">
-                    🎉 All lessons completed! Great job!
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Category Progress */}
-            <div className="p-6 bg-white rounded-3xl shadow-sm">
-              <h3 className="text-lg font-bold text-slate-800 mb-4">Category Progress</h3>
-              <div className="space-y-4">
-                {categories.map((category) => {
-                  const categoryLessons = lessons.filter((l) => l.category_id === category.id);
-                  const completedInCategory = categoryLessons.filter((l) => l.is_completed).length;
-                  const totalInCategory = categoryLessons.length;
-                  const progress = totalInCategory > 0 ? Math.round((completedInCategory / totalInCategory) * 100) : 0;
-
-                  return (
-                    <div key={category.id} className="p-4 bg-slate-50 rounded-2xl">
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="font-medium text-slate-800">{category.name}</span>
-                        <span className="text-sm text-slate-500">{completedInCategory}/{totalInCategory}</span>
-                      </div>
-                      <div className="w-full h-2 bg-slate-200 rounded-full overflow-hidden">
-                        <div className="h-full bg-gradient-to-r from-emerald-500 to-emerald-600 rounded-full transition-all duration-500" style={{ width: `${progress}%` }} />
-                      </div>
-                      <p className="text-xs text-slate-500 mt-1">{progress}% complete</p>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Recent Activity */}
-            <div className="p-6 bg-white rounded-3xl shadow-sm">
-              <h3 className="text-lg font-bold text-slate-800 mb-4">Recent Activity</h3>
-              <div className="space-y-3">
-                {lessons
-                  .filter((l) => l.is_completed)
-                  .slice(0, 5)
-                  .map((lesson) => (
-                    <div key={lesson.id} className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl">
-                      <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center">
-                        <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                      </div>
-                      <div className="flex-1">
-                        <p className="text-sm font-medium text-slate-800">{lesson.title}</p>
-                        <p className="text-xs text-slate-500">{lesson.category_name}</p>
-                      </div>
-                      <span className="text-xs text-slate-400">Completed</span>
-                    </div>
-                  ))}
-                {lessons.filter((l) => l.is_completed).length === 0 && (
-                  <div className="text-center p-4 text-slate-500">
-                    {loading ? "Loading recent activity..." : "No completed lessons yet. Start learning to see your progress!"}
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {selectedStaffGroup && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-sm">
-            <div className="w-full max-w-4xl overflow-hidden rounded-2xl bg-white shadow-2xl">
-              <div className="flex items-start justify-between gap-4 border-b border-slate-100 px-6 py-5">
-                <div>
-                  <h3 className="text-lg font-bold text-slate-800">{selectedStaffGroup.staff_name}</h3>
-                  <p className="mt-1 text-sm text-slate-500">
-                    {selectedStaffGroup.watched_staff_count} of {selectedStaffGroup.staff_count} staff records watched training videos
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setSelectedStaffGroup(null)}
-                  className="rounded-lg p-2 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
-                  aria-label="Close staff details"
-                >
-                  <X className="h-5 w-5" />
-                </button>
-              </div>
-              <div className="max-h-[70vh] overflow-y-auto px-6 py-5">
-                <div className="grid gap-3 sm:grid-cols-4">
-                  <div className="rounded-xl bg-slate-50 p-3">
-                    <p className="text-xs font-medium text-slate-500">Records</p>
-                    <p className="mt-1 text-xl font-bold text-slate-800">{selectedStaffGroup.staff_count}</p>
-                  </div>
-                  <div className="rounded-xl bg-blue-50 p-3">
-                    <p className="text-xs font-medium text-blue-700">Watched Staff</p>
-                    <p className="mt-1 text-xl font-bold text-blue-800">{selectedStaffGroup.watched_staff_count}</p>
-                  </div>
-                  <div className="rounded-xl bg-emerald-50 p-3">
-                    <p className="text-xs font-medium text-emerald-700">Completed Lessons</p>
-                    <p className="mt-1 text-xl font-bold text-emerald-800">
-                      {selectedStaffGroup.completed_lessons_count}/{selectedStaffGroup.total_lessons}
-                    </p>
-                  </div>
-                  <div className="rounded-xl bg-amber-50 p-3">
-                    <p className="text-xs font-medium text-amber-700">Latest Watch</p>
-                    <p className="mt-1 text-xl font-bold text-amber-800">{clampPercent(selectedStaffGroup.latest_watch_percentage)}%</p>
-                  </div>
-                </div>
-
-                {staffProgressError && (
-                  <div className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-                    {staffProgressError}
-                  </div>
-                )}
-
-                <div className="mt-5 overflow-x-auto">
-                  <table className="w-full">
-                    <thead>
-                      <tr className="border-b border-slate-200">
-                        <th className="px-3 py-2 text-left text-xs font-semibold uppercase text-slate-500">Staff ID</th>
-                        <th className="px-3 py-2 text-left text-xs font-semibold uppercase text-slate-500">Role</th>
-                        <th className="px-3 py-2 text-left text-xs font-semibold uppercase text-slate-500">Watched</th>
-                        <th className="px-3 py-2 text-left text-xs font-semibold uppercase text-slate-500">Completion</th>
-                        <th className="px-3 py-2 text-left text-xs font-semibold uppercase text-slate-500">Last Activity</th>
-                        <th className="px-3 py-2 text-left text-xs font-semibold uppercase text-slate-500">Last Video</th>
-                        <th className="px-3 py-2 text-right text-xs font-semibold uppercase text-slate-500">Action</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {selectedStaffGroup.records.map((record) => {
-                        const recordStatus = getStaffLearningStatus(record);
-                        const recordCompletion = clampPercent(record.completion_percentage);
-                        const recordWatch = clampPercent(record.latest_watch_percentage);
-                        const isOwnRecord = isOwnStaffRecord(record);
-
-                        return (
-                          <tr key={record.staff_id}>
-                            <td className="px-3 py-3 text-sm font-medium text-slate-800">#{record.staff_id}</td>
-                            <td className="px-3 py-3 text-sm text-slate-600">{record.role}</td>
-                            <td className="px-3 py-3">
-                              <div className="flex flex-col gap-1">
-                                <span className={`w-fit rounded-full px-2 py-0.5 text-xs font-medium ${recordStatus.className}`}>
-                                  {recordStatus.label}
-                                </span>
-                                <span className="text-xs text-slate-500">
-                                  {record.watched_lessons_count} videos • {recordWatch}% latest
-                                </span>
-                              </div>
-                            </td>
-                            <td className="px-3 py-3">
-                              <div className="min-w-[140px]">
-                                <div className="mb-1 flex items-center justify-between gap-2 text-xs text-slate-500">
-                                  <span>{record.completed_lessons_count}/{record.total_lessons}</span>
-                                  <span>{recordCompletion}%</span>
-                                </div>
-                                <div className="h-2 overflow-hidden rounded-full bg-slate-200">
-                                  <div
-                                    className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-emerald-600"
-                                    style={{ width: `${recordCompletion}%` }}
-                                  />
-                                </div>
-                              </div>
-                            </td>
-                            <td className="px-3 py-3 text-sm text-slate-600">{formatLmsDate(record.last_activity)}</td>
-                            <td className="max-w-[220px] truncate px-3 py-3 text-sm text-slate-500">
-                              {record.last_watched_lesson_title || "No video watched"}
-                            </td>
-                            <td className="px-3 py-3 text-right">
-                              <button
-                                type="button"
-                                onClick={() => void handleDeleteStaffRecord(record)}
-                                disabled={isOwnRecord || deletingStaffId === record.staff_id}
-                                title={isOwnRecord ? "You cannot delete your own LMS staff record" : "Delete LMS staff record"}
-                                className="inline-flex items-center gap-1.5 rounded-lg bg-red-50 px-3 py-2 text-xs font-medium text-red-600 transition-colors hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
-                              >
-                                <Trash2 className="h-3.5 w-3.5" />
-                                {deletingStaffId === record.staff_id ? "Deleting" : isOwnRecord ? "Own" : "Delete"}
-                              </button>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );

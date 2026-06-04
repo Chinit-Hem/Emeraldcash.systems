@@ -85,7 +85,7 @@ export default function EditAssetPage() {
       const result = await response.json();
 
       if (result.success) {
-        router.push(detailHref);
+        router.push(detailHref, { scroll: false });
         router.refresh();
         return { success: true };
       }
@@ -96,7 +96,7 @@ export default function EditAssetPage() {
   };
 
   const handleClose = () => {
-    router.push(detailHref);
+    router.push(detailHref, { scroll: false });
   };
 
   if (loading) {
@@ -117,6 +117,7 @@ export default function EditAssetPage() {
           <p className="mb-6 text-red-600 text-lg">{error || "Asset not found"}</p>
           <Link
             href={assetsBackHref}
+            scroll={false}
             className="inline-flex items-center gap-2 bg-emerald-600 text-white px-6 py-3 rounded-2xl font-bold hover:bg-emerald-700 transition-all"
           >
             <ArrowLeft className="h-4 w-4" />
