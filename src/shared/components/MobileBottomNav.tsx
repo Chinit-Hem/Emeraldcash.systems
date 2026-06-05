@@ -34,8 +34,22 @@ function isKeyboardTarget(element: Element | null) {
   if (!(element instanceof HTMLElement)) return false;
 
   const tagName = element.tagName.toLowerCase();
+  if (element instanceof HTMLInputElement) {
+    return ![
+      "button",
+      "checkbox",
+      "color",
+      "file",
+      "hidden",
+      "image",
+      "radio",
+      "range",
+      "reset",
+      "submit",
+    ].includes(element.type);
+  }
+
   return (
-    tagName === "input" ||
     tagName === "textarea" ||
     tagName === "select" ||
     element.isContentEditable
@@ -104,28 +118,42 @@ export default function MobileBottomNav({
 
   useEffect(() => {
     const mediaQuery = window.matchMedia("(max-width: 767px)");
+    const keyboardTimers = new Set<number>();
 
     const updateKeyboardState = () => {
-      const viewportHeight = window.visualViewport?.height ?? window.innerHeight;
-      const keyboardHeight = Math.max(window.innerHeight - viewportHeight, 0);
       const focusedFormField = isKeyboardTarget(document.activeElement);
 
-      setIsKeyboardOpen(mediaQuery.matches && focusedFormField && keyboardHeight > 80);
+      setIsKeyboardOpen(mediaQuery.matches && focusedFormField);
+    };
+
+    const scheduleKeyboardStateUpdate = () => {
+      updateKeyboardState();
+
+      [80, 240, 500].forEach((delay) => {
+        const timer = window.setTimeout(() => {
+          keyboardTimers.delete(timer);
+          updateKeyboardState();
+        }, delay);
+        keyboardTimers.add(timer);
+      });
     };
 
     updateKeyboardState();
-    window.visualViewport?.addEventListener("resize", updateKeyboardState);
-    window.visualViewport?.addEventListener("scroll", updateKeyboardState);
-    window.addEventListener("focusin", updateKeyboardState);
-    window.addEventListener("focusout", updateKeyboardState);
-    mediaQuery.addEventListener("change", updateKeyboardState);
+    window.visualViewport?.addEventListener("resize", scheduleKeyboardStateUpdate);
+    window.visualViewport?.addEventListener("scroll", scheduleKeyboardStateUpdate);
+    window.addEventListener("resize", scheduleKeyboardStateUpdate);
+    window.addEventListener("focusin", scheduleKeyboardStateUpdate);
+    window.addEventListener("focusout", scheduleKeyboardStateUpdate);
+    mediaQuery.addEventListener("change", scheduleKeyboardStateUpdate);
 
     return () => {
-      window.visualViewport?.removeEventListener("resize", updateKeyboardState);
-      window.visualViewport?.removeEventListener("scroll", updateKeyboardState);
-      window.removeEventListener("focusin", updateKeyboardState);
-      window.removeEventListener("focusout", updateKeyboardState);
-      mediaQuery.removeEventListener("change", updateKeyboardState);
+      keyboardTimers.forEach((timer) => window.clearTimeout(timer));
+      window.visualViewport?.removeEventListener("resize", scheduleKeyboardStateUpdate);
+      window.visualViewport?.removeEventListener("scroll", scheduleKeyboardStateUpdate);
+      window.removeEventListener("resize", scheduleKeyboardStateUpdate);
+      window.removeEventListener("focusin", scheduleKeyboardStateUpdate);
+      window.removeEventListener("focusout", scheduleKeyboardStateUpdate);
+      mediaQuery.removeEventListener("change", scheduleKeyboardStateUpdate);
     };
   }, []);
 
