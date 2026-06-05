@@ -3,7 +3,7 @@
 import type { User } from "@/shared/types/types";
 import { BookOpen, Boxes, Calculator, Menu, Settings } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { LucideIcon } from "lucide-react";
 import { isIOSSafariBrowser } from "@/shared/utils/platform";
 import { useMounted } from "@/shared/hooks/useMounted";
@@ -30,6 +30,18 @@ type NetworkInformationLike = {
   saveData?: boolean;
 };
 
+function isKeyboardTarget(element: Element | null) {
+  if (!(element instanceof HTMLElement)) return false;
+
+  const tagName = element.tagName.toLowerCase();
+  return (
+    tagName === "input" ||
+    tagName === "textarea" ||
+    tagName === "select" ||
+    element.isContentEditable
+  );
+}
+
 export default function MobileBottomNav({
   user,
   isMenuOpen = false,
@@ -39,6 +51,7 @@ export default function MobileBottomNav({
   const pathname = usePathname() || "/";
   const isIOSSafari = useMounted() && isIOSSafariBrowser();
   const { language } = useLanguage();
+  const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
 
   const translatedNavItems = useMemo(() => {
     const navItems: NavLinkItem[] = [];
@@ -89,6 +102,33 @@ export default function MobileBottomNav({
     };
   }, [isIOSSafari, router, translatedNavItems]);
 
+  useEffect(() => {
+    const mediaQuery = window.matchMedia("(max-width: 767px)");
+
+    const updateKeyboardState = () => {
+      const viewportHeight = window.visualViewport?.height ?? window.innerHeight;
+      const keyboardHeight = Math.max(window.innerHeight - viewportHeight, 0);
+      const focusedFormField = isKeyboardTarget(document.activeElement);
+
+      setIsKeyboardOpen(mediaQuery.matches && focusedFormField && keyboardHeight > 80);
+    };
+
+    updateKeyboardState();
+    window.visualViewport?.addEventListener("resize", updateKeyboardState);
+    window.visualViewport?.addEventListener("scroll", updateKeyboardState);
+    window.addEventListener("focusin", updateKeyboardState);
+    window.addEventListener("focusout", updateKeyboardState);
+    mediaQuery.addEventListener("change", updateKeyboardState);
+
+    return () => {
+      window.visualViewport?.removeEventListener("resize", updateKeyboardState);
+      window.visualViewport?.removeEventListener("scroll", updateKeyboardState);
+      window.removeEventListener("focusin", updateKeyboardState);
+      window.removeEventListener("focusout", updateKeyboardState);
+      mediaQuery.removeEventListener("change", updateKeyboardState);
+    };
+  }, []);
+
   const isActive = (item: NavLinkItem) => {
     if (item.id === "vms") {
       return (
@@ -108,6 +148,10 @@ export default function MobileBottomNav({
     ? "fixed inset-x-0 bottom-0 z-50 border-t border-neu-bg-dark bg-neu-bg shadow-lg xl:hidden"
     : "neu-mobile-nav fixed inset-x-0 bottom-0 z-50 xl:hidden";
   const menuLabel = language === "km" ? "ម៉ឺនុយ" : "Menu";
+
+  if (isKeyboardOpen && !isMenuOpen) {
+    return null;
+  }
 
   return (
     <nav

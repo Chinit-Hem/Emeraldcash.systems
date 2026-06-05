@@ -306,6 +306,10 @@ function detectMobileSafariLike(): boolean {
   return isIOS || maxTouchPoints > 1;
 }
 
+function detectMobileVehicleViewport(): boolean {
+  return typeof window !== "undefined" && window.matchMedia("(max-width: 767px)").matches;
+}
+
 function getVehicleListScrollContainer(): HTMLElement | null {
   if (typeof document === "undefined") return null;
 
@@ -566,7 +570,7 @@ function NeuInput({
 }) {
   return (
     <div className={cn("relative", className)}>
-      {Icon && <Icon className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 dark:text-slate-500 sm:left-4 sm:h-5 sm:w-5" />}
+      {Icon && <Icon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 dark:text-slate-500 sm:left-4 sm:h-5 sm:w-5" />}
       <input
         type={type}
         title={placeholder}
@@ -574,14 +578,14 @@ function NeuInput({
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
         className={cn(
-          "w-full rounded-2xl border border-slate-200/70 bg-white transition-all duration-200 dark:border-slate-700/70 dark:bg-slate-900",
+          "w-full rounded-xl border border-slate-200/70 bg-white transition-all duration-200 dark:border-slate-700/70 dark:bg-slate-900 sm:rounded-2xl",
           "shadow-[4px_4px_8px_#e2e8f0,-4px_-4px_8px_#ffffff]",
           "dark:shadow-[0_10px_24px_rgba(2,6,23,0.45)]",
           "focus:shadow-[6px_6px_12px_#e2e8f0,-6px_-6px_12px_#ffffff]",
           "dark:focus:shadow-[0_14px_30px_rgba(2,6,23,0.58)]",
           "focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500/40",
-          "text-sm text-slate-700 placeholder-slate-400 outline-none dark:text-slate-100 dark:placeholder-slate-500",
-          Icon ? "py-2.5 pl-10 pr-3 sm:py-3 sm:pl-12 sm:pr-4" : "px-3 py-2.5 sm:px-4 sm:py-3"
+          "text-xs text-slate-700 placeholder-slate-400 outline-none dark:text-slate-100 dark:placeholder-slate-500 sm:text-sm",
+          Icon ? "py-2 pl-9 pr-3 sm:py-3 sm:pl-12 sm:pr-4" : "px-3 py-2 sm:px-4 sm:py-3"
         )}
       />
     </div>
@@ -904,20 +908,20 @@ function ViewToggle({
   t: ReturnType<typeof useTranslation>["t"];
 }) {
   return (
-    <div className="flex items-center gap-1 rounded-2xl bg-slate-100/80 p-1 shadow-[inset_2px_2px_4px_#cbd5e1,inset_-2px_-2px_4px_#ffffff] dark:bg-slate-800/80 dark:shadow-[inset_2px_2px_6px_rgba(2,6,23,0.65),inset_-2px_-2px_6px_rgba(51,65,85,0.22)]">
+    <div className="flex items-center gap-1 rounded-xl bg-slate-100/80 p-0.5 shadow-[inset_2px_2px_4px_#cbd5e1,inset_-2px_-2px_4px_#ffffff] dark:bg-slate-800/80 dark:shadow-[inset_2px_2px_6px_rgba(2,6,23,0.65),inset_-2px_-2px_6px_rgba(51,65,85,0.22)] sm:rounded-2xl sm:p-1">
       <button
         type="button"
         onClick={() => onChange("grid")}
         aria-label={t.grid}
         title={t.grid}
         className={cn(
-          "flex min-h-9 items-center gap-2 rounded-xl px-2.5 py-2 text-sm font-medium transition-all duration-200 sm:min-h-0 sm:px-3",
+          "flex min-h-8 items-center gap-2 rounded-lg px-2 py-1.5 text-sm font-medium transition-all duration-200 sm:min-h-0 sm:rounded-xl sm:px-3 sm:py-2",
           view === "grid"
             ? "bg-white text-emerald-600 shadow-[2px_2px_4px_#cbd5e1,-2px_-2px_4px_#ffffff] dark:bg-slate-900 dark:text-emerald-300 dark:shadow-[0_6px_14px_rgba(2,6,23,0.4)]"
             : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-100"
         )}
       >
-        <Grid3X3 className="w-4 h-4" />
+        <Grid3X3 className="h-4 w-4" />
         <span className="hidden sm:inline">{t.grid}</span>
       </button>
       <button
@@ -926,13 +930,13 @@ function ViewToggle({
         aria-label={t.list}
         title={t.list}
         className={cn(
-          "flex min-h-9 items-center gap-2 rounded-xl px-2.5 py-2 text-sm font-medium transition-all duration-200 sm:min-h-0 sm:px-3",
+          "flex min-h-8 items-center gap-2 rounded-lg px-2 py-1.5 text-sm font-medium transition-all duration-200 sm:min-h-0 sm:rounded-xl sm:px-3 sm:py-2",
           view === "list"
             ? "bg-white text-emerald-600 shadow-[2px_2px_4px_#cbd5e1,-2px_-2px_4px_#ffffff] dark:bg-slate-900 dark:text-emerald-300 dark:shadow-[0_6px_14px_rgba(2,6,23,0.4)]"
             : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-100"
         )}
       >
-        <List className="w-4 h-4" />
+        <List className="h-4 w-4" />
         <span className="hidden sm:inline">{t.list}</span>
       </button>
     </div>
@@ -1245,7 +1249,7 @@ return (
         event.preventDefault();
         onView(vehicle.VehicleId);
       }}
-      className="group scroll-mt-24 cursor-pointer overflow-hidden rounded-lg border border-slate-100 bg-white shadow-[0_4px_20px_rgba(0,0,0,0.08)] transition-all duration-150 hover:border-emerald-200 hover:shadow-[0_8px_30px_rgba(0,0,0,0.12)] focus:outline-none focus:ring-2 focus:ring-emerald-400/40 active:scale-[0.98] dark:border-slate-700/80 dark:bg-slate-900 dark:shadow-[0_16px_32px_rgba(2,6,23,0.45)] dark:hover:border-emerald-500/35 dark:hover:shadow-[0_20px_42px_rgba(2,6,23,0.62)] sm:rounded-2xl"
+      className="group scroll-mt-24 cursor-pointer overflow-hidden rounded-md border border-slate-100 bg-white shadow-[0_3px_12px_rgba(0,0,0,0.08)] transition-all duration-150 hover:border-emerald-200 hover:shadow-[0_8px_30px_rgba(0,0,0,0.12)] focus:outline-none focus:ring-2 focus:ring-emerald-400/40 active:scale-[0.98] dark:border-slate-700/80 dark:bg-slate-900 dark:shadow-[0_16px_32px_rgba(2,6,23,0.45)] dark:hover:border-emerald-500/35 dark:hover:shadow-[0_20px_42px_rgba(2,6,23,0.62)] sm:rounded-2xl sm:shadow-[0_4px_20px_rgba(0,0,0,0.08)]"
     >
       {/* Image */}
       <div className="relative aspect-[4/3] overflow-hidden bg-slate-100 dark:bg-slate-800">
@@ -1263,21 +1267,21 @@ return (
             />
           ) : (
             <div className="flex h-full w-full items-center justify-center bg-slate-100 dark:bg-slate-800">
-              <Car className="h-10 w-10 text-slate-300 dark:text-slate-600" aria-hidden="true" />
+              <Car className="h-6 w-6 text-slate-300 dark:text-slate-600 sm:h-10 sm:w-10" aria-hidden="true" />
             </div>
           )}
         <VehicleImageActions vehicle={vehicle} photoCount={photoCount} />
       </div>
 
       {/* Content */}
-      <div className="p-1.5 sm:p-4">
-        <div className="mb-1 flex min-w-0 flex-col gap-1 sm:mb-2 sm:flex-row sm:items-start sm:justify-between">
+      <div className="p-1 sm:p-4">
+        <div className="mb-0.5 flex min-w-0 flex-col gap-0.5 sm:mb-2 sm:gap-1 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0">
-            <h3 className="truncate text-[10px] font-bold leading-tight text-slate-800 dark:text-slate-100 sm:text-lg">{vehicle.Brand}</h3>
-            <p className="truncate text-[9px] leading-tight text-slate-500 dark:text-slate-400 sm:text-sm">{vehicle.Model}</p>
+            <h3 className="truncate text-[9px] font-bold leading-tight text-slate-800 dark:text-slate-100 sm:text-lg">{vehicle.Brand}</h3>
+            <p className="truncate text-[8px] leading-tight text-slate-500 dark:text-slate-400 sm:text-sm">{vehicle.Model}</p>
           </div>
           <div className="min-w-0 sm:text-right">
-            <p className="truncate text-[10px] font-bold leading-tight text-emerald-600 sm:text-lg">
+            <p className="truncate text-[9px] font-bold leading-tight text-emerald-600 sm:text-lg">
               ${vehicle.PriceNew?.toLocaleString() || "-"}
             </p>
             <p className="hidden text-xs text-slate-400 dark:text-slate-500 sm:block">{t.marketPrice}</p>
@@ -1353,16 +1357,16 @@ const MobileVehicleListCard = memo(function MobileVehicleListCard({
         event.preventDefault();
         onView(vehicle.VehicleId);
       }}
-      className="grid min-h-[126px] scroll-mt-24 cursor-pointer grid-cols-[140px_minmax(0,1fr)] overflow-hidden rounded-lg border border-slate-100 bg-white shadow-[0_4px_16px_rgba(15,23,42,0.07)] transition-transform focus:outline-none focus:ring-2 focus:ring-emerald-400/40 active:scale-[0.99] dark:border-slate-700/80 dark:bg-slate-900 dark:shadow-[0_14px_30px_rgba(2,6,23,0.45)] sm:min-h-[180px] sm:grid-cols-[220px_minmax(0,1fr)] lg:min-h-[220px] lg:grid-cols-[280px_minmax(0,1fr)]"
+      className="grid min-h-[74px] scroll-mt-24 cursor-pointer grid-cols-[92px_minmax(0,1fr)] overflow-hidden rounded-md border border-slate-100 bg-white shadow-[0_3px_12px_rgba(15,23,42,0.07)] transition-transform focus:outline-none focus:ring-2 focus:ring-emerald-400/40 active:scale-[0.99] dark:border-slate-700/80 dark:bg-slate-900 dark:shadow-[0_14px_30px_rgba(2,6,23,0.45)] sm:min-h-[180px] sm:grid-cols-[220px_minmax(0,1fr)] sm:rounded-lg sm:shadow-[0_4px_16px_rgba(15,23,42,0.07)] lg:min-h-[220px] lg:grid-cols-[280px_minmax(0,1fr)]"
     >
-      <div className="relative min-h-[126px] overflow-hidden bg-slate-100 dark:bg-slate-800 sm:min-h-[180px] lg:min-h-[220px]">
-        <Car className="absolute inset-0 m-auto h-8 w-8 text-slate-300 dark:text-slate-600 sm:h-12 sm:w-12" aria-hidden="true" />
+      <div className="relative min-h-[74px] overflow-hidden bg-slate-100 dark:bg-slate-800 sm:min-h-[180px] lg:min-h-[220px]">
+        <Car className="absolute inset-0 m-auto h-5 w-5 text-slate-300 dark:text-slate-600 sm:h-12 sm:w-12" aria-hidden="true" />
         {imageUrl && (
           <Image
             src={imageUrl}
             alt={vehicle.Model || "Vehicle"}
             fill
-            sizes="(max-width: 640px) 140px, (max-width: 1024px) 220px, 280px"
+            sizes="(max-width: 640px) 92px, (max-width: 1024px) 220px, 280px"
             unoptimized={shouldBypassNextImageOptimization(imageUrl)}
             className="object-cover"
             loading="lazy"
@@ -1374,29 +1378,29 @@ const MobileVehicleListCard = memo(function MobileVehicleListCard({
         <VehicleImageActions vehicle={vehicle} photoCount={photoCount} />
       </div>
 
-      <div className="flex min-w-0 flex-col px-3 py-2.5 sm:px-5 sm:py-4 lg:px-6 lg:py-5">
-        <div className="flex min-w-0 items-start justify-between gap-2">
+      <div className="flex min-w-0 flex-col px-2 py-1.5 sm:px-5 sm:py-4 lg:px-6 lg:py-5">
+        <div className="flex min-w-0 items-start justify-between gap-1 sm:gap-2">
           <div className="min-w-0 pr-1">
-            <h3 className="line-clamp-2 text-sm font-bold leading-snug text-slate-900 dark:text-slate-100 sm:text-lg lg:text-xl">
+            <h3 className="line-clamp-1 text-[11px] font-bold leading-tight text-slate-900 dark:text-slate-100 sm:line-clamp-2 sm:text-lg sm:leading-snug lg:text-xl">
               {vehicle.Brand || "-"} {vehicle.Model || "-"}
             </h3>
-            <p className="mt-1 truncate text-[11px] text-slate-500 dark:text-slate-400 sm:text-sm">
+            <p className="mt-0.5 truncate text-[9px] leading-tight text-slate-500 dark:text-slate-400 sm:mt-1 sm:text-sm">
               {vehicle.Year || "-"} {vehicle.Plate ? `- ${vehicle.Plate}` : ""}
             </p>
-            <p className="mt-1 truncate text-[11px] text-slate-500 dark:text-slate-400 sm:text-sm">
+            <p className="mt-0.5 truncate text-[9px] leading-tight text-slate-500 dark:text-slate-400 sm:mt-1 sm:text-sm">
               {vehicle.Condition || "-"} - {vehicle.Plate ? `Plate ${vehicle.Plate}` : "Plate Number"}
             </p>
           </div>
           <span className={cn(
-            "flex-shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold ring-1 sm:px-3 sm:py-1 sm:text-xs",
+            "hidden flex-shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold ring-1 sm:inline-flex sm:px-3 sm:py-1 sm:text-xs",
             getMobileCategoryClass(vehicle.Category)
           )}>
             {vehicle.Category || "-"}
           </span>
         </div>
 
-        <div className="mt-auto pt-3">
-          <div className="truncate text-sm font-bold text-emerald-600 sm:text-lg lg:text-xl">
+        <div className="mt-auto pt-1 sm:pt-3">
+          <div className="truncate text-[11px] font-bold text-emerald-600 sm:text-lg lg:text-xl">
             {vehicle.PriceNew == null ? "-" : `$${vehicle.PriceNew.toLocaleString()}`}
           </div>
         </div>
@@ -1416,11 +1420,13 @@ export default function VehiclesClientEnhanced() {
   const searchParams = useSearchParams();
   const frameworkVehicleListSearch = searchParams.toString();
   const [nativeVehicleListSearch, setNativeVehicleListSearch] = useState<string | null>(null);
-  const effectiveVehicleListSearchParams = useMemo(
-    () => getVehicleListSearchParamsWithFallback(
-      nativeVehicleListSearch === null ? searchParams : new URLSearchParams(nativeVehicleListSearch)
-    ),
+  const activeVehicleListSearchParams = useMemo(
+    () => nativeVehicleListSearch === null ? searchParams : new URLSearchParams(nativeVehicleListSearch),
     [nativeVehicleListSearch, searchParams]
+  );
+  const effectiveVehicleListSearchParams = useMemo(
+    () => getVehicleListSearchParamsWithFallback(activeVehicleListSearchParams),
+    [activeVehicleListSearchParams]
   );
   const user = useAuthUser();
   const { success, error: showError } = useToast();
@@ -1428,11 +1434,11 @@ export default function VehiclesClientEnhanced() {
   const [isMobileSafeMode, setIsMobileSafeMode] = useState(detectMobileSafariLike);
   const activeListHrefRef = useRef<string | null>(null);
   const pendingListScrollRestoreRef = useRef<VehicleListScrollSnapshot | null>(null);
-  const userSelectedViewModeRef = useRef(Boolean(effectiveVehicleListSearchParams.get(VEHICLE_LIST_VIEW_PARAM)));
+  const userSelectedViewModeRef = useRef(Boolean(activeVehicleListSearchParams.get(VEHICLE_LIST_VIEW_PARAM)));
   const skipNextFilterPageResetRef = useRef(
     Boolean(
-      effectiveVehicleListSearchParams.get(VEHICLE_LIST_PAGE_PARAM) ||
-      effectiveVehicleListSearchParams.get(VEHICLE_LIST_FOCUS_PARAM)
+      activeVehicleListSearchParams.get(VEHICLE_LIST_PAGE_PARAM) ||
+      activeVehicleListSearchParams.get(VEHICLE_LIST_FOCUS_PARAM)
     )
   );
 
@@ -1440,12 +1446,16 @@ export default function VehiclesClientEnhanced() {
   // State Management
   // ==========================================================================
 
-  const [viewMode, setViewMode] = useState<ViewMode>(() =>
-    parseVehicleListViewParam(effectiveVehicleListSearchParams.get(VEHICLE_LIST_VIEW_PARAM))
-  );
-  const [currentPage, setCurrentPage] = useState(() =>
-    parseVehicleListPageParam(effectiveVehicleListSearchParams.get(VEHICLE_LIST_PAGE_PARAM))
-  );
+  const [viewMode, setViewMode] = useState<ViewMode>(() => {
+    const explicitViewMode = activeVehicleListSearchParams.get(VEHICLE_LIST_VIEW_PARAM);
+    if (detectMobileVehicleViewport() && !explicitViewMode) return "grid";
+    return parseVehicleListViewParam(effectiveVehicleListSearchParams.get(VEHICLE_LIST_VIEW_PARAM));
+  });
+  const [currentPage, setCurrentPage] = useState(() => {
+    const explicitPage = activeVehicleListSearchParams.get(VEHICLE_LIST_PAGE_PARAM);
+    if (detectMobileVehicleViewport() && !explicitPage) return 1;
+    return parseVehicleListPageParam(effectiveVehicleListSearchParams.get(VEHICLE_LIST_PAGE_PARAM));
+  });
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [lastSync, setLastSync] = useState<Date>(new Date());
   const [showColumnMenu, setShowColumnMenu] = useState(false);
@@ -1816,14 +1826,25 @@ export default function VehiclesClientEnhanced() {
         effectiveVehicleListSearchParams.get("noImage");
       const nextHasImage = isTruthyQueryParam(noImageParam) ? "no" : "";
       const nextGroupBy = parseVehicleGroupByParam(effectiveVehicleListSearchParams.get("groupBy"));
-      const viewModeParam = effectiveVehicleListSearchParams.get(VEHICLE_LIST_VIEW_PARAM);
+      const isMobileVehicleList = detectMobileVehicleViewport();
+      const explicitViewModeParam = activeVehicleListSearchParams.get(VEHICLE_LIST_VIEW_PARAM);
+      const explicitPageParam = activeVehicleListSearchParams.get(VEHICLE_LIST_PAGE_PARAM);
+      const explicitFocusParam = activeVehicleListSearchParams.get(VEHICLE_LIST_FOCUS_PARAM);
+      const viewModeParam =
+        explicitViewModeParam ?? (isMobileVehicleList ? null : effectiveVehicleListSearchParams.get(VEHICLE_LIST_VIEW_PARAM));
       const nextViewMode = parseVehicleListViewParam(viewModeParam);
       const nextPage = parseVehicleListPageParam(
-        effectiveVehicleListSearchParams.get(VEHICLE_LIST_PAGE_PARAM)
+        isMobileVehicleList && !explicitPageParam
+          ? null
+          : effectiveVehicleListSearchParams.get(VEHICLE_LIST_PAGE_PARAM)
       );
       const hasPositionQuery = Boolean(
-        effectiveVehicleListSearchParams.get(VEHICLE_LIST_PAGE_PARAM) ||
-        effectiveVehicleListSearchParams.get(VEHICLE_LIST_FOCUS_PARAM)
+        explicitPageParam ||
+        explicitFocusParam ||
+        (!isMobileVehicleList && (
+          effectiveVehicleListSearchParams.get(VEHICLE_LIST_PAGE_PARAM) ||
+          effectiveVehicleListSearchParams.get(VEHICLE_LIST_FOCUS_PARAM)
+        ))
       );
       const nextQuickFilter = (() => {
         if (!categoryParam) return null;
@@ -1854,14 +1875,16 @@ export default function VehiclesClientEnhanced() {
       if (viewModeParam) {
         userSelectedViewModeRef.current = true;
         setViewMode(prev => (prev === nextViewMode ? prev : nextViewMode));
+      } else if (isMobileVehicleList && !userSelectedViewModeRef.current) {
+        setViewMode(prev => (prev === "grid" ? prev : "grid"));
       }
-      if (effectiveVehicleListSearchParams.has(VEHICLE_LIST_PAGE_PARAM) || !pendingListScrollRestoreRef.current) {
+      if (explicitPageParam || !pendingListScrollRestoreRef.current) {
         setCurrentPage(prev => (prev === nextPage ? prev : nextPage));
       }
     }, 0);
 
     return () => clearTimeout(timeoutId);
-  }, [effectiveVehicleListSearchParams]);
+  }, [activeVehicleListSearchParams, effectiveVehicleListSearchParams]);
 
   // ==========================================================================
   // Effects
@@ -2583,22 +2606,22 @@ const getVehicleImageUrl = useCallback((imageValue: unknown): string | null => {
   }
 
   return (
-    <div className="ec-dark-scope min-h-screen bg-gradient-to-br from-slate-50 via-slate-100 to-slate-200 px-2 pb-2 pt-3 dark:from-slate-950 dark:via-slate-950 dark:to-slate-900 sm:p-6 lg:p-8">
-      <div className="mx-auto max-w-[1600px] space-y-4 sm:space-y-6">
+    <div className="ec-dark-scope min-h-screen bg-gradient-to-br from-slate-50 via-slate-100 to-slate-200 px-1.5 pb-2 pt-2 dark:from-slate-950 dark:via-slate-950 dark:to-slate-900 sm:p-6 lg:p-8">
+      <div className="mx-auto max-w-[1600px] space-y-2 sm:space-y-6">
 
         {/* Header Section */}
-        <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-center">
+        <div className="flex flex-col justify-between gap-2 sm:gap-4 lg:flex-row lg:items-center">
           <div>
-            <h1 className="flex items-center gap-3 text-3xl font-bold text-slate-800 dark:text-slate-100">
-              <span className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-600 flex items-center justify-center shadow-lg shadow-emerald-500/30">
-                <Car className="w-6 h-6 text-white" />
+            <h1 className="flex items-center gap-2 text-xl font-bold text-slate-800 dark:text-slate-100 sm:gap-3 sm:text-3xl">
+              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-emerald-500 to-emerald-600 shadow-lg shadow-emerald-500/30 sm:h-10 sm:w-10 sm:rounded-xl">
+                <Car className="h-5 w-5 text-white sm:h-6 sm:w-6" />
               </span>
               Vehicle Inventory
             </h1>
-            <p className="ml-13 mt-2 text-slate-500 dark:text-slate-400">{t.manageTrackVehicles}</p>
+            <p className="mt-1 hidden text-sm text-slate-500 dark:text-slate-400 sm:ml-13 sm:mt-2 sm:block sm:text-base">{t.manageTrackVehicles}</p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-3">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
             {isInitialVehiclesLoad && (
               <span className="inline-flex items-center gap-2 rounded-xl border border-slate-100 bg-white/80 px-3 py-2 text-xs font-medium text-slate-500 shadow-[0_2px_8px_rgba(0,0,0,0.05)] dark:border-slate-700 dark:bg-slate-900/80 dark:text-slate-400 dark:shadow-[0_10px_24px_rgba(2,6,23,0.4)]">
                 <RefreshCw className="h-4 w-4 animate-spin text-emerald-500" />
@@ -2607,7 +2630,7 @@ const getVehicleImageUrl = useCallback((imageValue: unknown): string | null => {
             )}
 
             {/* Last Sync */}
-            <div className="flex items-center gap-2 rounded-xl border border-slate-100 bg-white/80 px-3 py-2 shadow-[0_2px_8px_rgba(0,0,0,0.05)] dark:border-slate-700 dark:bg-slate-900/80 dark:shadow-[0_10px_24px_rgba(2,6,23,0.4)]">
+            <div className="hidden items-center gap-2 rounded-xl border border-slate-100 bg-white/80 px-3 py-2 shadow-[0_2px_8px_rgba(0,0,0,0.05)] dark:border-slate-700 dark:bg-slate-900/80 dark:shadow-[0_10px_24px_rgba(2,6,23,0.4)] sm:flex">
               <Clock className="w-4 h-4 text-slate-400 dark:text-slate-500" />
               <span className="text-xs text-slate-500 dark:text-slate-400">
                 Last sync: {lastSync.toLocaleTimeString()}
@@ -2639,39 +2662,43 @@ const getVehicleImageUrl = useCallback((imageValue: unknown): string | null => {
           </div>
         </div>
 
-        {selectedBrandName ? (
-          <ModelFilterSection
-            title={t.model}
-            backLabel={t.brand}
-            models={modelOptions}
-            selectedModel={filters.model}
-            isExpanded={showAllModels}
-            onBackToBrands={handleBackToBrands}
-            onToggleExpanded={() => setShowAllModels(prev => !prev)}
-            onModelSelect={handleModelSelect}
-          />
-        ) : (
-          <BrandFilterSection
-            title={t.brand}
-            brands={brandOptions}
-            selectedBrand={filters.brand}
-            isExpanded={showAllBrands}
-            onToggleExpanded={() => setShowAllBrands(prev => !prev)}
-            onBrandSelect={handleBrandSelect}
-          />
-        )}
+        <div className="hidden sm:block">
+          {selectedBrandName ? (
+            <ModelFilterSection
+              title={t.model}
+              backLabel={t.brand}
+              models={modelOptions}
+              selectedModel={filters.model}
+              isExpanded={showAllModels}
+              onBackToBrands={handleBackToBrands}
+              onToggleExpanded={() => setShowAllModels(prev => !prev)}
+              onModelSelect={handleModelSelect}
+            />
+          ) : (
+            <BrandFilterSection
+              title={t.brand}
+              brands={brandOptions}
+              selectedBrand={filters.brand}
+              isExpanded={showAllBrands}
+              onToggleExpanded={() => setShowAllBrands(prev => !prev)}
+              onBrandSelect={handleBrandSelect}
+            />
+          )}
+        </div>
 
-        <BodyTypeFilterSection
-          title={t.bodyType}
-          bodyTypes={bodyTypeOptions}
-          selectedBodyType={filters.bodyType}
-          onBodyTypeSelect={handleBodyTypeSelect}
-        />
+        <div className="hidden sm:block">
+          <BodyTypeFilterSection
+            title={t.bodyType}
+            bodyTypes={bodyTypeOptions}
+            selectedBodyType={filters.bodyType}
+            onBodyTypeSelect={handleBodyTypeSelect}
+          />
+        </div>
 
-        <div className="sticky top-0 z-40 space-y-3 rounded-[1.35rem] border border-slate-200/70 bg-slate-50/95 p-3 shadow-[0_12px_30px_rgba(15,23,42,0.08)] backdrop-blur-xl dark:border-slate-800/80 dark:bg-slate-950/95 dark:shadow-[0_18px_45px_rgba(0,0,0,0.26)] sm:-mx-3 sm:space-y-4 sm:rounded-2xl sm:px-3 sm:py-3">
+        <div className="sticky top-0 z-40 space-y-1.5 rounded-2xl border border-slate-200/70 bg-slate-50/95 p-1.5 shadow-[0_10px_22px_rgba(15,23,42,0.08)] backdrop-blur-xl dark:border-slate-800/80 dark:bg-slate-950/95 dark:shadow-[0_18px_45px_rgba(0,0,0,0.26)] sm:-mx-3 sm:space-y-4 sm:px-3 sm:py-3">
         {/* Search and Filters Bar */}
-        <div className="space-y-3 sm:space-y-4">
-            <div className="flex flex-col gap-3 lg:flex-row lg:gap-4">
+        <div className="space-y-1.5 sm:space-y-4">
+            <div className="flex flex-col gap-1.5 lg:flex-row lg:gap-4">
               {/* Search Input */}
               <div className="flex-1">
                 <NeuInput
@@ -2700,7 +2727,7 @@ const getVehicleImageUrl = useCallback((imageValue: unknown): string | null => {
                         navigateVehicleListInPlace(`/vehicles?category=${value}`);
                       }
                     }}
-                    className="w-full cursor-pointer appearance-none rounded-2xl border border-slate-200/70 bg-white px-3 py-2.5 pr-9 text-sm font-medium text-slate-700 shadow-[4px_4px_8px_#e2e8f0,-4px_-4px_8px_#ffffff] focus:outline-none focus:ring-2 focus:ring-emerald-500/30 dark:border-slate-700/70 dark:bg-slate-900 dark:text-slate-100 dark:shadow-[0_10px_24px_rgba(2,6,23,0.45)] sm:px-4 sm:py-3"
+                    className="w-full cursor-pointer appearance-none rounded-xl border border-slate-200/70 bg-white px-3 py-2 pr-9 text-xs font-medium text-slate-700 shadow-[4px_4px_8px_#e2e8f0,-4px_-4px_8px_#ffffff] focus:outline-none focus:ring-2 focus:ring-emerald-500/30 dark:border-slate-700/70 dark:bg-slate-900 dark:text-slate-100 dark:shadow-[0_10px_24px_rgba(2,6,23,0.45)] sm:rounded-2xl sm:px-4 sm:py-3 sm:text-sm"
                   >
                     <option value="all">{t.allCategories}</option>
                     <option value="cars">Cars</option>
@@ -2712,13 +2739,13 @@ const getVehicleImageUrl = useCallback((imageValue: unknown): string | null => {
               </div>
 
               {/* Filter Controls */}
-              <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+              <div className="flex items-center gap-2 overflow-x-auto pb-1 sm:flex-wrap sm:overflow-visible sm:pb-0 sm:gap-3">
                 <NeuButton
                   variant={showFilters ? "primary" : "default"}
                   size="sm"
                   onClick={() => setShowFilters(!showFilters)}
                   icon={Filter}
-                  className="min-h-10 rounded-2xl sm:text-sm"
+                  className="min-h-8 rounded-xl px-3 py-1.5 text-xs sm:min-h-10 sm:rounded-2xl sm:text-sm"
                 >
                   <span className="sm:hidden">Filters</span>
                   <span className="hidden sm:inline">More Filters</span>
@@ -2730,7 +2757,7 @@ const getVehicleImageUrl = useCallback((imageValue: unknown): string | null => {
                   size="sm"
                   onClick={resetFilters}
                   icon={RotateCcw}
-                  className="min-h-10 rounded-2xl sm:text-sm"
+                  className="min-h-8 rounded-xl px-3 py-1.5 text-xs sm:min-h-10 sm:rounded-2xl sm:text-sm"
                 >
                   <span className="sm:hidden">Clear</span>
                   <span className="hidden sm:inline">Reset</span>
@@ -2738,7 +2765,7 @@ const getVehicleImageUrl = useCallback((imageValue: unknown): string | null => {
               )}
 
               {/* Group By Dropdown */}
-              <div className="relative">
+              <div className="relative hidden sm:block">
 <select
                   title="Group vehicles by"
                   value={groupBy}
@@ -2758,7 +2785,7 @@ const getVehicleImageUrl = useCallback((imageValue: unknown): string | null => {
               <ViewToggle view={viewMode} onChange={handleViewModeChange} t={t} />
 
               {/* Columns Dropdown */}
-              <div className="relative" ref={columnMenuRef}>
+              <div className="relative hidden sm:block" ref={columnMenuRef}>
                 <button
                   type="button"
                   ref={columnsButtonRef}
@@ -3144,7 +3171,7 @@ const getVehicleImageUrl = useCallback((imageValue: unknown): string | null => {
         {/* Results Count */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <span className="text-sm text-slate-600 dark:text-slate-300">
+            <span className="text-xs text-slate-600 dark:text-slate-300 sm:text-sm">
               {isInitialVehiclesLoad ? (
                 <>
                   Loading <span className="font-semibold text-slate-800 dark:text-slate-100">vehicles</span>...
@@ -3188,9 +3215,11 @@ const getVehicleImageUrl = useCallback((imageValue: unknown): string | null => {
           // Grid View with Grouping
           <div className="space-y-4 sm:space-y-8">
             {filteredVehicles.length > 0 && visibleVehicleGroups.map((group) => (
-              <div key={group.key} className="space-y-2 sm:space-y-4">
+              <div key={group.key} className="space-y-1.5 sm:space-y-4">
                 {/* Group Header */}
-                <VehicleGroupHeader label={group.label} count={group.count} avgPrice={group.avgPrice} />
+                <div className={cn(groupBy === "none" && "hidden sm:block")}>
+                  <VehicleGroupHeader label={group.label} count={group.count} avgPrice={group.avgPrice} />
+                </div>
                 {/* Group Vehicles Grid */}
                 <div className="grid grid-cols-4 gap-1.5 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3 lg:gap-6 xl:grid-cols-4">
                   {group.vehicles.map((vehicle) => (
@@ -3211,11 +3240,13 @@ const getVehicleImageUrl = useCallback((imageValue: unknown): string | null => {
           // List View (Table) with Grouping
           <div className="space-y-6">
             {filteredVehicles.length > 0 && visibleVehicleGroups.map((group) => (
-              <div key={group.key} className="space-y-3">
+              <div key={group.key} className="space-y-1.5 sm:space-y-3">
                 {/* Group Header */}
-                <VehicleGroupHeader label={group.label} count={group.count} avgPrice={group.avgPrice} />
+                <div className={cn(groupBy === "none" && "hidden sm:block")}>
+                  <VehicleGroupHeader label={group.label} count={group.count} avgPrice={group.avgPrice} />
+                </div>
                 {/* Group Vehicles List */}
-                <div className="space-y-3 sm:space-y-4 lg:space-y-5">
+                <div className="space-y-1.5 sm:space-y-4 lg:space-y-5">
                   {group.vehicles.map((vehicle) => (
                     <MobileVehicleListCard
                       key={vehicle.VehicleId}
