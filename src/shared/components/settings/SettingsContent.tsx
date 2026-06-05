@@ -53,11 +53,11 @@ type TabType = "profile" | "users" | "system";
 const USER_ROLE_OPTIONS: Role[] = ["Staff", "Accounting", "Admin"];
 const USER_PASSWORD_MIN_LENGTH = 8;
 
-const UserAvatar = memo(({ 
-  user, 
+const UserAvatar = memo(({
+  user,
   size = "md",
-  showYouBadge = false 
-}: { 
+  showYouBadge = false
+}: {
   user: { username: string; full_name?: string | null; profile_picture?: string | null };
   size?: "sm" | "md" | "lg";
   showYouBadge?: boolean;
@@ -72,20 +72,26 @@ const UserAvatar = memo(({
     md: 56,
     lg: 96,
   }[size];
+  const [imageFailed, setImageFailed] = useState(false);
 
   const initial = (user.full_name || user.username).charAt(0).toUpperCase();
+  const showImage = Boolean(user.profile_picture && !imageFailed);
+
+  useEffect(() => {
+    setImageFailed(false);
+  }, [user.profile_picture]);
 
   return (
     <div className="relative shrink-0">
-      {user.profile_picture ? (
-         
+      {showImage ? (
         <Image
-          src={user.profile_picture}
+          src={user.profile_picture || ""}
           alt={user.username}
           width={sizePixels}
           height={sizePixels}
-          className={`${sizeClasses[size]} rounded-xl object-cover border-2 border-white dark:border-slate-700 shadow-sm`}
+          className={`${sizeClasses[size]} rounded-xl border-2 border-white bg-gradient-to-br from-emerald-400 to-blue-500 object-cover shadow-sm dark:border-slate-700`}
           loading="lazy"
+          onError={() => setImageFailed(true)}
         />
       ) : (
         <div className={`${sizeClasses[size]} rounded-xl bg-gradient-to-br from-emerald-400 to-blue-500 flex items-center justify-center text-white font-bold shadow-sm`}>
@@ -112,17 +118,17 @@ interface QuickLinkCardProps {
 const QuickLinkCard = memo(({ href, icon: Icon, label, color }: QuickLinkCardProps) => (
   <Link
     href={href}
-    className="group relative overflow-hidden rounded-2xl p-5 bg-white dark:bg-slate-900 border border-slate-200/70 dark:border-slate-700 shadow-sm hover:shadow-lg transition-all duration-300 hover:-translate-y-1"
+    className="group relative overflow-hidden rounded-2xl border border-slate-200/70 bg-white p-4 shadow-sm transition-all duration-200 hover:border-emerald-200 hover:shadow-md dark:border-slate-700 dark:bg-slate-900 dark:hover:border-emerald-500/40"
   >
     <div className={`absolute inset-0 bg-gradient-to-br ${color} opacity-0 group-hover:opacity-5 transition-opacity duration-300`} />
     <div className="relative flex items-center justify-between">
       <div className="flex items-center gap-3">
-        <div className={`p-2.5 rounded-xl bg-gradient-to-br ${color} text-white shadow-lg`}>
+        <div className={`flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br ${color} text-white shadow-sm`}>
           <Icon className="w-5 h-5" />
         </div>
-        <span className="font-semibold text-slate-700 dark:text-slate-200">{label}</span>
+        <span className="min-w-0 truncate text-sm font-semibold text-slate-700 dark:text-slate-200">{label}</span>
       </div>
-      <ChevronRight className="w-5 h-5 text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-300 group-hover:translate-x-1 transition-all" />
+      <ChevronRight className="h-4 w-4 shrink-0 text-slate-400 transition-all group-hover:translate-x-0.5 group-hover:text-slate-600 dark:group-hover:text-slate-300" />
     </div>
   </Link>
 ));
@@ -480,145 +486,140 @@ export default function SettingsContent() {
   }, [editingUser, editUsername, editPassword, editConfirmPassword, editRole, editFullName, editEmail, editPhone, editProfilePicture, t, cancelEdit, loadUsers, user.username, user.role, router]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-emerald-50/30 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 pb-24">
-      {/* Hero Section */}
-      <div className="relative overflow-hidden bg-white dark:bg-slate-900 border-b border-slate-200/80 dark:border-slate-800">
-        <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/5 via-transparent to-blue-500/5" />
-        <div className="relative mx-auto max-w-6xl px-4 sm:px-6 lg:px-8 py-8">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div>
-              <div className="flex items-center gap-3 mb-2">
-                <div className="p-2.5 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 shadow-lg shadow-emerald-500/20">
-                  <Settings className="w-6 h-6 text-white" />
-                </div>
-                <h1 className="text-3xl font-bold bg-gradient-to-r from-slate-800 to-slate-600 dark:from-white dark:to-slate-300 bg-clip-text text-transparent">
-                  {t.settings}
-                </h1>
-              </div>
-              <p className="text-slate-500 dark:text-slate-400">
+    <div className="min-h-screen bg-slate-50 pb-20 dark:bg-slate-950 sm:pb-8">
+      {/* Header */}
+      <div className="border-b border-slate-200/80 bg-white/95 dark:border-slate-800 dark:bg-slate-900/95">
+        <div className="mx-auto max-w-6xl px-4 py-4 sm:px-6 sm:py-7 lg:px-8">
+          <div className="flex min-w-0 items-center gap-3">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-emerald-500 text-white shadow-sm">
+              <Settings className="h-6 w-6" />
+            </div>
+            <div className="min-w-0">
+              <h1 className="truncate text-2xl font-bold text-slate-900 dark:text-white sm:text-3xl">
+                {t.settings}
+              </h1>
+              <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-500 dark:text-slate-400 sm:text-base">
                 {t.settingsDescription}
               </p>
             </div>
-            {/* Controls removed - will be redesigned in System tab */}
           </div>
         </div>
       </div>
 
       {/* Main Content */}
-      <div className="mx-auto max-w-6xl px-4 pb-[calc(8rem+env(safe-area-inset-bottom))] pt-8 sm:px-6 lg:px-8 lg:pb-8">
+      <div className="mx-auto max-w-6xl px-4 pb-[calc(7rem+env(safe-area-inset-bottom))] pt-4 sm:px-6 sm:pt-6 lg:px-8 lg:pb-8">
         {/* Tab Navigation */}
-        <div className="flex flex-wrap gap-2 mb-8 p-1.5 bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm rounded-2xl border border-slate-200/70 dark:border-slate-700 shadow-sm">
+        <div className={`mb-5 grid gap-1 rounded-2xl border border-slate-200/70 bg-white p-1 shadow-sm dark:border-slate-700 dark:bg-slate-900 ${isAdmin ? "grid-cols-3" : "grid-cols-2"}`}>
           <button
             onClick={() => setActiveTab("profile")}
-            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-medium transition-all duration-300 ${
+            className={`flex min-h-11 items-center justify-center gap-1.5 rounded-xl px-2 py-2 text-xs font-semibold transition-all duration-200 sm:text-sm ${
               activeTab === "profile"
-                ? "bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow-lg shadow-emerald-500/25"
+                ? "bg-emerald-500 text-white shadow-sm"
                 : "text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
             }`}
           >
-            <User className="w-4 h-4" />
-            {t.profile}
+            <User className="h-4 w-4 shrink-0" />
+            <span className="truncate">{t.profile}</span>
           </button>
           {isAdmin && (
             <button
               onClick={() => setActiveTab("users")}
-              className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-medium transition-all duration-300 ${
+              className={`flex min-h-11 items-center justify-center gap-1.5 rounded-xl px-2 py-2 text-xs font-semibold transition-all duration-200 sm:text-sm ${
                 activeTab === "users"
-                  ? "bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow-lg shadow-emerald-500/25"
+                  ? "bg-emerald-500 text-white shadow-sm"
                   : "text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
               }`}
             >
-              <Users className="w-4 h-4" />
-              {t.userManagement}
-              <span className="ml-1 px-2 py-0.5 text-xs bg-white/20 rounded-full">
-                {users.length}
-              </span>
+              <Users className="h-4 w-4 shrink-0" />
+              <span className="truncate">{t.users}</span>
             </button>
           )}
           <button
             onClick={() => setActiveTab("system")}
-            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-medium transition-all duration-300 ${
+            className={`flex min-h-11 items-center justify-center gap-1.5 rounded-xl px-2 py-2 text-xs font-semibold transition-all duration-200 sm:text-sm ${
               activeTab === "system"
-                ? "bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow-lg shadow-emerald-500/25"
+                ? "bg-emerald-500 text-white shadow-sm"
                 : "text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
             }`}
           >
-            <Shield className="w-4 h-4" />
-            {language === "km" ? "ចំណូលចិត្ត" : "Preferences"}
+            <Shield className="h-4 w-4 shrink-0" />
+            <span className="truncate">{t.system}</span>
           </button>
         </div>
 
         {/* Profile Tab */}
         {activeTab === "profile" && (
-          <div className="space-y-6">
+          <div className="space-y-4 sm:space-y-6">
             {/* User Profile Card */}
-            <div className="relative overflow-hidden rounded-3xl bg-white dark:bg-slate-900 border border-slate-200/70 dark:border-slate-700 shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.2)]">
-              <div className="absolute top-0 left-0 right-0 h-32 bg-gradient-to-r from-emerald-500/10 via-teal-500/10 to-blue-500/10" />
-              <div className="relative p-8">
-                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-6">
-                  <UserAvatar user={user} size="lg" />
-                  <div className="flex-1">
-                    <h2 className="text-2xl font-bold text-slate-800 dark:text-white">
-                      {user.username}
-                    </h2>
-                    <div className="flex items-center gap-3 mt-2">
-                      <span className="px-3 py-1 rounded-full bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 text-sm font-medium">
-                        {formatRoleLabel(user.role)}
+            <div className="rounded-2xl border border-slate-200/70 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900 sm:p-6">
+              <div className="flex min-w-0 items-start gap-4">
+                <UserAvatar user={user} size="md" />
+                <div className="min-w-0 flex-1">
+                  <h2 className="truncate text-xl font-bold text-slate-900 dark:text-white sm:text-2xl">
+                    {user.full_name || user.username}
+                  </h2>
+                  <p className="mt-1 truncate text-sm text-slate-500 dark:text-slate-400">
+                    @{user.username}
+                  </p>
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-100 dark:bg-emerald-500/10 dark:text-emerald-300 dark:ring-emerald-500/20">
+                      {formatRoleLabel(user.role)}
+                    </span>
+                    {(user.email || user.phone) && (
+                      <span className="truncate text-xs text-slate-500 dark:text-slate-400">
+                        {user.email || user.phone}
                       </span>
-                      <span className="text-slate-500 dark:text-slate-400 text-sm">
-                        {t.memberSince} {new Date().toLocaleDateString(language === "km" ? "km-KH" : "en-US")}
-                      </span>
-                    </div>
+                    )}
                   </div>
-                  <button
-                    onClick={handleLogout}
-                    disabled={isLoggingOut}
-                    className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-red-500 to-rose-600 text-white font-medium shadow-lg shadow-red-500/25 hover:shadow-red-500/40 transition-all duration-300 disabled:opacity-50"
-                  >
-                    <LogOut className="w-4 h-4" />
-                    {isLoggingOut ? t.loading : t.logout}
-                  </button>
                 </div>
+              </div>
+              <div className="mt-4 grid gap-2 sm:grid-cols-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsProfileEditing(true);
+                    setProfileError("");
+                    setProfileSuccess("");
+                  }}
+                  className="flex min-h-11 items-center justify-center gap-2 rounded-xl bg-emerald-500 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-emerald-600"
+                >
+                  <Edit3 className="h-4 w-4" />
+                  {language === "km" ? "កែប្រវត្តិរូប" : "Edit Profile"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsPasswordModalOpen(true)}
+                  className="flex min-h-11 items-center justify-center gap-2 rounded-xl bg-slate-100 px-4 py-2.5 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
+                >
+                  <Shield className="h-4 w-4" />
+                  {language === "km" ? "ពាក្យសម្ងាត់" : "Password"}
+                </button>
+                <button
+                  onClick={handleLogout}
+                  disabled={isLoggingOut}
+                  className="flex min-h-11 items-center justify-center gap-2 rounded-xl bg-red-50 px-4 py-2.5 text-sm font-semibold text-red-700 transition-colors hover:bg-red-100 disabled:opacity-50 dark:bg-red-500/10 dark:text-red-300 dark:hover:bg-red-500/20"
+                >
+                  <LogOut className="h-4 w-4" />
+                  {isLoggingOut ? t.loading : t.logout}
+                </button>
               </div>
             </div>
 
             {/* Profile Details */}
-            <div className="rounded-3xl bg-white dark:bg-slate-900 border border-slate-200/70 dark:border-slate-700 shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.2)] overflow-hidden">
-              <div className="flex flex-col gap-4 border-b border-slate-200/70 bg-gradient-to-r from-slate-50 to-white p-6 dark:border-slate-700 dark:from-slate-800/50 dark:to-slate-900 sm:flex-row sm:items-center sm:justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-xl bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600 dark:text-emerald-400">
-                    <User className="w-5 h-5" />
+            <div className="overflow-hidden rounded-2xl border border-slate-200/70 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
+              <div className="flex flex-col gap-3 border-b border-slate-200/70 bg-slate-50/80 p-4 dark:border-slate-700 dark:bg-slate-800/50 sm:flex-row sm:items-center sm:justify-between sm:p-5">
+                <div className="flex min-w-0 items-center gap-3">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-300">
+                    <User className="h-5 w-5" />
                   </div>
-                  <div>
-                    <h3 className="text-lg font-bold text-slate-800 dark:text-white">{language === "km" ? "ព័ត៌មានគណនី" : "Account Details"}</h3>
-                    <p className="text-sm text-slate-500 dark:text-slate-400">{user.email || `@${user.username}`}</p>
+                  <div className="min-w-0">
+                    <h3 className="text-base font-bold text-slate-900 dark:text-white sm:text-lg">{language === "km" ? "ព័ត៌មានគណនី" : "Account Details"}</h3>
+                    <p className="truncate text-sm text-slate-500 dark:text-slate-400">{user.email || `@${user.username}`}</p>
                   </div>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setIsPasswordModalOpen(true)}
-                    className="rounded-xl bg-slate-100 px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
-                  >
-                    {language === "km" ? "ប្តូរពាក្យសម្ងាត់" : "Change Password"}
-                  </button>
-                  {!isProfileEditing && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setIsProfileEditing(true);
-                        setProfileError("");
-                        setProfileSuccess("");
-                      }}
-                      className="rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 px-4 py-2.5 text-sm font-medium text-white shadow-lg shadow-emerald-500/25 transition-all hover:shadow-emerald-500/40"
-                    >
-                      {language === "km" ? "កែប្រែប្រវត្តិរូប" : "Edit Profile"}
-                    </button>
-                  )}
                 </div>
               </div>
 
-              <form onSubmit={handleSaveProfile} className="p-6">
+              <form onSubmit={handleSaveProfile} className="p-4 sm:p-5">
                 <div className="grid gap-6 lg:grid-cols-[auto,1fr]">
                   <div className="flex flex-col items-center">
                     <div className="relative">
@@ -748,23 +749,34 @@ export default function SettingsContent() {
               </form>
             </div>
 
-            {/* Quick Links */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              {quickLinks.map((link) => (
-                <QuickLinkCard key={link.href} {...link} />
-              ))}
-            </div>
           </div>
         )}
 
         {/* Users Tab */}
         {activeTab === "users" && isAdmin && (
-          <div className="space-y-6">
+          <div className="space-y-4 sm:space-y-6">
+            <div className="rounded-2xl border border-slate-200/70 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900 sm:p-5">
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-slate-500 dark:text-slate-400">{t.userManagement}</p>
+                  <h2 className="mt-1 text-2xl font-bold text-slate-900 dark:text-white">
+                    {users.length}
+                  </h2>
+                </div>
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:text-blue-300">
+                  <Users className="h-6 w-6" />
+                </div>
+              </div>
+              <p className="mt-3 text-sm text-slate-500 dark:text-slate-400">
+                {language === "km" ? "គ្រប់គ្រងអ្នកប្រើប្រាស់ និងសិទ្ធិចូលប្រើប្រព័ន្ធ។" : "Manage system users and access permissions."}
+              </p>
+            </div>
+
             {/* Create User Card */}
-            <div className="rounded-3xl bg-white dark:bg-slate-900 border border-slate-200/70 dark:border-slate-700 shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.2)] overflow-hidden">
-              <div className="p-6 border-b border-slate-200/70 dark:border-slate-700 bg-gradient-to-r from-emerald-50/50 to-teal-50/50 dark:from-slate-800/50 dark:to-slate-800/30">
+            <div className="overflow-hidden rounded-2xl border border-slate-200/70 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
+              <div className="border-b border-slate-200/70 bg-emerald-50/60 p-4 dark:border-slate-700 dark:bg-slate-800/50 sm:p-5">
                 <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-xl bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600 dark:text-emerald-400">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-100 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-300">
                     <Plus className="w-5 h-5" />
                   </div>
                   <div>
@@ -774,7 +786,7 @@ export default function SettingsContent() {
                 </div>
               </div>
               
-              <form onSubmit={handleCreateUser} className="p-6">
+              <form onSubmit={handleCreateUser} className="p-4 sm:p-5">
                 <div className="grid gap-5 sm:grid-cols-2">
                   <div>
                     <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
@@ -906,8 +918,8 @@ export default function SettingsContent() {
             </div>
 
             {/* Users List */}
-            <div className="rounded-3xl bg-white dark:bg-slate-900 border border-slate-200/70 dark:border-slate-700 shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.2)] overflow-hidden">
-              <div className="flex flex-col gap-4 border-b border-slate-200/70 bg-gradient-to-r from-slate-50 to-white p-4 dark:border-slate-700 dark:from-slate-800/50 dark:to-slate-900 sm:flex-row sm:items-center sm:justify-between sm:p-6">
+            <div className="overflow-hidden rounded-2xl border border-slate-200/70 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
+              <div className="flex flex-col gap-4 border-b border-slate-200/70 bg-slate-50/80 p-4 dark:border-slate-700 dark:bg-slate-800/50 sm:flex-row sm:items-center sm:justify-between sm:p-5">
                 <div className="flex min-w-0 items-center gap-3">
                   <div className="shrink-0 p-2 rounded-xl bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400">
                     <Users className="w-5 h-5" />
@@ -1064,12 +1076,12 @@ export default function SettingsContent() {
 
         {/* Preferences Tab */}
         {activeTab === "system" && (
-          <div className="space-y-6">
+          <div className="space-y-4 sm:space-y-6">
             {/* Appearance Settings */}
-            <div className="rounded-3xl bg-white dark:bg-slate-900 border border-slate-200/70 dark:border-slate-700 shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.2)] overflow-hidden">
-              <div className="p-6 border-b border-slate-200/70 dark:border-slate-700 bg-gradient-to-r from-violet-50/50 to-purple-50/50 dark:from-slate-800/50 dark:to-slate-800/30">
+            <div className="overflow-hidden rounded-2xl border border-slate-200/70 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
+              <div className="border-b border-slate-200/70 bg-slate-50/80 p-4 dark:border-slate-700 dark:bg-slate-800/50 sm:p-5">
                 <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-xl bg-violet-100 dark:bg-violet-900/40 text-violet-600 dark:text-violet-400">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-50 text-violet-600 dark:bg-violet-500/10 dark:text-violet-300">
                     <Settings className="w-5 h-5" />
                   </div>
                   <div>
@@ -1078,7 +1090,7 @@ export default function SettingsContent() {
                   </div>
                 </div>
               </div>
-              
+
               <div className="p-4 space-y-4 sm:p-6">
                 {/* Dark Mode Toggle */}
                 <div className="flex flex-col gap-4 p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200/50 dark:border-slate-700/50 sm:flex-row sm:items-center sm:justify-between">
@@ -1106,9 +1118,9 @@ export default function SettingsContent() {
                     </div>
                     <div className="min-w-0">
                       <p className="font-medium text-slate-800 dark:text-white">{t.language}</p>
-<p className="text-sm text-slate-500 dark:text-slate-400">
-  Current: {language === 'km' ? t.khmer : t.english}
-</p>
+                      <p className="text-sm text-slate-500 dark:text-slate-400">
+                        Current: {language === 'km' ? t.khmer : t.english}
+                      </p>
                     </div>
                   </div>
                   <button
@@ -1131,11 +1143,28 @@ export default function SettingsContent() {
               </div>
             </div>
 
+            {/* System Shortcuts */}
+            <div className="overflow-hidden rounded-2xl border border-slate-200/70 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900 sm:p-5">
+              <div className="mb-4">
+                <h3 className="text-base font-bold text-slate-900 dark:text-white sm:text-lg">
+                  {language === "km" ? "ផ្លូវកាត់ប្រព័ន្ធ" : "System Shortcuts"}
+                </h3>
+                <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                  {language === "km" ? "ចូលទៅប្រព័ន្ធសំខាន់ៗពីកន្លែងតែមួយ។" : "Open key systems from one place."}
+                </p>
+              </div>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                {quickLinks.map((link) => (
+                  <QuickLinkCard key={link.href} {...link} />
+                ))}
+              </div>
+            </div>
+
             {/* App Info */}
-            <div className="rounded-3xl bg-white dark:bg-slate-900 border border-slate-200/70 dark:border-slate-700 shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.2)] overflow-hidden">
-              <div className="p-6 border-b border-slate-200/70 dark:border-slate-700 bg-gradient-to-r from-blue-50/50 to-cyan-50/50 dark:from-slate-800/50 dark:to-slate-800/30">
+            <div className="overflow-hidden rounded-2xl border border-slate-200/70 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
+              <div className="border-b border-slate-200/70 bg-slate-50/80 p-4 dark:border-slate-700 dark:bg-slate-800/50 sm:p-5">
                 <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-xl bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:text-blue-300">
                     <Shield className="w-5 h-5" />
                   </div>
                   <div>
@@ -1144,19 +1173,19 @@ export default function SettingsContent() {
                   </div>
                 </div>
               </div>
-              
-              <div className="p-6">
+
+              <div className="p-4 sm:p-5">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200/50 dark:border-slate-700/50">
+                  <div className="rounded-2xl border border-slate-200/50 bg-slate-50 p-4 dark:border-slate-700/50 dark:bg-slate-800/50">
                     <p className="text-sm text-slate-500 dark:text-slate-400 mb-1">{language === 'km' ? 'កំណែទំរង់' : 'Version'}</p>
-                    <p className="text-lg font-semibold text-slate-800 dark:text-white">v2.0.0</p>
+                    <p className="text-base font-semibold text-slate-800 dark:text-white">v2.0.0</p>
                   </div>
-                  <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200/50 dark:border-slate-700/50">
+                  <div className="rounded-2xl border border-slate-200/50 bg-slate-50 p-4 dark:border-slate-700/50 dark:bg-slate-800/50">
                     <p className="text-sm text-slate-500 dark:text-slate-400 mb-1">{language === 'km' ? 'ប្រព័ន្ធប្រតិបត្តិការ' : 'Platform'}</p>
-                    <p className="text-lg font-semibold text-slate-800 dark:text-white">Emerald Cash Systems</p>
+                    <p className="text-base font-semibold text-slate-800 dark:text-white">Emerald Cash Systems</p>
                   </div>
                 </div>
-                <div className="mt-4 p-4 rounded-2xl bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-900/20 dark:to-teal-900/20 border border-emerald-200/50 dark:border-emerald-800/50">
+                <div className="mt-4 rounded-2xl border border-emerald-200/50 bg-emerald-50 p-4 dark:border-emerald-800/50 dark:bg-emerald-500/10">
                   <p className="text-sm text-emerald-700 dark:text-emerald-300 text-center">
                     {language === 'km' 
                       ? `© ${new Date().getFullYear()} អេមើរ៉ល ឃែស - រក្សាសិទ្ធិគ្រប់យ៉ាង`
