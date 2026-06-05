@@ -1249,7 +1249,7 @@ return (
         event.preventDefault();
         onView(vehicle.VehicleId);
       }}
-      className="group scroll-mt-24 cursor-pointer overflow-hidden rounded-md border border-slate-100 bg-white shadow-[0_3px_12px_rgba(0,0,0,0.08)] transition-all duration-150 hover:border-emerald-200 hover:shadow-[0_8px_30px_rgba(0,0,0,0.12)] focus:outline-none focus:ring-2 focus:ring-emerald-400/40 active:scale-[0.98] dark:border-slate-700/80 dark:bg-slate-900 dark:shadow-[0_16px_32px_rgba(2,6,23,0.45)] dark:hover:border-emerald-500/35 dark:hover:shadow-[0_20px_42px_rgba(2,6,23,0.62)] sm:rounded-2xl sm:shadow-[0_4px_20px_rgba(0,0,0,0.08)]"
+      className="group scroll-mt-24 cursor-pointer overflow-hidden rounded-md border border-slate-100 bg-white shadow-[0_3px_12px_rgba(0,0,0,0.08)] transition-all duration-150 hover:border-emerald-200 hover:shadow-[0_8px_30px_rgba(0,0,0,0.12)] focus:outline-none focus:ring-2 focus:ring-emerald-400/40 active:scale-[0.98] dark:border-slate-700/80 dark:bg-slate-900 dark:shadow-[0_16px_32px_rgba(2,6,23,0.45)] dark:hover:border-emerald-500/35 dark:hover:shadow-[0_20px_42px_rgba(2,6,23,0.62)] sm:rounded-xl sm:shadow-[0_4px_16px_rgba(0,0,0,0.08)]"
     >
       {/* Image */}
       <div className="relative aspect-[4/3] overflow-hidden bg-slate-100 dark:bg-slate-800">
@@ -1258,7 +1258,7 @@ return (
               src={imageUrl}
               alt={`${vehicle.Brand} ${vehicle.Model}`}
               fill
-              sizes="(max-width: 640px) 25vw, (max-width: 1024px) 50vw, (max-width: 1280px) 33vw, 25vw"
+              sizes="(max-width: 640px) 25vw, (max-width: 1024px) 33vw, (max-width: 1280px) 25vw, (max-width: 1536px) 20vw, 16vw"
               unoptimized={shouldBypassNextImageOptimization(imageUrl)}
               className="object-cover group-hover:scale-105 transition-transform duration-500"
               onError={(e) => {
@@ -1274,21 +1274,21 @@ return (
       </div>
 
       {/* Content */}
-      <div className="p-1 sm:p-4">
-        <div className="mb-0.5 flex min-w-0 flex-col gap-0.5 sm:mb-2 sm:gap-1 sm:flex-row sm:items-start sm:justify-between">
+      <div className="p-1 sm:p-2.5">
+        <div className="mb-0.5 flex min-w-0 flex-col gap-0.5 sm:mb-1 sm:gap-1 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0">
-            <h3 className="truncate text-[9px] font-bold leading-tight text-slate-800 dark:text-slate-100 sm:text-lg">{vehicle.Brand}</h3>
-            <p className="truncate text-[8px] leading-tight text-slate-500 dark:text-slate-400 sm:text-sm">{vehicle.Model}</p>
+            <h3 className="truncate text-[9px] font-bold leading-tight text-slate-800 dark:text-slate-100 sm:text-base">{vehicle.Brand}</h3>
+            <p className="truncate text-[8px] leading-tight text-slate-500 dark:text-slate-400 sm:text-xs">{vehicle.Model}</p>
           </div>
           <div className="min-w-0 sm:text-right">
-            <p className="truncate text-[9px] font-bold leading-tight text-emerald-600 sm:text-lg">
+            <p className="truncate text-[9px] font-bold leading-tight text-emerald-600 sm:text-base">
               ${vehicle.PriceNew?.toLocaleString() || "-"}
             </p>
             <p className="hidden text-xs text-slate-400 dark:text-slate-500 sm:block">{t.marketPrice}</p>
           </div>
         </div>
 
-        <div className="mb-4 hidden grid-cols-2 gap-2 text-sm sm:grid">
+        <div className="mb-1.5 hidden grid-cols-2 gap-1 text-[11px] sm:grid">
           <div className="flex items-center gap-2 text-slate-600 dark:text-slate-300">
             <span className="text-slate-400 dark:text-slate-500">{t.year}:</span>
             <span className="font-medium">{vehicle.Year || "-"}</span>
@@ -1357,16 +1357,16 @@ const MobileVehicleListCard = memo(function MobileVehicleListCard({
         event.preventDefault();
         onView(vehicle.VehicleId);
       }}
-      className="grid min-h-[74px] scroll-mt-24 cursor-pointer grid-cols-[92px_minmax(0,1fr)] overflow-hidden rounded-md border border-slate-100 bg-white shadow-[0_3px_12px_rgba(15,23,42,0.07)] transition-transform focus:outline-none focus:ring-2 focus:ring-emerald-400/40 active:scale-[0.99] dark:border-slate-700/80 dark:bg-slate-900 dark:shadow-[0_14px_30px_rgba(2,6,23,0.45)] sm:min-h-[180px] sm:grid-cols-[220px_minmax(0,1fr)] sm:rounded-lg sm:shadow-[0_4px_16px_rgba(15,23,42,0.07)] lg:min-h-[220px] lg:grid-cols-[280px_minmax(0,1fr)]"
+      className="grid min-h-[74px] scroll-mt-24 cursor-pointer grid-cols-[92px_minmax(0,1fr)] overflow-hidden rounded-md border border-slate-100 bg-white shadow-[0_3px_12px_rgba(15,23,42,0.07)] transition-transform focus:outline-none focus:ring-2 focus:ring-emerald-400/40 active:scale-[0.99] dark:border-slate-700/80 dark:bg-slate-900 dark:shadow-[0_14px_30px_rgba(2,6,23,0.45)] sm:min-h-[132px] sm:grid-cols-[164px_minmax(0,1fr)] sm:rounded-lg sm:shadow-[0_4px_16px_rgba(15,23,42,0.07)] lg:min-h-[154px] lg:grid-cols-[196px_minmax(0,1fr)]"
     >
-      <div className="relative min-h-[74px] overflow-hidden bg-slate-100 dark:bg-slate-800 sm:min-h-[180px] lg:min-h-[220px]">
+      <div className="relative min-h-[74px] overflow-hidden bg-slate-100 dark:bg-slate-800 sm:min-h-[132px] lg:min-h-[154px]">
         <Car className="absolute inset-0 m-auto h-5 w-5 text-slate-300 dark:text-slate-600 sm:h-12 sm:w-12" aria-hidden="true" />
         {imageUrl && (
           <Image
             src={imageUrl}
             alt={vehicle.Model || "Vehicle"}
             fill
-            sizes="(max-width: 640px) 92px, (max-width: 1024px) 220px, 280px"
+            sizes="(max-width: 640px) 92px, (max-width: 1024px) 164px, 196px"
             unoptimized={shouldBypassNextImageOptimization(imageUrl)}
             className="object-cover"
             loading="lazy"
@@ -1378,16 +1378,16 @@ const MobileVehicleListCard = memo(function MobileVehicleListCard({
         <VehicleImageActions vehicle={vehicle} photoCount={photoCount} />
       </div>
 
-      <div className="flex min-w-0 flex-col px-2 py-1.5 sm:px-5 sm:py-4 lg:px-6 lg:py-5">
+      <div className="flex min-w-0 flex-col px-2 py-1.5 sm:px-4 sm:py-3 lg:px-5 lg:py-4">
         <div className="flex min-w-0 items-start justify-between gap-1 sm:gap-2">
           <div className="min-w-0 pr-1">
-            <h3 className="line-clamp-1 text-[11px] font-bold leading-tight text-slate-900 dark:text-slate-100 sm:line-clamp-2 sm:text-lg sm:leading-snug lg:text-xl">
+            <h3 className="line-clamp-1 text-[11px] font-bold leading-tight text-slate-900 dark:text-slate-100 sm:line-clamp-2 sm:text-base sm:leading-snug lg:text-lg">
               {vehicle.Brand || "-"} {vehicle.Model || "-"}
             </h3>
-            <p className="mt-0.5 truncate text-[9px] leading-tight text-slate-500 dark:text-slate-400 sm:mt-1 sm:text-sm">
+            <p className="mt-0.5 truncate text-[9px] leading-tight text-slate-500 dark:text-slate-400 sm:mt-1 sm:text-xs">
               {vehicle.Year || "-"} {vehicle.Plate ? `- ${vehicle.Plate}` : ""}
             </p>
-            <p className="mt-0.5 truncate text-[9px] leading-tight text-slate-500 dark:text-slate-400 sm:mt-1 sm:text-sm">
+            <p className="mt-0.5 truncate text-[9px] leading-tight text-slate-500 dark:text-slate-400 sm:mt-1 sm:text-xs">
               {vehicle.Condition || "-"} - {vehicle.Plate ? `Plate ${vehicle.Plate}` : "Plate Number"}
             </p>
           </div>
@@ -1400,7 +1400,7 @@ const MobileVehicleListCard = memo(function MobileVehicleListCard({
         </div>
 
         <div className="mt-auto pt-1 sm:pt-3">
-          <div className="truncate text-[11px] font-bold text-emerald-600 sm:text-lg lg:text-xl">
+          <div className="truncate text-[11px] font-bold text-emerald-600 sm:text-base lg:text-lg">
             {vehicle.PriceNew == null ? "-" : `$${vehicle.PriceNew.toLocaleString()}`}
           </div>
         </div>
@@ -3209,15 +3209,15 @@ const getVehicleImageUrl = useCallback((imageValue: unknown): string | null => {
         {/* Vehicle Display */}
         {viewMode === "grid" ? (
           // Grid View with Grouping
-          <div className="space-y-4 sm:space-y-8">
+          <div className="space-y-4 sm:space-y-5">
             {filteredVehicles.length > 0 && visibleVehicleGroups.map((group) => (
-              <div key={group.key} className="space-y-1.5 sm:space-y-4">
+              <div key={group.key} className="space-y-1.5 sm:space-y-3">
                 {/* Group Header */}
                 <div className={cn(groupBy === "none" && "hidden sm:block")}>
                   <VehicleGroupHeader label={group.label} count={group.count} avgPrice={group.avgPrice} />
                 </div>
                 {/* Group Vehicles Grid */}
-                <div className="grid grid-cols-4 gap-1.5 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3 lg:gap-6 xl:grid-cols-4">
+                <div className="grid grid-cols-4 gap-1.5 sm:grid-cols-3 sm:gap-3 md:grid-cols-4 lg:gap-4 xl:grid-cols-5 2xl:grid-cols-6">
                   {group.vehicles.map((vehicle) => (
                     <VehicleCard
                       key={vehicle.VehicleId}
@@ -3242,7 +3242,7 @@ const getVehicleImageUrl = useCallback((imageValue: unknown): string | null => {
                   <VehicleGroupHeader label={group.label} count={group.count} avgPrice={group.avgPrice} />
                 </div>
                 {/* Group Vehicles List */}
-                <div className="space-y-1.5 sm:space-y-4 lg:space-y-5">
+                <div className="space-y-1.5 sm:space-y-3 lg:space-y-4">
                   {group.vehicles.map((vehicle) => (
                     <MobileVehicleListCard
                       key={vehicle.VehicleId}
