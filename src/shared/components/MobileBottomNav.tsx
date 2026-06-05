@@ -157,6 +157,18 @@ export default function MobileBottomNav({
     };
   }, []);
 
+  useEffect(() => {
+    const shouldCollapseNavSpace = isKeyboardOpen && !isMenuOpen;
+
+    document.documentElement.classList.toggle("mobile-keyboard-open", shouldCollapseNavSpace);
+    document.body.classList.toggle("mobile-keyboard-open", shouldCollapseNavSpace);
+
+    return () => {
+      document.documentElement.classList.remove("mobile-keyboard-open");
+      document.body.classList.remove("mobile-keyboard-open");
+    };
+  }, [isKeyboardOpen, isMenuOpen]);
+
   const isActive = (item: NavLinkItem) => {
     if (item.id === "vms") {
       return (

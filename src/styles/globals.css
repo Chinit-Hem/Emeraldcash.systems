@@ -695,6 +695,12 @@ textarea::placeholder {
   padding-bottom: max(env(safe-area-inset-bottom), 80px);
 }
 
+@media (max-width: 767px) {
+  .mobile-keyboard-open .pb-safe {
+    padding-bottom: 0 !important;
+  }
+}
+
 .ios-safari {
   -webkit-text-size-adjust: 100%;
 }
