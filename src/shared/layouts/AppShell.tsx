@@ -6,6 +6,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Suspense, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import MobileBottomNav from "@/shared/components/MobileBottomNav";
+import MobileBackHandler from "@/shared/components/MobileBackHandler";
 import Sidebar from "@/shared/components/Sidebar";
 import { AuthUserProvider } from "@/shared/hooks/AuthContext";
 import { UIProvider } from "@/shared/hooks/UIContext";
@@ -239,6 +240,8 @@ function AppShellContent({ children }: AppShellProps) {
   return (
     <div className="flex h-dvh min-h-screen overflow-hidden bg-transparent pb-safe xl:pb-0">
       <AuthUserProvider user={user}>
+        <MobileBackHandler isMenuOpen={isSidebarOpen} onCloseMenu={closeSidebar} />
+
         {/* Desktop sidebar */}
         {isDesktopSidebar && (
           <div className="hidden xl:block">
@@ -284,21 +287,8 @@ function AppShellContent({ children }: AppShellProps) {
         <div className="flex min-h-0 flex-1 min-w-0 flex-col pt-14 xl:pt-0">
           {/* Mobile header - Fixed position with safe area support */}
           <header className={mobileHeaderClass}>
-            <div className="h-14 px-4 flex items-center justify-between max-w-[100vw]">
-              <button
-                onClick={openSidebar}
-                className="neu-icon-btn touch-target touch-manipulation translate-y-1"
-                aria-label="Open navigation menu"
-                aria-controls={drawerId}
-                aria-expanded={isSidebarOpen}
-                type="button"
-              >
-                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 6h16M4 12h16M4 18h16" />
-                </svg>
-              </button>
-
-              <div className="flex min-w-0 flex-1 translate-y-1 items-center justify-center gap-3">
+            <div className="h-14 px-4 flex items-center justify-center max-w-[100vw]">
+              <div className="flex min-w-0 translate-y-1 items-center justify-center gap-3">
                 <div className="relative w-9 h-9 flex items-center justify-center overflow-hidden flex-shrink-0 neu-icon-btn !rounded-full !bg-white dark:!bg-white">
                   <Image
                     src="/logo.png"
@@ -313,8 +303,6 @@ function AppShellContent({ children }: AppShellProps) {
                   <span className="text-sm font-bold leading-tight text-emerald-700 dark:text-emerald-300">{systemsLabel}</span>
                 </div>
               </div>
-
-              <div className="w-9 flex-shrink-0" aria-hidden="true" />
             </div>
           </header>
 
