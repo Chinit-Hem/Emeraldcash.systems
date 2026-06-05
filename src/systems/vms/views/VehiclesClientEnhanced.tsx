@@ -2662,38 +2662,34 @@ const getVehicleImageUrl = useCallback((imageValue: unknown): string | null => {
           </div>
         </div>
 
-        <div className="hidden sm:block">
-          {selectedBrandName ? (
-            <ModelFilterSection
-              title={t.model}
-              backLabel={t.brand}
-              models={modelOptions}
-              selectedModel={filters.model}
-              isExpanded={showAllModels}
-              onBackToBrands={handleBackToBrands}
-              onToggleExpanded={() => setShowAllModels(prev => !prev)}
-              onModelSelect={handleModelSelect}
-            />
-          ) : (
-            <BrandFilterSection
-              title={t.brand}
-              brands={brandOptions}
-              selectedBrand={filters.brand}
-              isExpanded={showAllBrands}
-              onToggleExpanded={() => setShowAllBrands(prev => !prev)}
-              onBrandSelect={handleBrandSelect}
-            />
-          )}
-        </div>
-
-        <div className="hidden sm:block">
-          <BodyTypeFilterSection
-            title={t.bodyType}
-            bodyTypes={bodyTypeOptions}
-            selectedBodyType={filters.bodyType}
-            onBodyTypeSelect={handleBodyTypeSelect}
+        {selectedBrandName ? (
+          <ModelFilterSection
+            title={t.model}
+            backLabel={t.brand}
+            models={modelOptions}
+            selectedModel={filters.model}
+            isExpanded={showAllModels}
+            onBackToBrands={handleBackToBrands}
+            onToggleExpanded={() => setShowAllModels(prev => !prev)}
+            onModelSelect={handleModelSelect}
           />
-        </div>
+        ) : (
+          <BrandFilterSection
+            title={t.brand}
+            brands={brandOptions}
+            selectedBrand={filters.brand}
+            isExpanded={showAllBrands}
+            onToggleExpanded={() => setShowAllBrands(prev => !prev)}
+            onBrandSelect={handleBrandSelect}
+          />
+        )}
+
+        <BodyTypeFilterSection
+          title={t.bodyType}
+          bodyTypes={bodyTypeOptions}
+          selectedBodyType={filters.bodyType}
+          onBodyTypeSelect={handleBodyTypeSelect}
+        />
 
         <div className="sticky top-0 z-40 space-y-1.5 rounded-2xl border border-slate-200/70 bg-slate-50/95 p-1.5 shadow-[0_10px_22px_rgba(15,23,42,0.08)] backdrop-blur-xl dark:border-slate-800/80 dark:bg-slate-950/95 dark:shadow-[0_18px_45px_rgba(0,0,0,0.26)] sm:-mx-3 sm:space-y-4 sm:px-3 sm:py-3">
         {/* Search and Filters Bar */}
