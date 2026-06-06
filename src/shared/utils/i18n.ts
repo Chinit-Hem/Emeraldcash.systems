@@ -1354,6 +1354,7 @@ const extraEnglishToKhmer: Record<string, string> = {
   "Group & Location": "ក្រុម និងទីតាំង",
   "Group": "ក្រុម",
   "Asset group": "ក្រុមទ្រព្យសម្បត្តិ",
+  "e.g. Vehicle documents, Hard cards, Office equipment": "ឧ. ឯកសាររថយន្ត, កាតរឹង, ឧបករណ៍ការិយាល័យ",
   "Group assets by team, document type, or inventory location.": "ដាក់ក្រុមទ្រព្យសម្បត្តិតាមក្រុមការងារ ប្រភេទឯកសារ ឬទីតាំងក្នុងបញ្ជី។",
   "Receiver": "អ្នកទទួល",
   "Receiver *": "អ្នកទទួល *",

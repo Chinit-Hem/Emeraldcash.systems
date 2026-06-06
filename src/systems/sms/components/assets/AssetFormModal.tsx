@@ -544,7 +544,7 @@ export default function AssetFormModal({
                       value={formData.category || ''}
                       onChange={(e) => updateFormField('category', e.target.value || undefined)}
                       className={`${smsInputClass} ${errors.category ? smsInvalidFieldClass : ""}`}
-                      placeholder="Not set"
+                      placeholder="e.g. Vehicle documents, Hard cards, Office equipment"
                       disabled={loading}
                       maxLength={64}
                       aria-invalid={Boolean(errors.category)}
