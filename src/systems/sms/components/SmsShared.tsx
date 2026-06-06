@@ -13,6 +13,7 @@ type SmsPageHeaderProps = {
   icon: LucideIcon;
   tone?: "emerald" | "blue" | "slate" | "amber" | "purple";
   actions?: ReactNode;
+  backHref?: string | null;
 };
 
 type SmsFieldErrorProps = {
@@ -28,7 +29,7 @@ const headerTone = {
 };
 
 export const smsPanelClass =
-  "rounded-2xl bg-white/95 shadow-xl ring-1 ring-slate-200/80 backdrop-blur-sm dark:bg-slate-900/95 dark:ring-slate-800";
+  "rounded-2xl bg-white shadow-sm ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-800";
 export const smsInputClass =
   "h-11 w-full rounded-lg border border-gray-200 bg-white px-4 text-sm text-gray-900 shadow-sm transition-colors placeholder:text-gray-400 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-500 disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-gray-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white dark:placeholder:text-gray-500 disabled:dark:bg-gray-900 disabled:dark:text-gray-500";
 export const smsTextareaClass =
@@ -36,11 +37,11 @@ export const smsTextareaClass =
 export const smsSelectClass =
   "h-11 w-full rounded-lg border border-gray-200 bg-white px-4 text-sm text-gray-900 shadow-sm transition-colors focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-500 disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-gray-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white disabled:dark:bg-gray-900 disabled:dark:text-gray-500";
 export const smsPrimaryButtonClass =
-  "inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-emerald-600/15 transition-colors hover:bg-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 disabled:cursor-not-allowed disabled:opacity-50";
+  "inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 disabled:cursor-not-allowed disabled:opacity-50";
 export const smsSecondaryButtonClass =
   "inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-sm ring-1 ring-gray-200 transition-colors hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-400 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-gray-800 dark:text-gray-200 dark:ring-gray-700 dark:hover:bg-gray-700";
 export const smsDangerButtonClass =
-  "inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-red-600/15 transition-colors hover:bg-red-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 disabled:cursor-not-allowed disabled:opacity-50";
+  "inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-red-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 disabled:cursor-not-allowed disabled:opacity-50";
 export const smsLabelClass = "mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300";
 export const smsHelperClass = "mt-1.5 text-xs text-gray-500 dark:text-gray-400";
 export const smsErrorTextClass = "mt-1.5 flex items-center gap-1 text-sm font-medium text-red-600 dark:text-red-400";
@@ -60,7 +61,7 @@ export const smsModalFooterClass =
 
 export function SmsPageShell({ children, maxWidth = "max-w-7xl" }: SmsPageShellProps) {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 px-4 py-5 sm:p-6 lg:p-8 dark:from-slate-950 dark:via-slate-950 dark:to-slate-900">
+    <div className="min-h-screen bg-slate-50 px-4 pb-[calc(5.75rem+env(safe-area-inset-bottom))] pt-5 sm:p-6 lg:p-8 dark:bg-slate-950">
       <div className={`mx-auto ${maxWidth}`}>{children}</div>
     </div>
   );
@@ -83,18 +84,21 @@ export function SmsPageHeader({
   icon: Icon,
   tone = "emerald",
   actions,
+  backHref = "/sms/assets",
 }: SmsPageHeaderProps) {
   return (
-    <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+    <div className="mb-5 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
       <div className="flex min-w-0 items-start gap-4">
-        <Link
-          href="/sms"
-          scroll={false}
-          className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl bg-white text-gray-600 shadow-sm ring-1 ring-gray-200 transition-colors hover:bg-gray-50 hover:text-gray-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 dark:bg-gray-900 dark:text-gray-300 dark:ring-gray-700 dark:hover:bg-gray-800 dark:hover:text-white"
-          aria-label="Back to SMS Dashboard"
-        >
-          <ArrowLeft className="h-5 w-5" />
-        </Link>
+        {backHref && (
+          <Link
+            href={backHref}
+            scroll={false}
+            className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl bg-white text-gray-600 shadow-sm ring-1 ring-gray-200 transition-colors hover:bg-gray-50 hover:text-gray-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 dark:bg-gray-900 dark:text-gray-300 dark:ring-gray-700 dark:hover:bg-gray-800 dark:hover:text-white"
+            aria-label="Back to SMS assets"
+          >
+            <ArrowLeft className="h-5 w-5" />
+          </Link>
+        )}
         <div className="min-w-0">
           <div className="mb-3 flex items-center gap-3">
             <span className={`flex h-11 w-11 items-center justify-center rounded-xl ${headerTone[tone]}`}>
@@ -102,7 +106,7 @@ export function SmsPageHeader({
             </span>
             <p className="text-sm font-semibold text-emerald-700 dark:text-emerald-400">SMS</p>
           </div>
-          <h1 className="text-2xl font-bold leading-tight text-gray-950 dark:text-white md:text-3xl">{title}</h1>
+          <h1 className="text-2xl font-bold leading-tight text-gray-950 dark:text-white">{title}</h1>
           {description && <p className="mt-2 max-w-2xl text-sm leading-6 text-gray-500 dark:text-gray-400">{description}</p>}
         </div>
       </div>

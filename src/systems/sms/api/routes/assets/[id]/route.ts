@@ -91,7 +91,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
 
     if (auth.session.role !== 'Admin') {
       return NextResponse.json(
-        { success: false, error: 'Only Admin can delete stock assets' },
+        { success: false, error: 'Only Admin can delete SMS assets' },
         { status: 403 }
       );
     }

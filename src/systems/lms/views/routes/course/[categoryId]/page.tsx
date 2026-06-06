@@ -306,9 +306,7 @@ export default function CourseOverviewPage() {
                 </div>
                 <div className="flex items-center gap-1">
                   <Clock className="w-4 h-4" />
-                  <span>
-                    {lessons.reduce((acc, l) => acc + (l.duration_minutes || 0), 0)} minutes
-                  </span>
+                  <span>{`${lessons.reduce((acc, l) => acc + (l.duration_minutes || 0), 0)} minutes`}</span>
                 </div>
                 <div className="flex items-center gap-1">
                   <Trophy className="w-4 h-4" />
@@ -325,9 +323,7 @@ export default function CourseOverviewPage() {
                 <p className="text-2xl font-bold text-gray-900 dark:text-white">
                   {completedCount}/{lessons.length}
                 </p>
-                <p className="text-sm text-gray-500 dark:text-gray-400">
-                  lessons completed
-                </p>
+                <p className="text-sm text-gray-500 dark:text-gray-400">lessons completed</p>
               </div>
             </GlassCard>
           </div>

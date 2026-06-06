@@ -1,6 +1,8 @@
 "use client";
 
 import { useAuthUser } from "@/shared/hooks/AuthContext";
+import { useLanguage } from "@/shared/hooks/LanguageContext";
+import { translatePhrase } from "@/shared/utils/i18n";
 import type { LessonWithStatus } from "@/systems/lms/types/lms-types";
 import { ArrowLeft, Loader2, PlayCircle, Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -12,6 +14,7 @@ import { LessonFormPanel } from "./LessonFormPanel";
 import {
   createEmptyLessonForm,
   createLessonFormFromLesson,
+  getNextLessonOrderIndex,
   groupLessonsByCategory,
   validateLessonFormFields,
   type LessonAudienceRole,
@@ -25,6 +28,8 @@ import { LmsContentManagerTabs } from "../LmsContentManagerTabs";
 export default function LessonsAdminPage() {
   const router = useRouter();
   const user = useAuthUser();
+  const { language } = useLanguage();
+  const tr = useCallback((text: string) => translatePhrase(text, language), [language]);
   const isAdmin = user?.role === "Admin";
   const {
     categories,
@@ -119,13 +124,18 @@ export default function LessonsAdminPage() {
 
   const startEdit = useCallback(
     (lesson: LessonWithStatus) => {
+      const nextFormData = createLessonFormFromLesson(lesson);
       setEditingId(lesson.id);
-      setFormData(createLessonFormFromLesson(lesson));
+      setFormData({
+        ...nextFormData,
+        title: tr(nextFormData.title),
+        description: tr(nextFormData.description),
+      });
       setFormErrors({});
       setShowAddForm(true);
       setError("");
     },
-    [setError]
+    [setError, tr]
   );
 
   const handleFieldChange = useCallback(
@@ -136,6 +146,15 @@ export default function LessonsAdminPage() {
       setFormData((currentFormData) => ({
         ...currentFormData,
         [field]: value,
+        ...(field === "category_id"
+          ? {
+              order_index: getNextLessonOrderIndex(
+                lessons,
+                Number(value),
+                editingId
+              ),
+            }
+          : {}),
       }));
       setFormErrors((currentErrors) => {
         if (!currentErrors[field]) return currentErrors;
@@ -144,7 +163,7 @@ export default function LessonsAdminPage() {
         return nextErrors;
       });
     },
-    []
+    [editingId, lessons]
   );
 
   const handleYoutubeUrlChange = useCallback((url: string) => {
@@ -217,13 +236,13 @@ export default function LessonsAdminPage() {
 
   const handleDelete = useCallback(
     async (id: number) => {
-      if (!confirm("Are you sure you want to delete this lesson?")) {
+      if (!confirm(tr("Are you sure you want to delete this lesson?"))) {
         return;
       }
 
       await deleteLesson(id);
     },
-    [deleteLesson]
+    [deleteLesson, tr]
   );
 
   if (!isAdmin) return null;
@@ -243,8 +262,8 @@ export default function LessonsAdminPage() {
           <button
             type="button"
             onClick={() => router.push("/lms", { scroll: false })}
-            aria-label="Back to LMS"
-            title="Back to LMS"
+            aria-label={tr("Back to LMS")}
+            title={tr("Back to LMS")}
             className="flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-xl bg-white text-slate-600 shadow-[4px_4px_8px_#e2e8f0,-4px_-4px_8px_#ffffff] transition-all hover:shadow-[6px_6px_12px_#e2e8f0,-6px_-6px_12px_#ffffff] active:scale-95"
           >
             <ArrowLeft className="h-5 w-5" />
@@ -255,10 +274,10 @@ export default function LessonsAdminPage() {
             </div>
             <div className="min-w-0">
               <h1 className="break-words text-xl font-bold text-slate-800 sm:text-2xl">
-                Manage Lessons
+                {tr("Manage Lessons")}
               </h1>
               <p className="break-words text-sm text-slate-500">
-                Create YouTube lessons, set visibility, and organize training by category.
+                {tr("Create YouTube lessons, set visibility, and organize training by category.")}
               </p>
             </div>
           </div>
@@ -299,7 +318,7 @@ export default function LessonsAdminPage() {
             className="mb-8 flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-500 to-blue-600 px-6 py-3 font-medium text-white shadow-lg shadow-blue-500/30 transition-all hover:shadow-xl active:scale-95 sm:w-auto"
           >
             <Plus className="h-5 w-5" />
-            New Lesson
+            {tr("New Lesson")}
           </button>
         )}
 

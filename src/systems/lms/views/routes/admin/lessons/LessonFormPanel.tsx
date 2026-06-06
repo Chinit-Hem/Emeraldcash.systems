@@ -2,6 +2,8 @@
 
 import { useId } from "react";
 
+import { useLanguage } from "@/shared/hooks/LanguageContext";
+import { translatePhrase } from "@/shared/utils/i18n";
 import { extractYoutubeVideoId } from "@/systems/lms/types/lms-schema";
 import type { LmsCategory } from "@/systems/lms/types/lms-types";
 import { AlertCircle, CheckCircle2, Clock, Loader2, Save, X } from "lucide-react";
@@ -38,12 +40,13 @@ const labelClass = "mb-1 block text-sm font-medium text-slate-700";
 const sectionClass = "space-y-4 border-t border-slate-200 pt-5 first:border-t-0 first:pt-0";
 
 function FieldError({ error }: { error?: string }) {
+  const { language } = useLanguage();
   if (!error) return null;
 
   return (
     <p className="mt-1 flex items-start gap-1.5 text-xs font-medium text-red-600">
       <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-      <span>{error}</span>
+      <span>{translatePhrase(error, language)}</span>
     </p>
   );
 }
@@ -78,6 +81,8 @@ export function LessonFormPanel({
   onToggleAudienceRole,
   onYoutubeUrlChange,
 }: LessonFormPanelProps) {
+  const { language } = useLanguage();
+  const tr = (text: string) => translatePhrase(text, language);
   const formId = useId();
   const fieldIds = {
     title: `${formId}-title`,
@@ -86,7 +91,6 @@ export function LessonFormPanel({
     duration: `${formId}-duration`,
     audience: `${formId}-audience`,
     youtubeUrl: `${formId}-youtube-url`,
-    order: `${formId}-order`,
     isActive: `${formId}-is-active`,
   };
   const youtubeVideoId = extractYoutubeVideoId(formData.youtube_url);
@@ -94,27 +98,27 @@ export function LessonFormPanel({
     ? `https://img.youtube.com/vi/${youtubeVideoId}/mqdefault.jpg`
     : "";
   const saveLabel = saving
-    ? "Saving..."
+    ? tr("Saving...")
     : editingId
-      ? "Update Lesson"
-      : "Create Lesson";
+      ? tr("Update Lesson")
+      : tr("Create Lesson");
 
   return (
     <div className="mb-8 rounded-2xl bg-white p-4 shadow-[8px_8px_24px_#e2e8f0,-8px_-8px_24px_#ffffff] sm:rounded-3xl sm:p-6">
       <div className="mb-5 flex items-center justify-between gap-3">
         <div className="min-w-0">
           <h2 className="break-words text-lg font-bold text-slate-800">
-            {editingId ? "Edit Lesson" : "New Lesson"}
+            {editingId ? tr("Edit Lesson") : tr("New Lesson")}
           </h2>
           <p className="mt-1 text-sm text-slate-500">
-            Build the lesson, connect the video, then publish it to the right audience.
+            {tr("Build the lesson, connect the video, then publish it to the right audience.")}
           </p>
         </div>
         <button
           type="button"
           onClick={onCancel}
-          aria-label="Close lesson form"
-          title="Close lesson form"
+          aria-label={tr("Close lesson form")}
+          title={tr("Close lesson form")}
           className="flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-xl text-slate-500 hover:bg-slate-100"
         >
           <X className="h-5 w-5" />
@@ -124,21 +128,21 @@ export function LessonFormPanel({
       <div className="space-y-6">
         <section className={sectionClass}>
           <SectionHeader
-            title="Lesson Info"
-            description="Name the lesson and place it in the correct training category."
+            title={tr("Lesson Info")}
+            description={tr("Name the lesson and place it in the correct training category.")}
           />
 
           <div>
             <label htmlFor={fieldIds.title} className={labelClass}>
-              Lesson Title <span className="text-red-500">*</span>
+              {tr("Lesson Title")} <span className="text-red-500">*</span>
             </label>
             <input
               id={fieldIds.title}
               type="text"
-              title="Lesson title"
+              title={tr("Lesson title")}
               value={formData.title}
               onChange={(event) => onFieldChange("title", event.target.value)}
-              placeholder="e.g. Introduction to Vehicle Valuation"
+              placeholder={tr("e.g. Introduction to Vehicle Valuation")}
               className={`${inputClass} ${formErrors.title ? invalidInputClass : ""}`}
               aria-invalid={Boolean(formErrors.title)}
             />
@@ -147,16 +151,16 @@ export function LessonFormPanel({
 
           <div>
             <label htmlFor={fieldIds.description} className={labelClass}>
-              Description
+              {tr("Description")}
             </label>
             <textarea
               id={fieldIds.description}
-              title="Lesson description"
+              title={tr("Lesson description")}
               value={formData.description}
               onChange={(event) =>
                 onFieldChange("description", event.target.value)
               }
-              placeholder="Brief description of this lesson..."
+              placeholder={tr("Brief description of this lesson...")}
               rows={3}
               className={`${inputClass} min-h-[104px] resize-y`}
             />
@@ -164,11 +168,11 @@ export function LessonFormPanel({
 
           <div>
             <label htmlFor={fieldIds.category} className={labelClass}>
-              Category <span className="text-red-500">*</span>
+              {tr("Category")} <span className="text-red-500">*</span>
             </label>
             <select
               id={fieldIds.category}
-              title="Lesson category"
+              title={tr("Lesson category")}
               value={formData.category_id}
               onChange={(event) =>
                 onFieldChange("category_id", Number(event.target.value))
@@ -177,11 +181,11 @@ export function LessonFormPanel({
               aria-invalid={Boolean(formErrors.category_id)}
             >
               {categories.length === 0 && (
-                <option value={0}>Create a category first</option>
+                <option value={0}>{tr("Create a category first")}</option>
               )}
               {categories.map((category) => (
                 <option key={category.id} value={category.id}>
-                  {category.name}
+                  {tr(category.name)}
                 </option>
               ))}
             </select>
@@ -191,18 +195,18 @@ export function LessonFormPanel({
 
         <section className={sectionClass}>
           <SectionHeader
-            title="Video"
-            description="Paste a YouTube link. Duration is detected automatically before saving."
+            title={tr("Video")}
+            description={tr("Paste a YouTube link. Duration is detected automatically before saving.")}
           />
 
           <div>
             <label htmlFor={fieldIds.youtubeUrl} className={labelClass}>
-              YouTube URL <span className="text-red-500">*</span>
+              {tr("YouTube URL")} <span className="text-red-500">*</span>
             </label>
             <input
               id={fieldIds.youtubeUrl}
               type="url"
-              title="YouTube URL"
+              title={tr("YouTube URL")}
               value={formData.youtube_url}
               onChange={(event) => onYoutubeUrlChange(event.target.value)}
               placeholder="https://youtube.com/watch?v=..."
@@ -217,7 +221,7 @@ export function LessonFormPanel({
               <div className="aspect-video overflow-hidden rounded-lg bg-slate-200">
                 <img
                   src={thumbnailUrl}
-                  alt="YouTube thumbnail preview"
+                  alt={tr("YouTube thumbnail preview")}
                   className="h-full w-full object-cover"
                   onError={(event) => {
                     event.currentTarget.src = "/placeholder-car.svg";
@@ -226,7 +230,7 @@ export function LessonFormPanel({
               </div>
               <div className="min-w-0">
                 <p className="text-sm font-semibold text-slate-800">
-                  Video preview
+                  {tr("Video preview")}
                 </p>
                 <p className="mt-1 break-all text-xs text-slate-500">
                   {youtubeVideoId}
@@ -237,7 +241,7 @@ export function LessonFormPanel({
 
           <div>
             <p id={fieldIds.duration} className={labelClass}>
-              Duration
+              {tr("Duration")}
             </p>
             <div
               role="status"
@@ -262,15 +266,15 @@ export function LessonFormPanel({
               )}
               <span className="min-w-0 break-words font-medium">
                 {formData.duration_minutes && formData.duration_minutes > 0
-                  ? `${formData.duration_minutes} min`
-                  : "Auto from video"}
+                  ? tr(`${formData.duration_minutes} min`)
+                  : tr("Auto from video")}
               </span>
             </div>
             {formErrors.duration_minutes ? (
               <FieldError error={formErrors.duration_minutes} />
             ) : (
               <p className="mt-1 break-words text-xs text-slate-500">
-                {durationLookup.message}
+                {tr(durationLookup.message)}
               </p>
             )}
           </div>
@@ -278,13 +282,13 @@ export function LessonFormPanel({
 
         <section className={sectionClass}>
           <SectionHeader
-            title="Access & Publishing"
-            description="Choose who can see this lesson and where it appears in the category."
+            title={tr("Access & Publishing")}
+            description={tr("Choose who can see this lesson and where it appears in the category.")}
           />
 
           <div>
             <p id={fieldIds.audience} className="mb-2 block text-sm font-medium text-slate-700">
-              Visible To <span className="text-red-500">*</span>
+              {tr("Visible To")} <span className="text-red-500">*</span>
             </p>
             <div
               className="grid gap-3 sm:grid-cols-2"
@@ -307,35 +311,25 @@ export function LessonFormPanel({
                     className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
                   />
                   <span className="min-w-0 break-words text-sm font-medium">
-                    {role}
+                    {tr(role)}
                   </span>
                 </label>
               ))}
             </div>
             <FieldError error={formErrors.allowed_roles} />
             <p className="mt-2 break-words text-sm text-slate-500">
-              Admin can always view every lesson. Accounting can also view normal Staff lessons.
+              {tr("Admin can always view every lesson. Accounting can also view normal Staff lessons.")}
             </p>
           </div>
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div>
-              <label htmlFor={fieldIds.order} className={labelClass}>
-                Position in Category
-              </label>
-              <input
-                id={fieldIds.order}
-                type="number"
-                title="Position in category"
-                value={formData.order_index}
-                onChange={(event) =>
-                  onFieldChange("order_index", Number(event.target.value) || 0)
-                }
-                min={0}
-                className={inputClass}
-              />
+            <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+              <p className={labelClass}>{tr("Lesson Order")}</p>
+              <p className="text-sm font-semibold text-slate-800">
+                {tr("Automatic")}
+              </p>
               <p className="mt-1 text-xs text-slate-500">
-                Lower numbers appear first.
+                {tr("New lessons are placed at the end of the selected category.")}
               </p>
             </div>
 
@@ -353,9 +347,9 @@ export function LessonFormPanel({
                 className="mt-1 h-4 w-4 shrink-0 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
               />
               <span className="min-w-0 break-words text-sm text-slate-700">
-                Published
+                {tr("Published")}
                 <span className="mt-1 block text-xs text-slate-500">
-                  Staff can see this lesson when their role matches visibility.
+                  {tr("Staff can see this lesson when their role matches visibility.")}
                 </span>
               </span>
             </label>
@@ -381,7 +375,7 @@ export function LessonFormPanel({
             onClick={onCancel}
             className="min-h-11 w-full rounded-xl bg-slate-100 px-6 py-3 font-medium text-slate-700 transition-all hover:bg-slate-200 active:scale-95 sm:w-auto"
           >
-            Cancel
+            {tr("Cancel")}
           </button>
         </div>
       </div>

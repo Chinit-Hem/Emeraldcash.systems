@@ -28,7 +28,6 @@ import {
   ChevronRight,
   DollarSign,
   Download,
-  Filter,
   Image as ImageIcon,
   ImageOff,
   Languages,
@@ -535,6 +534,11 @@ export default function EnhancedDashboard({
   const tukTuksCount = meta.countsByCategory.TukTuks;
   const noImageCount = meta.noImageCount;
   const useMobileSafeCharts = isIOSSafari;
+  const isKm = language === "km";
+  const getCategoryPercent = (count: number) =>
+    totalVehicles > 0 ? Math.min((count / totalVehicles) * 100, 100) : 0;
+  const getCategoryRatio = (count: number) =>
+    `${count.toLocaleString()} / ${totalVehicles.toLocaleString()}`;
 
   return (
     <div className="ec-dark-scope min-h-screen w-full overflow-x-hidden bg-gradient-to-br from-slate-50 via-slate-100 to-slate-200 dark:from-slate-950 dark:via-slate-950 dark:to-slate-900">
@@ -547,7 +551,7 @@ export default function EnhancedDashboard({
             </div>
             <div className="min-w-0">
               <h1 className="truncate text-xl font-bold text-slate-800 dark:text-slate-100">{t.dashboard}</h1>
-              <p className="truncate text-xs text-slate-500 dark:text-slate-400">{language === 'km' ? 'វិភាគស្តុកយានយន្តពេលវេលាពិត' : 'Real-time inventory analytics'}</p>
+              <p className="truncate text-xs text-slate-500 dark:text-slate-400">{language === 'km' ? 'វិភាគទិន្នន័យយានយន្តជាពេលវេលាពិត' : 'Real-time inventory analytics'}</p>
             </div>
           </div>
 
@@ -563,7 +567,7 @@ export default function EnhancedDashboard({
 
             <button className="hidden sm:flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 font-medium transition-all active:scale-95 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800">
               <Download className="w-4 h-4" />
-              {language === 'km' ? 'ទាញយក' : 'Export'}
+              {language === 'km' ? 'នាំចេញ' : 'Export'}
             </button>
 
             <button
@@ -577,14 +581,6 @@ export default function EnhancedDashboard({
               <span className="hidden sm:inline">{language === 'km' ? 'English' : 'ខ្មែរ'}</span>
             </button>
 
-            <button
-              className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-600 px-3 py-2.5 font-medium text-white shadow-lg shadow-emerald-500/30 transition-all hover:shadow-xl hover:shadow-emerald-500/40 active:scale-95 sm:px-4"
-              aria-label={t.filter}
-              title={t.filter}
-            >
-              <Filter className="w-4 h-4" />
-              <span className="hidden sm:inline">{t.filter}</span>
-            </button>
           </div>
         </div>
       </header>
@@ -596,12 +592,17 @@ export default function EnhancedDashboard({
             {/* Section Header */}
             <div className="flex flex-wrap items-end justify-between gap-3">
               <div className="min-w-0">
-                <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-100">Vehicle Categories</h2>
-                <p className="text-sm text-slate-500 mt-1 dark:text-slate-400">Browse inventory by category</p>
+                <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-100">
+                  {isKm ? "ប្រភេទយានយន្ត" : "Vehicle Categories"}
+                </h2>
+                <p className="text-sm text-slate-500 mt-1 dark:text-slate-400">
+                  {isKm ? "ជ្រើសរើសប្រភេទដើម្បីមើលទិន្នន័យ" : "Browse inventory by category"}
+                </p>
               </div>
-              <div className="flex flex-shrink-0 items-center gap-2">
-                <span className="text-sm text-slate-400 dark:text-slate-500">Total Inventory</span>
-                <span className="text-2xl font-bold text-slate-800 dark:text-slate-100">{totalVehicles.toLocaleString()}</span>
+              <div className="flex flex-shrink-0 items-center gap-2 rounded-2xl bg-white px-3 py-2 text-sm shadow-sm ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-800">
+                <span className="text-slate-500 dark:text-slate-400">{isKm ? "សរុប" : "Total"}</span>
+                <span className="font-bold text-slate-800 dark:text-slate-100">{totalVehicles.toLocaleString()}</span>
+                <span className="text-slate-500 dark:text-slate-400">{isKm ? "យានយន្ត" : "vehicles"}</span>
               </div>
             </div>
 
@@ -631,12 +632,23 @@ export default function EnhancedDashboard({
 
                   {/* Label & Action */}
                   <div>
-                    <h3 className="mb-1 text-base font-bold text-slate-800 dark:text-slate-100 sm:text-lg">All Vehicles</h3>
-                    <p className="mb-3 text-xs text-slate-500 dark:text-slate-400 sm:text-sm">View complete inventory</p>
+                    <h3 className="mb-1 text-base font-bold text-slate-800 dark:text-slate-100 sm:text-lg">
+                      {isKm ? "យានយន្តទាំងអស់" : "All Vehicles"}
+                    </h3>
+                    <p className="mb-2 text-xs text-slate-500 dark:text-slate-400 sm:text-sm">
+                      {isKm ? "មើលបញ្ជីទាំងអស់" : "View complete inventory"}
+                    </p>
+                    <div className="mb-3 flex items-center justify-between gap-2 text-[11px] font-semibold text-emerald-700 dark:text-emerald-300 sm:text-xs">
+                      <span>{getCategoryRatio(totalVehicles)}</span>
+                      <span>{totalVehicles > 0 ? "100%" : "0%"}</span>
+                    </div>
 
                     {/* Progress Bar */}
                     <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden dark:bg-slate-800">
-                      <div className="h-full w-full bg-gradient-to-r from-emerald-500 to-teal-500 rounded-full" />
+                      <div
+                        className="h-full bg-gradient-to-r from-emerald-500 to-teal-500 rounded-full"
+                        style={{ width: totalVehicles > 0 ? "100%" : "0%" }}
+                      />
                     </div>
                   </div>
 
@@ -667,13 +679,21 @@ export default function EnhancedDashboard({
                   </div>
 
                   <div>
-                    <h3 className="mb-1 text-base font-bold text-slate-800 dark:text-slate-100 sm:text-lg">Cars</h3>
-                    <p className="mb-3 text-xs text-slate-500 dark:text-slate-400 sm:text-sm">Sedans, SUVs, Trucks</p>
+                    <h3 className="mb-1 text-base font-bold text-slate-800 dark:text-slate-100 sm:text-lg">
+                      {isKm ? "រថយន្ត" : "Cars"}
+                    </h3>
+                    <p className="mb-2 text-xs text-slate-500 dark:text-slate-400 sm:text-sm">
+                      {isKm ? "SUV, សេដាន, ហែចប៊ែក" : "SUV, Sedan, Hatchback"}
+                    </p>
+                    <div className="mb-3 flex items-center justify-between gap-2 text-[11px] font-semibold text-blue-700 dark:text-blue-300 sm:text-xs">
+                      <span>{getCategoryRatio(carsCount)}</span>
+                      <span>{Math.round(getCategoryPercent(carsCount))}%</span>
+                    </div>
 
                     <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden dark:bg-slate-800">
                       <div
                         className="h-full bg-gradient-to-r from-blue-500 to-indigo-500 rounded-full transition-all duration-1000"
-                        style={{ width: `${Math.min((carsCount / totalVehicles) * 100, 100)}%` }}
+                        style={{ width: `${getCategoryPercent(carsCount)}%` }}
                       />
                     </div>
                   </div>
@@ -704,13 +724,21 @@ export default function EnhancedDashboard({
                   </div>
 
                   <div>
-                    <h3 className="mb-1 text-base font-bold text-slate-800 dark:text-slate-100 sm:text-lg">Motorcycles</h3>
-                    <p className="mb-3 text-xs text-slate-500 dark:text-slate-400 sm:text-sm">Scooters, Bikes</p>
+                    <h3 className="mb-1 text-base font-bold text-slate-800 dark:text-slate-100 sm:text-lg">
+                      {isKm ? "ម៉ូតូ" : "Motorcycles"}
+                    </h3>
+                    <p className="mb-2 text-xs text-slate-500 dark:text-slate-400 sm:text-sm">
+                      {isKm ? "ស្គូទ័រ, ម៉ូតូ" : "Scooters, Bikes"}
+                    </p>
+                    <div className="mb-3 flex items-center justify-between gap-2 text-[11px] font-semibold text-violet-700 dark:text-violet-300 sm:text-xs">
+                      <span>{getCategoryRatio(motorcyclesCount)}</span>
+                      <span>{Math.round(getCategoryPercent(motorcyclesCount))}%</span>
+                    </div>
 
                     <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden dark:bg-slate-800">
                       <div
                         className="h-full bg-gradient-to-r from-violet-500 to-purple-500 rounded-full transition-all duration-1000"
-                        style={{ width: `${Math.min((motorcyclesCount / totalVehicles) * 100, 100)}%` }}
+                        style={{ width: `${getCategoryPercent(motorcyclesCount)}%` }}
                       />
                     </div>
                   </div>
@@ -741,13 +769,21 @@ export default function EnhancedDashboard({
                   </div>
 
                   <div>
-                    <h3 className="mb-1 text-base font-bold text-slate-800 dark:text-slate-100 sm:text-lg">TukTuks</h3>
-                    <p className="mb-3 text-xs text-slate-500 dark:text-slate-400 sm:text-sm">Three-wheelers</p>
+                    <h3 className="mb-1 text-base font-bold text-slate-800 dark:text-slate-100 sm:text-lg">
+                      {isKm ? "កង់បី" : "TukTuks"}
+                    </h3>
+                    <p className="mb-2 text-xs text-slate-500 dark:text-slate-400 sm:text-sm">
+                      {isKm ? "យានយន្តកង់បី" : "Three-wheelers"}
+                    </p>
+                    <div className="mb-3 flex items-center justify-between gap-2 text-[11px] font-semibold text-amber-700 dark:text-amber-300 sm:text-xs">
+                      <span>{getCategoryRatio(tukTuksCount)}</span>
+                      <span>{Math.round(getCategoryPercent(tukTuksCount))}%</span>
+                    </div>
 
                     <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden dark:bg-slate-800">
                       <div
                         className="h-full bg-gradient-to-r from-amber-500 to-orange-500 rounded-full transition-all duration-1000"
-                        style={{ width: `${Math.min((tukTuksCount / totalVehicles) * 100, 100)}%` }}
+                        style={{ width: `${getCategoryPercent(tukTuksCount)}%` }}
                       />
                     </div>
                   </div>

@@ -409,8 +409,8 @@ export default function HistoryPage() {
         {/* STATS CARDS */}
         {/* ================================================================ */}
         {stats && (
-          <div className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
-            <div className={`${smsPanelClass} p-5`}>
+          <div className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
+            <div className={`${smsPanelClass} p-4`}>
               <div className="flex items-center gap-3">
                 <div className="rounded-md bg-slate-100 p-2.5">
                   <BarChart3 className="w-5 h-5 text-slate-700" />
@@ -419,13 +419,13 @@ export default function HistoryPage() {
                   <p className="text-xs font-medium text-slate-500">
                     Total Events
                   </p>
-                  <p className="text-2xl font-semibold text-slate-900">
+                  <p className="text-xl font-semibold text-slate-900">
                     {stats.total}
                   </p>
                 </div>
               </div>
             </div>
-            <div className={`${smsPanelClass} p-5`}>
+            <div className={`${smsPanelClass} p-4`}>
               <div className="flex items-center gap-3">
                 <div className="rounded-md bg-blue-50 p-2.5">
                   <ArrowLeftRight className="w-5 h-5 text-blue-700" />
@@ -434,13 +434,13 @@ export default function HistoryPage() {
                   <p className="text-xs font-medium text-slate-500">
                     Transfers
                   </p>
-                  <p className="text-2xl font-semibold text-blue-900">
+                  <p className="text-xl font-semibold text-blue-900">
                     {stats.transfers}
                   </p>
                 </div>
               </div>
             </div>
-            <div className={`${smsPanelClass} p-5`}>
+            <div className={`${smsPanelClass} p-4`}>
               <div className="flex items-center gap-3">
                 <div className="rounded-md bg-emerald-50 p-2.5">
                   <ShieldCheck className="w-5 h-5 text-emerald-700" />
@@ -449,13 +449,13 @@ export default function HistoryPage() {
                   <p className="text-xs font-medium text-slate-500">
                     Audit Logs
                   </p>
-                  <p className="text-2xl font-semibold text-emerald-900">
+                  <p className="text-xl font-semibold text-emerald-900">
                     {stats.audits}
                   </p>
                 </div>
               </div>
             </div>
-            <div className={`${smsPanelClass} p-5`}>
+            <div className={`${smsPanelClass} p-4`}>
               <div className="flex items-center gap-3">
                 <div className="rounded-md bg-amber-50 p-2.5">
                   <Clock className="w-5 h-5 text-amber-700" />
@@ -464,7 +464,7 @@ export default function HistoryPage() {
                   <p className="text-xs font-medium text-slate-500">
                     Last Activity
                   </p>
-                  <p className="truncate text-lg font-semibold text-amber-900">
+                  <p className="truncate text-base font-semibold text-amber-900">
                     {stats.lastActivity || "—"}
                   </p>
                 </div>
@@ -476,18 +476,18 @@ export default function HistoryPage() {
         {/* ================================================================ */}
         {/* MAIN CONTENT GRID */}
         {/* ================================================================ */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-12 lg:gap-5">
           {/* -------------------------------------------------------------- */}
           {/* SIDEBAR — ASSET SELECTOR */}
           {/* -------------------------------------------------------------- */}
-          <div className="lg:col-span-4 space-y-6">
+          <div className="space-y-4 lg:col-span-3">
             <div className={`${smsPanelClass} overflow-hidden`}>
-              <div className="border-b border-slate-100 p-5">
-                <div className="flex items-center gap-3 mb-4">
+              <div className="border-b border-slate-100 p-4">
+                <div className="mb-3 flex items-center gap-3">
                   <div className="rounded-md bg-slate-100 p-2.5">
                     <Search className="h-5 w-5 text-slate-600" />
                   </div>
-                  <h3 className="text-lg font-semibold text-slate-900">
+                  <h3 className="text-base font-semibold text-slate-900">
                     {t.selectAsset}
                   </h3>
                 </div>
@@ -503,7 +503,7 @@ export default function HistoryPage() {
                 </div>
               </div>
 
-              <div className="max-h-[600px] overflow-y-auto p-3 space-y-2">
+              <div className="max-h-[520px] space-y-2 overflow-y-auto p-2.5">
                 {assetsLoading ? (
                   <div className="p-3">
                     <AssetSkeleton />
@@ -532,7 +532,7 @@ export default function HistoryPage() {
                       <button
                         key={asset.id}
                         onClick={() => handleAssetSelect(asset.id)}
-                        className={`w-full rounded-md border p-4 text-left transition-colors ${
+                        className={`w-full rounded-lg border p-3 text-left transition-colors ${
                           isSelected
                             ? "border-emerald-300 bg-emerald-50 ring-1 ring-emerald-200"
                             : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50"
@@ -589,7 +589,7 @@ export default function HistoryPage() {
           {/* -------------------------------------------------------------- */}
           {/* MAIN — TIMELINE */}
           {/* -------------------------------------------------------------- */}
-          <div className="lg:col-span-8">
+          <div className="lg:col-span-9">
             {/* Loading State */}
             {historyLoading && (
               <div className={`${smsPanelClass} p-6 sm:p-8`}>
@@ -698,12 +698,12 @@ export default function HistoryPage() {
                     )}
                   </div>
                 ) : (
-                  <div className={`${smsPanelClass} p-4 sm:p-6`}>
+                  <div className={`${smsPanelClass} p-3 sm:p-5`}>
                     <div className="relative">
                       {/* Vertical timeline line */}
                       <div className="absolute bottom-4 left-[26px] top-4 hidden w-px bg-slate-200 sm:block" />
 
-                      <div className="space-y-6">
+                      <div className="space-y-4">
                         {filteredEvents.map(
                           (event: HistoryEvent, index: number) => {
                             const isExpanded = expandedEvents.has(event.id);
@@ -741,7 +741,7 @@ export default function HistoryPage() {
                                 {/* Content card */}
                                 <div className="flex-1 min-w-0">
                                   <div
-                                    className={`rounded-lg border p-5 transition-colors ${
+                                    className={`rounded-lg border p-4 transition-colors ${
                                       isExpanded
                                         ? "border-slate-300 bg-slate-50"
                                         : "border-slate-200 bg-white hover:border-slate-300"

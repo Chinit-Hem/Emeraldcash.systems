@@ -47,16 +47,36 @@ function AppShellContent({ children }: AppShellProps) {
   const [user, setUser] = useState<User | null>(() => getCachedUser());
   const [loading, setLoading] = useState(false); // Changed: default false for 0ms load feel
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isSidebarClosing, setIsSidebarClosing] = useState(false);
   const [hasOpenedSidebar, setHasOpenedSidebar] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const hasRedirected = useRef(false);
   const authChecked = useRef(false);
+  const closeSidebarTimer = useRef<number | null>(null);
   const drawerId = "mobile-navigation-drawer";
   const openSidebar = useCallback(() => {
+    if (closeSidebarTimer.current !== null) {
+      window.clearTimeout(closeSidebarTimer.current);
+      closeSidebarTimer.current = null;
+    }
+    setIsSidebarClosing(false);
     setHasOpenedSidebar(true);
     setIsSidebarOpen(true);
   }, []);
-  const closeSidebar = useCallback(() => setIsSidebarOpen(false), []);
+  const closeSidebar = useCallback(() => {
+    if (!isSidebarOpen) return;
+
+    if (closeSidebarTimer.current !== null) {
+      window.clearTimeout(closeSidebarTimer.current);
+    }
+
+    setIsSidebarOpen(false);
+    setIsSidebarClosing(true);
+    closeSidebarTimer.current = window.setTimeout(() => {
+      setIsSidebarClosing(false);
+      closeSidebarTimer.current = null;
+    }, 220);
+  }, [isSidebarOpen]);
 
   useEffect(() => {
     let isActive = true;
@@ -131,6 +151,14 @@ function AppShellContent({ children }: AppShellProps) {
     };
   }, [router]);
 
+  useEffect(() => {
+    return () => {
+      if (closeSidebarTimer.current !== null) {
+        window.clearTimeout(closeSidebarTimer.current);
+      }
+    };
+  }, []);
+
   const mainRef = useRef<HTMLElement | null>(null);
 
   const scrollKey = useMemo(() => {
@@ -198,6 +226,7 @@ function AppShellContent({ children }: AppShellProps) {
 
   // Mobile-first header with Neumorphism
   const mobileHeaderClass = "xl:hidden fixed top-0 left-0 right-0 z-40 neu-card-sm !rounded-none !rounded-b-neu !p-0 safe-area-top";
+  const shouldShowSidebarLayer = isSidebarOpen || isSidebarClosing;
 
   // Loading state - Neumorphism
   if (loading) {
@@ -253,20 +282,20 @@ function AppShellContent({ children }: AppShellProps) {
 
         {/* Mobile drawer */}
         <div
-          className={`fixed inset-0 z-[60] xl:hidden ${isSidebarOpen ? "visible pointer-events-auto" : "invisible pointer-events-none"}`}
+          className={`fixed inset-0 z-[60] xl:hidden ${shouldShowSidebarLayer ? "visible" : "invisible"} ${isSidebarOpen ? "pointer-events-auto" : "pointer-events-none"}`}
           onKeyDown={(e) => {
             if (e.key === "Escape") closeSidebar();
           }}
           aria-hidden={!isSidebarOpen}
         >
           <div
-            className={`absolute inset-0 bg-slate-900/30 backdrop-blur-sm transition-opacity duration-200 motion-reduce:transition-none ${isSidebarOpen ? "opacity-100" : "opacity-0"}`}
+            className={`absolute inset-0 bg-slate-900/30 backdrop-blur-sm transition-opacity duration-200 ease-out motion-reduce:transition-none ${isSidebarOpen ? "opacity-100" : "opacity-0"}`}
             onClick={closeSidebar}
             aria-hidden="true"
           />
           <div
             id={drawerId}
-            className={`absolute inset-y-0 left-0 h-full w-[280px] max-w-[85vw] overflow-hidden bg-neu-bg shadow-neu-flat-lg transition-transform duration-200 ease-out will-change-transform motion-reduce:transition-none ${isSidebarOpen ? "translate-x-0" : "-translate-x-full"}`}
+            className={`absolute inset-y-0 left-0 h-full w-[280px] max-w-[85vw] overflow-hidden bg-neu-bg shadow-neu-flat-lg transition-[opacity,transform] duration-[220ms] ease-out will-change-[opacity,transform] motion-reduce:transition-none ${isSidebarOpen ? "translate-x-0 opacity-100" : "-translate-x-full opacity-0"}`}
             role="dialog"
             aria-modal={isSidebarOpen ? "true" : undefined}
             aria-label="Navigation menu"
@@ -286,16 +315,20 @@ function AppShellContent({ children }: AppShellProps) {
 
         <div className="flex min-h-0 flex-1 min-w-0 flex-col pt-14 xl:pt-0">
           {/* Mobile header - Fixed position with safe area support */}
-          <header className={mobileHeaderClass}>
+          <header
+            className={`${mobileHeaderClass} transition-opacity duration-150 ${shouldShowSidebarLayer ? "pointer-events-none opacity-0" : "opacity-100"}`}
+            aria-hidden={shouldShowSidebarLayer}
+          >
             <div className="h-14 px-4 flex items-center justify-center max-w-[100vw]">
               <div className="flex min-w-0 translate-y-1 items-center justify-center gap-3">
                 <div className="relative w-9 h-9 flex items-center justify-center overflow-hidden flex-shrink-0 neu-icon-btn !rounded-full !bg-white dark:!bg-white">
                   <Image
                     src="/logo.png"
-                    alt="Emerald Cash"
+                    alt=""
                     width={28}
                     height={28}
                     className="w-7 h-7 object-contain"
+                    aria-hidden="true"
                   />
                 </div>
                 <div className="flex flex-col min-w-0">

@@ -1,22 +1,22 @@
-# SMS (Stock Management System) Workflow Verification ✅
+# SMS (Asset Inventory) Workflow Verification ✅
 
 ## Overview
 Complete SMS workflow check covering all 4 main sections with their forms, pages, and data flow.
 
 ---
 
-## 1. 📊 SMS Dashboard (`/sms`)
+## 1. 📦 Asset Inventory Entry (`/sms` → `/sms/assets`)
 
 ### Purpose
-Central hub for SMS operations with quick stats and navigation to all modules.
+SMS opens directly to Asset Inventory so staff can search, review, and move assets without passing through a dashboard first.
 
 ### Features ✅
 - **Real-time Stats**: Total assets, Available, In Use, Borrowed counts
-- **Navigation Cards** (4 main sections):
-  1. **Assets** (Manage inventory)
-  2. **Transfers** (Send & receive)
-  3. **Pending** (Review requests)
-  4. **History** (Complete audit trail)
+- **Compact Actions**:
+  1. **Move** (send or return an asset)
+  2. **Review** (approve pending requests)
+  3. **History** (complete audit trail)
+  4. **Add Asset** (permission-based)
 - **Stats Cards**: Visual breakdown of asset status with percentages
 - **Error Handling**: Retry button on failure
 - **Loading State**: Skeleton loaders while fetching

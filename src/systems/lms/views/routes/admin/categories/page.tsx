@@ -16,6 +16,77 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { LmsContentManagerTabs } from "../LmsContentManagerTabs";
 
+const CATEGORY_COLOR_OPTIONS = [
+  { value: "emerald", label: "Emerald", class: "bg-emerald-500" },
+  { value: "blue", label: "Blue", class: "bg-blue-500" },
+  { value: "purple", label: "Purple", class: "bg-purple-500" },
+  { value: "orange", label: "Orange", class: "bg-orange-500" },
+  { value: "amber", label: "Amber", class: "bg-amber-500" },
+  { value: "rose", label: "Rose", class: "bg-rose-500" },
+] as const;
+
+function sortCategoriesByOrder(categories: LmsCategory[]) {
+  return [...categories].sort((a, b) => {
+    const orderDifference = (a.order_index || 0) - (b.order_index || 0);
+    if (orderDifference !== 0) return orderDifference;
+    return a.id - b.id;
+  });
+}
+
+function normalizeCategoryOrderIndexes(categories: LmsCategory[]) {
+  return sortCategoriesByOrder(categories).map((category, index) => ({
+    ...category,
+    order_index: index + 1,
+  }));
+}
+
+function getCategoryOrderChanges(
+  originalCategories: LmsCategory[],
+  normalizedCategories: LmsCategory[]
+) {
+  const originalById = new Map(
+    originalCategories.map((category) => [category.id, category])
+  );
+
+  return normalizedCategories.filter((category) => {
+    const originalCategory = originalById.get(category.id);
+    return originalCategory && originalCategory.order_index !== category.order_index;
+  });
+}
+
+async function repairCategoryOrderIndexes(categories: LmsCategory[]) {
+  await Promise.all(
+    categories.map((category) =>
+      fetch(`/api/lms/categories?id=${category.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: category.name,
+          description: category.description ?? "",
+          icon: category.icon ?? "BookOpen",
+          color: category.color ?? "emerald",
+          order_index: category.order_index,
+          is_active: category.is_active ?? true,
+        }),
+      }).then(async (response) => {
+        const payload = (await response.json().catch(() => null)) as {
+          success?: boolean;
+        } | null;
+
+        if (!response.ok || !payload?.success) {
+          throw new Error("Failed to repair category order");
+        }
+      })
+    )
+  );
+}
+
+function getCategoryColorValueForOrder(orderIndex: number) {
+  const safeOrderIndex = Math.max(1, orderIndex || 1);
+  const colorIndex = (safeOrderIndex - 1) % CATEGORY_COLOR_OPTIONS.length;
+  return CATEGORY_COLOR_OPTIONS[colorIndex]?.value ?? "emerald";
+}
+
 export default function CategoriesAdminPage() {
   const router = useRouter();
   const user = useAuthUser();
@@ -34,24 +105,43 @@ export default function CategoriesAdminPage() {
   const [formColor, setFormColor] = useState("emerald");
   const [formOrder, setFormOrder] = useState(0);
 
-  const colorOptions = [
-    { value: "emerald", label: "Emerald", class: "bg-emerald-500" },
-    { value: "blue", label: "Blue", class: "bg-blue-500" },
-    { value: "purple", label: "Purple", class: "bg-purple-500" },
-    { value: "orange", label: "Orange", class: "bg-orange-500" },
-    { value: "amber", label: "Amber", class: "bg-amber-500" },
-    { value: "rose", label: "Rose", class: "bg-rose-500" },
-  ];
-
   const getCategoryColorClass = (color?: string | null) =>
-    colorOptions.find((option) => option.value === color)?.class ?? "bg-emerald-500";
+    CATEGORY_COLOR_OPTIONS.find((option) => option.value === color)?.class ?? "bg-emerald-500";
+
+  const getNextCategoryOrderIndex = useCallback(
+    () =>
+      categories.reduce(
+        (maxOrderIndex, category) =>
+          Math.max(maxOrderIndex, category.order_index || 0),
+        0
+      ) + 1,
+    [categories]
+  );
+
+  const getNextCategoryColor = useCallback(
+    () => getCategoryColorValueForOrder(getNextCategoryOrderIndex()),
+    [getNextCategoryOrderIndex]
+  );
 
   const fetchCategories = useCallback(async () => {
     try {
       const res = await fetch("/api/lms/categories");
       const data = await res.json();
       if (data.success) {
-        setCategories(data.data);
+        const loadedCategories = Array.isArray(data.data) ? data.data : [];
+        const normalizedCategories = normalizeCategoryOrderIndexes(loadedCategories);
+        const categoryOrderChanges = getCategoryOrderChanges(
+          loadedCategories,
+          normalizedCategories
+        );
+
+        setCategories(normalizedCategories);
+
+        if (categoryOrderChanges.length > 0) {
+          void repairCategoryOrderIndexes(categoryOrderChanges).catch(() => {
+            setError("Failed to repair category order");
+          });
+        }
       }
     } catch {
       setError("Failed to load categories");
@@ -173,17 +263,27 @@ export default function CategoriesAdminPage() {
     setEditingId(category.id);
     setFormName(category.name);
     setFormDescription(category.description || "");
-    setFormColor(category.color || "");
+    setFormColor(category.color || getCategoryColorValueForOrder(category.order_index));
     setFormOrder(category.order_index);
     setShowAddForm(true);
+  };
+
+  const openAddForm = () => {
+    setEditingId(null);
+    setFormName("");
+    setFormDescription("");
+    setFormOrder(getNextCategoryOrderIndex());
+    setFormColor(getNextCategoryColor());
+    setShowAddForm(true);
+    setError("");
   };
 
   const resetForm = () => {
     setEditingId(null);
     setFormName("");
     setFormDescription("");
-    setFormColor("emerald");
-    setFormOrder(categories.length);
+    setFormOrder(getNextCategoryOrderIndex());
+    setFormColor(getNextCategoryColor());
     setShowAddForm(false);
     setError("");
   };
@@ -276,32 +376,28 @@ export default function CategoriesAdminPage() {
               </div>
               
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Color</label>
-                  <select
-                    title="Category color"
-                    value={formColor}
-                    onChange={(e) => setFormColor(e.target.value)}
-                    className="min-h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-base focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 sm:text-sm"
-                  >
-                    {colorOptions.map((color) => (
-                      <option key={color.value} value={color.value}>
-                        {color.label}
-                      </option>
-                    ))}
-                  </select>
+                <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+                  <p className="mb-1 block text-sm font-medium text-slate-700">Category Color</p>
+                  <div className="flex items-center gap-2 text-sm font-semibold text-slate-800">
+                    <span
+                      className={`h-4 w-4 shrink-0 rounded-full ${getCategoryColorClass(formColor)}`}
+                      aria-hidden="true"
+                    />
+                    <span>Automatic</span>
+                  </div>
+                  <p className="mt-1 text-xs text-slate-500">
+                    {editingId
+                      ? "Existing category color is preserved."
+                      : "New category colors rotate automatically."}
+                  </p>
                 </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Order</label>
-                  <input
-                    type="number"
-                    title="Category order"
-                    value={formOrder}
-                    onChange={(e) => setFormOrder(parseInt(e.target.value) || 0)}
-                    min={0}
-                    className="min-h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-base focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 sm:text-sm"
-                  />
+
+                <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+                  <p className="mb-1 block text-sm font-medium text-slate-700">Category Order</p>
+                  <p className="text-sm font-semibold text-slate-800">Automatic</p>
+                  <p className="mt-1 text-xs text-slate-500">
+                    New categories are placed at the end of the category list.
+                  </p>
                 </div>
               </div>
               
@@ -331,7 +427,7 @@ export default function CategoriesAdminPage() {
         {!showAddForm && (
           <button
             type="button"
-            onClick={() => setShowAddForm(true)}
+            onClick={openAddForm}
             className="mb-8 flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-600 px-6 py-3 font-medium text-white shadow-lg shadow-emerald-500/30 transition-all hover:shadow-xl active:scale-95 sm:w-auto"
           >
             <Plus className="w-5 h-5" />
@@ -362,7 +458,7 @@ export default function CategoriesAdminPage() {
                     <p className="break-words text-sm text-slate-500">{category.description || "No description"}</p>
                     <div className="mt-2 flex flex-wrap items-center gap-2">
                       <span className="rounded-full bg-slate-100 px-2 py-1 text-sm text-slate-600">
-                        Order: {category.order_index}
+                        Category Order: {category.order_index}
                       </span>
                       <span className="rounded-full bg-slate-100 px-2 py-1 text-sm capitalize text-slate-600">
                         {category.color}

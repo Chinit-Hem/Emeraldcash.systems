@@ -1,6 +1,8 @@
 "use client";
 
 import type { LessonWithStatus } from "@/systems/lms/types/lms-types";
+import { useLanguage } from "@/shared/hooks/LanguageContext";
+import { translatePhrase } from "@/shared/utils/i18n";
 import {
   BookOpen,
   ChevronDown,
@@ -32,15 +34,18 @@ export function LessonCategoryList({
   onEdit,
   onToggleCategory,
 }: LessonCategoryListProps) {
+  const { language } = useLanguage();
+  const tr = (text: string) => translatePhrase(text, language);
+
   if (groups.length === 0) {
     return (
       <div className="rounded-2xl bg-white px-4 py-12 text-center shadow-[8px_8px_24px_#e2e8f0,-8px_-8px_24px_#ffffff] sm:rounded-3xl">
         <PlayCircle className="mx-auto mb-4 h-12 w-12 text-slate-300" />
         <h3 className="mb-2 break-words text-lg font-semibold text-slate-800">
-          No Lessons Yet
+          {tr("No Lessons Yet")}
         </h3>
         <p className="break-words text-slate-500">
-          Create your first lesson to get started
+          {tr("Create your first lesson to get started")}
         </p>
       </div>
     );
@@ -72,10 +77,10 @@ export function LessonCategoryList({
                 </div>
                 <div className="min-w-0 text-left">
                   <h3 className="break-words text-lg font-bold text-slate-800">
-                    {category.name}
+                    {tr(category.name)}
                   </h3>
                   <p className="break-words text-sm text-slate-500">
-                    {category.lessons.length} lessons
+                    {tr(`${category.lessons.length} lessons`)}
                   </p>
                 </div>
               </div>
@@ -90,7 +95,7 @@ export function LessonCategoryList({
               <div className="border-t border-slate-100">
                 {category.lessons.length === 0 ? (
                   <div className="break-words p-6 text-center text-slate-500">
-                    No lessons in this category yet
+                    {tr("No lessons in this category yet")}
                   </div>
                 ) : (
                   category.lessons.map((lesson, index) => (
@@ -100,6 +105,7 @@ export function LessonCategoryList({
                       lesson={lesson}
                       onDelete={onDelete}
                       onEdit={onEdit}
+                      tr={tr}
                     />
                   ))
                 )}
@@ -117,9 +123,10 @@ interface LessonRowProps {
   lesson: LessonWithStatus;
   onDelete: (id: number) => void;
   onEdit: (lesson: LessonWithStatus) => void;
+  tr: (text: string) => string;
 }
 
-function LessonRow({ index, lesson, onDelete, onEdit }: LessonRowProps) {
+function LessonRow({ index, lesson, onDelete, onEdit, tr }: LessonRowProps) {
   return (
     <div className="flex flex-col gap-3 border-b border-slate-100 p-4 transition-colors last:border-b-0 hover:bg-slate-50/50 sm:flex-row sm:items-center sm:justify-between">
       <div className="flex min-w-0 flex-1 items-start gap-3 sm:items-center">
@@ -128,15 +135,15 @@ function LessonRow({ index, lesson, onDelete, onEdit }: LessonRowProps) {
         </div>
         <div className="min-w-0">
           <h4 className="break-words font-medium text-slate-800">
-            {lesson.title}
+            {tr(lesson.title)}
           </h4>
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-slate-500">
             <Video className="h-4 w-4 shrink-0" />
-            <span>Video</span>
+            <span>{tr("Video")}</span>
             <span aria-hidden="true">&bull;</span>
-            <span>{lesson.duration_minutes || 0} min</span>
+            <span>{tr(`${lesson.duration_minutes || 0} min`)}</span>
             <span aria-hidden="true">&bull;</span>
-            <span>{getAudienceLabel(lesson.allowed_roles)}</span>
+            <span>{tr(getAudienceLabel(lesson.allowed_roles))}</span>
           </div>
         </div>
       </div>
@@ -145,18 +152,18 @@ function LessonRow({ index, lesson, onDelete, onEdit }: LessonRowProps) {
         <button
           type="button"
           onClick={() => onEdit(lesson)}
-          aria-label={`Edit ${lesson.title}`}
+          aria-label={tr(`Edit ${lesson.title}`)}
           className="flex min-h-11 min-w-11 items-center justify-center rounded-xl bg-blue-50 text-blue-600 transition-all hover:bg-blue-100 active:scale-95"
-          title="Edit"
+          title={tr("Edit")}
         >
           <Edit2 className="h-4 w-4" />
         </button>
         <button
           type="button"
           onClick={() => onDelete(lesson.id)}
-          aria-label={`Delete ${lesson.title}`}
+          aria-label={tr(`Delete ${lesson.title}`)}
           className="flex min-h-11 min-w-11 items-center justify-center rounded-xl bg-red-50 text-red-600 transition-all hover:bg-red-100 active:scale-95"
-          title="Delete"
+          title={tr("Delete")}
         >
           <Trash2 className="h-4 w-4" />
         </button>

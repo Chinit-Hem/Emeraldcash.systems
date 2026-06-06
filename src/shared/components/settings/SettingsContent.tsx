@@ -82,7 +82,7 @@ const UserAvatar = memo(({
   }, [user.profile_picture]);
 
   return (
-    <div className="relative shrink-0">
+    <div className="relative shrink-0" data-no-translate>
       {showImage ? (
         <Image
           src={user.profile_picture || ""}
@@ -198,7 +198,7 @@ export default function SettingsContent() {
     const links: { href: string; icon: LucideIcon; label: string; color: string }[] = [
       { href: "/", icon: Calculator, label: "VMS - Vehicle Valuation", color: "from-emerald-500 to-teal-600" },
       { href: "/lms", icon: GraduationCap, label: "LMS - Learning Center", color: "from-violet-500 to-purple-600" },
-      { href: "/sms", icon: Boxes, label: "SMS - Asset Inventory", color: "from-blue-500 to-indigo-600" },
+      { href: "/sms/assets", icon: Boxes, label: "SMS - Asset Inventory", color: "from-blue-500 to-indigo-600" },
     ];
     if (isAdmin) {
       links.push({ href: "/lms/admin/staff", icon: Users, label: language === "km" ? "តាមដានបុគ្គលិក" : "Staff Tracking", color: "from-amber-500 to-orange-600" });
@@ -555,10 +555,10 @@ export default function SettingsContent() {
               <div className="flex min-w-0 items-start gap-4">
                 <UserAvatar user={user} size="md" />
                 <div className="min-w-0 flex-1">
-                  <h2 className="truncate text-xl font-bold text-slate-900 dark:text-white sm:text-2xl">
+                  <h2 className="truncate text-xl font-bold text-slate-900 dark:text-white sm:text-2xl" data-no-translate>
                     {user.full_name || user.username}
                   </h2>
-                  <p className="mt-1 truncate text-sm text-slate-500 dark:text-slate-400">
+                  <p className="mt-1 truncate text-sm text-slate-500 dark:text-slate-400" data-no-translate>
                     @{user.username}
                   </p>
                   <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -566,7 +566,7 @@ export default function SettingsContent() {
                       {formatRoleLabel(user.role)}
                     </span>
                     {(user.email || user.phone) && (
-                      <span className="truncate text-xs text-slate-500 dark:text-slate-400">
+                      <span className="truncate text-xs text-slate-500 dark:text-slate-400" data-no-translate>
                         {user.email || user.phone}
                       </span>
                     )}
@@ -614,7 +614,7 @@ export default function SettingsContent() {
                   </div>
                   <div className="min-w-0">
                     <h3 className="text-base font-bold text-slate-900 dark:text-white sm:text-lg">{language === "km" ? "ព័ត៌មានគណនី" : "Account Details"}</h3>
-                    <p className="truncate text-sm text-slate-500 dark:text-slate-400">{user.email || `@${user.username}`}</p>
+                    <p className="truncate text-sm text-slate-500 dark:text-slate-400" data-no-translate>{user.email || `@${user.username}`}</p>
                   </div>
                 </div>
               </div>
@@ -1021,7 +1021,7 @@ export default function SettingsContent() {
                         
                         <div className="flex-1 min-w-0">
                           <div className="flex min-w-0 items-center gap-2">
-                            <h4 className="min-w-0 truncate font-semibold text-slate-800 dark:text-white">
+                            <h4 className="min-w-0 truncate font-semibold text-slate-800 dark:text-white" data-no-translate>
                               {managedUser.full_name || managedUser.username}
                             </h4>
                             <span className={`shrink-0 px-2 py-0.5 rounded-full text-xs font-medium ${
@@ -1034,7 +1034,7 @@ export default function SettingsContent() {
                               {formatRoleLabel(managedUser.role)}
                             </span>
                           </div>
-                          <p className="text-sm text-slate-500 dark:text-slate-400 truncate">
+                          <p className="text-sm text-slate-500 dark:text-slate-400 truncate" data-no-translate>
                             {managedUser.email || `@${managedUser.username}`}
                           </p>
                         </div>

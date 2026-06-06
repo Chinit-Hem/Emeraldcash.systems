@@ -49,9 +49,9 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<string, Permission[]> = {
   ],
   Staff: [
     "vehicles:view",           // Can view vehicles (read-only)
-    "sms:view",                // Can view stock/assets
-    "sms:transfer",            // Can participate in stock transfers
-    "sms:create",              // Can upload images / create stock as part of transfer flow
+    "sms:view",                // Can view SMS assets
+    "sms:transfer",            // Can participate in asset transfers
+    "sms:create",              // Can upload images / create assets as part of transfer flow
     "users:view",              // Can view users
     "lms:view",                // Can access LMS
     "reports:view"             // Can view reports
@@ -74,11 +74,11 @@ export const PERMISSION_LABELS: Record<Permission, string> = {
   "vehicles:create": "Create Vehicles",
   "vehicles:edit": "Edit Vehicles",
   "vehicles:delete": "Delete Vehicles",
-  "sms:view": "View Stock",
-  "sms:create": "Create Stock",
-  "sms:edit": "Edit Stock",
-  "sms:delete": "Delete Stock",
-  "sms:transfer": "Transfer Stock",
+  "sms:view": "View Assets",
+  "sms:create": "Create Assets",
+  "sms:edit": "Edit Assets",
+  "sms:delete": "Delete Assets",
+  "sms:transfer": "Transfer Assets",
   "users:view": "View Users",
   "users:create": "Create Users",
   "users:edit": "Edit Users",

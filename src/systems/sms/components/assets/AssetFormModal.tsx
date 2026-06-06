@@ -4,7 +4,7 @@ import { compressImage } from '@/shared/utils/compressImage';
 import { generateShortUUID } from '@/shared/utils/uuid';
 import { AlertCircle, Loader2, Package, RefreshCw, Save, Upload, X } from 'lucide-react';
 import Image from 'next/image';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import {
   smsDropzoneClass,
   smsErrorTextClass,
@@ -43,7 +43,7 @@ interface AssetFormModalProps {
   onClose: () => void;
   onSave: (data: Omit<SmsAsset, 'id'>) => Promise<{ success: boolean; error?: string; errors?: Record<string, string> }>;
   initialData?: Partial<SmsAsset>;
-  title: string;
+  title: ReactNode;
   isEdit?: boolean;
 }
 
@@ -379,7 +379,7 @@ export default function AssetFormModal({
                     {title}
                   </h2>
                   <p className="text-sm text-gray-500 dark:text-gray-400">
-                    {isEdit ? 'Update SMS asset details' : 'Create an SMS stock asset'}
+                    {isEdit ? 'Update SMS asset details' : 'Create an SMS asset record'}
                   </p>
                 </div>
               </div>
@@ -471,7 +471,7 @@ export default function AssetFormModal({
                   </div>
 
                   <div>
-                    <label className={smsLabelClass}>Type *</label>
+                    <label className={smsLabelClass}>Asset Type *</label>
                     <input
                       list="asset-types"
                       type="text"
@@ -479,7 +479,7 @@ export default function AssetFormModal({
                       value={formData.type}
                       onChange={(e) => updateFormField('type', e.target.value)}
                       className={`${smsInputClass} ${errors.type ? smsInvalidFieldClass : ""}`}
-                      placeholder="Select or type a type..."
+                      placeholder="Select or type an asset type..."
                       disabled={loading}
                       required
                       maxLength={64}
@@ -531,20 +531,20 @@ export default function AssetFormModal({
 
               <section className="rounded-xl border border-gray-200 p-4 dark:border-gray-800">
                 <div className="mb-4">
-                  <h3 className="text-sm font-bold uppercase tracking-wide text-gray-700 dark:text-gray-200">Classification & Location</h3>
-                  <p className={smsHelperClass}>Group assets by category and stock location.</p>
+                  <h3 className="text-sm font-bold uppercase tracking-wide text-gray-700 dark:text-gray-200">Group & Location</h3>
+                  <p className={smsHelperClass}>Group assets by team, document type, or inventory location.</p>
                 </div>
 
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                   <div>
-                    <label className={smsLabelClass}>Category</label>
+                    <label className={smsLabelClass}>Group</label>
                     <input
                       type="text"
-                      title="Asset category"
+                      title="Asset group"
                       value={formData.category || ''}
                       onChange={(e) => updateFormField('category', e.target.value || undefined)}
                       className={`${smsInputClass} ${errors.category ? smsInvalidFieldClass : ""}`}
-                      placeholder="e.g. Laptop, Desk Chair"
+                      placeholder="Not set"
                       disabled={loading}
                       maxLength={64}
                       aria-invalid={Boolean(errors.category)}
@@ -583,7 +583,7 @@ export default function AssetFormModal({
               <section className="rounded-xl border border-gray-200 p-4 dark:border-gray-800">
                 <div className="mb-4">
                   <h3 className="text-sm font-bold uppercase tracking-wide text-gray-700 dark:text-gray-200">Status & Assignment</h3>
-                  <p className={smsHelperClass}>Keep new stock Available unless it is already assigned or sent out.</p>
+                  <p className={smsHelperClass}>Keep new assets Available unless they are already assigned or sent out.</p>
                 </div>
 
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
@@ -598,12 +598,12 @@ export default function AssetFormModal({
                       value={formData.assignedTo || ''}
                       onChange={(e) => updateFormField('assignedTo', e.target.value || undefined)}
                       className={`${smsInputClass} ${errors.assignedTo ? smsInvalidFieldClass : ""}`}
-                      placeholder={formData.status === 'Available' ? 'Optional for available stock' : 'Select or enter assignee'}
+                      placeholder={formData.status === 'Available' ? 'Optional for available assets' : 'Select or enter assignee'}
                       disabled={loading || formData.status === 'Available'}
                       maxLength={128}
                       aria-invalid={Boolean(errors.assignedTo)}
                     />
-                    <datalist id="asset-assignee-options">
+                    <datalist id="asset-assignee-options" data-no-translate>
                       {users.map((settingsUser) => (
                         <option
                           key={settingsUser.username}

@@ -52,7 +52,7 @@ export default function ImageModal({ src, alt, isOpen, onClose }: ImageModalProp
       onClick={onClose}
       role="dialog"
       aria-modal="true"
-      aria-label={`View ${alt}`}
+      aria-label="View image"
     >
       {/* Close button */}
       <button
@@ -82,13 +82,14 @@ export default function ImageModal({ src, alt, isOpen, onClose }: ImageModalProp
             className="max-h-[90vh] w-auto max-w-[90vw] rounded-lg object-contain"
             onError={() => setImageError(true)}
             priority
+            data-no-translate
           />
         )}
       </div>
 
       {/* Image info */}
       <div className="absolute bottom-4 left-1/2 -translate-x-1/2 rounded-full bg-black/60 px-4 py-2 text-white">
-        <span className="text-sm font-medium">{alt}</span>
+        <span className="text-sm font-medium" data-no-translate>{alt}</span>
       </div>
     </div>
   );

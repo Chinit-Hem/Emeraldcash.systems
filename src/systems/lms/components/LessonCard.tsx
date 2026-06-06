@@ -118,7 +118,7 @@ export function LessonCard({
         {durationMinutes && !isLocked && (
           <div className="absolute bottom-2 right-2 px-2 py-1 bg-black/70 backdrop-blur-sm rounded-md text-xs text-white font-medium flex items-center gap-1">
             <Clock className="w-3 h-3" />
-            {durationMinutes} min
+            {`${durationMinutes} min`}
           </div>
         )}
         

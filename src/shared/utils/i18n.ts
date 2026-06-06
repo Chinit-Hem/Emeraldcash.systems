@@ -834,15 +834,15 @@ export const translations: Record<Language, Translations> = {
     distributionAcrossTypes: "ការចែកចាយតាមប្រភេទយានយន្ត",
     conditionDistribution: "ការចែកចាយតាមស្ថានភាព",
     newVsUsed: "យានយន្តថ្មី ទៅនឹងបានប្រើ",
-    topBrands: "ម៉ាកល្បី",
+    topBrands: "ម៉ាកពេញនិយម",
     popularManufacturers: "ក្រុមហ៊ុនផលិតពេញនិយមបំផុត",
-    monthlyTrends: "របាក់រំពីរាប់ខែ",
-    vehiclesOverTime: "យានយន្តបានបន្ថែមតាមពេលវេលា",
+    monthlyTrends: "និន្នាការប្រចាំខែ",
+    vehiclesOverTime: "យានយន្តដែលបានបន្ថែមតាមពេលវេលា",
     withImages: "មានរូបភាព",
     withoutImages: "គ្មានរូបភាព",
     averagePrice: "តម្លៃមធ្យម",
-    uniqueBrands: "ម៉ាកពិសេស",
-    realTimeInventory: "វិភាគស្តុកយានយន្តពេលវេលាពិត",
+    uniqueBrands: "ចំនួនម៉ាក",
+    realTimeInventory: "វិភាគទិន្នន័យយានយន្តជាពេលវេលាពិត",
     exportLabel: "នាំចេញ",
     loadingCategoryData: "កំពុងផ្ទុកទិន្នន័យប្រភេទ...",
     loadingConditionData: "កំពុងផ្ទុកទិន្នន័យស្ថានភាព...",
@@ -950,8 +950,8 @@ const extraEnglishToKhmer: Record<string, string> = {
   "With Images": "មានរូបភាព",
   "Without Images": "គ្មានរូបភាព",
   "Avg Price": "តម្លៃមធ្យម",
-  "Unique Brands (sample)": "ម៉ាកផ្សេងៗ (គំរូ)",
-  "Real-time inventory analytics": "វិភាគស្តុកពេលវេលាពិត",
+  "Unique Brands (sample)": "ចំនួនម៉ាក (គំរូ)",
+  "Real-time inventory analytics": "វិភាគទិន្នន័យយានយន្តជាពេលវេលាពិត",
   "Export": "នាំចេញ",
   "Show": "បង្ហាញ",
   "Show:": "បង្ហាញ៖",
@@ -996,7 +996,7 @@ const extraEnglishToKhmer: Record<string, string> = {
   "TukTuks": "កង់បី",
   "Tuk Tuk": "កង់បី",
   "Certified Pre-Owned": "បានប្រើប្រាស់មានការបញ្ជាក់",
-  "Other": "ផ្សេងទៀត",
+  "Other": "ផ្សេងៗ",
   "VAT": "VAT",
   "Non-VAT": "មិនមែន VAT",
   "Exempt": "លើកលែង",
@@ -1073,6 +1073,7 @@ const extraEnglishToKhmer: Record<string, string> = {
   "Click to Enlarge": "ចុចដើម្បីពង្រីក",
   "No image available": "គ្មានរូបភាព",
   "No image selected": "មិនទាន់ជ្រើសរើសរូបភាព",
+  "View image": "មើលរូបភាព",
   "Vehicle image": "រូបភាពយានយន្ត",
   "Image preview": "មើលរូបភាពជាមុន",
   "Image viewer": "កម្មវិធីមើលរូបភាព",
@@ -1218,23 +1219,35 @@ const extraEnglishToKhmer: Record<string, string> = {
   // SMS assets and transfers
   "Manage SMS equipment and resources": "គ្រប់គ្រងឧបករណ៍ SMS និងធនធាន",
   "Track SMS stock, assignments, locations, and transfer status.": "តាមដានស្តុក SMS ការចាត់តាំង ទីតាំង និងស្ថានភាពផ្ទេរ។",
+  "Track SMS assets, assignments, locations, and transfer status.": "តាមដានទ្រព្យសម្បត្តិ SMS ការចាត់តាំង ទីតាំង និងស្ថានភាពផ្ទេរ។",
   "Transfers": "ការផ្ទេរ",
+  "Move": "ផ្ទេរ",
+  "Move Asset": "ផ្ទេរទ្រព្យសម្បត្តិ",
   "Send & receive": "ផ្ញើ និងទទួល",
   "Pending": "កំពុងរង់ចាំ",
+  "Pending Transfers": "ការផ្ទេរកំពុងរង់ចាំ",
   "Review Requests": "ពិនិត្យសំណើ",
   "Transfer Requests": "សំណើផ្ទេរ",
   "Review pending SMS asset handovers and return requests.": "ពិនិត្យសំណើប្រគល់ទ្រព្យសម្បត្តិ SMS និងសំណើផ្ញើត្រឡប់ដែលកំពុងរង់ចាំ។",
+  "Approve pending SMS asset handovers and return requests.": "អនុម័តសំណើប្រគល់ទ្រព្យសម្បត្តិ SMS និងសំណើត្រឡប់ដែលកំពុងរង់ចាំ។",
   "No Pending Transfer Requests": "គ្មានសំណើផ្ទេរកំពុងរង់ចាំ",
+  "No Pending Review Requests": "គ្មានសំណើរង់ចាំពិនិត្យ",
   "All SMS asset handovers and return requests are processed.": "ការប្រគល់ទ្រព្យសម្បត្តិ SMS និងសំណើផ្ញើត្រឡប់ទាំងអស់ត្រូវបានដំណើរការ។",
+  "Pending Review": "រង់ចាំពិនិត្យ",
+  "Create New Transfer": "បង្កើតការផ្ទេរថ្មី",
+  "Check Again": "ពិនិត្យម្តងទៀត",
   "SMS Movement": "ចលនាទ្រព្យសម្បត្តិ SMS",
   "Asset Movement": "ចលនាទ្រព្យសម្បត្តិ",
+  "Movement type": "ប្រភេទចលនា",
+  "People and location": "អ្នកពាក់ព័ន្ធ និងទីតាំង",
+  "Proof and notes": "ភស្តុតាង និងកំណត់សម្គាល់",
   "Send stock to someone or send it back through the same approval flow.": "ផ្ញើស្តុកទៅអ្នកណាម្នាក់ ឬផ្ញើត្រឡប់វិញតាមលំហូរអនុម័តដូចគ្នា។",
   "Send an asset to someone or send an assigned asset back to a selected user.": "ផ្ញើទ្រព្យសម្បត្តិទៅអ្នកណាម្នាក់ ឬផ្ញើទ្រព្យសម្បត្តិដែលបានចាត់តាំងត្រឡប់ទៅអ្នកប្រើដែលបានជ្រើសរើស។",
-  "Send SMS assets, record handovers, and request returns through approval.": "ផ្ញើទ្រព្យសម្បត្តិ SMS កត់ត្រាការប្រគល់ និងស្នើសុំផ្ញើត្រឡប់តាមការអនុម័ត។",
-  "Send Asset": "ផ្ញើទ្រព្យសម្បត្តិ",
-  "Return Asset": "ផ្ញើទ្រព្យសម្បត្តិត្រឡប់",
+  "Send SMS assets, record handovers, and request returns through approval.": "ផ្ញើ ឬស្នើត្រឡប់ទ្រព្យសម្បត្តិ SMS តាមលំហូរអនុម័ត។",
+  "Send Asset": "ផ្ញើចេញ",
+  "Return Asset": "ស្នើត្រឡប់",
   "Create Transfer Request": "បង្កើតសំណើផ្ទេរ",
-  "Create Return Request": "បង្កើតសំណើផ្ញើត្រឡប់",
+  "Create Return Request": "បង្កើតសំណើត្រឡប់",
   "Return request sent.": "បានផ្ញើសំណើត្រឡប់។",
   "Send To": "ផ្ញើទៅ",
   "Send Back": "ផ្ញើត្រឡប់",
@@ -1263,6 +1276,10 @@ const extraEnglishToKhmer: Record<string, string> = {
   "No assigned assets are available to send back.": "គ្មានទ្រព្យសម្បត្តិដែលបានចាត់តាំងសម្រាប់ផ្ញើត្រឡប់ទេ។",
   "Select an assigned asset to send back": "ជ្រើសរើសទ្រព្យសម្បត្តិដែលបានចាត់តាំងដើម្បីផ្ញើត្រឡប់",
   "Select asset to send back": "ជ្រើសរើសទ្រព្យសម្បត្តិដើម្បីផ្ញើត្រឡប់",
+  "Select or enter sender username": "ជ្រើសរើស ឬបញ្ចូលឈ្មោះអ្នកផ្ញើ",
+  "Select or enter returning username": "ជ្រើសរើស ឬបញ្ចូលឈ្មោះអ្នកត្រឡប់",
+  "Select or enter receiver": "ជ្រើសរើស ឬបញ្ចូលឈ្មោះអ្នកទទួល",
+  "Select or enter send back receiver": "ជ្រើសរើស ឬបញ្ចូលអ្នកទទួលការត្រឡប់",
   "No matching assets": "គ្មានទ្រព្យសម្បត្តិដែលត្រូវគ្នា",
   "Select person": "ជ្រើសរើសមនុស្ស",
   "Assigned to": "ចាត់តាំងឱ្យ",
@@ -1279,10 +1296,23 @@ const extraEnglishToKhmer: Record<string, string> = {
   "Enter returning username": "បញ្ចូលឈ្មោះអ្នកប្រើដែលត្រឡប់",
   "Please select who is returning this asset.": "សូមជ្រើសរើសអ្នកដែលត្រឡប់ទ្រព្យសម្បត្តិនេះ។",
   "Accept Return": "ទទួលយកការត្រឡប់",
+  "Accept Transfer": "ទទួលយកការផ្ទេរ",
+  "Reject Transfer": "បដិសេធការផ្ទេរ",
+  "Reject": "បដិសេធ",
   "Send Return Back": "ផ្ញើសំណើត្រឡប់វិញ",
   "Destination": "គោលដៅ",
   "The asset will stay assigned.": "ទ្រព្យសម្បត្តិនឹងនៅតែបានចាត់តាំង។",
   "Waiting for an admin to review this return request.": "កំពុងរង់ចាំអ្នកគ្រប់គ្រងពិនិត្យសំណើត្រឡប់នេះ។",
+  "Waiting for": "កំពុងរង់ចាំ",
+  "or an admin to review this transfer.": "ឬអ្នកគ្រប់គ្រងពិនិត្យការផ្ទេរនេះ។",
+  "Confirm returning": "បញ្ជាក់ការត្រឡប់",
+  "Confirm accepting transfer": "បញ្ជាក់ការទទួលយកការផ្ទេរ",
+  "Send this return request back to": "ផ្ញើសំណើត្រឡប់នេះត្រឡប់ទៅ",
+  "Reject transfer from": "បដិសេធការផ្ទេរពី",
+  "Message from sender": "សារពីអ្នកផ្ញើ",
+  "Requested": "បានស្នើ",
+  "Reason (optional)": "មូលហេតុ (មិនបាច់)",
+  "back to inventory?": "ត្រឡប់ទៅបញ្ជីទ្រព្យសម្បត្តិវិញឬ?",
   "Back to SMS": "ត្រឡប់ទៅ SMS",
   "Back to SMS Dashboard": "ត្រឡប់ទៅផ្ទាំងគ្រប់គ្រង SMS",
   "Transfer Inbox": "ប្រអប់ការផ្ទេរ",
@@ -1291,40 +1321,142 @@ const extraEnglishToKhmer: Record<string, string> = {
   "unread notification": "ការជូនដំណឹងមិនទាន់អាន",
   "unread notifications": "ការជូនដំណឹងមិនទាន់អាន",
   "Out": "បានចេញ",
+  "Sent Out": "បានផ្ញើចេញ",
   "Not Returned": "មិនទាន់ត្រឡប់",
+  "Overdue Return": "លើសកំណត់ត្រឡប់",
   "Today": "ថ្ងៃនេះ",
   "Asset": "ទ្រព្យសម្បត្តិ",
   "Asset *": "ទ្រព្យសម្បត្តិ *",
   "Assets": "ទ្រព្យសម្បត្តិ",
+  "Asset Name": "ឈ្មោះទ្រព្យសម្បត្តិ",
+  "Asset Name *": "ឈ្មោះទ្រព្យសម្បត្តិ *",
+  "Asset Code": "កូដទ្រព្យសម្បត្តិ",
+  "Asset name": "ឈ្មោះទ្រព្យសម្បត្តិ",
+  "Asset code": "កូដទ្រព្យសម្បត្តិ",
+  "Update SMS asset details": "កែប្រែព័ត៌មានទ្រព្យសម្បត្តិ SMS",
+  "Create an SMS asset record": "បង្កើតកំណត់ត្រាទ្រព្យសម្បត្តិ SMS",
+  "Required Asset Info": "ព័ត៌មានទ្រព្យសម្បត្តិចាំបាច់",
+  "Name, code, type, and quantity define the inventory record.": "ឈ្មោះ កូដ ប្រភេទ និងចំនួន ជាព័ត៌មានសំខាន់សម្រាប់កំណត់ត្រាទ្រព្យសម្បត្តិ។",
+  "Code": "កូដ",
   "Type": "ប្រភេទ",
   "Type *": "ប្រភេទ *",
+  "Asset type": "ប្រភេទទ្រព្យសម្បត្តិ",
+  "Asset Type": "ប្រភេទទ្រព្យសម្បត្តិ",
+  "Asset Type *": "ប្រភេទទ្រព្យសម្បត្តិ *",
+  "Select or type an asset type...": "ជ្រើសរើស ឬបញ្ចូលប្រភេទទ្រព្យសម្បត្តិ...",
+  "Type / Category": "ប្រភេទ / ក្រុម",
+  "Electronics": "អេឡិចត្រូនិក",
+  "Furniture": "គ្រឿងសង្ហារឹម",
+  "Tool": "ឧបករណ៍",
+  "Office Supply": "សម្ភារការិយាល័យ",
+  "Classification & Location": "ការចាត់ក្រុម និងទីតាំង",
+  "Group assets by category and inventory location.": "ដាក់ក្រុមទ្រព្យសម្បត្តិតាមប្រភេទ និងទីតាំងក្នុងបញ្ជី។",
+  "Group & Location": "ក្រុម និងទីតាំង",
+  "Group": "ក្រុម",
+  "Asset group": "ក្រុមទ្រព្យសម្បត្តិ",
+  "Group assets by team, document type, or inventory location.": "ដាក់ក្រុមទ្រព្យសម្បត្តិតាមក្រុមការងារ ប្រភេទឯកសារ ឬទីតាំងក្នុងបញ្ជី។",
   "Receiver": "អ្នកទទួល",
   "Receiver *": "អ្នកទទួល *",
   "Receiver is required": "ត្រូវការអ្នកទទួល",
   "Status": "ស្ថានភាព",
+  "Status & Assignment": "ស្ថានភាព និងការចាត់តាំង",
+  "Keep new assets Available unless they are already assigned or sent out.": "រក្សាទ្រព្យសម្បត្តិថ្មីជា “ទំនេរ” លុះត្រាតែបានចាត់តាំង ឬផ្ញើចេញរួចហើយ។",
   "Assigned": "បានចាត់តាំង",
   "Assigned To": "ចាត់តាំងឱ្យ",
+  "Optional for available assets": "មិនបាច់បញ្ចូលសម្រាប់ទ្រព្យសម្បត្តិទំនេរ",
+  "Select or enter assignee": "ជ្រើសរើស ឬបញ្ចូលអ្នកទទួលការចាត់តាំង",
   "Actions": "សកម្មភាព",
+  "Qty": "ចំនួន",
   "Item Code": "កូដទំនិញ",
+  "Use a short unique code for labels, audits, and search.": "ប្រើកូដខ្លីមិនស្ទួន សម្រាប់ស្លាក ការត្រួតពិនិត្យ និងការស្វែងរក។",
+  "Generate": "បង្កើតកូដ",
+  "Generate asset code": "បង្កើតកូដទ្រព្យសម្បត្តិ",
   "Image (Optional)": "រូបភាព (មិនបាច់)",
+  "Media": "រូបភាព និងឯកសារ",
+  "Use a clear photo of the actual asset and attach a document link if needed.": "ប្រើរូបថតច្បាស់នៃទ្រព្យសម្បត្តិពិត និងភ្ជាប់តំណឯកសារបើចាំបាច់។",
   "Upload Image": "ផ្ទុករូបភាព",
+  "Upload asset image": "ផ្ទុករូបភាពទ្រព្យសម្បត្តិ",
   "PNG, JPG up to 10MB": "PNG, JPG រហូតដល់ 10MB",
+  "Use a clear photo of the actual asset. PNG, JPG, or WebP up to 10MB.": "ប្រើរូបថតច្បាស់នៃទ្រព្យសម្បត្តិពិត។ PNG, JPG ឬ WebP រហូតដល់ 10MB។",
   "Reference ID": "លេខសម្គាល់យោង",
+  "Document URL": "URL ឯកសារ",
+  "Notes & References": "កំណត់សម្គាល់ និងឯកសារយោង",
+  "Optional details for purchasing, audit, or handover records.": "ព័ត៌មានបន្ថែមសម្រាប់ការទិញ ការត្រួតពិនិត្យ ឬកំណត់ត្រាប្រគល់ទ្រព្យសម្បត្តិ។",
   "View details": "មើលព័ត៌មានលម្អិត",
+  "View asset details": "មើលព័ត៌មានលម្អិតទ្រព្យសម្បត្តិ",
   "Asset preview": "មើលទ្រព្យសម្បត្តិជាមុន",
   "Last Movement": "ចលនាចុងក្រោយ",
+  "No movement": "គ្មានចលនា",
+  "No item code": "គ្មានកូដទំនិញ",
+  "Not set": "មិនទាន់កំណត់",
+  "Updated": "បានធ្វើបច្ចុប្បន្នភាព",
+  "Created By": "បង្កើតដោយ",
+  "Copy asset ID": "ចម្លងលេខសម្គាល់ទ្រព្យសម្បត្តិ",
+  "Image unavailable": "មិនអាចបង្ហាញរូបភាពបាន",
+  "No location": "គ្មានទីតាំង",
+  "Unassigned": "មិនទាន់ចាត់តាំង",
+  "Asset details": "ព័ត៌មានលម្អិតទ្រព្យសម្បត្តិ",
   "Return proof": "ភស្តុតាងត្រឡប់",
   "Copy JSON": "ចម្លង JSON",
+  "Latest Update": "បច្ចុប្បន្នភាពចុងក្រោយ",
+  "Newest Added": "បានបន្ថែមថ្មីបំផុត",
+  "All inventory": "ទ្រព្យសម្បត្តិទាំងអស់",
+  "Ready in inventory": "រួចរាល់ក្នុងបញ្ជីទ្រព្យសម្បត្តិ",
+  "Currently in use": "កំពុងប្រើប្រាស់",
+  "Needs follow-up": "ត្រូវតាមដានបន្ត",
+  "Waiting approval": "កំពុងរង់ចាំការអនុម័ត",
+  "Search assets": "ស្វែងរកទ្រព្យសម្បត្តិ",
+  "Search name, code, location, assigned person...": "ស្វែងរកតាមឈ្មោះ កូដ ទីតាំង ឬអ្នកដែលបានចាត់តាំង...",
   "Search assets by name, code, location, assigned person...": "ស្វែងរកទ្រព្យសម្បត្តិតាមឈ្មោះ កូដ ទីតាំង ឬអ្នកទទួល...",
   "Filter by asset status": "តម្រងតាមស្ថានភាពទ្រព្យសម្បត្តិ",
+  "Filter by type": "តម្រងតាមប្រភេទ",
+  "Filter by creator": "តម្រងតាមអ្នកបង្កើត",
+  "All Status": "ស្ថានភាពទាំងអស់",
+  "Sort assets": "តម្រៀបទ្រព្យសម្បត្តិ",
+  "Assets per page": "ចំនួនទ្រព្យសម្បត្តិក្នុងមួយទំព័រ",
+  "More filters": "តម្រងបន្ថែម",
+  "Active": "សកម្ម",
+  "Type...": "ប្រភេទ...",
+  "Category...": "ប្រភេទក្រុម...",
+  "Location...": "ទីតាំង...",
+  "Created by...": "បង្កើតដោយ...",
+  "Clear Filters": "សម្អាតតម្រង",
   "Assigned to...": "ចាត់តាំងឱ្យ...",
   "Clear Filters & Add Asset": "សម្អាតតម្រង និងបន្ថែមទ្រព្យសម្បត្តិ",
   "Add First Asset": "បន្ថែមទ្រព្យសម្បត្តិដំបូង",
+  "No SMS assets are available yet.": "មិនទាន់មានទ្រព្យសម្បត្តិ SMS ទេ។",
+  "Get started by adding your first asset.": "ចាប់ផ្តើមដោយបន្ថែមទ្រព្យសម្បត្តិដំបូងរបស់អ្នក។",
   "New Asset": "ទ្រព្យសម្បត្តិថ្មី",
   "Failed to load assets": "បរាជ័យក្នុងការផ្ទុកទ្រព្យសម្បត្តិ",
   "Failed to fetch assets": "បរាជ័យក្នុងការទាញយកទ្រព្យសម្បត្តិ",
+  "No assets found": "រកមិនឃើញទ្រព្យសម្បត្តិ",
+  "Try adjusting your search or filters": "សូមកែសម្រួលពាក្យស្វែងរក ឬតម្រង",
   "Failed to load returnable assets": "បរាជ័យក្នុងការផ្ទុកទ្រព្យសម្បត្តិដែលអាចត្រឡប់បាន",
+  "Failed to create transfer": "បរាជ័យក្នុងការបង្កើតសំណើផ្ទេរ",
+  "Failed to create new asset": "បរាជ័យក្នុងការបង្កើតទ្រព្យសម្បត្តិថ្មី",
+  "Asset name is required": "ត្រូវការឈ្មោះទ្រព្យសម្បត្តិ",
+  "Name must be at least 2 characters": "ឈ្មោះត្រូវមានយ៉ាងហោចណាស់ 2 តួអក្សរ",
+  "Name too long (max 255 characters)": "ឈ្មោះវែងពេក (អតិបរមា 255 តួអក្សរ)",
+  "Type is required": "ត្រូវការប្រភេទ",
+  "Type too long (max 64 characters)": "ប្រភេទវែងពេក (អតិបរមា 64 តួអក្សរ)",
+  "Quantity is required": "ត្រូវការចំនួន",
+  "Quantity must be at least 1": "ចំនួនត្រូវមានយ៉ាងហោចណាស់ 1",
+  "Quantity too high (max 999)": "ចំនួនខ្ពស់ពេក (អតិបរមា 999)",
+  "Assigned to is required when the asset is not available": "ត្រូវការអ្នកទទួលការចាត់តាំង នៅពេលទ្រព្យសម្បត្តិមិនមែនទំនេរ",
+  "Item code too long (max 64 characters)": "កូដទ្រព្យសម្បត្តិវែងពេក (អតិបរមា 64 តួអក្សរ)",
+  "Category too long (max 64 characters)": "ប្រភេទក្រុមវែងពេក (អតិបរមា 64 តួអក្សរ)",
+  "Location too long (max 128 characters)": "ទីតាំងវែងពេក (អតិបរមា 128 តួអក្សរ)",
+  "Assigned to too long (max 128 characters)": "អ្នកទទួលការចាត់តាំងវែងពេក (អតិបរមា 128 តួអក្សរ)",
+  "Description too long (max 1000 characters)": "សេចក្តីពិពណ៌នាវែងពេក (អតិបរមា 1000 តួអក្សរ)",
+  "Reference ID too long (max 128 characters)": "លេខសម្គាល់យោងវែងពេក (អតិបរមា 128 តួអក្សរ)",
+  "Document URL too long (max 512 characters)": "URL ឯកសារវែងពេក (អតិបរមា 512 តួអក្សរ)",
+  "File too large (max 10MB)": "ឯកសារធំពេក (អតិបរមា 10MB)",
+  "Upload failed": "ផ្ទុកឡើងបរាជ័យ",
+  "Please fix the errors below.": "សូមកែតម្រូវកំហុសខាងក្រោម។",
   "Save failed": "រក្សាទុកបរាជ័យ",
+  "Update failed": "កែប្រែបរាជ័យ",
+  "Update Asset": "ធ្វើឱ្យទាន់សម័យទ្រព្យសម្បត្តិ",
+  "Create Asset": "បង្កើតទ្រព្យសម្បត្តិ",
   "Delete this asset?": "លុបទ្រព្យសម្បត្តិនេះឬ?",
   "Delete failed": "លុបបរាជ័យ",
   "Returned from asset inventory": "បានត្រឡប់ពីបញ្ជីទ្រព្យសម្បត្តិ",
@@ -1384,6 +1516,11 @@ const extraEnglishToKhmer: Record<string, string> = {
   "Introduction to Vehicle Valuation": "ការណែនាំអំពីការវាយតម្លៃយានយន្ត",
   "VMS Platform Overview": "ទិដ្ឋភាពទូទៅនៃវេទិកា VMS",
   "Advanced Pricing Strategies": "យុទ្ធសាស្ត្រកំណត់តម្លៃកម្រិតខ្ពស់",
+  "Class Demo": "ការបង្ហាញសាកល្បង",
+  "Demo Class": "ថ្នាក់សាកល្បង",
+  "Vehicle Valuation 101": "មូលដ្ឋានគ្រឹះនៃការវាយតម្លៃរថយន្ត",
+  "Vehicle Valuation Basics": "មូលដ្ឋានគ្រឹះនៃការវាយតម្លៃរថយន្ត",
+  "Emerald Cloud System": "ប្រព័ន្ធអេមើរ៉ល ក្លោដ",
   "How to become an outstanding employee": "របៀបក្លាយជាបុគ្គលិកឆ្នើម",
   "Learn vehicle valuation techniques and pricing strategies": "រៀនបច្ចេកទេសវាយតម្លៃយានយន្ត និងយុទ្ធសាស្ត្រកំណត់តម្លៃ",
   "How to use the VMS platform effectively": "របៀបប្រើវេទិកា VMS ឱ្យមានប្រសិទ្ធភាព",
@@ -1393,8 +1530,10 @@ const extraEnglishToKhmer: Record<string, string> = {
   "Deep dive into pricing models and depreciation": "សិក្សាជ្រាលជ្រៅអំពីគំរូកំណត់តម្លៃ និងការរំលោះតម្លៃ",
   "Getting started with the Vehicle Management System": "ចាប់ផ្តើមប្រើប្រព័ន្ធគ្រប់គ្រងយានយន្ត",
   "Learning": "ការរៀន",
+  "Lessons": "មេរៀន",
   "Progress": "វឌ្ឍនភាព",
   "My Progress": "វឌ្ឍនភាពរបស់ខ្ញុំ",
+  "Awards": "ពានរង្វាន់",
   "Achievements": "សមិទ្ធផល",
   "My Process": "ដំណើរការរបស់ខ្ញុំ",
   "Your Progress": "វឌ្ឍនភាពរបស់អ្នក",
@@ -1406,6 +1545,7 @@ const extraEnglishToKhmer: Record<string, string> = {
   "lessons": "មេរៀន",
   "Start": "ចាប់ផ្តើម",
   "Review": "ពិនិត្យឡើងវិញ",
+  "Done": "រួចរាល់",
   "Unlocked": "បានដោះសោ",
   "Overall": "សរុប",
   "Completed": "បានបញ្ចប់",
@@ -1435,19 +1575,85 @@ const extraEnglishToKhmer: Record<string, string> = {
   "Manage Lessons": "គ្រប់គ្រងមេរៀន",
   "Manage Staff": "គ្រប់គ្រងបុគ្គលិក",
   "Staff Tracking": "តាមដានបុគ្គលិក",
+  "Track staff learning process and LMS completion": "តាមដានដំណើរការរៀន និងការបញ្ចប់ LMS របស់បុគ្គលិក",
+  "Settings accounts": "គណនីក្នុងការកំណត់",
+  "Synced to LMS": "បានសមកាលកម្មទៅ LMS",
+  "Not Synced": "មិនទាន់សមកាលកម្ម",
+  "Not Started": "មិនទាន់ចាប់ផ្តើម",
+  "Need follow-up": "ត្រូវតាមដាន",
+  "Need Follow-up": "ត្រូវតាមដាន",
+  "Started learning": "បានចាប់ផ្តើមរៀន",
+  "Finished all lessons": "បានបញ្ចប់មេរៀនទាំងអស់",
+  "Staff Learning Process": "ដំណើរការរៀនរបស់បុគ្គលិក",
+  "Monitor who has started, who is progressing, and who needs follow-up.": "តាមដានអ្នកដែលបានចាប់ផ្តើម អ្នកកំពុងរៀន និងអ្នកដែលត្រូវតាមដានបន្ត។",
+  "Started or ready to complete": "បានចាប់ផ្តើម ឬរួចរាល់ដើម្បីបញ្ចប់",
+  "Finished all assigned lessons": "បានបញ្ចប់មេរៀនដែលបានចាត់តាំងទាំងអស់",
+  "Latest learning activity": "សកម្មភាពរៀនចុងក្រោយ",
+  "No lesson activity": "មិនទាន់មានសកម្មភាពមេរៀន",
+  "No learning activity yet.": "មិនទាន់មានសកម្មភាពរៀនទេ។",
+  "Not synced to LMS": "មិនទាន់សមកាលកម្មទៅ LMS",
+  "Not started learning": "មិនទាន់ចាប់ផ្តើមរៀន",
+  "Low completion progress": "វឌ្ឍនភាពបញ្ចប់នៅទាប",
+  "Everyone is on track.": "បុគ្គលិកទាំងអស់កំពុងដំណើរការល្អ។",
+  "Search name, email, phone, or lesson...": "ស្វែងរកឈ្មោះ អ៊ីមែល ទូរស័ព្ទ ឬមេរៀន...",
+  "Search staff": "ស្វែងរកបុគ្គលិក",
+  "Filter by status": "តម្រងតាមស្ថានភាព",
+  "Filter by role": "តម្រងតាមតួនាទី",
+  "All Roles": "តួនាទីទាំងអស់",
+  "Sort staff": "តម្រៀបបុគ្គលិក",
+  "Progress High": "វឌ្ឍនភាពខ្ពស់",
+  "Progress Low": "វឌ្ឍនភាពទាប",
+  "Sync Staff to LMS": "សមកាលកម្មបុគ្គលិកទៅ LMS",
+  "Staff Progress Table": "តារាងវឌ្ឍនភាពបុគ្គលិក",
+  "Last Lesson": "មេរៀនចុងក្រោយ",
+  "No Staff Found": "រកមិនឃើញបុគ្គលិក",
+  "No staff accounts match the current filters": "គ្មានគណនីបុគ្គលិកត្រូវនឹងតម្រងបច្ចុប្បន្ន",
+  "View Details": "មើលព័ត៌មានលម្អិត",
+  "Latest Watch": "ការមើលចុងក្រោយ",
+  "Overall progress": "វឌ្ឍនភាពសរុប",
+  "Contact": "ទំនាក់ទំនង",
+  "Learning Activity": "សកម្មភាពរៀន",
+  "Last activity": "សកម្មភាពចុងក្រោយ",
+  "Last lesson": "មេរៀនចុងក្រោយ",
+  "Watched videos": "វីដេអូបានមើល",
+  "No email": "គ្មានអ៊ីមែល",
+  "No phone": "គ្មានលេខទូរស័ព្ទ",
+  "Close staff tracking details": "បិទព័ត៌មានតាមដានបុគ្គលិក",
+  "Go to Settings": "ទៅការកំណត់",
   "No Training Content Yet": "មិនទាន់មានមាតិកាបណ្តុះបណ្តាល",
+  "The training portal is ready, but no courses have been added.": "ផ្ទាំងបណ្តុះបណ្តាលរួចរាល់ហើយ ប៉ុន្តែមិនទាន់មានវគ្គសិក្សាត្រូវបានបន្ថែមទេ។",
+  "Open Content Manager": "បើកគ្រប់គ្រងមាតិកា",
+  "Admin: create categories and lessons in Content Manager.": "អ្នកគ្រប់គ្រង៖ បង្កើតប្រភេទ និងមេរៀននៅក្នុងគ្រប់គ្រងមាតិកា។",
+  "Training Content": "មាតិកាបណ្តុះបណ្តាល",
+  "Loading Training Content": "កំពុងផ្ទុកមាតិកាបណ្តុះបណ្តាល",
+  "Your LMS data will appear here as soon as it finishes loading.": "ទិន្នន័យ LMS របស់អ្នកនឹងបង្ហាញនៅទីនេះ បន្ទាប់ពីផ្ទុករួច។",
+  "No Categories Found": "រកមិនឃើញប្រភេទ",
+  "No Lessons Available": "មិនមានមេរៀនអាចរៀនបាន",
+  "Try adjusting your search query": "សូមកែសម្រួលពាក្យស្វែងរករបស់អ្នក",
+  "No published lessons are available yet.": "មិនទាន់មានមេរៀនដែលបានផ្សព្វផ្សាយទេ។",
+  "Search categories...": "ស្វែងរកប្រភេទ...",
+  "No lessons": "គ្មានមេរៀន",
+  "No category progress yet.": "មិនទាន់មានវឌ្ឍនភាពប្រភេទទេ។",
+  "Loading recent activity...": "កំពុងផ្ទុកសកម្មភាពថ្មីៗ...",
+  "No completed lessons yet. Start learning to see your progress.": "មិនទាន់មានមេរៀនបានបញ្ចប់ទេ។ ចាប់ផ្តើមរៀនដើម្បីមើលវឌ្ឍនភាពរបស់អ្នក។",
   "Contact your administrator to set up training modules.": "សូមទាក់ទងអ្នកគ្រប់គ្រងរបស់អ្នកដើម្បីរៀបចំម៉ូឌុលបណ្តុះបណ្តាល។",
   "Loading course...": "កំពុងផ្ទុកវគ្គសិក្សា...",
   "Back to Dashboard": "ត្រឡប់ទៅផ្ទាំងគ្រប់គ្រង",
   "No lessons available in this category": "គ្មានមេរៀនក្នុងប្រភេទនេះទេ",
   "Loading lesson...": "កំពុងផ្ទុកមេរៀន...",
   "Lesson not found": "រកមិនឃើញមេរៀន",
+  "Training Course": "វគ្គបណ្តុះបណ្តាល",
   "Test": "តេស្ត",
   "Course Content": "មាតិកាវគ្គសិក្សា",
+  "Course Progress": "វឌ្ឍនភាពវគ្គសិក្សា",
+  "lessons completed": "មេរៀនបានបញ្ចប់",
   "Back to course": "ត្រឡប់ទៅវគ្គសិក្សា",
   "Mark Complete": "សម្គាល់ថាបញ្ចប់",
   "Mark as Complete": "សម្គាល់ថាបញ្ចប់",
   "Mark lesson complete": "សម្គាល់មេរៀនថាបញ្ចប់",
+  "Complete this lesson": "បញ្ចប់មេរៀននេះ",
+  "You watched enough of this lesson. Mark it complete to unlock the next lesson.": "អ្នកបានមើលមេរៀននេះគ្រប់គ្រាន់ហើយ។ សម្គាល់ថាបញ្ចប់ ដើម្បីដោះសោមេរៀនបន្ទាប់។",
+  "Lesson Details": "ព័ត៌មានមេរៀន",
   "Lesson Progress": "វឌ្ឍនភាពមេរៀន",
   "Instruction Progress": "វឌ្ឍនភាពការណែនាំ",
   "Follow along with the video": "អនុវត្តតាមវីដេអូ",
@@ -1463,6 +1669,8 @@ const extraEnglishToKhmer: Record<string, string> = {
   "Video player unavailable": "កម្មវិធីចាក់វីដេអូមិនអាចប្រើបាន",
   "The embedded video player cannot load due to browser or network restrictions.": "កម្មវិធីចាក់វីដេអូដែលបានបង្កប់មិនអាចផ្ទុកបាន ដោយសារការកំណត់របស់កម្មវិធីរុករក ឬបណ្ដាញ។",
   "Open video on YouTube": "បើកវីដេអូនៅលើ YouTube",
+  "In this video": "ក្នុងវីដេអូនេះ",
+  "Restart": "ចាប់ផ្តើមឡើងវិញ",
   "Restart video": "ចាប់ផ្តើមវីដេអូឡើងវិញ",
   "Toggle fullscreen": "បិទ/បើកពេញអេក្រង់",
   "Hide instructions": "លាក់ការណែនាំ",
@@ -1475,6 +1683,8 @@ const extraEnglishToKhmer: Record<string, string> = {
   "Unable to mark this lesson complete. Please try again.": "មិនអាចសម្គាល់មេរៀននេះថាបញ្ចប់បានទេ។ សូមព្យាយាមម្តងទៀត។",
   "Watched": "បានមើល",
   "Watching": "កំពុងមើល",
+  "Refresh LMS data": "ធ្វើឱ្យទិន្នន័យ LMS ថ្មី",
+  "Loading": "កំពុងផ្ទុក",
   "Not started": "មិនទាន់ចាប់ផ្តើម",
   "Playback speed": "ល្បឿនចាក់វីដេអូ",
   "Play video": "ចាក់វីដេអូ",
@@ -1489,6 +1699,8 @@ const extraEnglishToKhmer: Record<string, string> = {
   "Create your first user to get started": "បង្កើតអ្នកប្រើប្រាស់ដំបូងដើម្បីចាប់ផ្តើម",
   "Edit Profile": "កែប្រែប្រវត្តិរូប",
   "Create and edit training categories": "បង្កើត និងកែប្រែប្រភេទបណ្តុះបណ្តាល",
+  "Training groups and order": "ក្រុមបណ្តុះបណ្តាល និងលំដាប់",
+  "Videos, visibility, and category placement": "វីដេអូ ការបង្ហាញ និងការដាក់ក្នុងប្រភេទ",
   "Category Name": "ឈ្មោះប្រភេទ",
   "Add New Category": "បន្ថែមប្រភេទថ្មី",
   "Brief description of this category...": "សេចក្តីពិពណ៌នាសង្ខេបអំពីប្រភេទនេះ...",
@@ -1500,34 +1712,89 @@ const extraEnglishToKhmer: Record<string, string> = {
   "Select an icon to represent this category": "ជ្រើសរើសរូបតំណាងសម្រាប់តំណាងប្រភេទនេះ",
   "Select a color theme for this category": "ជ្រើសរើសពណ៌សម្រាប់ប្រភេទនេះ",
   "Position in the category list (0 = first)": "ទីតាំងក្នុងបញ្ជីប្រភេទ (0 = ដំបូង)",
+  "Category Color": "ពណ៌ប្រភេទ",
+  "New category colors rotate automatically.": "ពណ៌ប្រភេទថ្មីនឹងប្តូរតាមលំដាប់ដោយស្វ័យប្រវត្តិ។",
+  "Existing category color is preserved.": "ពណ៌ប្រភេទដែលមានស្រាប់នឹងរក្សាទុកដដែល។",
+  "Category Order": "លំដាប់ប្រភេទ",
+  "New categories are placed at the end of the category list.": "ប្រភេទថ្មីនឹងត្រូវដាក់នៅចុងបញ្ជីប្រភេទ។",
+  "Failed to repair category order": "បរាជ័យក្នុងការកែលំដាប់ប្រភេទ",
   "Order": "លំដាប់",
+  "No description": "គ្មានសេចក្តីពិពណ៌នា",
   "No Categories Yet": "មិនទាន់មានប្រភេទ",
   "Create your first category to get started": "បង្កើតប្រភេទដំបូងដើម្បីចាប់ផ្តើម",
   "Create and organize training content": "បង្កើត និងរៀបចំមាតិកាបណ្តុះបណ្តាល",
+  "Create YouTube lessons, set visibility, and organize training by category.": "បង្កើតមេរៀន YouTube កំណត់ការបង្ហាញ និងរៀបចំតាមប្រភេទបណ្តុះបណ្តាល។",
   "Filter by category:": "តម្រងតាមប្រភេទ៖",
+  "Filter lessons by category": "តម្រងមេរៀនតាមប្រភេទ",
   "Lesson Title": "ចំណងជើងមេរៀន",
+  "Lesson title": "ចំណងជើងមេរៀន",
+  "Lesson description": "សេចក្តីពិពណ៌នាមេរៀន",
+  "Lesson category": "ប្រភេទមេរៀន",
+  "Lesson Info": "ព័ត៌មានមេរៀន",
+  "Name the lesson and place it in the correct training category.": "ដាក់ឈ្មោះមេរៀន និងជ្រើសប្រភេទបណ្តុះបណ្តាលឱ្យត្រឹមត្រូវ។",
   "Add New Lesson": "បន្ថែមមេរៀនថ្មី",
+  "New Lesson": "បន្ថែមមេរៀនថ្មី",
+  "Edit Lesson": "កែប្រែមេរៀន",
+  "Update Lesson": "រក្សាទុកការកែប្រែ",
+  "Build the lesson, connect the video, then publish it to the right audience.": "រៀបចំមេរៀន ភ្ជាប់វីដេអូ ហើយផ្សព្វផ្សាយទៅក្រុមអ្នកមើលឱ្យត្រឹមត្រូវ។",
+  "Close lesson form": "បិទទម្រង់មេរៀន",
   "Brief description of this lesson...": "សេចក្តីពិពណ៌នាសង្ខេបអំពីមេរៀននេះ...",
   "Brief overview of the lesson content": "ទិដ្ឋភាពសង្ខេបនៃមាតិកាមេរៀន",
   "Brief description of the lesson content...": "សេចក្តីពិពណ៌នាសង្ខេបនៃមាតិកាមេរៀន...",
   "Enter a descriptive title for the lesson": "បញ្ចូលចំណងជើងពិពណ៌នាសម្រាប់មេរៀន",
+  "e.g. Introduction to Vehicle Valuation": "ឧ. ការណែនាំអំពីការវាយតម្លៃយានយន្ត",
   "e.g., Introduction to Vehicle Valuation": "ឧ. ការណែនាំអំពីការវាយតម្លៃយានយន្ត",
   "e.g., 8": "ឧ. 8",
   "Lesson duration:": "រយៈពេលមេរៀន៖",
+  "Duration": "រយៈពេល",
+  "Auto from video": "យកពីវីដេអូដោយស្វ័យប្រវត្តិ",
+  "Video preview": "មើលវីដេអូជាមុន",
+  "Paste a YouTube link. Duration is detected automatically before saving.": "បិទភ្ជាប់តំណ YouTube។ រយៈពេលនឹងត្រូវរកឃើញដោយស្វ័យប្រវត្តិ មុនពេលរក្សាទុក។",
   "Visible to": "បង្ហាញដល់",
+  "Visible To": "បង្ហាញដល់",
+  "Access & Publishing": "ការចូលមើល និងការផ្សព្វផ្សាយ",
+  "Choose who can see this lesson and where it appears in the category.": "ជ្រើសអ្នកដែលអាចមើលមេរៀននេះ និងកំណត់ទីតាំងបង្ហាញក្នុងប្រភេទ។",
   "Admin can always view every lesson.": "អ្នកគ្រប់គ្រងអាចមើលមេរៀនទាំងអស់ជានិច្ច។",
+  "Admin can always view every lesson. Accounting can also view normal Staff lessons.": "អ្នកគ្រប់គ្រងអាចមើលមេរៀនទាំងអស់ជានិច្ច។ គណនេយ្យក៏អាចមើលមេរៀនបុគ្គលិកធម្មតាបានដែរ។",
   "No categories available": "គ្មានប្រភេទ",
+  "Create a category first": "សូមបង្កើតប្រភេទជាមុន",
   "Please create a category first before adding lessons.": "សូមបង្កើតប្រភេទជាមុន មុនពេលបន្ថែមមេរៀន។",
   "Order in Category": "លំដាប់ក្នុងប្រភេទ",
   "Position within the category (0 = first)": "ទីតាំងក្នុងប្រភេទ (0 = ដំបូង)",
+  "Position in Category": "ទីតាំងក្នុងប្រភេទ",
+  "Position in category": "ទីតាំងក្នុងប្រភេទ",
+  "Lower numbers appear first.": "លេខតូចនឹងបង្ហាញមុន។",
+  "Lesson Order": "លំដាប់មេរៀន",
+  "Automatic": "ស្វ័យប្រវត្តិ",
+  "New lessons are placed at the end of the selected category.": "មេរៀនថ្មីនឹងត្រូវដាក់នៅចុងប្រភេទដែលបានជ្រើស។",
+  "Published": "បានផ្សព្វផ្សាយ",
+  "Staff can see this lesson when their role matches visibility.": "បុគ្គលិកអាចមើលមេរៀននេះ ពេលតួនាទីត្រូវនឹងការបង្ហាញ។",
   "Duration (minutes)": "រយៈពេល (នាទី)",
   "YouTube URL": "URL YouTube",
   "Active (visible to staff)": "សកម្ម (បង្ហាញឱ្យបុគ្គលិក)",
   "No Lessons Yet": "មិនទាន់មានមេរៀន",
   "Create your first lesson to get started": "បង្កើតមេរៀនដំបូងដើម្បីចាប់ផ្តើម",
+  "No lessons in this category yet": "មិនទាន់មានមេរៀនក្នុងប្រភេទនេះទេ",
   "Video": "វីដេអូ",
   "Valid YouTube URL": "URL YouTube ត្រឹមត្រូវ",
   "YouTube thumbnail preview": "មើលរូបភាពតូច YouTube ជាមុន",
+  "All staff": "បុគ្គលិកទាំងអស់",
+  "Staff only": "តែបុគ្គលិក",
+  "Accounting": "គណនេយ្យ",
+  "Accounting only": "តែគណនេយ្យ",
+  "Are you sure you want to delete this lesson?": "តើអ្នកប្រាកដជាចង់លុបមេរៀននេះឬទេ?",
+  "Waiting for YouTube URL.": "កំពុងរង់ចាំ URL YouTube។",
+  "Enter a valid YouTube URL to detect duration.": "បញ្ចូល URL YouTube ត្រឹមត្រូវ ដើម្បីរករយៈពេល។",
+  "Reading duration from YouTube...": "កំពុងអានរយៈពេលពី YouTube...",
+  "Could not read this video's duration.": "មិនអាចអានរយៈពេលវីដេអូនេះបានទេ។",
+  "Could not load YouTube metadata. Check your connection and try again.": "មិនអាចផ្ទុកព័ត៌មាន YouTube បានទេ។ សូមពិនិត្យការតភ្ជាប់ ហើយព្យាយាមម្តងទៀត។",
+  "Lesson title is required": "ត្រូវការចំណងជើងមេរៀន",
+  "Please select a category": "សូមជ្រើសរើសប្រភេទ",
+  "YouTube URL is required": "ត្រូវការ URL YouTube",
+  "Please enter a valid YouTube URL": "សូមបញ្ចូល URL YouTube ត្រឹមត្រូវ",
+  "Please wait for the video duration to load": "សូមរង់ចាំឱ្យរយៈពេលវីដេអូផ្ទុករួច",
+  "Video duration must load automatically before saving": "រយៈពេលវីដេអូត្រូវផ្ទុកដោយស្វ័យប្រវត្តិ មុនពេលរក្សាទុក",
+  "Select at least one role for lesson visibility": "សូមជ្រើសយ៉ាងហោចណាស់មួយតួនាទីសម្រាប់ការបង្ហាញមេរៀន",
   "Branch Location": "ទីតាំងសាខា",
   "Phone Number": "លេខទូរស័ព្ទ",
   "Optional: Staff member's email address": "ជាជម្រើស៖ អាសយដ្ឋានអ៊ីមែលរបស់បុគ្គលិក",
@@ -1745,7 +2012,6 @@ const extraEnglishToKhmer: Record<string, string> = {
   "Delete user": "លុបអ្នកប្រើប្រាស់",
   "Development Mode - Error Details:": "របៀបអភិវឌ្ឍន៍ - ព័ត៌មានលម្អិតកំហុស៖",
   "Dismiss": "បិទ",
-  "Done": "រួចរាល់",
   "Drop an image file or a direct image URL.": "ទម្លាក់ឯកសាររូបភាព ឬ URL រូបភាពផ្ទាល់។",
   "Enter a descriptive name for the category": "បញ្ចូលឈ្មោះពិពណ៌នាសម្រាប់ប្រភេទ",
   "Enter the staff member&apos;s full name": "បញ្ចូលឈ្មោះពេញរបស់បុគ្គលិក",
@@ -1891,6 +2157,12 @@ function translateDynamicPhrase(core: string, lang: Language): string | null {
     const watchToUnlockMatch = core.match(/^Watch\s+(\d+)%\s+to unlock completion\.?$/i);
     if (watchToUnlockMatch) return `មើល ${watchToUnlockMatch[1]}% ដើម្បីដោះសោការបញ្ចប់`;
 
+    const watchMoreToUnlockMatch = core.match(/^Watch\s+(\d+)%\s+more\s+to unlock completion\.?$/i);
+    if (watchMoreToUnlockMatch) return `មើលបន្ថែម ${watchMoreToUnlockMatch[1]}% ដើម្បីដោះសោការបញ្ចប់`;
+
+    const watchedMoreToUnlockMatch = core.match(/^Watched\s+(\d+)%\.\s+Watch\s+(\d+)%\s+more\s+to unlock completion\.?$/i);
+    if (watchedMoreToUnlockMatch) return `បានមើល ${watchedMoreToUnlockMatch[1]}%។ មើលបន្ថែម ${watchedMoreToUnlockMatch[2]}% ដើម្បីដោះសោការបញ្ចប់។`;
+
     const watchAtLeastMatch = core.match(/^Watch at least\s+(\d+)%\s+to unlock completion\.?$/i);
     if (watchAtLeastMatch) return `មើលយ៉ាងហោចណាស់ ${watchAtLeastMatch[1]}% ដើម្បីដោះសោការបញ្ចប់។`;
 
@@ -1908,6 +2180,9 @@ function translateDynamicPhrase(core: string, lang: Language): string | null {
     const watchedLabelPercentMatch = core.match(/^Watched\s+(\d+)%$/i);
     if (watchedLabelPercentMatch) return `បានមើល ${watchedLabelPercentMatch[1]}%`;
 
+    const percentCompleteLowerMatch = core.match(/^(\d+)%\s+complete$/i);
+    if (percentCompleteLowerMatch) return `${percentCompleteLowerMatch[1]}% បានបញ្ចប់`;
+
     const durationMatch = core.match(/^(.+?)\s+•\s+(\d+)\s+min$/i);
     if (durationMatch) {
       return `${translatePhrase(durationMatch[1], lang)} • ${durationMatch[2]} នាទី`;
@@ -1916,11 +2191,35 @@ function translateDynamicPhrase(core: string, lang: Language): string | null {
     const minutesMatch = core.match(/^(\d+)\s+(min|minutes?)$/i);
     if (minutesMatch) return `${minutesMatch[1]} នាទី`;
 
+    const detectedYoutubeDurationMatch = core.match(/^Detected\s+(.+?)\s+from YouTube\.?$/i);
+    if (detectedYoutubeDurationMatch) return `បានរកឃើញរយៈពេល ${translatePhrase(detectedYoutubeDurationMatch[1], lang)} ពី YouTube។`;
+
     const activeCountMatch = core.match(/^(\d+)\s+active$/i);
     if (activeCountMatch) return `${activeCountMatch[1]} សកម្ម`;
 
+    const availableCountMatch = core.match(/^(\d+)\s+available$/i);
+    if (availableCountMatch) return `${availableCountMatch[1]} អាចប្រើបាន`;
+
     const thisWeekMatch = core.match(/^([+-]?\d+)\s+this week$/i);
     if (thisWeekMatch) return `${thisWeekMatch[1]} សប្តាហ៍នេះ`;
+
+    const notSyncedCountMatch = core.match(/^(\d+)\s+not synced$/i);
+    if (notSyncedCountMatch) return `${notSyncedCountMatch[1]} មិនទាន់សមកាលកម្ម`;
+
+    const syncedStaffMatch = core.match(/^(\d+)\s+synced staff$/i);
+    if (syncedStaffMatch) return `${syncedStaffMatch[1]} បុគ្គលិកបានសមកាលកម្ម`;
+
+    const needFollowUpCountMatch = core.match(/^(\d+)\s+need follow-up$/i);
+    if (needFollowUpCountMatch) return `${needFollowUpCountMatch[1]} ត្រូវតាមដាន`;
+
+    const showingStaffAccountsMatch = core.match(/^Showing\s+(\d+)\s+of\s+(\d+)\s+staff accounts$/i);
+    if (showingStaffAccountsMatch) return `បង្ហាញ ${showingStaffAccountsMatch[1]} នៃ ${showingStaffAccountsMatch[2]} គណនីបុគ្គលិក`;
+
+    const syncStaffToLmsMatch = core.match(/^Sync Staff to LMS\s+\((\d+)\)$/i);
+    if (syncStaffToLmsMatch) return `សមកាលកម្មបុគ្គលិកទៅ LMS (${syncStaffToLmsMatch[1]})`;
+
+    const lessonsCompletedCountMatch = core.match(/^(\d+)\s+of\s+(\d+)\s+lessons completed$/i);
+    if (lessonsCompletedCountMatch) return `${lessonsCompletedCountMatch[1]} នៃ ${lessonsCompletedCountMatch[2]} មេរៀនបានបញ្ចប់`;
 
     const lessonProgressMatch = core.match(/^(\d+)\s+of\s+(\d+)\s+(lessons?|staff-lessons)$/i);
     if (lessonProgressMatch) {
@@ -1931,6 +2230,9 @@ function translateDynamicPhrase(core: string, lang: Language): string | null {
     if (slashLessonProgressMatch) {
       return `${slashLessonProgressMatch[1]} / ${slashLessonProgressMatch[2]} ${slashLessonProgressMatch[3].toLowerCase().startsWith("staff") ? "មេរៀនបុគ្គលិក" : "មេរៀន"}`;
     }
+
+    const coursePositionMatch = core.match(/^Course\s+(\d+)\s*\/\s*(\d+)$/i);
+    if (coursePositionMatch) return `វគ្គ ${coursePositionMatch[1]} / ${coursePositionMatch[2]}`;
 
     const lessonPositionMatch = core.match(/^Lesson\s+(\d+)\s+of\s+(\d+)$/i);
     if (lessonPositionMatch) return `មេរៀន ${lessonPositionMatch[1]} នៃ ${lessonPositionMatch[2]}`;
@@ -1952,6 +2254,51 @@ function translateDynamicPhrase(core: string, lang: Language): string | null {
 
     const pageMatch = core.match(/^Page\s+(\d+)\s+of\s+(\d+)$/i);
     if (pageMatch) return `ទំព័រ ${pageMatch[1]} នៃ ${pageMatch[2]}`;
+
+    const qtyMatch = core.match(/^Qty\s+(.+)$/i);
+    if (qtyMatch) return `ចំនួន ${qtyMatch[1]}`;
+
+    const categoryOrderMatch = core.match(/^Category Order:\s+(\d+)$/i);
+    if (categoryOrderMatch) return `លំដាប់ប្រភេទ៖ ${categoryOrderMatch[1]}`;
+
+    const orderNumberMatch = core.match(/^Order:\s+(\d+)$/i);
+    if (orderNumberMatch) return `លំដាប់៖ ${orderNumberMatch[1]}`;
+
+    const lastLabelMatch = core.match(/^Last:\s+(.+)$/i);
+    if (lastLabelMatch) return `ចុងក្រោយ៖ ${translatePhrase(lastLabelMatch[1], lang)}`;
+
+    const latestPercentMatch = core.match(/^(\d+)%\s+latest$/i);
+    if (latestPercentMatch) return `${latestPercentMatch[1]}% ចុងក្រោយ`;
+
+    const roleLabelMatch = core.match(/^Role:\s+(.+)$/i);
+    if (roleLabelMatch) return `តួនាទី៖ ${translatePhrase(roleLabelMatch[1], lang)}`;
+
+    const emailLabelMatch = core.match(/^Email:\s+(.+)$/i);
+    if (emailLabelMatch) return `អ៊ីមែល៖ ${emailLabelMatch[1]}`;
+
+    const phoneLabelMatch = core.match(/^Phone:\s+(.+)$/i);
+    if (phoneLabelMatch) return `ទូរស័ព្ទ៖ ${translatePhrase(phoneLabelMatch[1], lang)}`;
+
+    const lastActivityLabelMatch = core.match(/^Last activity:\s+(.+)$/i);
+    if (lastActivityLabelMatch) return `សកម្មភាពចុងក្រោយ៖ ${translatePhrase(lastActivityLabelMatch[1], lang)}`;
+
+    const lastLessonLabelMatch = core.match(/^Last lesson:\s+(.+)$/i);
+    if (lastLessonLabelMatch) return `មេរៀនចុងក្រោយ៖ ${translatePhrase(lastLessonLabelMatch[1], lang)}`;
+
+    const watchedVideosLabelMatch = core.match(/^Watched videos:\s+(\d+)$/i);
+    if (watchedVideosLabelMatch) return `វីដេអូបានមើល៖ ${watchedVideosLabelMatch[1]}`;
+
+    const assetsPageSizeMatch = core.match(/^(\d+)\s*\/\s*page$/i);
+    if (assetsPageSizeMatch) return `${assetsPageSizeMatch[1]} ក្នុងមួយទំព័រ`;
+
+    const borrowedOutMatch = core.match(/^(\d+)\s+borrowed\s+\/\s+(\d+)\s+out$/i);
+    if (borrowedOutMatch) return `${borrowedOutMatch[1]} បានខ្ចី / ${borrowedOutMatch[2]} បានចេញ`;
+
+    const movementRecordsMatch = core.match(/^(\d+)\s+movement records?$/i);
+    if (movementRecordsMatch) return `${movementRecordsMatch[1]} កំណត់ត្រាចលនា`;
+
+    const auditTransferEventsMatch = core.match(/^(\d+)\s+audit and transfer events?$/i);
+    if (auditTransferEventsMatch) return `${auditTransferEventsMatch[1]} ព្រឹត្តិការណ៍ត្រួតពិនិត្យ និងផ្ទេរ`;
 
     const currentStockMatch = core.match(/^Current Stock\s+\((.+)\)$/i);
     if (currentStockMatch) return `ស្តុកបច្ចុប្បន្ន (${currentStockMatch[1]})`;

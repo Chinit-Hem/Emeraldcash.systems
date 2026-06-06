@@ -47,8 +47,12 @@ export const SmsMovementImageField = memo(function SmsMovementImageField({
                 <ImageIcon className="h-5 w-5" />
               </div>
               <div className="min-w-0">
-                <div className="truncate text-sm font-semibold text-gray-900 dark:text-white">{imageFile.name}</div>
-                <div className="text-xs text-gray-500 dark:text-gray-400">{(imageFile.size / 1024).toFixed(1)} KB</div>
+                <div className="truncate text-sm font-semibold text-gray-900 dark:text-white" data-no-translate>
+                  {imageFile.name}
+                </div>
+                <div className="text-xs text-gray-500 dark:text-gray-400" data-no-translate>
+                  {(imageFile.size / 1024).toFixed(1)} KB
+                </div>
               </div>
             </div>
             <button
@@ -71,7 +75,7 @@ export const SmsMovementImageField = memo(function SmsMovementImageField({
               type="file"
               title={copy.uploadLabel}
               accept="image/jpeg,image/png,image/webp,image/gif"
-              className="sr-only"
+              className="hidden"
               disabled={loading}
               onChange={(event) => onImageFileChange(event.target.files?.[0] || null)}
             />

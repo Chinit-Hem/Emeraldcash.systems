@@ -528,7 +528,12 @@ textarea::placeholder {
   background: transparent;
   border-radius: 12px;
   border: 1px solid transparent;
-  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+  transform: translateZ(0);
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease,
+    transform 0.12s ease;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -541,10 +546,24 @@ textarea::placeholder {
   background: var(--bg-hover);
 }
 
+.neu-mobile-nav-item:active {
+  transform: scale(0.96);
+}
+
 .neu-mobile-nav-item.active {
   background: var(--bg-accent-soft);
   border-color: rgba(16, 185, 129, 0.45);
   color: var(--accent-green);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .neu-mobile-nav-item {
+    transition: none;
+  }
+
+  .neu-mobile-nav-item:active {
+    transform: none;
+  }
 }
 
 .neu-icon-btn {

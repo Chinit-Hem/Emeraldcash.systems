@@ -42,7 +42,7 @@ export default function manifest(): MetadataRoute.Manifest {
     shortcuts: [
       { name: 'VMS - Vehicle Valuation', short_name: 'VMS', url: '/vehicles?category=all', icons: [{ src: '/icon-192.png', sizes: '192x192' }] },
       { name: 'LMS - Learning Center', short_name: 'LMS', url: '/lms', icons: [{ src: '/icon-192.png', sizes: '192x192' }] },
-      { name: 'SMS - Asset Inventory', short_name: 'SMS', url: '/sms', icons: [{ src: '/icon-192.png', sizes: '192x192' }] },
+      { name: 'SMS - Asset Inventory', short_name: 'SMS', url: '/sms/assets', icons: [{ src: '/icon-192.png', sizes: '192x192' }] },
     ]
   };
 }

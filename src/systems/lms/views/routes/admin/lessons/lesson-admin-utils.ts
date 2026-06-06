@@ -61,6 +61,19 @@ function findCategory(categories: LmsCategory[], categoryId: number) {
   return categories.find((category) => category.id === categoryId);
 }
 
+export function getNextLessonOrderIndex(
+  lessons: LessonWithStatus[],
+  categoryId: number,
+  excludeLessonId?: number | null
+) {
+  const maxOrderIndex = lessons
+    .filter((lesson) => lesson.category_id === categoryId)
+    .filter((lesson) => !excludeLessonId || lesson.id !== excludeLessonId)
+    .reduce((maxIndex, lesson) => Math.max(maxIndex, lesson.order_index || 0), 0);
+
+  return maxOrderIndex + 1;
+}
+
 export function normalizeLessonAudience(
   allowedRoles?: string[] | null
 ): LessonAudienceRole[] {
@@ -99,8 +112,7 @@ export function createEmptyLessonForm(
     category_id: categoryId,
     youtube_url: "",
     duration_minutes: null,
-    order_index: lessons.filter((lesson) => lesson.category_id === categoryId)
-      .length,
+    order_index: getNextLessonOrderIndex(lessons, categoryId),
     is_active: true,
     allowed_roles: [...DEFAULT_LESSON_AUDIENCE],
   };

@@ -1,7 +1,10 @@
 "use client";
 
-import { AlertCircle, ArrowUpDown, Eye, Filter, ImageIcon, Loader2, Package, Plus, Search } from 'lucide-react';
+import { useAuthUser } from '@/shared/hooks/AuthContext';
+import { hasAppPermission } from '@/shared/utils/permissions';
+import { AlertCircle, ArrowLeftRight, ArrowUpDown, Clock, Eye, Filter, History, ImageIcon, Loader2, Package, Plus, Search } from 'lucide-react';
 import Image from 'next/image';
+import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useState, type KeyboardEvent } from 'react';
 import { getAppScrollSnapshot, restoreAppScrollSnapshot } from '@/shared/utils/appScroll';
@@ -85,6 +88,7 @@ const sortOptions = [
 ] as const;
 
 export default function AssetsPage() {
+  const user = useAuthUser();
   const router = useRouter();
   const searchParams = useSearchParams();
   const [assets, setAssets] = useState<SmsAsset[]>([]);
@@ -99,6 +103,8 @@ export default function AssetsPage() {
   const [imageErrors, setImageErrors] = useState<Set<string>>(new Set());
   const focusedAssetId = searchParams.get(SMS_ASSET_FOCUS_PARAM) ?? '';
   const shouldOpenCreateModal = searchParams.get('action') === 'new';
+  const canCreateAsset = hasAppPermission(user.role, 'sms:create');
+  const canTransferAsset = hasAppPermission(user.role, 'sms:transfer');
 
   // Track images that failed to load - reset when assets change
   useEffect(() => {
@@ -166,10 +172,10 @@ export default function AssetsPage() {
   }, [fetchStats]);
 
   useEffect(() => {
-    if (shouldOpenCreateModal) {
+    if (shouldOpenCreateModal && canCreateAsset) {
       setCreateModalOpen(true);
     }
-  }, [shouldOpenCreateModal]);
+  }, [canCreateAsset, shouldOpenCreateModal]);
 
   useEffect(() => {
     const nextFilters = parseAssetListFilters(searchParams);
@@ -330,7 +336,7 @@ export default function AssetsPage() {
 
     return [
       { label: 'Total Assets', value: stats.totalAssets, helper: 'All inventory', color: 'text-slate-800', badge: 'bg-slate-100' },
-      { label: 'Available', value: stats.available, helper: 'Ready in stock', color: 'text-emerald-700', badge: 'bg-emerald-50' },
+      { label: 'Available', value: stats.available, helper: 'Ready in inventory', color: 'text-emerald-700', badge: 'bg-emerald-50' },
       { label: 'Assigned', value: stats.inUse, helper: 'Currently in use', color: 'text-amber-700', badge: 'bg-amber-50' },
       { label: 'Sent Out', value: stats.borrowed + stats.out, helper: `${stats.borrowed} borrowed / ${stats.out} out`, color: 'text-blue-700', badge: 'bg-blue-50' },
       { label: 'Overdue Return', value: stats.notReturned, helper: 'Needs follow-up', color: 'text-rose-700', badge: 'bg-rose-50' },
@@ -341,6 +347,9 @@ export default function AssetsPage() {
   const hasActiveFilters = !areAssetListFiltersEqual(
     filters,
     { ...DEFAULT_ASSET_LIST_FILTERS, page: filters.page, pageSize: filters.pageSize }
+  );
+  const hasAdvancedFilters = Boolean(
+    filters.type || filters.category || filters.location || filters.assignedTo || filters.createdBy
   );
 
   const clearFilters = useCallback(() => {
@@ -356,35 +365,56 @@ export default function AssetsPage() {
     <SmsPageShell>
       <SmsPageHeader
         title="Asset Inventory"
-        description="Track SMS stock, assignments, locations, and transfer status."
+        description="Track SMS assets, assignments, locations, and transfer status."
         icon={Package}
         tone="emerald"
+        backHref={null}
         actions={
+          <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-wrap sm:justify-end">
+            {canTransferAsset && (
+              <Link href="/sms/transfer" className={smsSecondaryButtonClass}>
+                <ArrowLeftRight className="h-4 w-4" />
+                Move
+              </Link>
+            )}
+            {canTransferAsset && (
+              <Link href="/sms/pending" className={smsSecondaryButtonClass}>
+                <Clock className="h-4 w-4" />
+                Review Requests
+              </Link>
+            )}
+            <Link href="/sms/history" className={smsSecondaryButtonClass}>
+              <History className="h-4 w-4" />
+              History
+            </Link>
+            {canCreateAsset && (
             <button
               onClick={() => setCreateModalOpen(true)}
               className={`${smsPrimaryButtonClass} w-full sm:w-auto`}
             >
-              <Plus className="w-5 h-5" />
+              <Plus className="h-4 w-4" />
               Add Asset
             </button>
+            )}
+          </div>
         }
       />
 
         {/* Stats Cards */}
         {stats && (
-          <div className="mb-6 grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6 xl:gap-4">
+          <div className="mb-4 grid grid-cols-3 gap-2 xl:grid-cols-6">
             {statCards.map((card) => (
               <div
                 key={card.label}
-                className="min-h-[104px] rounded-lg bg-white p-4 shadow-sm ring-1 ring-slate-200 transition-shadow md:hover:shadow-md dark:bg-slate-900 dark:ring-slate-800"
+                className="min-h-[70px] rounded-xl bg-white p-2.5 shadow-sm ring-1 ring-slate-200 transition-shadow md:hover:shadow-md sm:min-h-[82px] sm:p-3 dark:bg-slate-900 dark:ring-slate-800"
               >
-                <div className={`mb-3 inline-flex rounded-md px-2 py-1 text-2xl font-semibold leading-none ${card.badge} ${card.color}`}>
+                <div className={`mb-1.5 inline-flex rounded-md px-1.5 py-0.5 text-lg font-semibold leading-none sm:mb-2 sm:px-2 sm:py-1 sm:text-xl ${card.badge} ${card.color}`}>
                   {card.value}
                 </div>
-                <div className="text-xs font-medium text-slate-500">
+                <div className="text-[11px] font-medium leading-4 text-slate-500 sm:text-xs">
                   {card.label}
                 </div>
-                <div className="mt-1 text-[11px] font-medium text-slate-400">
+                <div className="mt-0.5 hidden text-[11px] font-medium text-slate-400 sm:block">
                   {card.helper}
                 </div>
               </div>
@@ -393,8 +423,8 @@ export default function AssetsPage() {
         )}
 
         {/* Filters */}
-        <div className={`${smsPanelClass} mb-6 p-4 sm:p-5`}>
-          <div className="grid gap-3 lg:grid-cols-12">
+        <div className={`${smsPanelClass} sticky top-3 z-20 mb-4 p-3 sm:static sm:p-4`}>
+          <div className="grid gap-2 lg:grid-cols-12">
             <div className="relative min-w-0 lg:col-span-4">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
               <input
@@ -406,7 +436,7 @@ export default function AssetsPage() {
                 className={`${smsInputClass} pl-12`}
               />
             </div>
-            <div className="relative lg:col-span-2">
+            <div className="relative lg:col-span-3">
               <Filter className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
               <select
                 title="Filter by asset status"
@@ -422,46 +452,6 @@ export default function AssetsPage() {
                 <option value="Not Returned">Overdue Return</option>
               </select>
             </div>
-            <input
-              type="text"
-              title="Filter by type"
-              placeholder="Type..."
-              value={filters.type}
-              onChange={(e) => handleFilterChange('type', e.target.value)}
-              className={`${smsInputClass} lg:col-span-2`}
-            />
-            <input
-              type="text"
-              title="Filter by category"
-              placeholder="Category..."
-              value={filters.category}
-              onChange={(e) => handleFilterChange('category', e.target.value)}
-              className={`${smsInputClass} lg:col-span-2`}
-            />
-            <input
-              type="text"
-              title="Filter by location"
-              placeholder="Location..."
-              value={filters.location}
-              onChange={(e) => handleFilterChange('location', e.target.value)}
-              className={`${smsInputClass} lg:col-span-2`}
-            />
-            <input
-              type="text"
-              title="Filter by assigned person"
-              placeholder="Assigned to..."
-              value={filters.assignedTo}
-              onChange={(e) => handleFilterChange('assignedTo', e.target.value)}
-              className={`${smsInputClass} lg:col-span-2`}
-            />
-            <input
-              type="text"
-              title="Filter by creator"
-              placeholder="Created by..."
-              value={filters.createdBy}
-              onChange={(e) => handleFilterChange('createdBy', e.target.value)}
-              className={`${smsInputClass} lg:col-span-2`}
-            />
             <div className="relative lg:col-span-2">
               <ArrowUpDown className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
               <select
@@ -479,7 +469,7 @@ export default function AssetsPage() {
               title="Assets per page"
               value={filters.pageSize}
               onChange={(e) => handleFilterChange('pageSize', e.target.value)}
-              className={`${smsSelectClass} lg:col-span-2`}
+              className={`${smsSelectClass} lg:col-span-1`}
             >
               <option value={10}>10 / page</option>
               <option value={20}>20 / page</option>
@@ -495,6 +485,61 @@ export default function AssetsPage() {
               Clear Filters
             </button>
           </div>
+          <details open={hasAdvancedFilters} className="mt-2 rounded-xl border border-slate-200 bg-slate-50/70 dark:border-slate-800 dark:bg-slate-950/30">
+            <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-3 py-2 text-sm font-semibold text-slate-700 [&::-webkit-details-marker]:hidden dark:text-slate-200">
+              <span className="inline-flex items-center gap-2">
+                <Filter className="h-4 w-4 text-slate-500" />
+                More filters
+              </span>
+              {hasAdvancedFilters && (
+                <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs text-emerald-700 ring-1 ring-emerald-100">
+                  Active
+                </span>
+              )}
+            </summary>
+            <div className="grid gap-2 border-t border-slate-200 p-3 sm:grid-cols-2 lg:grid-cols-5 dark:border-slate-800">
+              <input
+                type="text"
+                title="Filter by type"
+                placeholder="Type..."
+                value={filters.type}
+                onChange={(e) => handleFilterChange('type', e.target.value)}
+                className={smsInputClass}
+              />
+              <input
+                type="text"
+                title="Filter by category"
+                placeholder="Category..."
+                value={filters.category}
+                onChange={(e) => handleFilterChange('category', e.target.value)}
+                className={smsInputClass}
+              />
+              <input
+                type="text"
+                title="Filter by location"
+                placeholder="Location..."
+                value={filters.location}
+                onChange={(e) => handleFilterChange('location', e.target.value)}
+                className={smsInputClass}
+              />
+              <input
+                type="text"
+                title="Filter by assigned person"
+                placeholder="Assigned to..."
+                value={filters.assignedTo}
+                onChange={(e) => handleFilterChange('assignedTo', e.target.value)}
+                className={smsInputClass}
+              />
+              <input
+                type="text"
+                title="Filter by creator"
+                placeholder="Created by..."
+                value={filters.createdBy}
+                onChange={(e) => handleFilterChange('createdBy', e.target.value)}
+                className={smsInputClass}
+              />
+            </div>
+          </details>
         </div>
 
         {/* Assets */}
@@ -526,26 +571,33 @@ export default function AssetsPage() {
               <p className="mx-auto mb-6 max-w-md text-base leading-6 text-slate-600">
                 {hasActiveFilters
                   ? 'Try adjusting your search or filters'
-                  : 'Get started by adding your first asset.'
+                  : canCreateAsset
+                    ? 'Get started by adding your first asset.'
+                    : 'No SMS assets are available yet.'
                 }
               </p>
-              <button
-                type="button"
-                onClick={() => {
-                  if (hasActiveFilters) {
-                    clearFilters();
-                  }
-                  setCreateModalOpen(true);
-                }}
-                className={`${smsPrimaryButtonClass} w-full sm:w-auto`}
-              >
-                <Plus className="w-5 h-5" />
-                {hasActiveFilters ? 'Clear Filters & Add Asset' : 'Add First Asset'}
-              </button>
+              {(hasActiveFilters || canCreateAsset) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (hasActiveFilters) {
+                      clearFilters();
+                      return;
+                    }
+                    if (canCreateAsset) {
+                      setCreateModalOpen(true);
+                    }
+                  }}
+                  className={`${smsPrimaryButtonClass} w-full sm:w-auto`}
+                >
+                  <Plus className="w-5 h-5" />
+                  {hasActiveFilters ? 'Clear Filters' : 'Add First Asset'}
+                </button>
+              )}
             </div>
           ) : (
             <>
-              <div className="grid min-w-0 gap-3 p-2.5 md:hidden">
+              <div className="grid min-w-0 gap-2 p-2 md:hidden">
                 {assets.map((asset) => {
                   const isFocused = asset.id === focusedAssetId;
 
@@ -555,70 +607,61 @@ export default function AssetsPage() {
                       id={getAssetListItemElementId(asset.id)}
                       role="link"
                       tabIndex={0}
-                      aria-label={`View ${asset.name} details`}
+                      aria-label="View asset details"
                       onClick={() => navigateToAssetDetail(asset.id)}
                       onKeyDown={(event) => handleAssetItemKeyDown(asset.id, event)}
-                      className={`scroll-mt-24 min-w-0 cursor-pointer overflow-hidden rounded-xl border border-slate-200 bg-white p-4 shadow-sm outline-none transition-shadow hover:shadow-md focus-visible:ring-2 focus-visible:ring-emerald-500 dark:border-slate-700/80 dark:bg-slate-900/80 ${
+                      className={`scroll-mt-24 min-w-0 cursor-pointer overflow-hidden rounded-xl border border-slate-200 bg-white p-2.5 shadow-sm outline-none transition-shadow hover:shadow-md focus-visible:ring-2 focus-visible:ring-emerald-500 dark:border-slate-700/80 dark:bg-slate-900/80 ${
                         isFocused ? 'ring-2 ring-emerald-500 ring-offset-2' : ''
                       }`}
                     >
-                    <div className="flex min-w-0 items-start gap-3">
+                    <div className="flex min-w-0 items-start gap-2.5">
                       {asset.imageUrl && !imageErrors.has(asset.id) ? (
-                        <div className="relative h-14 w-14 flex-shrink-0 overflow-hidden rounded-lg bg-slate-100 shadow-sm dark:bg-slate-800">
+                        <div className="relative h-12 w-12 flex-shrink-0 overflow-hidden rounded-lg bg-slate-100 shadow-sm dark:bg-slate-800">
                           <Image
                             src={asset.imageUrl!}
                             alt={asset.name}
                             fill
-                            sizes="56px"
+                            sizes="48px"
                             className="object-cover"
                             onError={() => handleImageError(asset.id)}
                             loading="lazy"
+                            data-no-translate
                           />
                         </div>
                       ) : (
-                        <div className="flex h-14 w-14 flex-shrink-0 items-center justify-center rounded-lg bg-slate-100 shadow-sm dark:bg-slate-800">
-                          <ImageIcon className="h-6 w-6 text-slate-500 dark:text-slate-400" />
+                        <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-lg bg-slate-100 shadow-sm dark:bg-slate-800">
+                          <ImageIcon className="h-5 w-5 text-slate-500 dark:text-slate-400" />
                         </div>
                       )}
 
-                      <div className="min-w-0 flex-1 pt-0.5">
-                        <div className="flex min-w-0 flex-wrap items-start gap-x-2 gap-y-1">
-                          <h3 className="min-w-0 flex-1 break-words text-base font-bold leading-6 text-slate-900 dark:text-white">
-                            {asset.name}
+                      <div className="min-w-0 flex-1">
+                        <div className="flex min-w-0 items-start gap-2">
+                          <h3 className="min-w-0 flex-1 truncate text-sm font-bold leading-5 text-slate-900 dark:text-white">
+                            <span data-no-translate>{asset.name}</span>
                           </h3>
-                          <span className={`inline-flex max-w-full shrink-0 rounded-full px-2.5 py-1 text-xs font-bold ring-1 ring-inset ${statusColor(asset.status)}`}>
+                          <span className={`inline-flex max-w-full shrink-0 rounded-full px-2 py-0.5 text-[11px] font-bold ring-1 ring-inset ${statusColor(asset.status)}`}>
                             {statusLabels[asset.status]}
                           </span>
                         </div>
-                        {asset.itemCode && (
-                          <p className="mt-1 break-all font-mono text-sm text-slate-500 dark:text-slate-400">{asset.itemCode}</p>
-                        )}
-                      </div>
-                    </div>
-
-                    <dl className="mt-4 grid min-w-0 grid-cols-2 overflow-hidden rounded-xl border border-slate-200 bg-slate-50/80 text-sm dark:border-slate-800 dark:bg-slate-950/35">
-                      {[
-                        { label: 'Type', value: asset.type },
-                        { label: 'Category', value: asset.category || '-' },
-                        { label: 'Quantity', value: asset.quantity ?? '-' },
-                        { label: 'Location', value: asset.location || '-' },
-                        { label: 'Assigned To', value: asset.assignedTo || '-' },
-                        { label: 'Created By', value: asset.createdBy || '-' },
-                      ].map((item, index) => (
-                        <div
-                          key={item.label}
-                          className={`min-w-0 px-3 py-3 ${index % 2 === 1 ? 'border-l border-slate-200 dark:border-slate-800' : ''} ${index > 1 ? 'border-t border-slate-200 dark:border-slate-800' : ''}`}
-                        >
-                          <dt className="text-xs font-semibold leading-5 text-slate-500 dark:text-slate-400">{item.label}</dt>
-                          <dd className="mt-0.5 min-h-5 break-words font-semibold leading-5 text-slate-900 dark:text-slate-100">{item.value}</dd>
+                        <p className="truncate font-mono text-xs text-slate-500 dark:text-slate-400">
+                          {asset.itemCode ? (
+                            <span data-no-translate>{asset.itemCode}</span>
+                          ) : (
+                            <span>{asset.type}</span>
+                          )}
+                        </p>
+                        <div className="mt-1.5 flex min-w-0 flex-wrap gap-1.5 text-[11px] font-semibold text-slate-600 dark:text-slate-300">
+                          <span className="rounded-md bg-slate-100 px-1.5 py-0.5 dark:bg-slate-800">
+                            Qty {asset.quantity ?? '-'}
+                          </span>
+                          <span className="max-w-[8rem] truncate rounded-md bg-slate-100 px-1.5 py-0.5 dark:bg-slate-800">
+                            {asset.location ? <span data-no-translate>{asset.location}</span> : 'No location'}
+                          </span>
+                          <span className="max-w-[9rem] truncate rounded-md bg-slate-100 px-1.5 py-0.5 dark:bg-slate-800">
+                            {asset.assignedTo ? <span data-no-translate>{asset.assignedTo}</span> : 'Unassigned'}
+                          </span>
                         </div>
-                      ))}
-                    </dl>
-                    <div className="mt-4 flex justify-end">
-                      <span className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg bg-emerald-600 px-3 py-2 text-sm font-semibold text-white">
-                        <Eye className="h-4 w-4" />
-                        View
-                      </span>
+                      </div>
                     </div>
                     </article>
                   );
@@ -629,14 +672,14 @@ export default function AssetsPage() {
                 <table className="w-full divide-y divide-slate-200">
                   <thead className="bg-slate-50/50">
                     <tr>
-                      <th className="px-6 py-5 text-left text-xs font-semibold text-slate-600">Asset</th>
-                      <th className="px-6 py-5 text-left text-xs font-semibold text-slate-600">Code</th>
-                      <th className="px-6 py-5 text-left text-xs font-semibold text-slate-600">Type / Category</th>
-                      <th className="px-6 py-5 text-left text-xs font-semibold text-slate-600">Status</th>
-                      <th className="px-6 py-5 text-left text-xs font-semibold text-slate-600">Qty</th>
-                      <th className="px-6 py-5 text-left text-xs font-semibold text-slate-600">Location</th>
-                      <th className="px-6 py-5 text-left text-xs font-semibold text-slate-600">Assigned To</th>
-                      <th className="px-6 py-5 text-right text-xs font-semibold text-slate-600">Action</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600">Asset</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600">Code</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600">Type / Category</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600">Status</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600">Qty</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600">Location</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600">Assigned To</th>
+                      <th className="px-4 py-3 text-right text-xs font-semibold text-slate-600">Action</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-200">
@@ -649,69 +692,76 @@ export default function AssetsPage() {
                           id={getAssetListItemElementId(asset.id)}
                           role="link"
                           tabIndex={0}
-                          aria-label={`View ${asset.name} details`}
+                          aria-label="View asset details"
                           onClick={() => navigateToAssetDetail(asset.id)}
                           onKeyDown={(event) => handleAssetItemKeyDown(asset.id, event)}
                           className={`scroll-mt-24 cursor-pointer outline-none transition-colors focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-500 ${
                             isFocused ? 'bg-emerald-50 ring-2 ring-inset ring-emerald-500' : 'hover:bg-slate-50/50'
                           }`}
                         >
-                        <td className="px-6 py-6 whitespace-nowrap">
-                          <div className="flex items-center gap-4">
+                        <td className="whitespace-nowrap px-4 py-3">
+                          <div className="flex items-center gap-3">
                             {asset.imageUrl && !imageErrors.has(asset.id) ? (
-                              <div className="relative h-14 w-14 overflow-hidden rounded-lg bg-slate-100 shadow-sm">
+                              <div className="relative h-10 w-10 overflow-hidden rounded-lg bg-slate-100 shadow-sm">
                                 <Image
                                   src={asset.imageUrl!}
                                   alt={asset.name}
                                   fill
-                                  sizes="56px"
+                                  sizes="40px"
                                   className="object-cover"
                                   onError={() => handleImageError(asset.id)}
                                   loading="lazy"
+                                  data-no-translate
                                 />
                               </div>
                             ) : (
-                              <div className="w-14 h-14 bg-slate-100 rounded-lg flex items-center justify-center shadow-sm">
-                                <ImageIcon className="w-8 h-8 text-slate-500" />
+                              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-slate-100 shadow-sm">
+                                <ImageIcon className="h-5 w-5 text-slate-500" />
                               </div>
                             )}
                             <div className="min-w-0 flex-1">
-                              <div className="font-semibold text-slate-900 truncate">{asset.name}</div>
-                              <div className="text-sm text-slate-500 truncate">{asset.description || asset.refId || 'Asset details'}</div>
+                              <div className="font-semibold text-slate-900 truncate" data-no-translate>{asset.name}</div>
+                              <div className="max-w-[18rem] truncate text-xs text-slate-500">
+                                {asset.description || asset.refId ? (
+                                  <span data-no-translate>{asset.description || asset.refId}</span>
+                                ) : (
+                                  'Asset details'
+                                )}
+                              </div>
                             </div>
                           </div>
                         </td>
-                        <td className="px-6 py-6 whitespace-nowrap">
-                          <span className="font-mono text-sm text-slate-600">{asset.itemCode || '-'}</span>
+                        <td className="whitespace-nowrap px-4 py-3">
+                          <span className="font-mono text-xs text-slate-600" data-no-translate>{asset.itemCode || '-'}</span>
                         </td>
-                        <td className="px-6 py-6 whitespace-nowrap">
+                        <td className="whitespace-nowrap px-4 py-3">
                           <div className="flex flex-col gap-1">
-                            <span className="w-fit rounded-md bg-slate-100 px-3 py-1 text-sm font-semibold text-slate-800">
-                              {asset.type}
+                            <span className="w-fit rounded-md bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-800">
+                              <span>{asset.type}</span>
                             </span>
                             <span className="text-xs text-slate-500">{asset.category || '-'}</span>
                           </div>
                         </td>
-                        <td className="px-6 py-6 whitespace-nowrap">
-                          <span className={`px-3 py-1 rounded-md font-semibold text-sm ring-1 ring-inset ${statusColor(asset.status)}`}>
+                        <td className="whitespace-nowrap px-4 py-3">
+                          <span className={`rounded-md px-2 py-0.5 text-xs font-semibold ring-1 ring-inset ${statusColor(asset.status)}`}>
                             {statusLabels[asset.status]}
                           </span>
                         </td>
-                        <td className="px-6 py-6 text-sm font-semibold text-slate-700">{asset.quantity ?? '-'}</td>
-                        <td className="px-6 py-6 text-sm text-slate-700">{asset.location || '-'}</td>
-                        <td className="px-6 py-6">
-                          <span className="inline-block rounded-full bg-slate-100 px-3 py-1 text-sm font-medium text-slate-800">
+                        <td className="px-4 py-3 text-sm font-semibold text-slate-700">{asset.quantity ?? '-'}</td>
+                        <td className="px-4 py-3 text-sm text-slate-700" data-no-translate>{asset.location || '-'}</td>
+                        <td className="px-4 py-3">
+                          <span className="inline-block rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-800" data-no-translate>
                             {asset.assignedTo || '-'}
                           </span>
                         </td>
-                        <td className="px-6 py-6 text-right">
+                        <td className="px-4 py-3 text-right">
                           <button
                             type="button"
                             onClick={(event) => {
                               event.stopPropagation();
                               navigateToAssetDetail(asset.id);
                             }}
-                            className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg bg-emerald-600 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
+                            className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-lg bg-emerald-600 px-2.5 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
                           >
                             <Eye className="h-4 w-4" />
                             View
@@ -755,14 +805,16 @@ export default function AssetsPage() {
         </div>
 
       {/* Create Modal */}
-      <AssetFormModal
-        isOpen={createModalOpen}
-        onClose={closeCreateModal}
-        onSave={handleSaveAsset}
-        initialData={{}}
-        title="New Asset"
-        isEdit={false}
-      />
+      {canCreateAsset && (
+        <AssetFormModal
+          isOpen={createModalOpen}
+          onClose={closeCreateModal}
+          onSave={handleSaveAsset}
+          initialData={{}}
+          title="New Asset"
+          isEdit={false}
+        />
+      )}
     </SmsPageShell>
   );
 }

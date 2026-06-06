@@ -186,31 +186,30 @@ function StatCard({
   trendUp?: boolean;
 }) {
   const colorClasses = {
-    emerald: "from-emerald-500 to-emerald-600 shadow-emerald-500/25",
-    blue: "from-blue-500 to-blue-600 shadow-blue-500/25",
-    purple: "from-purple-500 to-purple-600 shadow-purple-500/25",
-    orange: "from-orange-500 to-orange-600 shadow-orange-500/25",
-    amber: "from-amber-500 to-amber-600 shadow-amber-500/25",
-    rose: "from-rose-500 to-rose-600 shadow-rose-500/25",
+    emerald: "bg-emerald-50 text-emerald-700 ring-emerald-100",
+    blue: "bg-blue-50 text-blue-700 ring-blue-100",
+    purple: "bg-purple-50 text-purple-700 ring-purple-100",
+    orange: "bg-orange-50 text-orange-700 ring-orange-100",
+    amber: "bg-amber-50 text-amber-700 ring-amber-100",
+    rose: "bg-rose-50 text-rose-700 ring-rose-100",
   };
 
   return (
-    <div className="relative overflow-hidden rounded-2xl sm:rounded-3xl p-4 sm:p-6 bg-gradient-to-br from-[#f0f4f8] to-[#e6e9ef] shadow-sm transition-all duration-300 hover:bg-slate-50 group">
-      <div className={`absolute top-0 right-0 w-32 h-32 bg-gradient-to-br ${colorClasses[color]} opacity-10 rounded-full blur-3xl transform translate-x-16 -translate-y-16 transition-opacity group-hover:opacity-20`} />
-      <div className="relative flex items-start justify-between">
+    <div className="rounded-2xl bg-white p-3 shadow-sm ring-1 ring-slate-200 transition-shadow hover:shadow-md sm:p-4">
+      <div className="flex items-start justify-between gap-2">
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold text-slate-500 uppercase tracking-wider">{title}</p>
-          <p className="mt-2 text-2xl sm:text-3xl font-bold text-slate-800 tracking-tight">{value}</p>
+          <p className="truncate text-[10px] font-semibold uppercase tracking-wide text-slate-500 sm:text-xs sm:tracking-wider">{title}</p>
+          <p className="mt-1 text-xl font-bold tracking-tight text-slate-800 sm:text-2xl">{value}</p>
           {trend && (
-            <div className={`mt-2 flex items-center gap-1 text-sm font-medium ${trendUp ? 'text-emerald-600' : 'text-red-600'}`}>
-              <TrendingUp className={`w-4 h-4 ${trendUp ? '' : 'rotate-180'}`} />
+            <div className={`mt-1 flex items-center gap-1 text-xs font-medium ${trendUp ? 'text-emerald-600' : 'text-red-600'}`}>
+              <TrendingUp className={`h-3.5 w-3.5 ${trendUp ? '' : 'rotate-180'}`} />
               {trend}
             </div>
           )}
-          {subtitle && <p className="mt-2 text-sm text-slate-500">{subtitle}</p>}
+          {subtitle && <p className="mt-1 truncate text-[11px] text-slate-500 sm:text-xs">{subtitle}</p>}
         </div>
-        <div className={`flex-shrink-0 p-2.5 sm:p-3 rounded-2xl bg-gradient-to-br ${colorClasses[color]} text-white shadow-lg transform transition-transform group-hover:scale-110`}>
-          <Icon className="w-6 h-6" />
+        <div className={`hidden h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl ring-1 min-[420px]:flex sm:h-10 sm:w-10 ${colorClasses[color]}`}>
+          <Icon className="h-4 w-4 sm:h-5 sm:w-5" />
         </div>
       </div>
     </div>
@@ -246,48 +245,47 @@ function CategoryCard({
     <button
       onClick={onClick}
       disabled={!hasLessons}
-      className={`w-full text-left group relative overflow-hidden rounded-3xl p-6 bg-gradient-to-br from-[#f0f4f8] to-[#e6e9ef] shadow-sm transition-all duration-300 ${
+      className={`group w-full rounded-2xl bg-white p-4 text-left shadow-sm ring-1 ring-slate-200 transition-all duration-200 ${
         hasLessons
-          ? "hover:-translate-y-1 hover:bg-slate-50"
+          ? "hover:bg-slate-50 hover:shadow-md"
           : "cursor-not-allowed opacity-75"
       }`}
     >
-      <div className={`absolute top-0 right-0 w-24 h-24 bg-gradient-to-br ${gradientColor} opacity-10 rounded-full blur-2xl transform translate-x-8 -translate-y-8`} />
-      <div className="relative">
-        <div className="flex items-start justify-between mb-4">
-          <div className={`p-3 rounded-2xl bg-gradient-to-br ${gradientColor} text-white shadow-lg transform transition-transform ${hasLessons ? "group-hover:scale-110" : ""}`}>
-            <BookOpen className="w-6 h-6" />
+      <div>
+        <div className="mb-3 flex items-start justify-between gap-3">
+          <div className={`rounded-xl bg-gradient-to-br p-2.5 ${gradientColor} text-white shadow-sm transition-transform ${hasLessons ? "group-hover:scale-105" : ""}`}>
+            <BookOpen className="h-5 w-5" />
           </div>
           {!hasLessons ? (
-            <div className="flex items-center gap-1 text-slate-400 text-sm font-medium">
-              <Lock className="w-4 h-4" />No lessons
+            <div className="flex items-center gap-1 text-xs font-semibold text-slate-400">
+              <Lock className="h-4 w-4" />No lessons
             </div>
           ) : completionRate === 100 ? (
-            <div className="flex items-center gap-1 text-emerald-600 text-sm font-medium">
-              <CheckCircle2 className="w-4 h-4" />Done
+            <div className="flex items-center gap-1 text-xs font-semibold text-emerald-600">
+              <CheckCircle2 className="h-4 w-4" />Done
             </div>
           ) : completionRate > 0 ? (
-            <div className="flex items-center gap-1 text-amber-600 text-sm font-medium">
-              <Clock className="w-4 h-4" />{completionRate}% complete
+            <div className="flex items-center gap-1 text-xs font-semibold text-amber-600">
+              <Clock className="h-4 w-4" />{completionRate}%
             </div>
           ) : (
-            <div className="flex items-center gap-1 text-slate-400 text-sm font-medium">
-              <Circle className="w-4 h-4" />Start
+            <div className="flex items-center gap-1 text-xs font-semibold text-slate-400">
+              <Circle className="h-4 w-4" />Start
             </div>
           )}
         </div>
-        <h3 className="text-lg font-bold text-slate-800 mb-1">{category.name}</h3>
-        <p className="text-sm text-slate-500 mb-4 line-clamp-2">{category.description}</p>
+        <h3 className="mb-1 text-base font-bold leading-6 text-slate-800">{category.name}</h3>
+        <p className="mb-3 line-clamp-2 text-sm leading-5 text-slate-500">{category.description}</p>
         <div className="flex items-center justify-between">
           <span className="text-xs text-slate-400">{lessonCountLabel}</span>
           {hasLessons && (
-            <ChevronRight className="w-5 h-5 text-slate-400 transform transition-transform group-hover:translate-x-1" />
+            <ChevronRight className="h-5 w-5 text-slate-400 transition-transform group-hover:translate-x-1" />
           )}
         </div>
         {hasLessons && completionRate > 0 && completionRate < 100 && (
-          <div className="mt-4">
-            <div className="w-full h-2 bg-slate-200 rounded-full overflow-hidden">
-              <div className={`h-full bg-gradient-to-r ${gradientColor} rounded-full transition-all duration-500`} style={{ width: `${completionRate}%` }} />
+          <div className="mt-3">
+            <div className="h-2 w-full overflow-hidden rounded-full bg-slate-200">
+              <div className={`h-full rounded-full bg-gradient-to-r ${gradientColor} transition-all duration-500`} style={{ width: `${completionRate}%` }} />
             </div>
           </div>
         )}
@@ -627,46 +625,82 @@ function LmsDashboard({ initialData }: LmsDashboardProps) {
 
   const tabs = [
     { id: "learning" as TabType, label: "Lessons", icon: BookOpen },
-    { id: "progress" as TabType, label: "My Progress", icon: BarChart3 },
-    { id: "achievements" as TabType, label: "Achievements", icon: Award },
+    { id: "progress" as TabType, label: "Progress", icon: BarChart3 },
+    { id: "achievements" as TabType, label: "Awards", icon: Award },
   ];
 
   return (
-    <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <div className="space-y-8 animate-fade-in">
+    <div className="mx-auto max-w-[1600px] px-4 pb-[calc(5.75rem+env(safe-area-inset-bottom))] pt-5 sm:px-6 sm:py-8 lg:px-8">
+      <div className="animate-fade-in space-y-5 sm:space-y-8">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="flex items-start justify-between gap-3">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-600 shadow-lg shadow-emerald-500/30 flex items-center justify-center">
-              <GraduationCap className="w-6 h-6 text-white" />
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-600 shadow-lg shadow-emerald-500/25 sm:h-12 sm:w-12">
+              <GraduationCap className="h-5 w-5 text-white sm:h-6 sm:w-6" />
             </div>
-            <div>
-              <h1 className="text-2xl font-bold text-slate-800">{t.trainingPortal}</h1>
-              <p className="text-sm text-slate-500">{t.masterSkills}</p>
+            <div className="min-w-0">
+              <h1 className="text-2xl font-bold leading-tight text-slate-800">{t.trainingPortal}</h1>
+              <p className="mt-1 text-sm leading-5 text-slate-500">{t.masterSkills}</p>
             </div>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex shrink-0 items-center gap-2">
             {loading && (
               <span className="hidden items-center gap-2 rounded-xl bg-white px-3 py-2 text-sm font-medium text-slate-500 shadow-sm sm:inline-flex">
                 <RefreshCw className="h-4 w-4 animate-spin text-emerald-500" />
                 Loading
               </span>
             )}
-            <button onClick={handleRefresh} disabled={isRefreshing} className="p-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 transition-all active:scale-95 disabled:opacity-50" title="Refresh data">
-              <RefreshCw className={`w-5 h-5 ${isRefreshing ? 'animate-spin' : ''}`} />
+            <button
+              type="button"
+              onClick={handleRefresh}
+              disabled={isRefreshing}
+              className="flex h-11 w-11 items-center justify-center rounded-xl bg-white text-slate-600 shadow-sm ring-1 ring-slate-200 transition-all hover:bg-slate-50 active:scale-95 disabled:opacity-50"
+              title="Refresh data"
+              aria-label="Refresh LMS data"
+            >
+              <RefreshCw className={`h-5 w-5 ${isRefreshing ? 'animate-spin' : ''}`} />
             </button>
           </div>
         </div>
 
+        {activeTab === "learning" && continueLesson && (
+          <div className="rounded-2xl border border-emerald-200/70 bg-emerald-50 p-4 shadow-sm sm:p-5">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex min-w-0 items-start gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-600 text-white shadow-sm shadow-emerald-600/20">
+                  <PlayCircle className="h-5 w-5" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-sm font-bold text-emerald-900">Continue Learning</p>
+                  <p className="mt-0.5 truncate font-semibold text-slate-900">{continueLesson.title}</p>
+                  <p className="mt-0.5 truncate text-sm text-slate-600">
+                    <span>{lastWatched?.categoryName || currentLesson?.category_name}</span>
+                    {lastWatched ? ` • ${lastWatched.watchPercentage}% watched` : ` • ${currentLesson?.duration_minutes || 0} min`}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  if (continueLessonId) handleResumeLesson(continueLessonId);
+                }}
+                className="inline-flex min-h-11 w-full items-center justify-center rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-emerald-700 active:scale-[0.99] sm:w-auto"
+              >
+                Resume
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Stats Grid */}
-        <div className="grid grid-cols-1 gap-4 sm:gap-6 min-[420px]:grid-cols-2 lg:grid-cols-3">
+        <div className="grid grid-cols-3 gap-2 sm:gap-4 lg:grid-cols-3">
           <StatCard title="Categories" value={dashboardStats.total_categories} subtitle={`${categories.length} active`} icon={BookOpen} color="emerald" />
           <StatCard title="Lessons" value={totalLessons} subtitle={`${unlockedLessons.length} available`} icon={PlayCircle} color="blue" />
-          <StatCard title="Your Progress" value={`${overallProgress}%`} subtitle={`${completedLessons} of ${totalLessons} lessons`} icon={Trophy} color="purple" />
+          <StatCard title="Progress" value={`${overallProgress}%`} subtitle={`${completedLessons} of ${totalLessons} lessons`} icon={Trophy} color="purple" />
         </div>
 
         {/* Tab Navigation */}
-        <div className="flex gap-2 overflow-x-auto p-2 bg-white rounded-2xl shadow-sm sm:flex-wrap">
+        <div className="grid grid-cols-3 gap-1.5 rounded-2xl bg-white p-1.5 shadow-sm ring-1 ring-slate-200">
           {tabs.map((tab) => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.id;
@@ -674,9 +708,10 @@ function LmsDashboard({ initialData }: LmsDashboardProps) {
               <button
                 key={tab.id}
                 onClick={() => handleTabChange(tab.id)}
-                className={`flex shrink-0 items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all ${isActive ? 'bg-gradient-to-r from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/30' : 'text-slate-600 hover:bg-slate-100'}`}
+                className={`flex min-h-11 items-center justify-center gap-1.5 rounded-xl px-2 py-2 text-sm font-semibold transition-all sm:gap-2 sm:px-4 ${isActive ? 'bg-emerald-600 text-white shadow-sm shadow-emerald-600/20' : 'text-slate-600 hover:bg-slate-100'}`}
               >
-                <Icon className="w-4 h-4" />{tab.label}
+                <Icon className="h-4 w-4" />
+                <span className="truncate">{tab.label}</span>
               </button>
             );
           })}
@@ -684,59 +719,35 @@ function LmsDashboard({ initialData }: LmsDashboardProps) {
 
         {/* Tab Content */}
         {activeTab === "learning" && (
-          <div className="space-y-8">
+          <div className="space-y-5 sm:space-y-8">
             {/* Search Bar */}
             <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-5 flex items-center pointer-events-none text-slate-400">
-                <Search className="w-5 h-5" />
+              <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4 text-slate-400 sm:pl-5">
+                <Search className="h-5 w-5" />
               </div>
-              <input id="lms-search" type="text" placeholder="Search categories... (Cmd/Ctrl+K)" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full pl-14 pr-14 py-4 rounded-2xl bg-white shadow-sm text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:ring-2 focus:ring-emerald-500/20 transition-all text-base" />
+              <input
+                id="lms-search"
+                type="text"
+                placeholder="Search categories..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full rounded-2xl bg-white py-3 pl-12 pr-12 text-base text-slate-700 shadow-sm ring-1 ring-slate-200 transition-all placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 sm:py-4 sm:pl-14 sm:pr-14"
+              />
               {debouncedSearch !== searchQuery && (
-                <div className="absolute inset-y-0 right-0 pr-5 flex items-center">
-                  <div className="w-5 h-5 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
+                <div className="absolute inset-y-0 right-0 flex items-center pr-4 sm:pr-5">
+                  <div className="h-5 w-5 animate-spin rounded-full border-2 border-emerald-500 border-t-transparent" />
                 </div>
               )}
             </div>
 
-{/* Continue Learning - Show last watched lesson first, fallback after lookup finishes */}
-            {continueLesson && (
-              <div className="p-6 bg-gradient-to-br from-emerald-50 to-emerald-100/50 rounded-3xl shadow-sm border border-emerald-200/50">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-500 to-emerald-600 shadow-lg shadow-emerald-500/30 flex items-center justify-center">
-                    <PlayCircle className="w-6 h-6 text-white" />
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-bold text-slate-800">Continue Learning</h3>
-                    <p className="text-sm text-slate-500">Pick up where you left off</p>
-                  </div>
-                </div>
-                <div className="flex flex-col gap-4 p-4 bg-white rounded-2xl shadow-sm sm:flex-row sm:items-center sm:justify-between">
-                  <div className="min-w-0">
-                    <p className="font-semibold text-slate-800">{continueLesson.title}</p>
-                    <p className="text-sm text-slate-500">
-                      {lastWatched?.categoryName || currentLesson?.category_name}
-                      {lastWatched ? ` • ${lastWatched.watchPercentage}% watched` : ` • ${currentLesson?.duration_minutes || 0} min`}
-                    </p>
-                  </div>
-                  <button 
-                    onClick={() => {
-                      if (continueLessonId) handleResumeLesson(continueLessonId);
-                    }} 
-                    className="w-full px-6 py-2.5 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white font-medium rounded-xl shadow-lg shadow-emerald-500/30 hover:shadow-xl hover:shadow-emerald-500/40 transition-all active:scale-95 sm:w-auto"
-                  >
-                    Resume
-                  </button>
-                </div>
-              </div>
-            )}
-
             {/* Categories Grid */}
             <div>
-              <h2 className="text-xl font-bold text-slate-800 mb-4 flex items-center gap-2">
-                <Target className="w-5 h-5 text-emerald-500" />Training Categories
+              <h2 className="mb-3 flex items-center gap-2 text-lg font-bold text-slate-800 sm:mb-4 sm:text-xl">
+                <Target className="h-5 w-5 text-emerald-500" />
+                Training Categories
               </h2>
               {learningCategories.length > 0 ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-4 lg:gap-4">
                   {learningCategories.map((category) => {
                     const categoryLessonsCount = lessonCountByCategoryId.get(category.id) || 0;
                     const categoryProgress = categoryProgressById.get(category.id)?.progress ?? 0;

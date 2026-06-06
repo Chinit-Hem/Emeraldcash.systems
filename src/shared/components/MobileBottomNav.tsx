@@ -79,7 +79,7 @@ export default function MobileBottomNav({
     }
 
     if (hasAppPermission(user.role, "sms:view")) {
-      navItems.push({ id: "sms", label: "SMS", labelKm: "SMS", href: "/sms", icon: Boxes });
+      navItems.push({ id: "sms", label: "SMS", labelKm: "SMS", href: "/sms/assets", icon: Boxes });
     }
 
     navItems.push({

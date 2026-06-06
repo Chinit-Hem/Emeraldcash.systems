@@ -101,14 +101,14 @@ export const SmsMovementAssetField = memo(function SmsMovementAssetField({
                     className="flex w-full items-center justify-between gap-3 px-3 py-2.5 text-left text-sm transition-colors hover:bg-emerald-50 dark:hover:bg-emerald-900/20"
                   >
                     <span className="min-w-0">
-                      <span className="block truncate font-medium text-gray-900 dark:text-white">{asset.name}</span>
+                      <span className="block truncate font-medium text-gray-900 dark:text-white" data-no-translate>{asset.name}</span>
                       {asset.assignedTo && (
                         <span className="block truncate text-xs text-gray-500 dark:text-gray-400">
-                          Assigned to {asset.assignedTo}
+                          Assigned to <span data-no-translate>{asset.assignedTo}</span>
                         </span>
                       )}
                     </span>
-                    <span className="flex-shrink-0 text-sm text-gray-500 dark:text-gray-400">
+                    <span className="flex-shrink-0 text-sm text-gray-500 dark:text-gray-400" data-no-translate>
                       {asset.itemCode ? `(${asset.itemCode})` : asset.id.slice(0, 8)}
                     </span>
                   </button>

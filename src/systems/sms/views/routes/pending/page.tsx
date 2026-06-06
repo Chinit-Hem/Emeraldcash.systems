@@ -229,8 +229,8 @@ export default function PendingPage() {
   return (
     <SmsPageShell maxWidth="max-w-5xl">
       <SmsPageHeader
-        title="Transfer Requests"
-        description="Review pending SMS asset handovers and return requests."
+        title="Review Requests"
+        description="Approve pending SMS asset handovers and return requests."
         icon={Clock}
         tone="slate"
         actions={
@@ -248,46 +248,46 @@ export default function PendingPage() {
               href="/sms/transfer"
               className={smsPrimaryButtonClass}
             >
-              + New Transfer
+              + Move Asset
             </Link>
           </>
         }
       />
 
         {/* Stats Card */}
-        <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-3">
-          <div className={`${smsPanelClass} p-5`}>
+        <div className="mb-4 grid grid-cols-1 gap-3 md:grid-cols-3">
+          <div className={`${smsPanelClass} p-4`}>
             <div className="flex items-center gap-4">
-              <div className="rounded-md bg-slate-100 p-3">
-                <Users className="w-6 h-6 text-slate-700" />
+              <div className="rounded-md bg-slate-100 p-2.5">
+                <Users className="h-5 w-5 text-slate-700" />
               </div>
               <div>
                 <p className="text-sm font-medium text-slate-500">Pending</p>
-                <div className="text-3xl font-semibold text-slate-900">{stats.total}</div>
+                <div className="text-2xl font-semibold text-slate-900">{stats.total}</div>
               </div>
             </div>
           </div>
           {stats.total > 0 && (
             <>
-            <div className={`${smsPanelClass} p-5`}>
+            <div className={`${smsPanelClass} p-4`}>
               <div className="flex items-center gap-4">
-                <div className="rounded-md bg-emerald-50 p-3">
-                  <Clock className="w-6 h-6 text-emerald-700" />
+                <div className="rounded-md bg-emerald-50 p-2.5">
+                  <Clock className="h-5 w-5 text-emerald-700" />
                 </div>
                 <div>
                   <p className="text-sm font-medium text-slate-500">Oldest Request</p>
-                  <div className="text-xl font-semibold text-emerald-900">{stats.avgWait}</div>
+                  <div className="text-lg font-semibold text-emerald-900">{stats.avgWait}</div>
                 </div>
               </div>
             </div>
-            <div className={`${smsPanelClass} p-5`}>
+            <div className={`${smsPanelClass} p-4`}>
               <div className="flex items-center gap-4">
-                <div className="rounded-md bg-amber-50 p-3">
-                  <Package className="w-6 h-6 text-amber-700" />
+                <div className="rounded-md bg-amber-50 p-2.5">
+                  <Package className="h-5 w-5 text-amber-700" />
                 </div>
                 <div>
                   <p className="text-sm font-medium text-slate-500">Asset Types</p>
-                  <div className="text-xl font-semibold text-amber-900">
+                  <div className="text-lg font-semibold text-amber-900">
                     {[...new Set(pending.map(t => t.asset?.name || 'Unknown'))].length}
                   </div>
                 </div>
@@ -298,14 +298,14 @@ export default function PendingPage() {
         </div>
 
         {/* Content */}
-        <div className="space-y-6">
+        <div className="space-y-4">
           {pending.length === 0 ? (
-            <div className={`${smsPanelClass} p-10 text-center lg:p-16`}>
-              <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-md bg-emerald-50">
-                <CheckCircle2 className="h-9 w-9 text-emerald-600" />
+            <div className={`${smsPanelClass} p-8 text-center lg:p-12`}>
+              <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-md bg-emerald-50">
+                <CheckCircle2 className="h-8 w-8 text-emerald-600" />
               </div>
-              <h2 className="mb-3 text-2xl font-semibold text-slate-900">
-                No Pending Transfer Requests
+              <h2 className="mb-2 text-xl font-semibold text-slate-900">
+                No Pending Review Requests
               </h2>
               <p className="mx-auto mb-6 max-w-md text-sm leading-6 text-slate-500">
                 All SMS asset handovers and return requests are processed.
@@ -331,23 +331,24 @@ export default function PendingPage() {
             pending.map((transfer) => (
               <Card
                 key={transfer.id}
-                className="overflow-hidden rounded-lg border-0 bg-white shadow-sm ring-1 ring-slate-200 transition-shadow hover:shadow-md"
+                className="overflow-hidden rounded-xl border-0 bg-white shadow-sm ring-1 ring-slate-200 transition-shadow hover:shadow-md"
                 role="article"
                 aria-labelledby={`transfer-title-${transfer.id}`}
               >
-                <CardHeader className="px-5 pb-4 pt-5">
+                <CardHeader className="px-4 pb-3 pt-4">
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex-1">
-                      <CardTitle id={`transfer-title-${transfer.id}`} className="font-bold text-xl mb-1">
-                        {isReturnRequest(transfer) ? 'Return' : 'Transfer'} #{transfer.id.slice(-8).toUpperCase()}
+                      <CardTitle id={`transfer-title-${transfer.id}`} className="mb-1 text-lg font-bold">
+                        {isReturnRequest(transfer) ? 'Return' : 'Transfer'}{' '}
+                        <span data-no-translate>#{transfer.id.slice(-8).toUpperCase()}</span>
                       </CardTitle>
                       <div className="flex items-center gap-2">
                         {transfer.asset ? (
                           <>
                             <div className="rounded-md bg-blue-50 px-2.5 py-1 text-sm font-medium text-blue-800">
-                              {transfer.asset.name}
+                              <span data-no-translate>{transfer.asset.name}</span>
                             </div>
-                            <div className="text-xs text-slate-500">({transfer.asset.item_code})</div>
+                            <div className="text-xs text-slate-500" data-no-translate>({transfer.asset.item_code})</div>
                           </>
                         ) : (
                           <div className="rounded-md bg-slate-100 px-2.5 py-1 text-sm font-medium text-slate-700">Unknown Asset</div>
@@ -362,27 +363,27 @@ export default function PendingPage() {
                     </Badge>
                   </div>
                 </CardHeader>
-                <CardContent className="px-5 pb-5">
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-1 gap-6 text-sm">
-                    <div className="flex items-center gap-3 rounded-lg bg-slate-50 p-4 ring-1 ring-slate-200">
+                <CardContent className="px-4 pb-4">
+                  <div className="grid grid-cols-1 gap-3 text-sm md:grid-cols-2">
+                    <div className="flex items-center gap-3 rounded-lg bg-slate-50 p-3 ring-1 ring-slate-200">
                       <UserAvatar userId={transfer.senderId} users={users} />
                       <div>
                         <div className="font-medium text-slate-900">{isReturnRequest(transfer) ? 'Returning Person' : 'From'}</div>
-                        <div className="text-slate-800 font-semibold">{getUserDisplay(transfer.senderId)}</div>
+                        <div className="text-slate-800 font-semibold" data-no-translate>{getUserDisplay(transfer.senderId)}</div>
                       </div>
                     </div>
-                    <div className="flex items-center gap-3 rounded-lg bg-emerald-50 p-4 ring-1 ring-emerald-100">
+                    <div className="flex items-center gap-3 rounded-lg bg-emerald-50 p-3 ring-1 ring-emerald-100">
                       <UserAvatar userId={transfer.receiverId} users={users} />
                       <div>
                         <div className="font-medium text-slate-900">{isReturnRequest(transfer) ? 'Destination' : 'To'}</div>
-                        <div className="text-slate-800 font-semibold">{getUserDisplay(transfer.receiverId)}</div>
+                        <div className="text-slate-800 font-semibold" data-no-translate>{getUserDisplay(transfer.receiverId)}</div>
                       </div>
                     </div>
-                    <div className="grid gap-2 rounded-lg bg-blue-50 p-4 ring-1 ring-blue-100">
+                    <div className="grid gap-1 rounded-lg bg-blue-50 p-3 ring-1 ring-blue-100">
                       <div className="font-medium text-slate-900">{isReturnRequest(transfer) ? 'Return Location' : 'Location'}</div>
-                      <div className="text-lg font-bold text-blue-900">{transfer.location}</div>
+                      <div className="text-base font-bold text-blue-900" data-no-translate>{transfer.location}</div>
                     </div>
-                    <div className="grid gap-2 rounded-lg bg-amber-50 p-4 ring-1 ring-amber-100">
+                    <div className="grid gap-1 rounded-lg bg-amber-50 p-3 ring-1 ring-amber-100">
                       <div className="font-medium text-slate-900">Requested</div>
                       <div className="flex items-center gap-2 text-slate-800">
                         <Clock className="w-4 h-4 text-amber-600" />
@@ -391,11 +392,11 @@ export default function PendingPage() {
                     </div>
                   </div>
                   {transfer.remark && (
-                    <div className="mt-5 rounded-lg bg-blue-50 p-4 ring-1 ring-blue-100">
+                    <div className="mt-4 rounded-lg bg-blue-50 p-3 ring-1 ring-blue-100">
                       <div className="mb-1 text-sm font-semibold text-blue-950">
                         {isReturnRequest(transfer) ? 'Return Note' : 'Message from sender'}
                       </div>
-                      <p className="text-sm leading-6 text-blue-900">{transfer.remark}</p>
+                      <p className="text-sm leading-6 text-blue-900" data-no-translate>{transfer.remark}</p>
                     </div>
                   )}
 
@@ -408,7 +409,7 @@ export default function PendingPage() {
                           alt: `${isReturnRequest(transfer) ? 'Return' : 'Transfer'} proof - #${transfer.id.slice(-8)}`,
                         })
                       }
-                      className="relative mt-5 h-40 w-full cursor-zoom-in overflow-hidden rounded-lg bg-slate-100 ring-1 ring-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 sm:w-64"
+                      className="relative mt-4 h-32 w-full cursor-zoom-in overflow-hidden rounded-lg bg-slate-100 ring-1 ring-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 sm:w-56"
                       aria-label={`View ${isReturnRequest(transfer) ? 'return' : 'transfer'} proof larger`}
                     >
                       <Image
@@ -421,9 +422,9 @@ export default function PendingPage() {
                     </button>
                   )}
                 </CardContent>
-                <div className="border-t border-slate-200 bg-slate-50 px-5 py-4">
+                <div className="border-t border-slate-200 bg-slate-50 px-4 py-3">
                   {canManageTransfer(transfer) ? (
-                  <div className="flex gap-3 justify-end">
+                  <div className="flex justify-end gap-2">
                     <AlertDialog>
                       <AlertDialogTrigger asChild>
                         <Button 
@@ -449,15 +450,19 @@ export default function PendingPage() {
                           <AlertDialogDescription>
                             {isReturnRequest(transfer) ? (
                               <>
-                                Confirm returning #{transfer.id.slice(-8)} from{' '}
-                                <span className="font-semibold">{getUserDisplay(transfer.senderId)}</span>{' '}
-                                back to stock?
+                                Confirm returning{' '}
+                                <span data-no-translate>#{transfer.id.slice(-8)}</span>{' '}
+                                from{' '}
+                                <span className="font-semibold" data-no-translate>{getUserDisplay(transfer.senderId)}</span>{' '}
+                                back to inventory?
                               </>
                             ) : (
                               <>
-                                Confirm accepting transfer #{transfer.id.slice(-8)} from{' '}
-                                <span className="font-semibold">{getUserDisplay(transfer.senderId)}</span>{' '}
-                                to <span className="font-semibold">{getUserDisplay(transfer.receiverId)}</span>?
+                                Confirm accepting transfer{' '}
+                                <span data-no-translate>#{transfer.id.slice(-8)}</span>{' '}
+                                from{' '}
+                                <span className="font-semibold" data-no-translate>{getUserDisplay(transfer.senderId)}</span>{' '}
+                                to <span className="font-semibold" data-no-translate>{getUserDisplay(transfer.receiverId)}</span>?
                               </>
                             )}
                           </AlertDialogDescription>
@@ -509,11 +514,11 @@ export default function PendingPage() {
                             {isReturnRequest(transfer) ? (
                               <>
                                 Send this return request back to{' '}
-                                <span className="font-semibold">{getUserDisplay(transfer.senderId)}</span>? The asset will stay assigned.
+                                <span className="font-semibold" data-no-translate>{getUserDisplay(transfer.senderId)}</span>? The asset will stay assigned.
                               </>
                             ) : (
                               <>
-                                Reject transfer from <span className="font-semibold">{getUserDisplay(transfer.senderId)}</span>?
+                                Reject transfer from <span className="font-semibold" data-no-translate>{getUserDisplay(transfer.senderId)}</span>?
                               </>
                             )}
                           </AlertDialogDescription>
@@ -568,7 +573,13 @@ export default function PendingPage() {
                     <div className="rounded-lg bg-white px-4 py-3 text-sm font-medium text-slate-600 ring-1 ring-slate-200">
                       {isReturnRequest(transfer)
                         ? 'Waiting for an admin to review this return request.'
-                        : `Waiting for ${getUserDisplay(transfer.receiverId)} or an admin to review this transfer.`}
+                        : (
+                          <>
+                            Waiting for{' '}
+                            <span data-no-translate>{getUserDisplay(transfer.receiverId)}</span>{' '}
+                            or an admin to review this transfer.
+                          </>
+                        )}
                     </div>
                   )}
                 </div>

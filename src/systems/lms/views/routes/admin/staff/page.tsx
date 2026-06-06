@@ -464,7 +464,7 @@ export default function StaffAdminPage() {
               <CheckCircle2 className="h-4 w-4 text-emerald-500" />
             </div>
             <p className="mt-2 text-2xl font-bold text-slate-800">{staffSummary.syncedUsers}</p>
-            <p className="mt-1 text-xs text-slate-500">{staffSummary.notSyncedUsers} not synced</p>
+            <p className="mt-1 text-xs text-slate-500">{`${staffSummary.notSyncedUsers} not synced`}</p>
           </div>
           <div className="rounded-2xl bg-white p-4 shadow-[4px_4px_12px_#e2e8f0,-4px_-4px_12px_#ffffff]">
             <div className="flex items-center justify-between">
@@ -496,7 +496,7 @@ export default function StaffAdminPage() {
               <TrendingUp className="h-4 w-4 text-purple-500" />
             </div>
             <p className="mt-2 text-2xl font-bold text-slate-800">{staffSummary.overallCompletion}%</p>
-            <p className="mt-1 text-xs text-slate-500">{staffSummary.completedLessons}/{staffSummary.totalLessons} lessons</p>
+            <p className="mt-1 text-xs text-slate-500">{`${staffSummary.completedLessons}/${staffSummary.totalLessons} lessons`}</p>
           </div>
         </div>
 
@@ -520,8 +520,8 @@ export default function StaffAdminPage() {
 
           <div className="mt-5">
             <div className="flex items-center justify-between text-xs font-medium text-slate-600">
-              <span>{staffSummary.completedLessons} of {staffSummary.totalLessons} lessons completed</span>
-              <span>{staffSummary.syncedUsers} synced staff</span>
+              <span>{`${staffSummary.completedLessons} of ${staffSummary.totalLessons} lessons completed`}</span>
+              <span>{`${staffSummary.syncedUsers} synced staff`}</span>
             </div>
             <div className="mt-2 h-3 overflow-hidden rounded-full bg-slate-100">
               <div
@@ -565,7 +565,9 @@ export default function StaffAdminPage() {
                 {learningMonitorRows.length > 0 ? learningMonitorRows.map(({ managedUser, progress, completionPercentage }) => (
                   <div key={managedUser.username} className="flex items-center justify-between gap-3">
                     <div className="min-w-0">
-                      <p className="truncate text-sm font-semibold text-slate-700">{managedUser.full_name || managedUser.username}</p>
+                      <p className="truncate text-sm font-semibold text-slate-700" data-no-translate>
+                        {managedUser.full_name || managedUser.username}
+                      </p>
                       <p className="truncate text-xs text-slate-500">{progress?.last_watched_lesson_title || "No lesson activity"}</p>
                     </div>
                     <div className="shrink-0 text-right">
@@ -585,7 +587,9 @@ export default function StaffAdminPage() {
                 {attentionRows.length > 0 ? attentionRows.map(({ managedUser, progress, completionPercentage }) => (
                   <div key={managedUser.username} className="flex items-center justify-between gap-3">
                     <div className="min-w-0">
-                      <p className="truncate text-sm font-semibold text-slate-700">{managedUser.full_name || managedUser.username}</p>
+                      <p className="truncate text-sm font-semibold text-slate-700" data-no-translate>
+                        {managedUser.full_name || managedUser.username}
+                      </p>
                       <p className="truncate text-xs text-slate-500">
                         {!progress ? "Not synced to LMS" : progress.training_status === "not_started" ? "Not started learning" : "Low completion progress"}
                       </p>
@@ -674,10 +678,10 @@ export default function StaffAdminPage() {
             <div>
               <h2 className="text-lg font-bold text-slate-800">Staff Progress Table</h2>
               <p className="text-sm text-slate-500">
-                Showing {filteredTrackingRows.length} of {usersWithProgress.length} staff accounts
+                {`Showing ${filteredTrackingRows.length} of ${usersWithProgress.length} staff accounts`}
               </p>
             </div>
-            <p className="text-sm font-medium text-slate-500">{staffSummary.needFollowUpUsers} need follow-up</p>
+            <p className="text-sm font-medium text-slate-500">{`${staffSummary.needFollowUpUsers} need follow-up`}</p>
           </div>
 
           {isUsersLoading ? (
@@ -743,12 +747,16 @@ export default function StaffAdminPage() {
                               )}
                               <div className="min-w-0">
                                 <div className="flex items-center gap-2">
-                                  <p className="truncate text-sm font-bold text-slate-800">{getDisplayName(managedUser)}</p>
+                                  <p className="truncate text-sm font-bold text-slate-800" data-no-translate>
+                                    {getDisplayName(managedUser)}
+                                  </p>
                                   {managedUser.username.toLowerCase() === (user?.username || "").toLowerCase() && (
                                     <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700">You</span>
                                   )}
                                 </div>
-                                <p className="truncate text-xs text-slate-500">{managedUser.email || managedUser.username}</p>
+                                <p className="truncate text-xs text-slate-500" data-no-translate>
+                                  {managedUser.email || managedUser.username}
+                                </p>
                               </div>
                             </div>
                           </td>
@@ -821,10 +829,14 @@ export default function StaffAdminPage() {
                         )}
                         <div className="min-w-0 flex-1">
                           <div className="flex flex-wrap items-center gap-2">
-                            <h3 className="truncate text-base font-bold text-slate-800">{getDisplayName(managedUser)}</h3>
+                            <h3 className="truncate text-base font-bold text-slate-800" data-no-translate>
+                              {getDisplayName(managedUser)}
+                            </h3>
                             <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${status.className}`}>{status.label}</span>
                           </div>
-                          <p className="mt-1 truncate text-xs text-slate-500">{managedUser.email || managedUser.username}</p>
+                          <p className="mt-1 truncate text-xs text-slate-500" data-no-translate>
+                            {managedUser.email || managedUser.username}
+                          </p>
                         </div>
                       </div>
                       <div className="mt-4">
@@ -839,8 +851,8 @@ export default function StaffAdminPage() {
                       <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-slate-600">
                         <span>{managedUser.role}</span>
                         <span className="text-right">{progress ? `${progress.completed_lessons_count}/${progress.total_lessons} lessons` : "Not synced"}</span>
-                        <span>Last: {formatDate(progress?.last_activity)}</span>
-                        <span className="text-right">{latestWatchPercentage}% latest</span>
+                        <span>{`Last: ${formatDate(progress?.last_activity)}`}</span>
+                        <span className="text-right">{`${latestWatchPercentage}% latest`}</span>
                       </div>
                       <button
                         type="button"
@@ -863,8 +875,12 @@ export default function StaffAdminPage() {
             <div className="w-full max-w-3xl overflow-hidden rounded-3xl bg-white shadow-2xl">
               <div className="flex items-start justify-between gap-4 border-b border-slate-100 px-6 py-5">
                 <div className="min-w-0">
-                  <h3 className="truncate text-xl font-bold text-slate-800">{getDisplayName(selectedRow.managedUser)}</h3>
-                  <p className="mt-1 text-sm text-slate-500">{selectedRow.managedUser.email || selectedRow.managedUser.username}</p>
+                  <h3 className="truncate text-xl font-bold text-slate-800" data-no-translate>
+                    {getDisplayName(selectedRow.managedUser)}
+                  </h3>
+                  <p className="mt-1 text-sm text-slate-500" data-no-translate>
+                    {selectedRow.managedUser.email || selectedRow.managedUser.username}
+                  </p>
                 </div>
                 <button
                   type="button"
@@ -915,8 +931,20 @@ export default function StaffAdminPage() {
                     <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Contact</p>
                     <div className="mt-3 space-y-2 text-slate-600">
                       <p>Role: {selectedRow.managedUser.role}</p>
-                      <p>Email: {selectedRow.managedUser.email || "No email"}</p>
-                      <p>Phone: {selectedRow.managedUser.phone || "No phone"}</p>
+                      <p>
+                        Email: {selectedRow.managedUser.email ? (
+                          <span data-no-translate>{selectedRow.managedUser.email}</span>
+                        ) : (
+                          "No email"
+                        )}
+                      </p>
+                      <p>
+                        Phone: {selectedRow.managedUser.phone ? (
+                          <span data-no-translate>{selectedRow.managedUser.phone}</span>
+                        ) : (
+                          "No phone"
+                        )}
+                      </p>
                     </div>
                   </div>
                   <div className="rounded-2xl border border-slate-100 p-4">

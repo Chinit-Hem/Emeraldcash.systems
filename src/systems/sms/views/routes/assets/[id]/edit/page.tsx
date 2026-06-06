@@ -148,7 +148,11 @@ export default function EditAssetPage() {
           description: asset.description ?? undefined,
           refId: asset.refId ?? undefined,
         } : undefined}
-        title={`Edit ${asset.name}`}
+        title={(
+          <>
+            Edit <span data-no-translate>{asset.name}</span>
+          </>
+        )}
         isEdit={true}
       />
     </div>

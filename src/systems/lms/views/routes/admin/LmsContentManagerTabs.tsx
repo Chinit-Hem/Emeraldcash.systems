@@ -1,6 +1,8 @@
 "use client";
 
 import { cn } from "@/shared/utils/ui";
+import { useLanguage } from "@/shared/hooks/LanguageContext";
+import { translatePhrase } from "@/shared/utils/i18n";
 import { BookOpen, PlayCircle, type LucideIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
 
@@ -37,6 +39,8 @@ export function LmsContentManagerTabs({
   activeTab: ContentManagerTabId;
 }) {
   const router = useRouter();
+  const { language } = useLanguage();
+  const tr = (text: string) => translatePhrase(text, language);
 
   return (
     <div className="mb-6 rounded-2xl bg-white p-2 shadow-sm ring-1 ring-slate-200">
@@ -68,14 +72,14 @@ export function LmsContentManagerTabs({
                 <Icon className="h-5 w-5" />
               </span>
               <span className="min-w-0">
-                <span className="block truncate text-sm font-bold">{tab.label}</span>
+                <span className="block truncate text-sm font-bold">{tr(tab.label)}</span>
                 <span
                   className={cn(
                     "mt-0.5 block truncate text-xs font-medium",
                     isActive ? "text-emerald-600" : "text-slate-500"
                   )}
                 >
-                  {tab.description}
+                  {tr(tab.description)}
                 </span>
               </span>
             </button>

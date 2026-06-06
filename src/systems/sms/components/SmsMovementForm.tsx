@@ -1,6 +1,6 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useAuthUser } from "@/shared/hooks/AuthContext";
 import {
   AlertCircle,
@@ -9,7 +9,7 @@ import {
   Loader2,
   RotateCcw,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
 import { validateTransferForm } from "@/systems/sms/utils/sms-validation";
 import {
   SmsFieldError,
@@ -94,9 +94,33 @@ function canChooseMovementActor(role: string): boolean {
   return role === "Admin";
 }
 
+function MovementStepSection({
+  step,
+  title,
+  children,
+}: {
+  step: string;
+  title: string;
+  children: ReactNode;
+}) {
+  return (
+    <section className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900/80">
+      <div className="mb-3 flex items-center gap-2">
+        <span className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-50 text-xs font-bold text-emerald-700 ring-1 ring-emerald-100 dark:bg-emerald-500/15 dark:text-emerald-200 dark:ring-emerald-500/30">
+          {step}
+        </span>
+        <h2 className="text-sm font-bold text-slate-900 dark:text-white">{title}</h2>
+      </div>
+      <div className="space-y-4">{children}</div>
+    </section>
+  );
+}
+
 export default function SmsMovementForm({ initialMode }: SmsMovementFormProps) {
   const user = useAuthUser();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const initialAssetId = searchParams.get("assetId") || searchParams.get("asset") || "";
   const canChooseActor = canChooseMovementActor(user.role);
   const [mode, setMode] = useState<MovementMode>(initialMode);
   const [form, setForm] = useState<MovementFormState>(INITIAL_FORM_STATE);
@@ -214,6 +238,15 @@ export default function SmsMovementForm({ initialMode }: SmsMovementFormProps) {
     }));
     clearFieldError("assetId");
   }, [clearFieldError, mode, user.username]);
+
+  useEffect(() => {
+    if (!initialAssetId || assetsLoading || selectedAssetId) return;
+
+    const matchingAsset = selectableAssets.find((asset) => asset.id === initialAssetId);
+    if (matchingAsset) {
+      handleAssetSelect(matchingAsset);
+    }
+  }, [assetsLoading, handleAssetSelect, initialAssetId, selectableAssets, selectedAssetId]);
 
   const handleSenderChange = useCallback(
     (value: string) => handleChange("senderId", value),
@@ -345,101 +378,123 @@ export default function SmsMovementForm({ initialMode }: SmsMovementFormProps) {
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className={`${smsPanelClass} space-y-6 p-4 md:p-6`}>
-        <SmsMovementModeToggle mode={mode} onModeChange={setModeSafely} />
+      <form onSubmit={handleSubmit} className={`${smsPanelClass} overflow-hidden`}>
+        <div className="space-y-4 p-4 md:p-5">
+          <MovementStepSection step="1" title="Movement type">
+            <SmsMovementModeToggle mode={mode} onModeChange={setModeSafely} />
+          </MovementStepSection>
 
-        <SmsMovementAssetField
-          mode={mode}
-          value={form.assetSearch}
-          error={fieldErrors.assetId}
-          loading={loading}
-          assetsLoading={assetsLoading}
-          selectableAssets={selectableAssets}
-          returnableAssetsCount={returnableAssets.length}
-          onSearchChange={handleAssetSearchChange}
-          onSelect={handleAssetSelect}
-        />
+          <MovementStepSection step="2" title="Asset">
+            <SmsMovementAssetField
+              mode={mode}
+              value={form.assetSearch}
+              error={fieldErrors.assetId}
+              loading={loading}
+              assetsLoading={assetsLoading}
+              selectableAssets={selectableAssets}
+              returnableAssetsCount={returnableAssets.length}
+              onSearchChange={handleAssetSearchChange}
+              onSelect={handleAssetSelect}
+            />
 
-        {selectedAsset && (
-          <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-950 dark:border-blue-800 dark:bg-blue-900/20 dark:text-blue-200">
-            <div className="font-semibold">{selectedAsset.name}</div>
-            <div className="mt-1 text-blue-800 dark:text-blue-300">
-              Status: {selectedAsset.status} | Assigned: {selectedAsset.assignedTo || "Unassigned"}
+            {selectedAsset && (
+              <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-950 dark:border-blue-800 dark:bg-blue-900/20 dark:text-blue-200">
+                <div className="font-semibold" data-no-translate>{selectedAsset.name}</div>
+                <div className="mt-1 flex flex-wrap gap-x-1.5 gap-y-1 text-blue-800 dark:text-blue-300">
+                  <span>Status:</span>
+                  <span>{selectedAsset.status}</span>
+                  <span>|</span>
+                  <span>Assigned:</span>
+                  {selectedAsset.assignedTo ? (
+                    <span data-no-translate>{selectedAsset.assignedTo}</span>
+                  ) : (
+                    <span>Unassigned</span>
+                  )}
+                </div>
+              </div>
+            )}
+          </MovementStepSection>
+
+          <MovementStepSection step="3" title="People and location">
+            <SmsMovementUserField
+              label={copy.actorLabel}
+              value={form.senderId}
+              error={fieldErrors.senderId}
+              datalistId="sms-movement-sender-options"
+              title={`Select or enter ${copy.actorLabel.toLowerCase()}`}
+              placeholder={mode === "return" ? "Select or enter returning username" : "Select or enter sender username"}
+              users={users}
+              usersLoading={usersLoading}
+              loading={loading}
+              readOnlyDisplayValue={!canChooseActor ? formatSmsUserLabel(user) : undefined}
+              extraOption={selectedAssignedUserOption}
+              onChange={handleSenderChange}
+            />
+
+            <SmsMovementUserField
+              label={copy.destinationLabel}
+              value={form.receiverId}
+              error={fieldErrors.receiverId}
+              datalistId="sms-movement-receiver-options"
+              title={mode === "return" ? "Select or enter send back receiver" : "Select or enter receiver"}
+              placeholder={mode === "return" ? "Select or enter send back receiver" : "Select or enter receiver"}
+              users={users}
+              usersLoading={usersLoading}
+              loading={loading}
+              extraOption={selectedAssignedUserOption}
+              onChange={handleReceiverChange}
+            />
+
+            <div>
+              <label className={smsLabelClass}>
+                {copy.locationLabel} <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                title={copy.locationLabel}
+                value={form.location}
+                onChange={(event) => handleChange("location", event.target.value)}
+                className={`${smsInputClass} ${fieldErrors.location ? smsInvalidFieldClass : ""}`}
+                placeholder="e.g. Warehouse A, Office Building"
+                disabled={loading}
+                maxLength={128}
+                aria-invalid={fieldErrors.location ? "true" : "false"}
+              />
+              <SmsFieldError error={fieldErrors.location} />
             </div>
+          </MovementStepSection>
+
+          <MovementStepSection step="4" title="Proof and notes">
+            <div>
+              <label className={smsLabelClass}>{copy.noteLabel}</label>
+              <textarea
+                title={copy.noteLabel}
+                value={form.remark}
+                onChange={(event) => handleChange("remark", event.target.value)}
+                className={`${smsTextareaClass} h-24 resize-none ${fieldErrors.remark ? smsInvalidFieldClass : ""}`}
+                placeholder={copy.notePlaceholder}
+                disabled={loading}
+                maxLength={500}
+                aria-invalid={fieldErrors.remark ? "true" : "false"}
+              />
+              <SmsFieldError error={fieldErrors.remark} />
+              <p className={smsHelperClass}>{form.remark.length}/500</p>
+            </div>
+
+            <SmsMovementImageField
+              mode={mode}
+              imageFile={imageFile}
+              loading={loading}
+              onImageFileChange={setImageFile}
+            />
+          </MovementStepSection>
+
+          <div className="text-xs text-gray-500 dark:text-gray-400">
+            Signed in as <span data-no-translate>{user.full_name || user.username}</span>
           </div>
-        )}
-
-        <SmsMovementUserField
-          label={copy.actorLabel}
-          value={form.senderId}
-          error={fieldErrors.senderId}
-          datalistId="sms-movement-sender-options"
-          title={`Select or enter ${copy.actorLabel.toLowerCase()}`}
-          placeholder={mode === "return" ? "Select or enter returning username" : "Select or enter sender username"}
-          users={users}
-          usersLoading={usersLoading}
-          loading={loading}
-          readOnlyDisplayValue={!canChooseActor ? formatSmsUserLabel(user) : undefined}
-          extraOption={selectedAssignedUserOption}
-          onChange={handleSenderChange}
-        />
-
-        <SmsMovementUserField
-          label={copy.destinationLabel}
-          value={form.receiverId}
-          error={fieldErrors.receiverId}
-          datalistId="sms-movement-receiver-options"
-          title={mode === "return" ? "Select or enter send back receiver" : "Select or enter receiver"}
-          placeholder={mode === "return" ? "Select or enter send back receiver" : "Select or enter receiver"}
-          users={users}
-          usersLoading={usersLoading}
-          loading={loading}
-          extraOption={selectedAssignedUserOption}
-          onChange={handleReceiverChange}
-        />
-
-        <div>
-          <label className={smsLabelClass}>
-            {copy.locationLabel} <span className="text-red-500">*</span>
-          </label>
-          <input
-            type="text"
-            title={copy.locationLabel}
-            value={form.location}
-            onChange={(event) => handleChange("location", event.target.value)}
-            className={`${smsInputClass} ${fieldErrors.location ? smsInvalidFieldClass : ""}`}
-            placeholder="e.g. Warehouse A, Office Building"
-            disabled={loading}
-            maxLength={128}
-            aria-invalid={fieldErrors.location ? "true" : "false"}
-          />
-          <SmsFieldError error={fieldErrors.location} />
         </div>
 
-        <div>
-          <label className={smsLabelClass}>{copy.noteLabel}</label>
-          <textarea
-            title={copy.noteLabel}
-            value={form.remark}
-            onChange={(event) => handleChange("remark", event.target.value)}
-            className={`${smsTextareaClass} h-24 resize-none ${fieldErrors.remark ? smsInvalidFieldClass : ""}`}
-            placeholder={copy.notePlaceholder}
-            disabled={loading}
-            maxLength={500}
-            aria-invalid={fieldErrors.remark ? "true" : "false"}
-          />
-          <SmsFieldError error={fieldErrors.remark} />
-          <p className={smsHelperClass}>{form.remark.length}/500</p>
-        </div>
-
-        <SmsMovementImageField
-          mode={mode}
-          imageFile={imageFile}
-          loading={loading}
-          onImageFileChange={setImageFile}
-        />
-
-        <div className={`flex flex-col gap-3 pt-4 sm:flex-row ${smsDividerClass}`}>
+        <div className={`sticky bottom-0 z-10 flex flex-col gap-3 bg-white/95 p-4 backdrop-blur sm:flex-row dark:bg-slate-900/95 ${smsDividerClass}`}>
           <button
             type="button"
             onClick={() => router.back()}
@@ -460,10 +515,6 @@ export default function SmsMovementForm({ initialMode }: SmsMovementFormProps) {
             )}
             {loading ? "Processing..." : copy.submitLabel}
           </button>
-        </div>
-
-        <div className="text-xs text-gray-500 dark:text-gray-400">
-          Signed in as {user.full_name || user.username}
         </div>
       </form>
     </SmsPageShell>

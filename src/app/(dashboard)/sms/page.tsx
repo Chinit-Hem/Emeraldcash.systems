@@ -1,5 +1,5 @@
-﻿"use client";
+import { redirect } from "next/navigation";
 
-export { default } from "@/systems/sms/views/routes/page";
-export * from "@/systems/sms/views/routes/page";
-
+export default function SmsIndexPage() {
+  redirect("/sms/assets");
+}
