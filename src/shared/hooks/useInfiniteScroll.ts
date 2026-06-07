@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 /**
  * Infinite scroll hook with manual fallback + search reset
- * Optimized for VehicleList.tsx (1218 items dataset)
+ * Optimized for large client-rendered result sets.
  */
 export function useInfiniteScroll({
   pageSize = 50,

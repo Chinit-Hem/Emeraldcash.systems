@@ -9,6 +9,7 @@ export const VEHICLE_LIST_PAGE_SIZE_PARAM = "pageSize";
 export const VEHICLE_LIST_FOCUS_PARAM = "focusVehicle";
 export const VEHICLE_LIST_RETURN_PARAM = "from";
 export const VEHICLE_LIST_RETURN_STORAGE_KEY = "vms-vehicle-list-return-href";
+export const VEHICLE_LIST_VIEW_STORAGE_KEY = "vms-vehicle-list-view-mode";
 export const VEHICLE_LIST_SCROLL_STORAGE_KEY = "vms-vehicle-list-scroll-position";
 export const VEHICLE_LIST_SCROLL_SNAPSHOT_STORAGE_PREFIX = "vms-vehicle-list-scroll-snapshot:";
 export const VEHICLE_LIST_URL_CHANGE_EVENT = "vms-vehicle-list-url-change";
@@ -65,6 +66,31 @@ export function parseVehicleListViewParam(value: string | null | undefined): Veh
   return value === "list" ? "list" : "grid";
 }
 
+function isVehicleListViewMode(value: string | null | undefined): value is VehicleListViewMode {
+  return value === "grid" || value === "list";
+}
+
+export function rememberVehicleListViewMode(viewMode: VehicleListViewMode): void {
+  if (typeof window === "undefined") return;
+
+  try {
+    window.localStorage.setItem(VEHICLE_LIST_VIEW_STORAGE_KEY, viewMode);
+  } catch {
+    // Best-effort user preference only.
+  }
+}
+
+export function getStoredVehicleListViewMode(): VehicleListViewMode | null {
+  if (typeof window === "undefined") return null;
+
+  try {
+    const storedViewMode = window.localStorage.getItem(VEHICLE_LIST_VIEW_STORAGE_KEY);
+    return isVehicleListViewMode(storedViewMode) ? storedViewMode : null;
+  } catch {
+    return null;
+  }
+}
+
 export function parseVehicleListPageParam(value: string | null | undefined): number {
   const parsed = Number.parseInt(value ?? "", 10);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : 1;
@@ -119,6 +145,11 @@ export function rememberVehicleListHref(href: string): void {
     window.sessionStorage.setItem(VEHICLE_LIST_RETURN_STORAGE_KEY, safeHref);
   } catch {
     // Best-effort navigation handoff only.
+  }
+
+  const viewMode = new URL(safeHref, "http://localhost").searchParams.get(VEHICLE_LIST_VIEW_PARAM);
+  if (isVehicleListViewMode(viewMode)) {
+    rememberVehicleListViewMode(viewMode);
   }
 }
 
@@ -255,7 +286,12 @@ export function getCurrentVehicleListHref(fallback = VEHICLE_LIST_PATH): string 
   if (typeof window === "undefined") return fallback;
 
   const currentHref = normalizeVehicleListHref(`${window.location.pathname}${window.location.search}`);
-  return currentHref ?? getStoredVehicleListHref(fallback);
+  if (!currentHref) return getStoredVehicleListHref(fallback);
+
+  const currentQuery = currentHref.split("?")[1] ?? "";
+  return getVehicleListHrefFromParams(
+    getVehicleListSearchParamsWithFallback(new URLSearchParams(currentQuery))
+  );
 }
 
 export function getVehicleGroupValue(vehicle: Vehicle, groupBy: VehicleGroupByOption): string {
@@ -346,15 +382,28 @@ function mergeVehicleListSearchParams(
   return merged;
 }
 
+function withStoredVehicleListViewParam(params: URLSearchParams): URLSearchParams {
+  if (params.has(VEHICLE_LIST_VIEW_PARAM)) return params;
+
+  const storedViewMode = getStoredVehicleListViewMode();
+  if (!storedViewMode) return params;
+
+  const nextParams = new URLSearchParams(params.toString());
+  nextParams.set(VEHICLE_LIST_VIEW_PARAM, storedViewMode);
+  return nextParams;
+}
+
 export function getVehicleListSearchParamsWithFallback(
   searchParams: SearchParamsLike | null | undefined
 ): URLSearchParams {
   const current = getVehicleListSearchParams(searchParams);
   const stored = getStoredVehicleListSearchParams();
 
-  return shouldMergeStoredVehicleListParams(current, stored)
+  const nextParams = shouldMergeStoredVehicleListParams(current, stored)
     ? mergeVehicleListSearchParams(stored, current)
     : current;
+
+  return withStoredVehicleListViewParam(nextParams);
 }
 
 export function setVehicleListQueryValue(
@@ -370,8 +419,8 @@ export function setVehicleListQueryValue(
 
 export function withVehicleListFocusHref(href: string, focusVehicleId: string | null | undefined): string {
   const safeHref = normalizeVehicleListHref(href) ?? VEHICLE_LIST_PATH;
-  const params = getVehicleListSearchParams(
-    new URLSearchParams(safeHref.split("?")[1] ?? "")
+  const params = withStoredVehicleListViewParam(
+    getVehicleListSearchParams(new URLSearchParams(safeHref.split("?")[1] ?? ""))
   );
 
   if (focusVehicleId) {
@@ -385,8 +434,8 @@ export function withVehicleListFocusHref(href: string, focusVehicleId: string | 
 
 export function withVehicleListReturnHref(path: string, returnHref: string): string {
   const safeReturnHref = normalizeVehicleListHref(returnHref) ?? VEHICLE_LIST_PATH;
-  const params = getVehicleListSearchParams(
-    new URLSearchParams(safeReturnHref.split("?")[1] ?? "")
+  const params = withStoredVehicleListViewParam(
+    getVehicleListSearchParams(new URLSearchParams(safeReturnHref.split("?")[1] ?? ""))
   );
   params.set(VEHICLE_LIST_RETURN_PARAM, safeReturnHref);
 
@@ -423,7 +472,7 @@ export function getVehicleListHrefWithFallback(searchParams: SearchParamsLike | 
       }
     }
 
-    return getVehicleListHrefFromParams(returnParams);
+    return getVehicleListHrefFromParams(withStoredVehicleListViewParam(returnParams));
   }
 
   return getVehicleListHrefFromParams(getVehicleListSearchParamsWithFallback(searchParams));

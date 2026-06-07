@@ -44,6 +44,7 @@ const ALLOWED_MIME_TYPES = [
 
 const BASE64_DATA_URL_PREFIX = "data:";
 const REMOTE_IMAGE_PROTOCOLS = new Set(["http:", "https:"]);
+const SAFE_VEHICLE_UPLOAD_ID_PATTERN = /^\d{1,18}$/;
 
 // ============================================================================
 // Helper Functions
@@ -142,6 +143,15 @@ function dataUrlToFile(
   }
 }
 
+function normalizeVehicleUploadId(vehicleId: string | null): { value: string | null; error?: string } {
+  const trimmed = vehicleId?.trim();
+  if (!trimmed) return { value: null };
+  if (!SAFE_VEHICLE_UPLOAD_ID_PATTERN.test(trimmed)) {
+    return { value: null, error: "Invalid vehicleId. Expected a numeric vehicle ID." };
+  }
+  return { value: trimmed };
+}
+
 function isValidRemoteImageUrl(value: string): boolean {
   try {
     const url = new URL(value);
@@ -200,6 +210,14 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       );
     }
 
+    const { value: safeVehicleId, error: vehicleIdError } = normalizeVehicleUploadId(vehicleId);
+    if (vehicleIdError) {
+      return NextResponse.json(
+        { ok: false, error: vehicleIdError },
+        { status: 400 }
+      );
+    }
+
     const imageData = file || base64Image;
     if (!imageData) {
       return NextResponse.json(
@@ -231,7 +249,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
         uploadResult = await uploadImage(fileFromDataUrl, {
           category: category || "vehicles",
-          publicId: vehicleId ? `vehicle_${vehicleId}` : undefined,
+          publicId: safeVehicleId ? `vehicle_${safeVehicleId}` : undefined,
           timeout: 120000,
           retryAttempts: 2,
           retryDelay: 1000,
@@ -249,7 +267,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
         uploadResult = await uploadImage(imageData, {
           category: category || "vehicles",
-          publicId: vehicleId ? `vehicle_${vehicleId}` : undefined,
+          publicId: safeVehicleId ? `vehicle_${safeVehicleId}` : undefined,
           timeout: 120000,
           retryAttempts: 2,
           retryDelay: 1000,
@@ -269,7 +287,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
       uploadResult = await uploadImage(file!, {
         category: category || "vehicles",
-        publicId: vehicleId ? `vehicle_${vehicleId}` : undefined,
+        publicId: safeVehicleId ? `vehicle_${safeVehicleId}` : undefined,
         timeout: 120000,
         retryAttempts: 2,
         retryDelay: 1000,

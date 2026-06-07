@@ -45,6 +45,7 @@ import {
   rememberVehicleListHref,
   rememberVehicleListScrollPosition,
   rememberVehicleListScrollSnapshot,
+  rememberVehicleListViewMode,
   setVehicleListQueryValue,
   VEHICLE_LIST_ALL_HREF,
   VEHICLE_LIST_FOCUS_PARAM,
@@ -1434,7 +1435,7 @@ export default function VehiclesClientEnhanced() {
   const [isMobileSafeMode, setIsMobileSafeMode] = useState(detectMobileSafariLike);
   const activeListHrefRef = useRef<string | null>(null);
   const pendingListScrollRestoreRef = useRef<VehicleListScrollSnapshot | null>(null);
-  const userSelectedViewModeRef = useRef(Boolean(activeVehicleListSearchParams.get(VEHICLE_LIST_VIEW_PARAM)));
+  const userSelectedViewModeRef = useRef(Boolean(effectiveVehicleListSearchParams.get(VEHICLE_LIST_VIEW_PARAM)));
   const skipNextFilterPageResetRef = useRef(
     Boolean(
       activeVehicleListSearchParams.get(VEHICLE_LIST_PAGE_PARAM) ||
@@ -1446,11 +1447,9 @@ export default function VehiclesClientEnhanced() {
   // State Management
   // ==========================================================================
 
-  const [viewMode, setViewMode] = useState<ViewMode>(() => {
-    const explicitViewMode = activeVehicleListSearchParams.get(VEHICLE_LIST_VIEW_PARAM);
-    if (detectMobileVehicleViewport() && !explicitViewMode) return "grid";
-    return parseVehicleListViewParam(effectiveVehicleListSearchParams.get(VEHICLE_LIST_VIEW_PARAM));
-  });
+  const [viewMode, setViewMode] = useState<ViewMode>(() =>
+    parseVehicleListViewParam(effectiveVehicleListSearchParams.get(VEHICLE_LIST_VIEW_PARAM))
+  );
   const [currentPage, setCurrentPage] = useState(() => {
     const explicitPage = activeVehicleListSearchParams.get(VEHICLE_LIST_PAGE_PARAM);
     if (detectMobileVehicleViewport() && !explicitPage) return 1;
@@ -1615,20 +1614,6 @@ export default function VehiclesClientEnhanced() {
 
   useEffect(() => {
     setIsMobileSafeMode(detectMobileSafariLike());
-  }, []);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-
-    const mediaQuery = window.matchMedia("(max-width: 767px)");
-    const applyDefaultView = () => {
-      if (userSelectedViewModeRef.current) return;
-      setViewMode(mediaQuery.matches ? "grid" : "list");
-    };
-
-    applyDefaultView();
-    mediaQuery.addEventListener("change", applyDefaultView);
-    return () => mediaQuery.removeEventListener("change", applyDefaultView);
   }, []);
 
   // ==========================================================================
@@ -1827,11 +1812,9 @@ export default function VehiclesClientEnhanced() {
       const nextHasImage = isTruthyQueryParam(noImageParam) ? "no" : "";
       const nextGroupBy = parseVehicleGroupByParam(effectiveVehicleListSearchParams.get("groupBy"));
       const isMobileVehicleList = detectMobileVehicleViewport();
-      const explicitViewModeParam = activeVehicleListSearchParams.get(VEHICLE_LIST_VIEW_PARAM);
       const explicitPageParam = activeVehicleListSearchParams.get(VEHICLE_LIST_PAGE_PARAM);
       const explicitFocusParam = activeVehicleListSearchParams.get(VEHICLE_LIST_FOCUS_PARAM);
-      const viewModeParam =
-        explicitViewModeParam ?? (isMobileVehicleList ? null : effectiveVehicleListSearchParams.get(VEHICLE_LIST_VIEW_PARAM));
+      const viewModeParam = effectiveVehicleListSearchParams.get(VEHICLE_LIST_VIEW_PARAM);
       const nextViewMode = parseVehicleListViewParam(viewModeParam);
       const nextPage = parseVehicleListPageParam(
         isMobileVehicleList && !explicitPageParam
@@ -1875,8 +1858,6 @@ export default function VehiclesClientEnhanced() {
       if (viewModeParam) {
         userSelectedViewModeRef.current = true;
         setViewMode(prev => (prev === nextViewMode ? prev : nextViewMode));
-      } else if (isMobileVehicleList && !userSelectedViewModeRef.current) {
-        setViewMode(prev => (prev === "grid" ? prev : "grid"));
       }
       if (explicitPageParam || !pendingListScrollRestoreRef.current) {
         setCurrentPage(prev => (prev === nextPage ? prev : nextPage));
@@ -2358,6 +2339,7 @@ export default function VehiclesClientEnhanced() {
   const handleViewModeChange = useCallback((nextViewMode: ViewMode) => {
     preserveVehicleListScrollForUpdate();
     userSelectedViewModeRef.current = true;
+    rememberVehicleListViewMode(nextViewMode);
     setViewMode(nextViewMode);
     const nextParams = buildVehicleListParams({
       focusVehicleId: null,

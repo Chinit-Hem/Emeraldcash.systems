@@ -1,11 +1,6 @@
-import { requirePermission } from "@/lib/auth-helpers";
-import { clearCachedVehicles } from "@/systems/vms/api/vehicles-cache";
-import { NextRequest, NextResponse } from "next/server";
-
-export async function POST(req: NextRequest) {
-  const auth = requirePermission(req, "vehicles:edit");
-  if (auth.response) return auth.response;
-
-  clearCachedVehicles();
-  return NextResponse.json({ ok: true, message: "Cache cleared" });
-}
+/**
+ * Compatibility endpoint for POST /api/vehicles/clear-cache.
+ *
+ * The canonical cache-clear handler is /api/vehicles-cache.
+ */
+export { POST } from "../../vehicles-cache/route";

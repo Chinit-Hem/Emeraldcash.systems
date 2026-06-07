@@ -10,31 +10,6 @@ const ALLOW_HEADER_VALUE = "GET, POST, OPTIONS";
 const VEHICLE_ROUTE_HINT =
   "Use /api/vehicles for list/create and /api/vehicles/:id for update/delete.";
 
-function resolveAppsScriptUrl(): string | null {
-  const publicUrl = process.env.NEXT_PUBLIC_API_URL?.trim();
-  const serverUrl = process.env.APPS_SCRIPT_URL?.trim();
-  return publicUrl || serverUrl || null;
-}
-
-function configErrorResponse(): NextResponse {
-  return NextResponse.json(
-    {
-      ok: false,
-      error:
-        "API URL is not configured. Set NEXT_PUBLIC_API_URL in Vercel Environment Variables.",
-      debug: {
-        NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL?.trim()
-          ? "configured"
-          : "missing",
-        APPS_SCRIPT_URL: process.env.APPS_SCRIPT_URL?.trim()
-          ? "configured"
-          : "missing",
-      },
-    },
-    { status: 500, headers: { "Cache-Control": "no-store" } }
-  );
-}
-
 function methodNotAllowedResponse(method: string): NextResponse {
   return NextResponse.json(
     {
@@ -70,7 +45,6 @@ function proxyErrorResponse(method: string, error: unknown): NextResponse {
 }
 
 export async function GET(req: NextRequest) {
-  if (!resolveAppsScriptUrl()) return configErrorResponse();
   try {
     return await vehiclesGet(req);
   } catch (error) {
@@ -79,7 +53,6 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  if (!resolveAppsScriptUrl()) return configErrorResponse();
   try {
     return await vehiclesPost(req);
   } catch (error) {
@@ -96,16 +69,13 @@ export async function OPTIONS(req: NextRequest) {
 }
 
 export function PUT() {
-  if (!resolveAppsScriptUrl()) return configErrorResponse();
   return methodNotAllowedResponse("PUT");
 }
 
 export function DELETE() {
-  if (!resolveAppsScriptUrl()) return configErrorResponse();
   return methodNotAllowedResponse("DELETE");
 }
 
 export function PATCH() {
-  if (!resolveAppsScriptUrl()) return configErrorResponse();
   return methodNotAllowedResponse("PATCH");
 }

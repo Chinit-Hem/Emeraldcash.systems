@@ -135,6 +135,28 @@ export interface StockNotification {
   relatedModelKey?: string;
 }
 
+const VEHICLE_ORDER_COLUMNS: Record<string, string> = {
+  id: "id",
+  created_at: "created_at",
+  updated_at: "updated_at",
+  category: "category",
+  brand: "brand",
+  model: "model",
+  year: "year",
+  plate: "plate",
+  market_price: "market_price",
+  condition: "condition",
+  body_type: "body_type",
+  color: "color",
+};
+
+function getVehicleOrderClause(filters: VehicleFilters): string {
+  const column = filters.orderBy ? VEHICLE_ORDER_COLUMNS[filters.orderBy] : undefined;
+  const safeColumn = column || VEHICLE_ORDER_COLUMNS.id;
+  const direction = filters.orderDirection === "ASC" ? "ASC" : "DESC";
+  return ` ORDER BY ${safeColumn} ${direction}`;
+}
+
 // ============================================================================
 // Vehicle Service Singleton Class
 // ============================================================================
@@ -238,10 +260,12 @@ export class VehicleService extends BaseService<VehicleEntity, VehicleDB> {
   protected applyFilters(
     baseQuery: string,
     filters: VehicleFilters,
-    params: (string | number | null)[]
+    params: (string | number | null)[],
+    options: { includeOrderAndPagination?: boolean } = {}
   ): { query: string; params: (string | number | null)[]; _paramIndex: number } {
     const conditions: string[] = [];
     let _paramIndex = 1;
+    const includeOrderAndPagination = options.includeOrderAndPagination ?? true;
 
     // Filter for vehicles without images (NULL or empty string for both image_id and thumbnail_url)
     if (filters?.withoutImage === true) {
@@ -341,16 +365,20 @@ conditions.push(`(NULLIF(TRIM(COALESCE(image_id, '')), '') IS NULL AND NULLIF(TR
       query += ` WHERE ${conditions.join(" AND ")}`;
     }
 
-    // Append LIMIT and OFFSET outside the WHERE clause
-    if (filters.limit) {
-      query += ` LIMIT $${_paramIndex}`;
-      params.push(filters.limit);
-      _paramIndex++;
-    }
-    if (filters.offset) {
-      query += ` OFFSET $${_paramIndex}`;
-      params.push(filters.offset);
-      _paramIndex++;
+    if (includeOrderAndPagination) {
+      query += getVehicleOrderClause(filters);
+
+      // Append LIMIT and OFFSET outside the WHERE clause
+      if (filters.limit) {
+        query += ` LIMIT $${_paramIndex}`;
+        params.push(filters.limit);
+        _paramIndex++;
+      }
+      if (filters.offset) {
+        query += ` OFFSET $${_paramIndex}`;
+        params.push(filters.offset);
+        _paramIndex++;
+      }
     }
 
     return { query, params, _paramIndex };
@@ -1645,14 +1673,23 @@ AVG(CASE WHEN market_price > 0 THEN market_price ELSE NULL END)::numeric as avg_
       // Build base query for counting
       let query = `SELECT COUNT(*) as count FROM ${this.tableName}`;
       let params: (string | number | null)[] = [];
-      let paramIndex = 1;
+      const countFilters = filters
+        ? {
+            ...filters,
+            limit: undefined,
+            offset: undefined,
+            orderBy: undefined,
+            orderDirection: undefined,
+          }
+        : undefined;
 
-      // Apply the same filters as getVehicles for consistency
-      if (filters && Object.keys(filters).length > 0) {
-        const filterResult = this.applyFilters(query, filters, params);
+      // Apply the same WHERE filters as getVehicles, without list pagination.
+      if (countFilters && Object.keys(countFilters).some((key) => countFilters[key as keyof VehicleFilters] !== undefined)) {
+        const filterResult = this.applyFilters(query, countFilters, params, {
+          includeOrderAndPagination: false,
+        });
         query = filterResult.query;
         params = filterResult.params;
-        paramIndex = filterResult._paramIndex;
       }
 
 

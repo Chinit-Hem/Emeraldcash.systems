@@ -1,4 +1,6 @@
 import type { Metadata, Viewport } from "next";
+import { Analytics } from "@vercel/analytics/next";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 import { Inter, Kantumruy_Pro } from "next/font/google";
 import { Suspense } from "react";
 import "../styles/globals.css";
@@ -169,6 +171,8 @@ export default async function RootLayout({
       </head>
       <body className="antialiased" suppressHydrationWarning>
         <PwaLifecycle />
+        <Analytics />
+        <SpeedInsights />
         <ThemeProvider>
           <LanguageProvider>
             <Suspense fallback={<NeuDashboardSkeleton />}>

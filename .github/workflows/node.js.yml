@@ -1,48 +1,44 @@
-# This workflow will do a clean installation of node dependencies, cache/restore them, build the source code and run tests across different versions of node
-# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-nodejs
-
-name: Node.js CI
+name: CI
 
 on:
   push:
-    branches: [ "main" ]
+    branches: ["main", "master"]
   pull_request:
-    branches: [ "main" ]
+    branches: ["main", "master"]
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  build:
+  verify:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
       contents: read
+    env:
+      DATABASE_URL: postgresql://dummy:dummy@localhost:5432/dummy
+      NEXT_PUBLIC_API_URL: https://dummy.example.com
+      SESSION_SECRET: dummy-session-secret-for-ci-build-only-not-real
+      CLOUDINARY_CLOUD_NAME: dummy-cloud
+      CLOUDINARY_API_KEY: dummy-key
+      CLOUDINARY_API_SECRET: dummy-secret
+      NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME: dummy-cloud
+      NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET: dummy-preset
+      CRON_SECRET: dummy-cron-secret
 
     strategy:
       matrix:
         node-version: [20.9.0, 22.x]
-        # See supported Node.js release schedule at https://nodejs.org/en/about/releases/
 
     steps:
-    - uses: actions/checkout@v4
-    - name: Use Node.js ${{ matrix.node-version }}
-      uses: actions/setup-node@v4
-      with:
-        node-version: ${{ matrix.node-version }}
-        cache: 'npm'
-    - run: npm ci
-    - run: npm run lint
-    - run: npm run typecheck
-    - name: Build with dummy env vars
-      env:
-        # Dummy values for CI build - real values are set in Vercel/production
-        DATABASE_URL: postgresql://dummy:dummy@localhost:5432/dummy
-        NEXT_PUBLIC_API_URL: https://dummy.example.com
-        SESSION_SECRET: dummy-session-secret-for-ci-build-only-not-real
-        CLOUDINARY_CLOUD_NAME: dummy-cloud
-        CLOUDINARY_API_KEY: dummy-key
-        CLOUDINARY_API_SECRET: dummy-secret
-        NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME: dummy-cloud
-        NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET: dummy-preset
-        CRON_SECRET: dummy-cron-secret
-      run: npm run build --if-present
-    - name: Production dependency audit
-      run: npm run audit:prod
+      - uses: actions/checkout@v4
+
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: npm
+
+      - run: npm ci
+      - run: npm run verify:ci

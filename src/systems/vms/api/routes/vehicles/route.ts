@@ -18,7 +18,7 @@ import { requirePermission } from "@/lib/auth-helpers";
 import type { VehicleFilters, VehicleStats } from "@/systems/vms/services/VehicleService";
 import { vehicleService } from "@/systems/vms/services/VehicleService";
 import { NextRequest, NextResponse } from "next/server";
-import { getCachedVehicles, setCachedVehicles } from "@/systems/vms/api/vehicles-cache";
+import { clearCachedVehicles, getCachedVehicles, setCachedVehicles } from "@/systems/vms/api/vehicles-cache";
 import { buildCorsHeaders } from "@/lib/cors"; // Import shared CORS utility
 import type { Vehicle } from "@/shared/types/types";
 import { normalizeImageUrl } from "@/lib/cloudinary";
@@ -584,10 +584,7 @@ const postHandler = withErrorHandling(async (req, { logger, requestId, startTime
     },
   }));
 
-  // Invalidate LRU cache on create
-  import('@/systems/vms/api/vehicles-cache').then(({ clearCachedVehicles }) => {
-    clearCachedVehicles();
-  });
+  clearCachedVehicles();
 
   return createSuccessResponse(
     result.data,
@@ -665,10 +662,7 @@ const deleteHandler = withErrorHandling(async (req, { logger, requestId, startTi
     status: "success",
   }));
 
-  // Invalidate LRU cache on delete
-  import('@/systems/vms/api/vehicles-cache').then(({ clearCachedVehicles }) => {
-    clearCachedVehicles();
-  });
+  clearCachedVehicles();
 
   return createSuccessResponse(
     result.data,

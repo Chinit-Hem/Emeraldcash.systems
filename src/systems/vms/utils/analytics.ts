@@ -234,9 +234,7 @@ import type { VehicleMeta } from "@/shared/types/types";
  * Compute vehicle metadata from an array of vehicles
  * Defensive programming: handles undefined/null inputs safely
  *
- * This function consolidates the duplicate computeVehicleMeta logic from:
- * - VehiclesClient.tsx
- * - DashboardClient.tsx (via aggregatedStats)
+ * This function consolidates shared vehicle metadata calculations.
  *
  * @param vehicles - Array of vehicles (or undefined/null)
  * @returns VehicleMeta object with computed statistics

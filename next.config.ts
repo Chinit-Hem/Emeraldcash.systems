@@ -87,6 +87,15 @@ const authSensitivePageHeaders = [
   { key: "Vary", value: "Cookie, User-Agent" },
 ];
 
+const apiNoStoreHeaders = [
+  { key: "Cache-Control", value: "no-store, no-cache, must-revalidate, proxy-revalidate, private" },
+  { key: "Pragma", value: "no-cache" },
+];
+
+const publicAppAssetHeaders = [
+  { key: "Cache-Control", value: "public, max-age=86400" },
+];
+
 const nextConfig: NextConfig = {
   serverExternalPackages: ['@neondatabase/serverless'],
   generateEtags: true,
@@ -170,6 +179,34 @@ const nextConfig: NextConfig = {
         ],
       },
       {
+        source: "/api/:path*",
+        headers: apiNoStoreHeaders,
+      },
+      {
+        source: "/manifest.webmanifest",
+        headers: publicAppAssetHeaders,
+      },
+      {
+        source: "/favicon.ico",
+        headers: publicAppAssetHeaders,
+      },
+      {
+        source: "/icon-192.png",
+        headers: publicAppAssetHeaders,
+      },
+      {
+        source: "/icon-512.png",
+        headers: publicAppAssetHeaders,
+      },
+      {
+        source: "/apple-touch-icon.png",
+        headers: publicAppAssetHeaders,
+      },
+      {
+        source: "/apple-touch-icon-precomposed.png",
+        headers: publicAppAssetHeaders,
+      },
+      {
         source: "/(.*)",
         headers: securityHeaders,
       },
@@ -196,28 +233,6 @@ const nextConfig: NextConfig = {
     ];
   },
 
-  async rewrites() {
-    return {
-      beforeFiles: [
-        {
-          source: "/api/vehicles/edge",
-          destination: "/api/vehicles",
-        },
-        {
-          source: "/api/vehicles/stats",
-          destination: "/api/dashboard/stats",
-        },
-        {
-          source: "/api/vehicles/create",
-          destination: "/api/vehicles",
-        },
-        {
-          source: "/api/vehicles/clear-cache",
-          destination: "/api/vehicles-cache",
-        },
-      ],
-    };
-  },
 };
 
 export default nextConfig;
