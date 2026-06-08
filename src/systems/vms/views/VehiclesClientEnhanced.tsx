@@ -312,6 +312,31 @@ function detectMobileVehicleViewport(): boolean {
   return typeof window !== "undefined" && window.matchMedia("(max-width: 767px)").matches;
 }
 
+function isTextEntryElement(element: Element | null): boolean {
+  if (!(element instanceof HTMLElement)) return false;
+
+  if (element instanceof HTMLInputElement) {
+    return ![
+      "button",
+      "checkbox",
+      "color",
+      "file",
+      "hidden",
+      "image",
+      "radio",
+      "range",
+      "reset",
+      "submit",
+    ].includes(element.type);
+  }
+
+  return (
+    element instanceof HTMLTextAreaElement ||
+    element instanceof HTMLSelectElement ||
+    element.isContentEditable
+  );
+}
+
 function getVehicleListScrollContainer(): HTMLElement | null {
   if (typeof document === "undefined") return null;
 
@@ -558,17 +583,27 @@ function NeuButton({
 function NeuInput({
   value,
   onChange,
+  onFocus,
+  onBlur,
   placeholder,
   type = "text",
   icon: Icon,
-  className
+  className,
+  autoComplete,
+  enterKeyHint,
+  inputMode,
 }: {
   value: string;
   onChange: (value: string) => void;
+  onFocus?: () => void;
+  onBlur?: () => void;
   placeholder?: string;
   type?: string;
   icon?: React.ComponentType<{ className?: string }>;
   className?: string;
+  autoComplete?: string;
+  enterKeyHint?: React.HTMLAttributes<HTMLInputElement>["enterKeyHint"];
+  inputMode?: React.HTMLAttributes<HTMLInputElement>["inputMode"];
 }) {
   return (
     <div className={cn("relative", className)}>
@@ -578,7 +613,12 @@ function NeuInput({
         title={placeholder}
         value={value}
         onChange={(e) => onChange(e.target.value)}
+        onFocus={onFocus}
+        onBlur={onBlur}
         placeholder={placeholder}
+        autoComplete={autoComplete}
+        enterKeyHint={enterKeyHint}
+        inputMode={inputMode}
         className={cn(
           "w-full rounded-xl border border-slate-200/70 bg-white transition-all duration-200 dark:border-slate-700/70 dark:bg-slate-900 sm:rounded-2xl",
           "shadow-[4px_4px_8px_#e2e8f0,-4px_-4px_8px_#ffffff]",
@@ -1545,9 +1585,11 @@ export default function VehiclesClientEnhanced() {
   const columnMenuRef = useRef<HTMLDivElement>(null);
   const columnsButtonRef = useRef<HTMLButtonElement>(null);
   const infiniteScrollSentinelRef = useRef<HTMLDivElement>(null);
+  const searchBlurTimerRef = useRef<number | null>(null);
 
   // Add Vehicle Modal state
   const [showAddModal, setShowAddModal] = useState(false);
+  const [isVehicleSearchFocused, setIsVehicleSearchFocused] = useState(false);
 
   // Delete Vehicle Modal state
   const [vehicleToDelete, setVehicleToDelete] = useState<Vehicle | null>(null);
@@ -2098,6 +2140,41 @@ export default function VehiclesClientEnhanced() {
     });
   }, [vehicles, filters.search, filteredVehicles.length]);
 
+  const searchSuggestionVehicles = useMemo(() => {
+    const searchTerms = filters.search
+      .toLowerCase()
+      .trim()
+      .split(/\s+/)
+      .filter(Boolean);
+
+    if (searchTerms.join("").length < 2) return [];
+
+    const matches: Vehicle[] = [];
+
+    for (const vehicle of vehicles) {
+      const searchableText = [
+        vehicle.Brand,
+        vehicle.Model,
+        vehicle.Plate,
+        vehicle.Category,
+        vehicle.Year?.toString(),
+        vehicle.Color,
+      ].filter(Boolean).join(" ").toLowerCase();
+
+      if (!searchTerms.every((term) => searchableText.includes(term))) continue;
+
+      matches.push(vehicle);
+      if (matches.length >= 6) break;
+    }
+
+    return matches;
+  }, [filters.search, vehicles]);
+
+  const showVehicleSearchSuggestions =
+    isVehicleSearchFocused &&
+    filters.search.trim().length >= 2 &&
+    searchSuggestionVehicles.length > 0;
+
   // ==========================================================================
   // Progressive rendering keeps the full result set available without rendering every card at once.
   // ==========================================================================
@@ -2169,6 +2246,7 @@ export default function VehiclesClientEnhanced() {
 
   useLayoutEffect(() => {
     if (!focusedVehicleId || isInitialVehiclesLoad) return;
+    if (isTextEntryElement(document.activeElement)) return;
 
     let restoreAnimationFrame: number | null = null;
     let restoreTimeoutId: number | null = null;
@@ -2227,6 +2305,14 @@ export default function VehiclesClientEnhanced() {
       }
     };
   }, [focusedVehicleId, isInitialVehiclesLoad, visibleVehicles]);
+
+  useEffect(() => {
+    return () => {
+      if (searchBlurTimerRef.current !== null) {
+        window.clearTimeout(searchBlurTimerRef.current);
+      }
+    };
+  }, []);
 
   // ==========================================================================
   // Event Handlers
@@ -2382,6 +2468,29 @@ export default function VehiclesClientEnhanced() {
     }));
     resetVisibleVehicleBatch();
   }, [preserveVehicleListScrollForUpdate, resetVisibleVehicleBatch]);
+
+  const handleVehicleSearchChange = useCallback((value: string) => {
+    setFilters(prev => (prev.search === value ? prev : { ...prev, search: value }));
+  }, []);
+
+  const handleVehicleSearchFocus = useCallback(() => {
+    if (searchBlurTimerRef.current !== null) {
+      window.clearTimeout(searchBlurTimerRef.current);
+      searchBlurTimerRef.current = null;
+    }
+    setIsVehicleSearchFocused(true);
+  }, []);
+
+  const handleVehicleSearchBlur = useCallback(() => {
+    if (searchBlurTimerRef.current !== null) {
+      window.clearTimeout(searchBlurTimerRef.current);
+    }
+
+    searchBlurTimerRef.current = window.setTimeout(() => {
+      searchBlurTimerRef.current = null;
+      setIsVehicleSearchFocused(false);
+    }, 160);
+  }, []);
 
   useEffect(() => {
     if (!selectedBrandName) return;
@@ -2694,13 +2803,49 @@ const getVehicleImageUrl = useCallback((imageValue: unknown): string | null => {
         <div className="space-y-1.5 sm:space-y-4">
             <div className="flex flex-col gap-1.5 lg:flex-row lg:gap-4">
               {/* Search Input */}
-              <div className="flex-1">
+              <div className="relative flex-1">
                 <NeuInput
                   value={filters.search}
-                  onChange={(val) => setFilters(prev => ({ ...prev, search: val }))}
+                  onChange={handleVehicleSearchChange}
+                  onFocus={handleVehicleSearchFocus}
+                  onBlur={handleVehicleSearchBlur}
                   placeholder={t.searchByBrandModel}
                   icon={Search}
+                  autoComplete="off"
+                  enterKeyHint="search"
+                  inputMode="search"
                 />
+                {showVehicleSearchSuggestions && (
+                  <div className="absolute left-0 right-0 top-[calc(100%+0.35rem)] z-[950] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl ring-1 ring-slate-900/5 dark:border-slate-800 dark:bg-slate-900 dark:ring-white/10">
+                    <div className="max-h-80 overflow-y-auto overscroll-contain py-1">
+                      {searchSuggestionVehicles.map((vehicle) => (
+                        <button
+                          key={vehicle.VehicleId}
+                          type="button"
+                          onPointerDown={(event) => event.preventDefault()}
+                          onClick={() => {
+                            setIsVehicleSearchFocused(false);
+                            handleView(vehicle.VehicleId);
+                          }}
+                          className="flex w-full items-center gap-3 px-4 py-3 text-left transition hover:bg-emerald-50 active:bg-emerald-100 dark:hover:bg-emerald-500/10 dark:active:bg-emerald-500/15"
+                        >
+                          <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-300">
+                            <Car className="h-5 w-5" aria-hidden="true" />
+                          </span>
+                          <span className="min-w-0 flex-1">
+                            <span className="block truncate text-sm font-semibold text-slate-800 dark:text-slate-100">
+                              {vehicle.Brand || "Vehicle"} {vehicle.Model || ""}
+                            </span>
+                            <span className="mt-0.5 block truncate text-xs text-slate-500 dark:text-slate-400">
+                              {[vehicle.Category, vehicle.Year, vehicle.Plate].filter(Boolean).join(" - ") || vehicle.VehicleId}
+                            </span>
+                          </span>
+                          <ChevronDown className="h-4 w-4 flex-shrink-0 -rotate-90 text-slate-300 dark:text-slate-600" aria-hidden="true" />
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Category Dropdown - Quick Access */}

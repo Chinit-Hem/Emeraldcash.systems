@@ -77,6 +77,8 @@ export default function SearchSuggestions({
           return (
             <button
               key={`${v.VehicleId}-${index}`}
+              type="button"
+              onPointerDown={(event) => event.preventDefault()}
               onClick={() => onSelect(suggestion)}
               className={cn(
                 "group relative flex items-center gap-3 p-4 rounded-2xl text-left",
