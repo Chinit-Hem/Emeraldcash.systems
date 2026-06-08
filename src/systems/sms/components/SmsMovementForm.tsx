@@ -458,7 +458,7 @@ export default function SmsMovementForm({ initialMode }: SmsMovementFormProps) {
                 placeholder="e.g. Warehouse A, Office Building"
                 disabled={loading}
                 maxLength={128}
-                aria-invalid={fieldErrors.location ? "true" : "false"}
+                {...(fieldErrors.location ? { "aria-invalid": "true" as const } : {})}
               />
               <SmsFieldError error={fieldErrors.location} />
             </div>
@@ -475,7 +475,7 @@ export default function SmsMovementForm({ initialMode }: SmsMovementFormProps) {
                 placeholder={copy.notePlaceholder}
                 disabled={loading}
                 maxLength={500}
-                aria-invalid={fieldErrors.remark ? "true" : "false"}
+                {...(fieldErrors.remark ? { "aria-invalid": "true" as const } : {})}
               />
               <SmsFieldError error={fieldErrors.remark} />
               <p className={smsHelperClass}>{form.remark.length}/500</p>

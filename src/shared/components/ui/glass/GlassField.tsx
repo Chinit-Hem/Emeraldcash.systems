@@ -40,7 +40,7 @@ export const GlassField = forwardRef<HTMLInputElement | HTMLSelectElement | HTML
             ref={ref as React.Ref<HTMLSelectElement>}
             id={fieldId}
             className={`${inputStyles} appearance-none cursor-pointer`}
-            aria-invalid={!!error}
+            {...(error ? { "aria-invalid": "true" as const } : {})}
             aria-describedby={errorId || helperId}
             {...(props as React.SelectHTMLAttributes<HTMLSelectElement>)}
           >
@@ -51,7 +51,7 @@ export const GlassField = forwardRef<HTMLInputElement | HTMLSelectElement | HTML
             ref={ref as React.Ref<HTMLTextAreaElement>}
             id={fieldId}
             className={`${inputStyles} h-auto min-h-24 py-3 resize-y`}
-            aria-invalid={!!error}
+            {...(error ? { "aria-invalid": "true" as const } : {})}
             aria-describedby={errorId || helperId}
             {...(props as unknown as React.TextareaHTMLAttributes<HTMLTextAreaElement>)}
 
@@ -61,7 +61,7 @@ export const GlassField = forwardRef<HTMLInputElement | HTMLSelectElement | HTML
             ref={ref as React.Ref<HTMLInputElement>}
             id={fieldId}
             className={inputStyles}
-            aria-invalid={!!error}
+            {...(error ? { "aria-invalid": "true" as const } : {})}
             aria-describedby={errorId || helperId}
             {...(props as React.InputHTMLAttributes<HTMLInputElement>)}
           />

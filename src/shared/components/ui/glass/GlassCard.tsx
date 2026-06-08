@@ -34,7 +34,7 @@ const variants: Record<NonNullable<GlassCardProps["variant"]>, string> = {
     <div
       className={cn(baseStyles, variants[variant], hoverStyles, className)}
       onClick={onClick}
-      role={onClick ? "button" : undefined}
+      {...(onClick ? { role: "button" as const } : {})}
       tabIndex={onClick ? 0 : undefined}
     >
       <div className="relative z-10">{children}</div>

@@ -2,6 +2,7 @@
 
 import type { User } from "@/shared/types/types";
 import Image from "next/image";
+import { Menu } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Suspense, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
@@ -12,6 +13,7 @@ import { AuthUserProvider } from "@/shared/hooks/AuthContext";
 import { UIProvider } from "@/shared/hooks/UIContext";
 import { clearCachedUser, getCachedUser, setCachedUser } from "@/shared/utils/authCache";
 import { useLanguage } from "@/shared/hooks/LanguageContext";
+import { useStandaloneDisplayMode } from "@/shared/hooks/useStandaloneDisplayMode";
 
 type AppShellProps = {
   children: ReactNode;
@@ -40,8 +42,10 @@ function AppShellContent({ children }: AppShellProps) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const isDesktopSidebar = useDesktopSidebar();
+  const isStandaloneApp = useStandaloneDisplayMode();
   const { language } = useLanguage();
   const systemsLabel = language === "km" ? "ប្រព័ន្ធ" : "Systems";
+  const openMenuLabel = language === "km" ? "បើកម៉ឺនុយ" : "Open menu";
 
   // OPTIMIZATION: Show UI immediately with cached user, check auth in background
   const [user, setUser] = useState<User | null>(() => getCachedUser());
@@ -226,6 +230,7 @@ function AppShellContent({ children }: AppShellProps) {
 
   // Mobile-first header with Neumorphism
   const mobileHeaderClass = "xl:hidden fixed top-0 left-0 right-0 z-40 neu-card-sm !rounded-none !rounded-b-neu !p-0 safe-area-top";
+  const bottomPaddingClass = isStandaloneApp ? "pb-safe" : "pb-0";
   const shouldShowSidebarLayer = isSidebarOpen || isSidebarClosing;
 
   // Loading state - Neumorphism
@@ -267,7 +272,7 @@ function AppShellContent({ children }: AppShellProps) {
   }
 
   return (
-    <div className="flex h-dvh min-h-screen overflow-hidden bg-transparent pb-safe xl:pb-0">
+    <div className={`flex h-dvh min-h-screen overflow-hidden bg-transparent ${bottomPaddingClass} xl:pb-0`}>
       <AuthUserProvider user={user}>
         <MobileBackHandler isMenuOpen={isSidebarOpen} onCloseMenu={closeSidebar} />
 
@@ -286,7 +291,7 @@ function AppShellContent({ children }: AppShellProps) {
           onKeyDown={(e) => {
             if (e.key === "Escape") closeSidebar();
           }}
-          aria-hidden={!isSidebarOpen}
+          {...(!isSidebarOpen ? { "aria-hidden": "true" as const } : {})}
         >
           <div
             className={`absolute inset-0 bg-slate-900/30 backdrop-blur-sm transition-opacity duration-200 ease-out motion-reduce:transition-none ${isSidebarOpen ? "opacity-100" : "opacity-0"}`}
@@ -297,7 +302,7 @@ function AppShellContent({ children }: AppShellProps) {
             id={drawerId}
             className={`absolute inset-y-0 left-0 h-full w-[280px] max-w-[85vw] overflow-hidden bg-neu-bg shadow-neu-flat-lg transition-[opacity,transform] duration-[220ms] ease-out will-change-[opacity,transform] motion-reduce:transition-none ${isSidebarOpen ? "translate-x-0 opacity-100" : "-translate-x-full opacity-0"}`}
             role="dialog"
-            aria-modal={isSidebarOpen ? "true" : undefined}
+            {...(isSidebarOpen ? { "aria-modal": "true" as const } : {})}
             aria-label="Navigation menu"
           >
             <Suspense fallback={null}>
@@ -317,9 +322,9 @@ function AppShellContent({ children }: AppShellProps) {
           {/* Mobile header - Fixed position with safe area support */}
           <header
             className={`${mobileHeaderClass} transition-opacity duration-150 ${shouldShowSidebarLayer ? "pointer-events-none opacity-0" : "opacity-100"}`}
-            aria-hidden={shouldShowSidebarLayer}
+            {...(shouldShowSidebarLayer ? { "aria-hidden": "true" as const } : {})}
           >
-            <div className="h-14 px-4 flex items-center justify-center max-w-[100vw]">
+            <div className="relative h-14 px-4 flex items-center justify-center max-w-[100vw]">
               <div className="flex min-w-0 translate-y-1 items-center justify-center gap-3">
                 <div className="relative w-9 h-9 flex items-center justify-center overflow-hidden flex-shrink-0 neu-icon-btn !rounded-full !bg-white dark:!bg-white">
                   <Image
@@ -336,6 +341,18 @@ function AppShellContent({ children }: AppShellProps) {
                   <span className="text-sm font-bold leading-tight text-emerald-700 dark:text-emerald-300">{systemsLabel}</span>
                 </div>
               </div>
+              {!isStandaloneApp ? (
+                <button
+                  type="button"
+                  className="neu-icon-btn absolute left-3 top-1/2 h-10 w-10 -translate-y-1/2 text-neu-text-muted"
+                  onClick={openSidebar}
+                  aria-label={openMenuLabel}
+                  aria-controls={drawerId}
+                  {...{ "aria-expanded": isSidebarOpen ? "true" as const : "false" as const }}
+                >
+                  <Menu className="h-5 w-5" aria-hidden="true" />
+                </button>
+              ) : null}
             </div>
           </header>
 

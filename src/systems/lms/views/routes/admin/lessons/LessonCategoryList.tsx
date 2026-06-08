@@ -64,7 +64,7 @@ export function LessonCategoryList({
             <button
               type="button"
               onClick={() => onToggleCategory(category.id)}
-              aria-expanded={isExpanded}
+              {...(isExpanded ? { "aria-expanded": "true" as const } : { "aria-expanded": "false" as const })}
               className="flex min-h-11 w-full items-center justify-between gap-3 p-4 transition-colors hover:bg-slate-50/50 sm:p-6"
             >
               <div className="flex min-w-0 items-center gap-3">

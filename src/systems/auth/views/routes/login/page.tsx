@@ -328,7 +328,7 @@ function LoginForm() {
                     className="absolute right-3 top-1/2 -translate-y-1/2 rounded-lg p-2 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700 dark:text-slate-500 dark:hover:bg-slate-700 dark:hover:text-slate-200"
                     aria-label={showPassword ? "Hide password" : "Show password"}
                     aria-controls={passwordInputId}
-                    aria-pressed={showPassword}
+                    {...(showPassword ? { "aria-pressed": "true" as const } : { "aria-pressed": "false" as const })}
                   >
                     {showPassword ? (
                       <svg

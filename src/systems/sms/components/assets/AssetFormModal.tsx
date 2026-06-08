@@ -425,7 +425,7 @@ export default function AssetFormModal({
                       disabled={loading}
                       required
                       maxLength={255}
-                      aria-invalid={Boolean(errors.name)}
+                      {...(errors.name ? { "aria-invalid": "true" as const } : {})}
                       autoFocus
                     />
                     {errors.name && (
@@ -448,7 +448,7 @@ export default function AssetFormModal({
                         placeholder="e.g. SMS-LAP-0001"
                         disabled={loading}
                         maxLength={64}
-                        aria-invalid={Boolean(errors.itemCode)}
+                        {...(errors.itemCode ? { "aria-invalid": "true" as const } : {})}
                       />
                       <button
                         type="button"
@@ -483,7 +483,7 @@ export default function AssetFormModal({
                       disabled={loading}
                       required
                       maxLength={64}
-                      aria-invalid={Boolean(errors.type)}
+                      {...(errors.type ? { "aria-invalid": "true" as const } : {})}
                     />
                     <datalist id="asset-types">
                       <option value="Electronics" />
@@ -517,7 +517,7 @@ export default function AssetFormModal({
                       className={`${smsInputClass} ${errors.quantity ? smsInvalidFieldClass : ""}`}
                       placeholder="1"
                       disabled={loading}
-                      aria-invalid={Boolean(errors.quantity)}
+                      {...(errors.quantity ? { "aria-invalid": "true" as const } : {})}
                     />
                     {errors.quantity && (
                       <p className={smsErrorTextClass}>
@@ -547,7 +547,7 @@ export default function AssetFormModal({
                       placeholder="e.g. Vehicle documents, Hard cards, Office equipment"
                       disabled={loading}
                       maxLength={64}
-                      aria-invalid={Boolean(errors.category)}
+                      {...(errors.category ? { "aria-invalid": "true" as const } : {})}
                     />
                     {errors.category && (
                       <p className={smsErrorTextClass}>
@@ -568,7 +568,7 @@ export default function AssetFormModal({
                       placeholder="e.g. Phnom Penh Office"
                       disabled={loading}
                       maxLength={128}
-                      aria-invalid={Boolean(errors.location)}
+                      {...(errors.location ? { "aria-invalid": "true" as const } : {})}
                     />
                     {errors.location && (
                       <p className={smsErrorTextClass}>
@@ -601,7 +601,7 @@ export default function AssetFormModal({
                       placeholder={formData.status === 'Available' ? 'Optional for available assets' : 'Select or enter assignee'}
                       disabled={loading || formData.status === 'Available'}
                       maxLength={128}
-                      aria-invalid={Boolean(errors.assignedTo)}
+                      {...(errors.assignedTo ? { "aria-invalid": "true" as const } : {})}
                     />
                     <datalist id="asset-assignee-options" data-no-translate>
                       {users.map((settingsUser) => (
@@ -739,7 +739,7 @@ export default function AssetFormModal({
                       placeholder="Additional details about this asset..."
                       disabled={loading}
                       maxLength={1000}
-                      aria-invalid={Boolean(errors.description)}
+                      {...(errors.description ? { "aria-invalid": "true" as const } : {})}
                     />
                     <div className="mt-1 flex items-center justify-between gap-3">
                       {errors.description ? (
@@ -766,7 +766,7 @@ export default function AssetFormModal({
                         placeholder="e.g. PO-2024-001"
                         disabled={loading}
                         maxLength={128}
-                        aria-invalid={Boolean(errors.refId)}
+                        {...(errors.refId ? { "aria-invalid": "true" as const } : {})}
                       />
                       {errors.refId && (
                         <p className={smsErrorTextClass}>
@@ -787,7 +787,7 @@ export default function AssetFormModal({
                         placeholder="https://..."
                         disabled={loading}
                         maxLength={512}
-                        aria-invalid={Boolean(errors.documentUrl)}
+                        {...(errors.documentUrl ? { "aria-invalid": "true" as const } : {})}
                       />
                       {errors.documentUrl && (
                         <p className={smsErrorTextClass}>

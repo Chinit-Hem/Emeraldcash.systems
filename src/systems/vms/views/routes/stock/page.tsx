@@ -173,6 +173,8 @@ const handleSubmit = async (e: React.FormEvent) => {
                   <select
                     value={form.location}
                     onChange={(e) => setForm({...form, location: e.target.value})}
+                    title="Stock location"
+                    aria-label="Stock location"
                     className="w-full p-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
                   >
                     {locations.map(loc => (

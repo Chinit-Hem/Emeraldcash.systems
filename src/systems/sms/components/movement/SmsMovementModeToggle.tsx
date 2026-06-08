@@ -41,7 +41,7 @@ export const SmsMovementModeToggle = memo(function SmsMovementModeToggle({
         <button
           key={optionMode}
           type="button"
-          aria-pressed={mode === optionMode}
+          {...{ "aria-pressed": mode === optionMode ? "true" as const : "false" as const }}
           onClick={() => onModeChange(optionMode)}
           className={`inline-flex min-h-11 items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-semibold transition ${
             mode === optionMode

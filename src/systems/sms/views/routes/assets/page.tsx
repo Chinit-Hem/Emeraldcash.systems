@@ -185,6 +185,17 @@ export default function AssetsPage() {
     );
   }, [searchParams]);
 
+  const syncFiltersToUrl = useCallback(
+    (nextFilters: AssetListFilters) => {
+      const nextPath = buildAssetListPath(nextFilters);
+      const scrollSnapshot = getAppScrollSnapshot();
+
+      rememberAssetListScrollSnapshot(nextPath, scrollSnapshot);
+      router.replace(nextPath, { scroll: false });
+    },
+    [router]
+  );
+
   const handleFilterChange = useCallback(
     (key: AssetFilterKey, value: string | number) => {
       const nextFilters: AssetListFilters = {
@@ -192,14 +203,21 @@ export default function AssetsPage() {
         [key]: key === 'page' || key === 'pageSize' ? Number(value) : String(value),
         page: key === 'page' ? Number(value) : 1,
       };
-      const nextPath = buildAssetListPath(nextFilters);
-      const scrollSnapshot = getAppScrollSnapshot();
 
-      rememberAssetListScrollSnapshot(nextPath, scrollSnapshot);
       setFilters(nextFilters);
-      router.replace(nextPath, { scroll: false });
+
+      if (key !== 'search') {
+        syncFiltersToUrl(nextFilters);
+      }
     },
-    [filters, router]
+    [filters, syncFiltersToUrl]
+  );
+
+  const commitSearchFilter = useCallback(
+    () => {
+      syncFiltersToUrl(filters);
+    },
+    [filters, syncFiltersToUrl]
   );
 
   const rememberAssetReturnTarget = useCallback(
@@ -433,7 +451,17 @@ export default function AssetsPage() {
                 placeholder="Search name, code, location, assigned person..."
                 value={filters.search}
                 onChange={(e) => handleFilterChange('search', e.target.value)}
+                onBlur={commitSearchFilter}
+                onKeyDown={(e) => {
+                  if (e.key !== 'Enter') return;
+                  e.preventDefault();
+                  commitSearchFilter();
+                  e.currentTarget.blur();
+                }}
                 className={`${smsInputClass} pl-12`}
+                autoComplete="off"
+                enterKeyHint="search"
+                inputMode="search"
               />
             </div>
             <div className="relative lg:col-span-3">

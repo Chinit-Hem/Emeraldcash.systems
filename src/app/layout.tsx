@@ -84,6 +84,36 @@ const iosSafariGuardScript = `
   })();
 `;
 
+const standaloneModeScript = `
+  (function () {
+    try {
+      var queries = [
+        "(display-mode: standalone)",
+        "(display-mode: fullscreen)",
+        "(display-mode: minimal-ui)"
+      ];
+      var matchesDisplayMode = false;
+
+      if (window.matchMedia) {
+        for (var i = 0; i < queries.length; i++) {
+          if (window.matchMedia(queries[i]).matches) {
+            matchesDisplayMode = true;
+            break;
+          }
+        }
+      }
+
+      var isStandalone =
+        matchesDisplayMode ||
+        navigator.standalone === true ||
+        (document.referrer || "").indexOf("android-app://") === 0;
+
+      document.documentElement.classList.toggle("pwa-standalone", isStandalone);
+      document.documentElement.classList.toggle("pwa-browser", !isStandalone);
+    } catch (_) {}
+  })();
+`;
+
 const languageInitScript = `
   (function () {
     try {
@@ -166,6 +196,7 @@ export default async function RootLayout({
     >
       <head>
         <script id="ios-safari-guard" dangerouslySetInnerHTML={{ __html: iosSafariGuardScript }} />
+        <script id="standalone-mode" dangerouslySetInnerHTML={{ __html: standaloneModeScript }} />
         <script id="language-init" dangerouslySetInnerHTML={{ __html: languageInitScript }} />
         <script id="theme-init" dangerouslySetInnerHTML={{ __html: themeInitScript }} />
       </head>

@@ -10,13 +10,18 @@ type FilterSelectProps = {
   onChange: (value: string) => void;
   options: SelectOption[];
   placeholder?: string;
+  label?: string;
   disabled?: boolean;
 };
 
-export default function FilterSelect({ id, value, onChange, options, placeholder, disabled }: FilterSelectProps) {
+export default function FilterSelect({ id, value, onChange, options, placeholder, label, disabled }: FilterSelectProps) {
+  const accessibleName = label ?? placeholder ?? "Filter options";
+
   return (
     <select
       id={id}
+      title={accessibleName}
+      aria-label={accessibleName}
       value={value}
       onChange={(e: React.ChangeEvent<HTMLSelectElement>) => onChange(e.target.value)}
       className="ec-select w-full"
@@ -31,4 +36,3 @@ export default function FilterSelect({ id, value, onChange, options, placeholder
     </select>
   );
 }
-

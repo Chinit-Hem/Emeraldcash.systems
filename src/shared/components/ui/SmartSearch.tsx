@@ -147,6 +147,7 @@ export default function SmartSearch({
           onFocus={() => setIsOpen(true)}
           onKeyDown={handleKeyDown}
           placeholder={placeholder}
+          title={placeholder}
           className="w-full px-4 py-2 pl-10 pr-4 text-sm bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
           aria-label="Search vehicles"
           aria-haspopup="listbox"
@@ -189,19 +190,14 @@ export default function SmartSearch({
             </div>
           ) : (
             <ul className="py-1" role="presentation">
-              {filteredVehicles.map((vehicle, index) => (
-                <li
-                  key={vehicle.VehicleId}
-                  role="option"
-                  aria-selected={index === highlightedIndex ? "true" : "false"}
-                  onClick={() => handleSelect(vehicle)}
-                  onMouseEnter={() => setHighlightedIndex(index)}
-                  className={`px-4 py-2 cursor-pointer text-sm ${
-                    index === highlightedIndex
-                      ? "bg-emerald-50 dark:bg-emerald-900/30 text-emerald-900 dark:text-emerald-100"
-                      : "text-gray-900 dark:text-white hover:bg-gray-50 dark:hover:bg-gray-700"
-                  }`}
-                >
+              {filteredVehicles.map((vehicle, index) => {
+                const isHighlighted = index === highlightedIndex;
+                const className = `px-4 py-2 cursor-pointer text-sm ${
+                  isHighlighted
+                    ? "bg-emerald-50 dark:bg-emerald-900/30 text-emerald-900 dark:text-emerald-100"
+                    : "text-gray-900 dark:text-white hover:bg-gray-50 dark:hover:bg-gray-700"
+                }`;
+                const content = (
                   <div className="flex items-center justify-between">
                     <div>
                       <span className="font-medium">
@@ -215,8 +211,32 @@ export default function SmartSearch({
                       {vehicle.Plate}
                     </span>
                   </div>
-                </li>
-              ))}
+                );
+
+                return isHighlighted ? (
+                  <li
+                    key={vehicle.VehicleId}
+                    role="option"
+                    aria-selected="true"
+                    onClick={() => handleSelect(vehicle)}
+                    onMouseEnter={() => setHighlightedIndex(index)}
+                    className={className}
+                  >
+                    {content}
+                  </li>
+                ) : (
+                  <li
+                    key={vehicle.VehicleId}
+                    role="option"
+                    aria-selected="false"
+                    onClick={() => handleSelect(vehicle)}
+                    onMouseEnter={() => setHighlightedIndex(index)}
+                    className={className}
+                  >
+                    {content}
+                  </li>
+                );
+              })}
             </ul>
           )}
         </div>

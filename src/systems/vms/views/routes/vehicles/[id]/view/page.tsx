@@ -245,7 +245,7 @@ function FloatingLabelInput({
           title={label}
           min={min}
           max={max}
-          aria-invalid={!!error}
+          {...(error ? { "aria-invalid": "true" as const } : {})}
           aria-describedby={errorId}
           className={cn(
             "w-full px-3 py-3 bg-transparent text-sm text-slate-800 outline-none rounded-xl",
@@ -312,33 +312,55 @@ function CategorySelector({
         Category <span className="text-rose-500">*</span>
       </p>
       <div className="grid grid-cols-3 gap-3" role="radiogroup" aria-labelledby={labelId}>
-        {CATEGORY_OPTIONS.map((cat) => (
-          <button
-            key={cat.value}
-            type="button"
-            role="radio"
-            aria-checked={value === cat.value}
-            onClick={() => !disabled && onChange(cat.value)}
-            disabled={disabled}
-            className={cn(
-              "relative flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all duration-200",
-              value === cat.value
-                ? "border-emerald-500 bg-emerald-50/50 shadow-md"
-                : "border-slate-200 hover:border-slate-300 bg-white hover:shadow-sm",
-              disabled && "opacity-50 cursor-not-allowed"
-            )}
-          >
-            <div className={cn("w-12 h-12 rounded-xl flex items-center justify-center", cat.bgClass)}>
-              {cat.icon}
-            </div>
-            <span className="text-sm font-medium text-slate-700">{cat.label}</span>
-            {value === cat.value && (
-              <div className="absolute top-2 right-2 w-5 h-5 rounded-full bg-emerald-500 flex items-center justify-center">
-                <CheckCircle2 className="w-3 h-3 text-white" aria-hidden="true" />
+        {CATEGORY_OPTIONS.map((cat) => {
+          const isSelected = value === cat.value;
+          const className = cn(
+            "relative flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all duration-200",
+            isSelected
+              ? "border-emerald-500 bg-emerald-50/50 shadow-md"
+              : "border-slate-200 hover:border-slate-300 bg-white hover:shadow-sm",
+            disabled && "opacity-50 cursor-not-allowed"
+          );
+          const content = (
+            <>
+              <div className={cn("w-12 h-12 rounded-xl flex items-center justify-center", cat.bgClass)}>
+                {cat.icon}
               </div>
-            )}
-          </button>
-        ))}
+              <span className="text-sm font-medium text-slate-700">{cat.label}</span>
+              {isSelected && (
+                <div className="absolute top-2 right-2 w-5 h-5 rounded-full bg-emerald-500 flex items-center justify-center">
+                  <CheckCircle2 className="w-3 h-3 text-white" aria-hidden="true" />
+                </div>
+              )}
+            </>
+          );
+
+          return isSelected ? (
+            <button
+              key={cat.value}
+              type="button"
+              role="radio"
+              aria-checked="true"
+              onClick={() => !disabled && onChange(cat.value)}
+              disabled={disabled}
+              className={className}
+            >
+              {content}
+            </button>
+          ) : (
+            <button
+              key={cat.value}
+              type="button"
+              role="radio"
+              aria-checked="false"
+              onClick={() => !disabled && onChange(cat.value)}
+              disabled={disabled}
+              className={className}
+            >
+              {content}
+            </button>
+          );
+        })}
       </div>
       {error && <p className="text-xs text-rose-500">{error}</p>}
     </div>
@@ -854,7 +876,7 @@ function ViewVehicleInner() {
                     onClick={handleSubmit}
                     disabled={isSubmitting}
                     aria-label={isSubmitting ? "Saving vehicle" : "Save vehicle"}
-                    aria-busy={isSubmitting}
+                    {...(isSubmitting ? { "aria-busy": "true" as const } : { "aria-busy": "false" as const })}
                     className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-500 text-white rounded-xl font-medium hover:bg-emerald-600 transition-all duration-200 shadow-md hover:shadow-lg disabled:opacity-50"
                   >
                     {isSubmitting ? (

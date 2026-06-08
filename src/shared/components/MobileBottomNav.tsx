@@ -4,9 +4,11 @@ import type { User } from "@/shared/types/types";
 import { BookOpen, Boxes, Calculator, Menu, Settings } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
+import { flushSync } from "react-dom";
 import type { LucideIcon } from "lucide-react";
 import { isIOSSafariBrowser } from "@/shared/utils/platform";
 import { useMounted } from "@/shared/hooks/useMounted";
+import { useStandaloneDisplayMode } from "@/shared/hooks/useStandaloneDisplayMode";
 import { useLanguage } from "@/shared/hooks/LanguageContext";
 import { OptimizedLink } from "@/shared/components/OptimizedLink";
 import { hasAppPermission } from "@/shared/utils/permissions";
@@ -64,8 +66,10 @@ export default function MobileBottomNav({
   const router = useRouter();
   const pathname = usePathname() || "/";
   const isIOSSafari = useMounted() && isIOSSafariBrowser();
+  const isStandaloneApp = useStandaloneDisplayMode();
   const { language } = useLanguage();
   const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
+  const [pendingItemId, setPendingItemId] = useState<NavLinkItem["id"] | null>(null);
 
   const translatedNavItems = useMemo(() => {
     const navItems: NavLinkItem[] = [];
@@ -97,6 +101,7 @@ export default function MobileBottomNav({
   }, [language, user.role]);
 
   useEffect(() => {
+    if (!isStandaloneApp) return;
     if (isIOSSafari) return;
 
     const connection = (navigator as Navigator & { connection?: NetworkInformationLike }).connection;
@@ -114,9 +119,11 @@ export default function MobileBottomNav({
       window.clearTimeout(timer);
       prefetchTimers.forEach((prefetchTimer) => window.clearTimeout(prefetchTimer));
     };
-  }, [isIOSSafari, router, translatedNavItems]);
+  }, [isIOSSafari, isStandaloneApp, router, translatedNavItems]);
 
   useEffect(() => {
+    if (!isStandaloneApp) return;
+
     const mediaQuery = window.matchMedia("(max-width: 767px)");
     const keyboardTimers = new Set<number>();
 
@@ -155,19 +162,7 @@ export default function MobileBottomNav({
       window.removeEventListener("focusout", scheduleKeyboardStateUpdate);
       mediaQuery.removeEventListener("change", scheduleKeyboardStateUpdate);
     };
-  }, []);
-
-  useEffect(() => {
-    const shouldCollapseNavSpace = isKeyboardOpen && !isMenuOpen;
-
-    document.documentElement.classList.toggle("mobile-keyboard-open", shouldCollapseNavSpace);
-    document.body.classList.toggle("mobile-keyboard-open", shouldCollapseNavSpace);
-
-    return () => {
-      document.documentElement.classList.remove("mobile-keyboard-open");
-      document.body.classList.remove("mobile-keyboard-open");
-    };
-  }, [isKeyboardOpen, isMenuOpen]);
+  }, [isStandaloneApp]);
 
   const isActive = (item: NavLinkItem) => {
     if (item.id === "vms") {
@@ -184,23 +179,61 @@ export default function MobileBottomNav({
     return pathname === "/settings";
   };
 
+  const routeActiveItemId = translatedNavItems.find((item) => isActive(item))?.id ?? null;
+
+  useEffect(() => {
+    if (pendingItemId && routeActiveItemId === pendingItemId) {
+      setPendingItemId(null);
+    }
+  }, [pendingItemId, routeActiveItemId]);
+
+  useEffect(() => {
+    if (!pendingItemId) return;
+
+    const timer = window.setTimeout(() => {
+      setPendingItemId(null);
+    }, 4000);
+
+    return () => window.clearTimeout(timer);
+  }, [pendingItemId]);
+
+  const markPendingNavItem = (item: NavLinkItem, active: boolean) => {
+    if (!active) {
+      flushSync(() => {
+        setPendingItemId(item.id);
+      });
+    }
+  };
+
+  const handleNavClick = (item: NavLinkItem, active: boolean) => {
+    markPendingNavItem(item, active);
+
+    if (document.activeElement instanceof HTMLElement) {
+      document.activeElement.blur();
+    }
+  };
+
   const navClass = isIOSSafari
-    ? "fixed inset-x-0 bottom-0 z-50 border-t border-neu-bg-dark bg-neu-bg shadow-lg xl:hidden"
-    : "neu-mobile-nav fixed inset-x-0 bottom-0 z-50 xl:hidden";
+    ? "fixed inset-x-0 bottom-0 z-50 border-t border-neu-bg-dark bg-neu-bg shadow-lg transition-[opacity,transform] duration-150 xl:hidden"
+    : "neu-mobile-nav fixed inset-x-0 bottom-0 z-50 transition-[opacity,transform] duration-150 xl:hidden";
+  const keyboardHiddenClass =
+    isKeyboardOpen && !isMenuOpen ? "pointer-events-none translate-y-full opacity-0" : "";
   const menuLabel = language === "km" ? "ម៉ឺនុយ" : "Menu";
 
-  if (isKeyboardOpen && !isMenuOpen) {
+  if (!isStandaloneApp) {
     return null;
   }
 
   return (
     <nav
-      className={navClass}
+      className={`${navClass} ${keyboardHiddenClass}`}
       aria-label="Primary navigation"
+      {...(isKeyboardOpen && !isMenuOpen ? { "aria-hidden": "true" as const } : {})}
     >
       <div className="mx-auto flex h-[calc(4.25rem+env(safe-area-inset-bottom))] max-w-2xl items-start justify-around gap-1 px-2 pb-[max(env(safe-area-inset-bottom),0.35rem)] pt-2">
         {translatedNavItems.map((item) => {
-          const active = isActive(item);
+          const routeActive = routeActiveItemId === item.id;
+          const active = pendingItemId ? pendingItemId === item.id : routeActive;
           const Icon = item.icon;
 
           return (
@@ -208,8 +241,11 @@ export default function MobileBottomNav({
               key={item.id}
               href={item.href}
               className={`neu-mobile-nav-item min-w-0 flex-1 !px-1 ${active ? "active" : ""}`}
-              prefetch={false}
-              priority="low"
+              prefetch
+              priority="high"
+              deferNavigation
+              onPointerDown={() => markPendingNavItem(item, routeActive)}
+              onClick={() => handleNavClick(item, routeActive)}
             >
               <Icon className="h-5 w-5" strokeWidth={active ? 2.35 : 1.9} />
               <span className="max-w-full truncate text-[11px] font-medium leading-tight sm:text-xs">
@@ -223,7 +259,7 @@ export default function MobileBottomNav({
           className={`neu-mobile-nav-item min-w-0 flex-1 !px-1 ${isMenuOpen ? "active" : ""}`}
           onClick={onOpenMenu}
           aria-label={language === "km" ? "បើកម៉ឺនុយ" : "Open menu"}
-          aria-expanded={isMenuOpen}
+          {...{ "aria-expanded": isMenuOpen ? "true" as const : "false" as const }}
         >
           <Menu className="h-5 w-5" strokeWidth={isMenuOpen ? 2.35 : 1.9} />
           <span className="max-w-full truncate text-[11px] font-medium leading-tight sm:text-xs">

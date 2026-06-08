@@ -667,7 +667,7 @@ function BrandFilterSection({
             <button
               key={brand.name}
               type="button"
-              aria-pressed={isActive}
+              {...(isActive ? { "aria-pressed": "true" as const } : { "aria-pressed": "false" as const })}
               onClick={() => onBrandSelect(brand.name)}
               className={cn(
                 "group flex min-h-[58px] min-w-0 flex-col items-center justify-start gap-1 rounded-xl px-0 py-1 text-center transition sm:min-h-[122px] sm:gap-3 sm:px-2 sm:py-2",
@@ -742,7 +742,7 @@ function ModelFilterSection({
             <button
               key={model.label}
               type="button"
-              aria-pressed={isActive}
+              {...(isActive ? { "aria-pressed": "true" as const } : { "aria-pressed": "false" as const })}
               onClick={() => onModelSelect(model.value)}
               className={cn(
                 "flex min-h-12 items-center justify-center rounded-xl px-3 py-2 text-center text-xs font-medium leading-tight transition focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/70 sm:min-h-14 sm:text-base",
@@ -875,7 +875,7 @@ function BodyTypeFilterSection({
             <button
               key={bodyType.label}
               type="button"
-              aria-pressed={isActive}
+              {...(isActive ? { "aria-pressed": "true" as const } : { "aria-pressed": "false" as const })}
               onClick={() => onBodyTypeSelect(bodyType.value)}
               className={cn(
                 "group flex min-h-[58px] min-w-0 flex-col items-center justify-start gap-1 rounded-xl px-0 py-1 text-center transition sm:min-h-[122px] sm:gap-3 sm:px-2 sm:py-2",
@@ -1168,7 +1168,7 @@ function VehicleImageActions({ vehicle, photoCount }: { vehicle: Vehicle; photoC
         type="button"
         onClick={handleMenuToggle}
         aria-label="Vehicle actions"
-        aria-expanded={isMenuOpen}
+        {...(isMenuOpen ? { "aria-expanded": "true" as const } : { "aria-expanded": "false" as const })}
         className="absolute right-0.5 top-0.5 z-20 flex h-5 w-5 items-center justify-center rounded-full bg-slate-950/82 text-white shadow-sm backdrop-blur-sm transition hover:bg-slate-950 active:scale-95 sm:right-2 sm:top-2 sm:h-9 sm:w-9"
       >
         <MoreVertical className="h-3 w-3 sm:h-5 sm:w-5" />
@@ -2768,7 +2768,7 @@ const getVehicleImageUrl = useCallback((imageValue: unknown): string | null => {
                   type="button"
                   ref={columnsButtonRef}
                   onClick={() => setShowColumnMenu(!showColumnMenu)}
-                  aria-expanded={showColumnMenu ? "true" : "false"}
+                  {...(showColumnMenu ? { "aria-expanded": "true" as const } : { "aria-expanded": "false" as const })}
                   aria-haspopup="dialog"
                   className={cn(
                     "flex min-h-10 items-center gap-2 rounded-2xl px-3 py-2 text-sm font-medium sm:px-4 sm:py-2.5",

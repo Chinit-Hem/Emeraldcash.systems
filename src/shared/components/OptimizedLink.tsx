@@ -10,7 +10,9 @@ interface OptimizedLinkProps {
   className?: string;
   prefetch?: boolean;
   priority?: "high" | "normal" | "low";
-  onClick?: () => void;
+  onClick?: (event: React.MouseEvent<HTMLAnchorElement>) => void;
+  onPointerDown?: () => void;
+  deferNavigation?: boolean;
 }
 
 /**
@@ -29,6 +31,8 @@ export function OptimizedLink({
   prefetch = true,
   priority = "normal",
   onClick,
+  onPointerDown,
+  deferNavigation = false,
 }: OptimizedLinkProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -88,10 +92,35 @@ export function OptimizedLink({
   }, []);
 
   const handleClick = useCallback(
-    () => {
-      onClick?.();
+    (event: React.MouseEvent<HTMLAnchorElement>) => {
+      onClick?.(event);
+
+      if (!deferNavigation || href === pathname || href === "#") return;
+      if (
+        event.defaultPrevented ||
+        event.button !== 0 ||
+        event.metaKey ||
+        event.ctrlKey ||
+        event.shiftKey ||
+        event.altKey
+      ) {
+        return;
+      }
+
+      event.preventDefault();
+      router.prefetch(href);
+      window.requestAnimationFrame(() => {
+        router.push(href);
+      });
     },
-    [onClick]
+    [deferNavigation, href, onClick, pathname, router]
+  );
+
+  const handlePointerDown = useCallback(
+    () => {
+      onPointerDown?.();
+    },
+    [onPointerDown]
   );
 
   return (
@@ -101,6 +130,7 @@ export function OptimizedLink({
       className={className}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
+      onPointerDown={handlePointerDown}
       onClick={handleClick}
       prefetch={false} // We handle prefetching manually for better control
     >

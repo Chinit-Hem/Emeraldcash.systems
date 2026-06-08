@@ -286,6 +286,8 @@ function GlassSelect({
           onChange={onChange}
           onBlur={onBlur}
           disabled={disabled}
+          title={label}
+          aria-label={label}
           className={`
             w-full h-11 px-4 rounded-xl
             bg-white/5 border border-white/10
@@ -905,8 +907,11 @@ label: isKm ? (cat === "Cars" ? "រថយន្ត" : cat === "Motorcycles" ? "
                     </p>
                   </div>
                   <button
+                    type="button"
                     onClick={onCancel}
                     disabled={isSubmitting}
+                    aria-label="Close vehicle form"
+                    title="Close vehicle form"
                     className="p-2 rounded-xl bg-white/5 border border-white/10 text-slate-400 hover:text-white hover:bg-white/10 transition-all disabled:opacity-50"
                   >
                     <svg

@@ -1690,7 +1690,7 @@ useEffect(() => {
                       <button
                         type="button"
                         onClick={handleVideoSurfaceClick}
-                        aria-disabled={!isReady}
+                        {...(!isReady ? { "aria-disabled": "true" as const } : { "aria-disabled": "false" as const })}
                         className="absolute inset-0 z-10 cursor-pointer bg-transparent"
                         aria-label={
                           areControlsVisible

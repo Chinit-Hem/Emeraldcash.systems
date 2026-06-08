@@ -1,13 +1,13 @@
 /**
  * Dashboard Component - Clean Professional Advanced Standard
- * 
+ *
  * Features:
  * - Pure Neumorphism design system
  * - Soft shadows and tactile interactions
  * - Smooth animations and hover transitions
  * - Professional typography hierarchy
  * - Mobile-responsive layout
- * 
+ *
  * @module Dashboard
  */
 
@@ -16,6 +16,7 @@
 
 import { useState, useCallback, useMemo, useEffect } from "react";
 import dynamic from "next/dynamic";
+import Link from "next/link";
 import type { Vehicle } from "@/shared/types/types";
 import { useDashboardVehicleSearch } from "@/systems/vms/hooks/useDashboardVehicleSearch";
 import { CATEGORY_COLORS } from "@/systems/vms/utils/categoryColors";
@@ -23,6 +24,7 @@ import { VEHICLE_LIST_ALL_HREF } from "@/systems/vms/utils/vehicleListState";
 import { safeGetMonthKey } from "@/shared/utils/safeDate";
 import { MotorcycleIcon } from "@/shared/components/icons/MotorcycleIcon";
 import { TukTukIcon } from "@/shared/components/icons/TukTukIcon";
+import { OptimizedLink } from "@/shared/components/OptimizedLink";
 
 // ============================================================================
 // Dynamic Chart Imports (ssr: false prevents hydration errors)
@@ -30,33 +32,33 @@ import { TukTukIcon } from "@/shared/components/icons/TukTukIcon";
 
 const VehiclesByCategoryChart = dynamic(
   () => import("@/systems/vms/components/dashboard/charts/VehiclesByCategoryChart"),
-  { 
-    ssr: false, 
-    loading: () => <ChartSkeleton height={300} /> 
+  {
+    ssr: false,
+    loading: () => <ChartSkeleton height={300} />
   }
 );
 
 const NewVsUsedChart = dynamic(
   () => import("@/systems/vms/components/dashboard/charts/NewVsUsedChart"),
-  { 
-    ssr: false, 
-    loading: () => <ChartSkeleton height={300} /> 
+  {
+    ssr: false,
+    loading: () => <ChartSkeleton height={300} />
   }
 );
 
 const VehiclesByBrandChart = dynamic(
   () => import("@/systems/vms/components/dashboard/charts/VehiclesByBrandChart"),
-  { 
-    ssr: false, 
-    loading: () => <ChartSkeleton height={300} /> 
+  {
+    ssr: false,
+    loading: () => <ChartSkeleton height={300} />
   }
 );
 
 const MonthlyAddedChart = dynamic(
   () => import("@/systems/vms/components/dashboard/charts/MonthlyAddedChart"),
-  { 
-    ssr: false, 
-    loading: () => <ChartSkeleton height={300} /> 
+  {
+    ssr: false,
+    loading: () => <ChartSkeleton height={300} />
   }
 );
 
@@ -144,7 +146,7 @@ const ColorPalette = {
  */
 function ChartSkeleton({ height = 300 }: ChartSkeletonProps) {
   return (
-    <div 
+    <div
       className="w-full flex items-center justify-center bg-slate-100 rounded-[20px] dark:bg-slate-900"
       style={{ height: `${height}px` }}
     >
@@ -219,20 +221,23 @@ function DashboardStatCard({
   href,
 }: StatCardProps) {
   const colors = ColorPalette[color];
-  
+
   const isClickable = !!onClick || !!href;
-  const clickableClasses = isClickable 
-    ? "cursor-pointer hover:-translate-y-1 active:translate-y-0 transition-transform" 
+  const clickableClasses = isClickable
+    ? "cursor-pointer transition-transform duration-150 active:scale-[0.98] sm:hover:-translate-y-1"
     : "";
 
   const subtitleContent = subtitle && subtitleHref ? (
-    <a 
-      href={subtitleHref} 
+    <OptimizedLink
+      href={subtitleHref}
+      prefetch
+      priority="high"
+      deferNavigation
       className="text-xs text-red-700 mt-1 truncate hover:text-red-800 hover:underline cursor-pointer inline-block relative z-10 dark:text-red-400 dark:hover:text-red-300"
       onClick={(e) => e.stopPropagation()}
     >
       {subtitle}
-    </a>
+    </OptimizedLink>
   ) : subtitle ? (
     <p className="text-xs text-[#4a4a5a] mt-1 truncate dark:text-slate-400">{subtitle}</p>
   ) : null;
@@ -272,19 +277,33 @@ function DashboardStatCard({
 
   if (href && subtitleHref) {
     return (
-      <div className={cardClasses} onClick={() => window.location.href = href}>
+      <OptimizedLink
+        href={href}
+        prefetch
+        priority="high"
+        deferNavigation
+        className="block no-underline"
+      >
+        <div className={cardClasses}>
         {innerContent}
-      </div>
+        </div>
+      </OptimizedLink>
     );
   }
 
   if (href) {
     return (
-      <a href={href} className="block no-underline">
+      <OptimizedLink
+        href={href}
+        prefetch
+        priority="high"
+        deferNavigation
+        className="block no-underline"
+      >
         <div className={cardClasses}>
           {innerContent}
         </div>
-      </a>
+      </OptimizedLink>
     );
   }
 
@@ -409,7 +428,7 @@ export default function Dashboard({
       const normalizedCategory = category.includes("car") ? "Cars" :
                                   category.includes("motor") ? "Motorcycles" :
                                   category.includes("tuk") ? "TukTuks" : "Other";
-      
+
       stats.byCategory[normalizedCategory] = (stats.byCategory[normalizedCategory] || 0) + 1;
 
       const condition = (vehicle.Condition || "Unknown").toLowerCase().trim();
@@ -447,6 +466,11 @@ export default function Dashboard({
     }
     return vehicles;
   }, [vehicles, debouncedSearch, searchResults]);
+  const searchSuggestionVehicles = useMemo(
+    () => searchResults.slice(0, 6),
+    [searchResults]
+  );
+  const showSearchSuggestions = searchQuery.trim().length >= 2;
 
   const categoryChartData = useMemo(() => {
     if (!meta) return [];
@@ -610,11 +634,51 @@ export default function Dashboard({
           placeholder="Search vehicles..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
+          autoComplete="off"
+          enterKeyHint="search"
+          inputMode="search"
           className="w-full pl-12 pr-4 py-4 rounded-[20px] bg-slate-100 shadow-sm text-[#1a1a2e] placeholder-[#4a4a5a] focus:outline-none focus:ring-2 focus:ring-emerald-500/20 text-sm sm:text-base dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-500 dark:ring-1 dark:ring-slate-800"
         />
         {debouncedSearch !== searchQuery && (
           <div className="absolute inset-y-0 right-0 pr-4 flex items-center">
             <div className="w-5 h-5 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
+          </div>
+        )}
+        {showSearchSuggestions && (
+          <div className="absolute left-0 right-0 top-[calc(100%+0.5rem)] z-50 overflow-hidden rounded-[20px] border border-slate-200 bg-white shadow-xl dark:border-slate-800 dark:bg-slate-900">
+            {isSearching || debouncedSearch !== searchQuery ? (
+              <div className="flex items-center gap-3 px-4 py-3 text-sm text-[#4a4a5a] dark:text-slate-400">
+                <div className="h-4 w-4 rounded-full border-2 border-emerald-500 border-t-transparent animate-spin" />
+                Searching vehicles...
+              </div>
+            ) : searchSuggestionVehicles.length > 0 ? (
+              <div className="max-h-80 overflow-y-auto py-1">
+                {searchSuggestionVehicles.map((vehicle) => (
+                  <Link
+                    key={vehicle.VehicleId}
+                    href={`/vehicles/${encodeURIComponent(vehicle.VehicleId)}/view`}
+                    className="flex items-center gap-3 px-4 py-3 text-left transition hover:bg-emerald-50 dark:hover:bg-emerald-500/10"
+                  >
+                    <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-300">
+                      {Icons.car}
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm font-semibold text-[#1a1a2e] dark:text-slate-100">
+                        {vehicle.Brand || "Vehicle"} {vehicle.Model || ""}
+                      </span>
+                      <span className="mt-0.5 block truncate text-xs text-[#4a4a5a] dark:text-slate-400">
+                        {[vehicle.Category, vehicle.Year, vehicle.Plate].filter(Boolean).join(" - ") || vehicle.VehicleId}
+                      </span>
+                    </span>
+                    <span className="text-slate-300 dark:text-slate-600">&rsaquo;</span>
+                  </Link>
+                ))}
+              </div>
+            ) : (
+              <div className="px-4 py-3 text-sm text-[#4a4a5a] dark:text-slate-400">
+                No matching vehicles
+              </div>
+            )}
           </div>
         )}
       </div>

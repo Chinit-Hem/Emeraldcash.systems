@@ -85,7 +85,7 @@ export const SmsMovementAssetField = memo(function SmsMovementAssetField({
             disabled={loading}
             autoComplete="off"
             title={inputLabel}
-            aria-invalid={Boolean(error)}
+            {...(error ? { "aria-invalid": "true" as const } : {})}
           />
           {!loading && selectableAssets.length > 0 && dropdownOpen && (
             <div className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-lg bg-white py-1 shadow-xl ring-1 ring-gray-200 dark:bg-gray-900 dark:ring-gray-700">

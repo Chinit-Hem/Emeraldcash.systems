@@ -22,6 +22,7 @@ import type { Vehicle } from "@/shared/types/types";
 import { useDashboardVehicleSearch } from "@/systems/vms/hooks/useDashboardVehicleSearch";
 import { safeGetMonthKey } from "@/shared/utils/safeDate";
 import { TukTukIcon } from "@/shared/components/icons/TukTukIcon";
+import { OptimizedLink } from "@/shared/components/OptimizedLink";
 import {
   Bike,
   Car,
@@ -404,6 +405,7 @@ export default function EnhancedDashboard({
   const [vehicles, setVehicles] = useState<Vehicle[]>(initialVehicles);
   const [meta, setMeta] = useState<DashboardMeta>(initialMeta);
   const [activeFilter, setActiveFilter] = useState<string | null>(null);
+  const [pendingCategoryHref, setPendingCategoryHref] = useState<string | null>(null);
 
   const { language, toggleLanguage } = useLanguage();
   const { t } = useTranslation(language);
@@ -452,6 +454,11 @@ export default function EnhancedDashboard({
     }
     return vehicles;
   }, [vehicles, debouncedSearch, searchResults]);
+  const searchSuggestionVehicles = useMemo(
+    () => searchResults.slice(0, 6),
+    [searchResults]
+  );
+  const showSearchSuggestions = searchQuery.trim().length >= 2;
 
   // Chart data preparation
   const categoryChartData = useMemo(() => {
@@ -506,6 +513,20 @@ export default function EnhancedDashboard({
   const handleFilterClick = useCallback((filter: string) => {
     setActiveFilter(activeFilter === filter ? null : filter);
   }, [activeFilter]);
+
+  const handleCategoryNavIntent = useCallback((href: string) => {
+    setPendingCategoryHref(href);
+  }, []);
+
+  useEffect(() => {
+    if (!pendingCategoryHref) return;
+
+    const timer = window.setTimeout(() => {
+      setPendingCategoryHref(null);
+    }, 3000);
+
+    return () => window.clearTimeout(timer);
+  }, [pendingCategoryHref]);
 
   // Error state
   if (error) {
@@ -609,22 +630,26 @@ export default function EnhancedDashboard({
             {/* Vehicle Category Cards Grid */}
             <div className="grid min-w-0 grid-cols-2 gap-3 sm:gap-6 lg:grid-cols-4">
               {/* All Vehicles Card */}
-              <Link
+              <OptimizedLink
                 href={VEHICLE_LIST_ALL_HREF}
-                className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-white to-slate-50 p-4 shadow-sm transition-all duration-500 hover:-translate-y-1 hover:bg-slate-50 dark:from-slate-900 dark:to-slate-800 dark:ring-1 dark:ring-slate-800 dark:hover:bg-slate-800 sm:rounded-3xl sm:p-6"
+                prefetch
+                priority="high"
+                deferNavigation
+                onPointerDown={() => handleCategoryNavIntent(VEHICLE_LIST_ALL_HREF)}
+                className={`group relative overflow-hidden rounded-2xl bg-gradient-to-br from-white to-slate-50 p-4 shadow-sm transition-all duration-150 hover:bg-slate-50 active:scale-[0.98] dark:from-slate-900 dark:to-slate-800 dark:ring-1 dark:ring-slate-800 dark:hover:bg-slate-800 sm:rounded-3xl sm:p-6 sm:duration-300 sm:hover:-translate-y-1 ${pendingCategoryHref === VEHICLE_LIST_ALL_HREF ? "scale-[0.98] ring-2 ring-emerald-400/50" : ""}`}
               >
                 {/* Animated Background Gradient */}
-                <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/5 via-teal-500/5 to-cyan-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+                <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/5 via-teal-500/5 to-cyan-500/5 opacity-0 transition-opacity duration-150 group-hover:opacity-100 sm:duration-300" />
 
                 {/* Content */}
                 <div className="relative">
                   {/* Icon & Count Row */}
                   <div className="mb-4 flex items-start justify-between gap-3">
-                    <div className="rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 p-2.5 shadow-lg shadow-emerald-500/30 transition-all duration-300 group-hover:scale-110 group-hover:shadow-emerald-500/40 sm:p-3">
+                    <div className="rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 p-2.5 shadow-lg shadow-emerald-500/30 transition-all duration-150 group-hover:scale-105 group-hover:shadow-emerald-500/40 sm:p-3 sm:duration-300 sm:group-hover:scale-110">
                       <Package className="h-6 w-6 text-white sm:h-7 sm:w-7" />
                     </div>
                     <div className="min-w-0 text-right">
-                      <span className="text-3xl font-bold text-slate-800 transition-colors duration-300 group-hover:text-emerald-600 dark:text-slate-100 dark:group-hover:text-emerald-300 sm:text-4xl">
+                      <span className="text-3xl font-bold text-slate-800 transition-colors duration-150 group-hover:text-emerald-600 dark:text-slate-100 dark:group-hover:text-emerald-300 sm:text-4xl sm:duration-300">
                         {totalVehicles.toLocaleString()}
                       </span>
                     </div>
@@ -653,26 +678,30 @@ export default function EnhancedDashboard({
                   </div>
 
                   {/* Hover Arrow */}
-                  <div className="absolute bottom-0 right-0 opacity-0 group-hover:opacity-100 transition-all duration-300 transform translate-x-2 group-hover:translate-x-0">
+                  <div className="absolute bottom-0 right-0 translate-x-2 opacity-0 transition-all duration-150 group-hover:translate-x-0 group-hover:opacity-100 sm:duration-300">
                     <ChevronRight className="w-6 h-6 text-emerald-500" />
                   </div>
                 </div>
-              </Link>
+              </OptimizedLink>
 
               {/* Cars Card */}
-              <Link
+              <OptimizedLink
                 href="/vehicles?category=cars"
-                className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-white to-blue-50/30 p-4 shadow-sm transition-all duration-500 hover:-translate-y-1 hover:bg-slate-50 dark:from-slate-900 dark:to-slate-800 dark:ring-1 dark:ring-slate-800 dark:hover:bg-slate-800 sm:rounded-3xl sm:p-6"
+                prefetch
+                priority="high"
+                deferNavigation
+                onPointerDown={() => handleCategoryNavIntent("/vehicles?category=cars")}
+                className={`group relative overflow-hidden rounded-2xl bg-gradient-to-br from-white to-blue-50/30 p-4 shadow-sm transition-all duration-150 hover:bg-slate-50 active:scale-[0.98] dark:from-slate-900 dark:to-slate-800 dark:ring-1 dark:ring-slate-800 dark:hover:bg-slate-800 sm:rounded-3xl sm:p-6 sm:duration-300 sm:hover:-translate-y-1 ${pendingCategoryHref === "/vehicles?category=cars" ? "scale-[0.98] ring-2 ring-blue-400/50" : ""}`}
               >
-                <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 via-indigo-500/5 to-violet-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+                <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 via-indigo-500/5 to-violet-500/5 opacity-0 transition-opacity duration-150 group-hover:opacity-100 sm:duration-300" />
 
                 <div className="relative">
                   <div className="mb-4 flex items-start justify-between gap-3">
-                    <div className="rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 p-2.5 shadow-lg shadow-blue-500/30 transition-all duration-300 group-hover:scale-110 group-hover:shadow-blue-500/40 sm:p-3">
+                    <div className="rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 p-2.5 shadow-lg shadow-blue-500/30 transition-all duration-150 group-hover:scale-105 group-hover:shadow-blue-500/40 sm:p-3 sm:duration-300 sm:group-hover:scale-110">
                       <Car className="h-6 w-6 text-white sm:h-7 sm:w-7" />
                     </div>
                     <div className="min-w-0 text-right">
-                      <span className="text-3xl font-bold text-slate-800 transition-colors duration-300 group-hover:text-blue-600 dark:text-slate-100 dark:group-hover:text-blue-300 sm:text-4xl">
+                      <span className="text-3xl font-bold text-slate-800 transition-colors duration-150 group-hover:text-blue-600 dark:text-slate-100 dark:group-hover:text-blue-300 sm:text-4xl sm:duration-300">
                         {carsCount.toLocaleString()}
                       </span>
                     </div>
@@ -692,32 +721,36 @@ export default function EnhancedDashboard({
 
                     <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden dark:bg-slate-800">
                       <div
-                        className="h-full bg-gradient-to-r from-blue-500 to-indigo-500 rounded-full transition-all duration-1000"
+                        className="h-full rounded-full bg-gradient-to-r from-blue-500 to-indigo-500 transition-all duration-300 sm:duration-700"
                         style={{ width: `${getCategoryPercent(carsCount)}%` }}
                       />
                     </div>
                   </div>
 
-                  <div className="absolute bottom-0 right-0 opacity-0 group-hover:opacity-100 transition-all duration-300 transform translate-x-2 group-hover:translate-x-0">
+                  <div className="absolute bottom-0 right-0 translate-x-2 opacity-0 transition-all duration-150 group-hover:translate-x-0 group-hover:opacity-100 sm:duration-300">
                     <ChevronRight className="w-6 h-6 text-blue-500" />
                   </div>
                 </div>
-              </Link>
+              </OptimizedLink>
 
               {/* Motorcycles Card */}
-              <Link
+              <OptimizedLink
                 href="/vehicles?category=motorcycles"
-                className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-white to-violet-50/30 p-4 shadow-sm transition-all duration-500 hover:-translate-y-1 hover:bg-slate-50 dark:from-slate-900 dark:to-slate-800 dark:ring-1 dark:ring-slate-800 dark:hover:bg-slate-800 sm:rounded-3xl sm:p-6"
+                prefetch
+                priority="high"
+                deferNavigation
+                onPointerDown={() => handleCategoryNavIntent("/vehicles?category=motorcycles")}
+                className={`group relative overflow-hidden rounded-2xl bg-gradient-to-br from-white to-violet-50/30 p-4 shadow-sm transition-all duration-150 hover:bg-slate-50 active:scale-[0.98] dark:from-slate-900 dark:to-slate-800 dark:ring-1 dark:ring-slate-800 dark:hover:bg-slate-800 sm:rounded-3xl sm:p-6 sm:duration-300 sm:hover:-translate-y-1 ${pendingCategoryHref === "/vehicles?category=motorcycles" ? "scale-[0.98] ring-2 ring-violet-400/50" : ""}`}
               >
-                <div className="absolute inset-0 bg-gradient-to-br from-violet-500/5 via-purple-500/5 to-fuchsia-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+                <div className="absolute inset-0 bg-gradient-to-br from-violet-500/5 via-purple-500/5 to-fuchsia-500/5 opacity-0 transition-opacity duration-150 group-hover:opacity-100 sm:duration-300" />
 
                 <div className="relative">
                   <div className="mb-4 flex items-start justify-between gap-3">
-                    <div className="rounded-2xl bg-gradient-to-br from-violet-500 to-purple-600 p-2.5 shadow-lg shadow-violet-500/30 transition-all duration-300 group-hover:scale-110 group-hover:shadow-violet-500/40 sm:p-3">
+                    <div className="rounded-2xl bg-gradient-to-br from-violet-500 to-purple-600 p-2.5 shadow-lg shadow-violet-500/30 transition-all duration-150 group-hover:scale-105 group-hover:shadow-violet-500/40 sm:p-3 sm:duration-300 sm:group-hover:scale-110">
                       <Bike className="h-6 w-6 text-white sm:h-7 sm:w-7" />
                     </div>
                     <div className="min-w-0 text-right">
-                      <span className="text-3xl font-bold text-slate-800 transition-colors duration-300 group-hover:text-violet-600 dark:text-slate-100 dark:group-hover:text-violet-300 sm:text-4xl">
+                      <span className="text-3xl font-bold text-slate-800 transition-colors duration-150 group-hover:text-violet-600 dark:text-slate-100 dark:group-hover:text-violet-300 sm:text-4xl sm:duration-300">
                         {motorcyclesCount.toLocaleString()}
                       </span>
                     </div>
@@ -737,32 +770,36 @@ export default function EnhancedDashboard({
 
                     <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden dark:bg-slate-800">
                       <div
-                        className="h-full bg-gradient-to-r from-violet-500 to-purple-500 rounded-full transition-all duration-1000"
+                        className="h-full rounded-full bg-gradient-to-r from-violet-500 to-purple-500 transition-all duration-300 sm:duration-700"
                         style={{ width: `${getCategoryPercent(motorcyclesCount)}%` }}
                       />
                     </div>
                   </div>
 
-                  <div className="absolute bottom-0 right-0 opacity-0 group-hover:opacity-100 transition-all duration-300 transform translate-x-2 group-hover:translate-x-0">
+                  <div className="absolute bottom-0 right-0 translate-x-2 opacity-0 transition-all duration-150 group-hover:translate-x-0 group-hover:opacity-100 sm:duration-300">
                     <ChevronRight className="w-6 h-6 text-violet-500" />
                   </div>
                 </div>
-              </Link>
+              </OptimizedLink>
 
               {/* TukTuks Card */}
-              <Link
+              <OptimizedLink
                 href="/vehicles?category=tuktuks"
-                className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-white to-amber-50/30 p-4 shadow-sm transition-all duration-500 hover:-translate-y-1 hover:bg-slate-50 dark:from-slate-900 dark:to-slate-800 dark:ring-1 dark:ring-slate-800 dark:hover:bg-slate-800 sm:rounded-3xl sm:p-6"
+                prefetch
+                priority="high"
+                deferNavigation
+                onPointerDown={() => handleCategoryNavIntent("/vehicles?category=tuktuks")}
+                className={`group relative overflow-hidden rounded-2xl bg-gradient-to-br from-white to-amber-50/30 p-4 shadow-sm transition-all duration-150 hover:bg-slate-50 active:scale-[0.98] dark:from-slate-900 dark:to-slate-800 dark:ring-1 dark:ring-slate-800 dark:hover:bg-slate-800 sm:rounded-3xl sm:p-6 sm:duration-300 sm:hover:-translate-y-1 ${pendingCategoryHref === "/vehicles?category=tuktuks" ? "scale-[0.98] ring-2 ring-amber-400/50" : ""}`}
               >
-                <div className="absolute inset-0 bg-gradient-to-br from-amber-500/5 via-orange-500/5 to-red-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+                <div className="absolute inset-0 bg-gradient-to-br from-amber-500/5 via-orange-500/5 to-red-500/5 opacity-0 transition-opacity duration-150 group-hover:opacity-100 sm:duration-300" />
 
                 <div className="relative">
                   <div className="mb-4 flex items-start justify-between gap-3">
-                    <div className="rounded-2xl bg-gradient-to-br from-amber-500 to-orange-600 p-2.5 shadow-lg shadow-amber-500/30 transition-all duration-300 group-hover:scale-110 group-hover:shadow-amber-500/40 sm:p-3">
+                    <div className="rounded-2xl bg-gradient-to-br from-amber-500 to-orange-600 p-2.5 shadow-lg shadow-amber-500/30 transition-all duration-150 group-hover:scale-105 group-hover:shadow-amber-500/40 sm:p-3 sm:duration-300 sm:group-hover:scale-110">
                       <TukTukIcon className="h-6 w-6 text-white sm:h-7 sm:w-7" />
                     </div>
                     <div className="min-w-0 text-right">
-                      <span className="text-3xl font-bold text-slate-800 transition-colors duration-300 group-hover:text-amber-600 dark:text-slate-100 dark:group-hover:text-amber-300 sm:text-4xl">
+                      <span className="text-3xl font-bold text-slate-800 transition-colors duration-150 group-hover:text-amber-600 dark:text-slate-100 dark:group-hover:text-amber-300 sm:text-4xl sm:duration-300">
                         {tukTuksCount.toLocaleString()}
                       </span>
                     </div>
@@ -782,17 +819,17 @@ export default function EnhancedDashboard({
 
                     <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden dark:bg-slate-800">
                       <div
-                        className="h-full bg-gradient-to-r from-amber-500 to-orange-500 rounded-full transition-all duration-1000"
+                        className="h-full rounded-full bg-gradient-to-r from-amber-500 to-orange-500 transition-all duration-300 sm:duration-700"
                         style={{ width: `${getCategoryPercent(tukTuksCount)}%` }}
                       />
                     </div>
                   </div>
 
-                  <div className="absolute bottom-0 right-0 opacity-0 group-hover:opacity-100 transition-all duration-300 transform translate-x-2 group-hover:translate-x-0">
+                  <div className="absolute bottom-0 right-0 translate-x-2 opacity-0 transition-all duration-150 group-hover:translate-x-0 group-hover:opacity-100 sm:duration-300">
                     <ChevronRight className="w-6 h-6 text-amber-500" />
                   </div>
                 </div>
-              </Link>
+              </OptimizedLink>
             </div>
 
             {/* Missing Images Alert Card */}
@@ -826,11 +863,51 @@ export default function EnhancedDashboard({
               placeholder="Search by brand, model, category, plate number, or year..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
+              autoComplete="off"
+              enterKeyHint="search"
+              inputMode="search"
               className="w-full pl-14 pr-14 py-4 rounded-2xl bg-white shadow-sm text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 transition-all text-base dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-500 dark:ring-1 dark:ring-slate-800"
             />
             {debouncedSearch !== searchQuery && (
               <div className="absolute inset-y-0 right-0 pr-5 flex items-center">
                 <div className="w-5 h-5 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
+              </div>
+            )}
+            {showSearchSuggestions && (
+              <div className="absolute left-0 right-0 top-[calc(100%+0.5rem)] z-50 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl ring-1 ring-slate-900/5 dark:border-slate-800 dark:bg-slate-900 dark:ring-white/10">
+                {isSearching || debouncedSearch !== searchQuery ? (
+                  <div className="flex items-center gap-3 px-4 py-3 text-sm text-slate-500 dark:text-slate-400">
+                    <div className="h-4 w-4 rounded-full border-2 border-emerald-500 border-t-transparent animate-spin" />
+                    Searching vehicles...
+                  </div>
+                ) : searchSuggestionVehicles.length > 0 ? (
+                  <div className="max-h-80 overflow-y-auto py-1">
+                    {searchSuggestionVehicles.map((vehicle) => (
+                      <Link
+                        key={vehicle.VehicleId}
+                        href={`/vehicles/${encodeURIComponent(vehicle.VehicleId)}/view`}
+                        className="flex items-center gap-3 px-4 py-3 text-left transition hover:bg-emerald-50 dark:hover:bg-emerald-500/10"
+                      >
+                        <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-300">
+                          <Car className="h-5 w-5" />
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-sm font-semibold text-slate-800 dark:text-slate-100">
+                            {vehicle.Brand || "Vehicle"} {vehicle.Model || ""}
+                          </span>
+                          <span className="mt-0.5 block truncate text-xs text-slate-500 dark:text-slate-400">
+                            {[vehicle.Category, vehicle.Year, vehicle.Plate].filter(Boolean).join(" - ") || vehicle.VehicleId}
+                          </span>
+                        </span>
+                        <ChevronRight className="h-4 w-4 flex-shrink-0 text-slate-300 dark:text-slate-600" />
+                      </Link>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="px-4 py-3 text-sm text-slate-500 dark:text-slate-400">
+                    No matching vehicles
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -880,8 +957,8 @@ export default function EnhancedDashboard({
                   <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100">Vehicles by Category</h3>
                   <p className="text-sm text-slate-500 dark:text-slate-400">Distribution across vehicle types</p>
                 </div>
-                <button className="flex-shrink-0 p-2 rounded-xl hover:bg-slate-100 text-slate-400 transition-colors dark:text-slate-500 dark:hover:bg-slate-800">
-                  <MoreHorizontal className="w-5 h-5" />
+                <button type="button" aria-label="Open category chart actions" title="Open category chart actions" className="flex-shrink-0 p-2 rounded-xl hover:bg-slate-100 text-slate-400 transition-colors dark:text-slate-500 dark:hover:bg-slate-800">
+                  <MoreHorizontal className="w-5 h-5" aria-hidden="true" />
                 </button>
               </div>
               <div className="w-full h-[300px] sm:h-[320px]">
@@ -904,8 +981,8 @@ export default function EnhancedDashboard({
                   <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100">Condition Distribution</h3>
                   <p className="text-sm text-slate-500 dark:text-slate-400">New vs used vehicles</p>
                 </div>
-                <button className="flex-shrink-0 p-2 rounded-xl hover:bg-slate-100 text-slate-400 transition-colors dark:text-slate-500 dark:hover:bg-slate-800">
-                  <MoreHorizontal className="w-5 h-5" />
+                <button type="button" aria-label="Open condition chart actions" title="Open condition chart actions" className="flex-shrink-0 p-2 rounded-xl hover:bg-slate-100 text-slate-400 transition-colors dark:text-slate-500 dark:hover:bg-slate-800">
+                  <MoreHorizontal className="w-5 h-5" aria-hidden="true" />
                 </button>
               </div>
               <div className="w-full h-[300px] sm:h-[320px]">
@@ -928,8 +1005,8 @@ export default function EnhancedDashboard({
                   <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100">Top Brands</h3>
                   <p className="text-sm text-slate-500 dark:text-slate-400">Most popular manufacturers</p>
                 </div>
-                <button className="flex-shrink-0 p-2 rounded-xl hover:bg-slate-100 text-slate-400 transition-colors dark:text-slate-500 dark:hover:bg-slate-800">
-                  <MoreHorizontal className="w-5 h-5" />
+                <button type="button" aria-label="Open brand chart actions" title="Open brand chart actions" className="flex-shrink-0 p-2 rounded-xl hover:bg-slate-100 text-slate-400 transition-colors dark:text-slate-500 dark:hover:bg-slate-800">
+                  <MoreHorizontal className="w-5 h-5" aria-hidden="true" />
                 </button>
               </div>
               <div className="w-full h-[300px] sm:h-[320px]">
@@ -952,8 +1029,8 @@ export default function EnhancedDashboard({
                   <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100">Monthly Trends</h3>
                   <p className="text-sm text-slate-500 dark:text-slate-400">Vehicles added over time</p>
                 </div>
-                <button className="flex-shrink-0 p-2 rounded-xl hover:bg-slate-100 text-slate-400 transition-colors dark:text-slate-500 dark:hover:bg-slate-800">
-                  <MoreHorizontal className="w-5 h-5" />
+                <button type="button" aria-label="Open monthly trends chart actions" title="Open monthly trends chart actions" className="flex-shrink-0 p-2 rounded-xl hover:bg-slate-100 text-slate-400 transition-colors dark:text-slate-500 dark:hover:bg-slate-800">
+                  <MoreHorizontal className="w-5 h-5" aria-hidden="true" />
                 </button>
               </div>
               <div className="w-full h-[300px] sm:h-[320px]">

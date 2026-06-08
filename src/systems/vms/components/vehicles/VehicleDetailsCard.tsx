@@ -247,7 +247,10 @@ export function VehicleDetailsCard({
             <div className="flex items-center justify-between gap-4">
               <div className="flex items-center gap-4">
                 <button
+                  type="button"
                   onClick={handleBackToList}
+                  aria-label="Back to vehicle list"
+                  title="Back to vehicle list"
                   className="flex items-center justify-center w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600 transition-all duration-200 shadow-sm hover:shadow-md"
                 >
                   <Icons.Back />

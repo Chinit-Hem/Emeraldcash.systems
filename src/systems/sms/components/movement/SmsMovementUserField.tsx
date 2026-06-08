@@ -71,7 +71,7 @@ export const SmsMovementUserField = memo(function SmsMovementUserField({
             disabled={loading}
             autoComplete="off"
             maxLength={128}
-            aria-invalid={Boolean(error)}
+            {...(error ? { "aria-invalid": "true" as const } : {})}
           />
           <datalist id={datalistId}>
             {extraOption && <option value={extraOption.value} label={extraOption.label} />}

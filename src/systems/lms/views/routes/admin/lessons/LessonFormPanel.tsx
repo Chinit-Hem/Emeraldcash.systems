@@ -144,7 +144,7 @@ export function LessonFormPanel({
               onChange={(event) => onFieldChange("title", event.target.value)}
               placeholder={tr("e.g. Introduction to Vehicle Valuation")}
               className={`${inputClass} ${formErrors.title ? invalidInputClass : ""}`}
-              aria-invalid={Boolean(formErrors.title)}
+              {...(formErrors.title ? { "aria-invalid": "true" as const } : {})}
             />
             <FieldError error={formErrors.title} />
           </div>
@@ -178,7 +178,7 @@ export function LessonFormPanel({
                 onFieldChange("category_id", Number(event.target.value))
               }
               className={`${inputClass} ${formErrors.category_id ? invalidInputClass : ""}`}
-              aria-invalid={Boolean(formErrors.category_id)}
+              {...(formErrors.category_id ? { "aria-invalid": "true" as const } : {})}
             >
               {categories.length === 0 && (
                 <option value={0}>{tr("Create a category first")}</option>
@@ -211,7 +211,7 @@ export function LessonFormPanel({
               onChange={(event) => onYoutubeUrlChange(event.target.value)}
               placeholder="https://youtube.com/watch?v=..."
               className={`${inputClass} ${formErrors.youtube_url ? invalidInputClass : ""}`}
-              aria-invalid={Boolean(formErrors.youtube_url)}
+              {...(formErrors.youtube_url ? { "aria-invalid": "true" as const } : {})}
             />
             <FieldError error={formErrors.youtube_url} />
           </div>

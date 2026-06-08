@@ -157,10 +157,13 @@ function ModalHeader({ title, onClose }: { title: string; onClose: () => void })
         {title}
       </h2>
       <button
+        type="button"
         onClick={onClose}
+        aria-label="Close add vehicle modal"
+        title="Close add vehicle modal"
         className="w-10 h-10 rounded-xl bg-white shadow-md hover:shadow-lg border border-slate-200 flex items-center justify-center text-slate-500 hover:text-slate-700 transition-all hover:rotate-90"
       >
-        <X className="w-5 h-5" />
+        <X className="w-5 h-5" aria-hidden="true" />
       </button>
     </div>
   );

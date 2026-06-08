@@ -528,7 +528,10 @@ textarea::placeholder {
   background: transparent;
   border-radius: 12px;
   border: 1px solid transparent;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
   transform: translateZ(0);
+  will-change: background-color, border-color, color, transform;
   transition:
     background-color 0.15s ease,
     border-color 0.15s ease,

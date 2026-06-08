@@ -877,6 +877,8 @@ export function ImageInput({
         <input
           ref={fileInputRef}
           type="file"
+          title={multiple ? "Upload images" : "Upload image"}
+          aria-label={multiple ? "Upload images" : "Upload image"}
           accept={accept}
           multiple={multiple}
           onChange={handleInputChange}
@@ -887,6 +889,8 @@ export function ImageInput({
           <input
             ref={replaceInputRef}
             type="file"
+            title="Replace image"
+            aria-label="Replace image"
             accept={accept}
             onChange={handleInputChange}
             disabled={disabled}

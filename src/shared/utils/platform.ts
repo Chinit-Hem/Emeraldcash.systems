@@ -18,3 +18,22 @@ export function isIOSSafariBrowser(): boolean {
 
   return isIOSDevice && isIOSWebKit;
 }
+
+export function isStandaloneAppDisplay(): boolean {
+  if (typeof window === "undefined" || typeof navigator === "undefined") return false;
+
+  if (document.documentElement.classList.contains("pwa-standalone")) return true;
+
+  const mediaQueries = [
+    "(display-mode: standalone)",
+    "(display-mode: fullscreen)",
+    "(display-mode: minimal-ui)",
+  ];
+
+  if (mediaQueries.some((query) => window.matchMedia(query).matches)) return true;
+
+  const iosNavigator = navigator as Navigator & { standalone?: boolean };
+  if (iosNavigator.standalone === true) return true;
+
+  return document.referrer.startsWith("android-app://");
+}
