@@ -139,20 +139,31 @@ export function isLikelyTypo(query: string, target: string): boolean {
 function tokenizedSimilarity(query: string, target: string): number {
   const tokens = query
     .toLowerCase()
-    .split(/\s+/)
+    .split(/[\s/_.,()-]+/)
+    .filter((t) => t.length > 0);
+
+  const targetLower = target.toLowerCase();
+  const targetWords = targetLower
+    .split(/[\s/_.,()-]+/)
     .filter((t) => t.length > 0);
 
   if (tokens.length === 0) return 0;
-  if (tokens.length === 1) return similarityScore(tokens[0], target);
 
   let totalScore = 0;
   for (const token of tokens) {
-    // Best match for this token against any word in target
-    const targetWords = target.toLowerCase().split(/\s+/);
-    let bestTokenScore = 0;
+    let bestTokenScore = similarityScore(token, targetLower);
+
+    if (targetLower.includes(token)) {
+      bestTokenScore = Math.max(bestTokenScore, 0.9);
+    }
+
     for (const tw of targetWords) {
       bestTokenScore = Math.max(bestTokenScore, similarityScore(token, tw));
+      if (tw.startsWith(token)) {
+        bestTokenScore = Math.max(bestTokenScore, 0.85);
+      }
     }
+
     totalScore += bestTokenScore;
   }
 
@@ -216,14 +227,9 @@ export function getFuzzySuggestions(
       // Score this field
       let fieldScore: number;
 
-      if (queryTokens.length > 1) {
-        // Multi-word query: use tokenized matching
-        fieldScore = tokenizedSimilarity(query, fieldValue);
-      } else {
-        // Single word: direct similarity
-        fieldScore = similarityScore(query, fieldValue);
+      fieldScore = tokenizedSimilarity(query, fieldValue);
 
-        // Boost score for prefix matches (user typing partial word)
+      if (queryTokens.length === 1) {
         const fieldLower = fieldValue.toLowerCase();
         if (fieldLower.startsWith(query)) {
           fieldScore = Math.max(fieldScore, 0.85);
@@ -245,10 +251,7 @@ export function getFuzzySuggestions(
     // Also score combined brand + model for better "did you mean" suggestions
     const combined = `${vehicle.Brand || ""} ${vehicle.Model || ""}`.trim();
     if (combined.length > 0) {
-      const combinedScore =
-        queryTokens.length > 1
-          ? tokenizedSimilarity(query, combined)
-          : similarityScore(query, combined);
+      const combinedScore = tokenizedSimilarity(query, combined);
       if (combinedScore > bestScore) {
         bestScore = combinedScore;
         bestField = "BrandModel";
@@ -315,4 +318,3 @@ export default {
   mightNeedFuzzySuggestions,
   formatSuggestionText,
 };
-

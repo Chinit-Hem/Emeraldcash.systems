@@ -86,6 +86,7 @@ import {
   Search,
   Share2,
   Shapes,
+  Sparkles,
   Trash2,
   Truck,
   Van,
@@ -2173,7 +2174,7 @@ export default function VehiclesClientEnhanced() {
   const showVehicleSearchSuggestions =
     isVehicleSearchFocused &&
     filters.search.trim().length >= 2 &&
-    searchSuggestionVehicles.length > 0;
+    (searchSuggestionVehicles.length > 0 || fuzzySuggestions.length > 0);
 
   // ==========================================================================
   // Progressive rendering keeps the full result set available without rendering every card at once.
@@ -2817,32 +2818,52 @@ const getVehicleImageUrl = useCallback((imageValue: unknown): string | null => {
                 />
                 {showVehicleSearchSuggestions && (
                   <div className="absolute left-0 right-0 top-[calc(100%+0.35rem)] z-[950] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl ring-1 ring-slate-900/5 dark:border-slate-800 dark:bg-slate-900 dark:ring-white/10">
+                    {searchSuggestionVehicles.length === 0 && fuzzySuggestions.length > 0 && (
+                      <div className="flex items-center gap-2 border-b border-slate-100 px-4 py-2 text-xs font-semibold text-emerald-700 dark:border-slate-800 dark:text-emerald-300">
+                        <Sparkles className="h-4 w-4" aria-hidden="true" />
+                        Recommended matches
+                      </div>
+                    )}
                     <div className="max-h-80 overflow-y-auto overscroll-contain py-1">
-                      {searchSuggestionVehicles.map((vehicle) => (
-                        <button
-                          key={vehicle.VehicleId}
-                          type="button"
-                          onPointerDown={(event) => event.preventDefault()}
-                          onClick={() => {
-                            setIsVehicleSearchFocused(false);
-                            handleView(vehicle.VehicleId);
-                          }}
-                          className="flex w-full items-center gap-3 px-4 py-3 text-left transition hover:bg-emerald-50 active:bg-emerald-100 dark:hover:bg-emerald-500/10 dark:active:bg-emerald-500/15"
-                        >
-                          <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-300">
-                            <Car className="h-5 w-5" aria-hidden="true" />
-                          </span>
-                          <span className="min-w-0 flex-1">
-                            <span className="block truncate text-sm font-semibold text-slate-800 dark:text-slate-100">
-                              {vehicle.Brand || "Vehicle"} {vehicle.Model || ""}
+                      {(searchSuggestionVehicles.length > 0
+                        ? searchSuggestionVehicles.map((vehicle) => ({ vehicle, score: null }))
+                        : fuzzySuggestions.map((suggestion) => ({ vehicle: suggestion.vehicle, score: suggestion.score }))
+                      ).map(({ vehicle, score }, index) => {
+                        const suggestedSearch = `${vehicle.Brand || ""} ${vehicle.Model || ""}`.trim();
+
+                        return (
+                          <button
+                            key={`${vehicle.VehicleId}-${index}`}
+                            type="button"
+                            onPointerDown={(event) => event.preventDefault()}
+                            onClick={() => {
+                              if (score === null) {
+                                setIsVehicleSearchFocused(false);
+                                handleView(vehicle.VehicleId);
+                                return;
+                              }
+
+                              handleVehicleSearchChange(suggestedSearch);
+                            }}
+                            className="flex w-full items-center gap-3 px-4 py-3 text-left transition hover:bg-emerald-50 active:bg-emerald-100 dark:hover:bg-emerald-500/10 dark:active:bg-emerald-500/15"
+                          >
+                            <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-300">
+                              <Car className="h-5 w-5" aria-hidden="true" />
                             </span>
-                            <span className="mt-0.5 block truncate text-xs text-slate-500 dark:text-slate-400">
-                              {[vehicle.Category, vehicle.Year, vehicle.Plate].filter(Boolean).join(" - ") || vehicle.VehicleId}
+                            <span className="min-w-0 flex-1">
+                              <span className="block truncate text-sm font-semibold text-slate-800 dark:text-slate-100">
+                                {suggestedSearch || "Vehicle"}
+                              </span>
+                              <span className="mt-0.5 block truncate text-xs text-slate-500 dark:text-slate-400">
+                                {score === null
+                                  ? ([vehicle.Category, vehicle.Year, vehicle.Plate].filter(Boolean).join(" - ") || vehicle.VehicleId)
+                                  : `Close match ${Math.round(score * 100)}%`}
+                              </span>
                             </span>
-                          </span>
-                          <ChevronDown className="h-4 w-4 flex-shrink-0 -rotate-90 text-slate-300 dark:text-slate-600" aria-hidden="true" />
-                        </button>
-                      ))}
+                            <ChevronDown className="h-4 w-4 flex-shrink-0 -rotate-90 text-slate-300 dark:text-slate-600" aria-hidden="true" />
+                          </button>
+                        );
+                      })}
                     </div>
                   </div>
                 )}
