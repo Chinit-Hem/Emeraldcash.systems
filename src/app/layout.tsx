@@ -104,6 +104,7 @@ const standaloneModeScript = `
       }
 
       var isStandalone =
+        !!window.Capacitor ||
         matchesDisplayMode ||
         navigator.standalone === true ||
         (document.referrer || "").indexOf("android-app://") === 0;

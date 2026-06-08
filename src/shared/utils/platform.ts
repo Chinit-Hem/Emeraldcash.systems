@@ -19,8 +19,30 @@ export function isIOSSafariBrowser(): boolean {
   return isIOSDevice && isIOSWebKit;
 }
 
+export function isCapacitorNativeApp(): boolean {
+  if (typeof window === "undefined") return false;
+
+  const capacitor = (window as Window & {
+    Capacitor?: {
+      getPlatform?: () => string;
+      isNativePlatform?: () => boolean;
+    };
+  }).Capacitor;
+
+  if (!capacitor) return false;
+
+  if (typeof capacitor.isNativePlatform === "function") {
+    return capacitor.isNativePlatform();
+  }
+
+  const platform = capacitor.getPlatform?.();
+  return platform === "android" || platform === "ios";
+}
+
 export function isStandaloneAppDisplay(): boolean {
   if (typeof window === "undefined" || typeof navigator === "undefined") return false;
+
+  if (isCapacitorNativeApp()) return true;
 
   if (document.documentElement.classList.contains("pwa-standalone")) return true;
 

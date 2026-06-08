@@ -14,6 +14,9 @@ function subscribe(callback: () => void) {
   if (typeof window === "undefined") return () => {};
 
   const mediaQueries = displayModeQueries.map((query) => window.matchMedia(query));
+  const recheckTimers = [0, 100, 500, 1500].map((delay) =>
+    window.setTimeout(callback, delay)
+  );
 
   mediaQueries.forEach((mediaQuery) => {
     if (mediaQuery.addEventListener) {
@@ -25,10 +28,13 @@ function subscribe(callback: () => void) {
   });
 
   window.addEventListener("focus", callback);
+  window.addEventListener("load", callback);
   window.addEventListener("pageshow", callback);
+  document.addEventListener("DOMContentLoaded", callback);
   document.addEventListener("visibilitychange", callback);
 
   return () => {
+    recheckTimers.forEach((timer) => window.clearTimeout(timer));
     mediaQueries.forEach((mediaQuery) => {
       if (mediaQuery.removeEventListener) {
         mediaQuery.removeEventListener("change", callback);
@@ -38,7 +44,9 @@ function subscribe(callback: () => void) {
       mediaQuery.removeListener?.(callback);
     });
     window.removeEventListener("focus", callback);
+    window.removeEventListener("load", callback);
     window.removeEventListener("pageshow", callback);
+    document.removeEventListener("DOMContentLoaded", callback);
     document.removeEventListener("visibilitychange", callback);
   };
 }
