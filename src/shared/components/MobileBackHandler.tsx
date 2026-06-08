@@ -3,6 +3,7 @@
 import { Capacitor } from "@capacitor/core";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef } from "react";
+import { dispatchMobileBackRequest } from "@/shared/utils/mobileBack";
 
 type MobileBackHandlerProps = {
   isMenuOpen: boolean;
@@ -78,6 +79,10 @@ export default function MobileBackHandler({
   const goBackInsideApp = useCallback(() => {
     if (isMenuOpen) {
       onCloseMenu();
+      return;
+    }
+
+    if (dispatchMobileBackRequest()) {
       return;
     }
 

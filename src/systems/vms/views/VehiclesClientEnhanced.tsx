@@ -14,6 +14,7 @@ import { getVehicleColorHex, translateVehicleColor } from "@/systems/vms/utils/v
 import type { Vehicle } from "@/shared/types/types";
 import { cn } from "@/shared/utils/ui";
 import { formatVehicleId } from "@/shared/utils/format";
+import { MOBILE_BACK_REQUEST_EVENT } from "@/shared/utils/mobileBack";
 import { useVehiclesNeon } from "@/systems/vms/hooks/useVehiclesNeon";
 import { getFuzzySuggestions } from "@/systems/vms/utils/fuzzySearch";
 import {
@@ -2381,6 +2382,21 @@ export default function VehiclesClientEnhanced() {
     }));
     resetVisibleVehicleBatch();
   }, [preserveVehicleListScrollForUpdate, resetVisibleVehicleBatch]);
+
+  useEffect(() => {
+    if (!selectedBrandName) return;
+
+    const handleMobileBackRequest = (event: Event) => {
+      event.preventDefault();
+      handleBackToBrands();
+    };
+
+    window.addEventListener(MOBILE_BACK_REQUEST_EVENT, handleMobileBackRequest);
+
+    return () => {
+      window.removeEventListener(MOBILE_BACK_REQUEST_EVENT, handleMobileBackRequest);
+    };
+  }, [handleBackToBrands, selectedBrandName]);
 
   const handleBodyTypeSelect = useCallback((bodyType: string) => {
     preserveVehicleListScrollForUpdate();
