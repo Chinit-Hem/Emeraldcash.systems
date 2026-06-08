@@ -61,10 +61,10 @@ export default function SearchSuggestions({
       <div className="flex items-center gap-2 mb-4">
         <Sparkles className="w-5 h-5 text-emerald-500" />
         <h3 className="text-base font-semibold text-slate-800">
-          Did you mean?
+          Recommended matches
         </h3>
         <span className="text-sm text-slate-500">
-          {`Showing suggestions for "${searchTerm}"`}
+          {`Suggestions for "${searchTerm}"`}
         </span>
       </div>
 
@@ -126,7 +126,7 @@ export default function SearchSuggestions({
 
       {/* Helper text */}
       <p className="mt-3 text-xs text-slate-400">
-        Click a suggestion to search for that vehicle instead.
+        Tap a suggestion to search for that vehicle instead.
       </p>
     </div>
   );

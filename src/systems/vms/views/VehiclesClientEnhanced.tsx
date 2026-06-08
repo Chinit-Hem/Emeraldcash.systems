@@ -3601,8 +3601,7 @@ const getVehicleImageUrl = useCallback((imageValue: unknown): string | null => {
 
             {filteredVehicles.length === 0 && (
               <div className="space-y-6">
-                {/* Fuzzy Suggestions */}
-                {fuzzySuggestions.length > 0 && (
+                {filters.search.trim().length >= 2 && fuzzySuggestions.length > 0 ? (
                   <SearchSuggestions
                     suggestions={fuzzySuggestions}
                     searchTerm={filters.search}
@@ -3612,25 +3611,31 @@ const getVehicleImageUrl = useCallback((imageValue: unknown): string | null => {
                       setFilters(prev => ({ ...prev, search: suggestedSearch }));
                     }}
                   />
-                )}
-
-                <div className="rounded-2xl border border-slate-100 bg-white px-6 py-12 text-center shadow-[0_4px_20px_rgba(0,0,0,0.08)] dark:border-slate-700/80 dark:bg-slate-900 dark:shadow-[0_18px_40px_rgba(2,6,23,0.5)]">
-                  <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-slate-50 dark:bg-slate-800">
-                    {isInitialVehiclesLoad ? (
-                      <RefreshCw className="w-8 h-8 animate-spin text-emerald-500" />
-                    ) : (
-                      <Search className="w-8 h-8 text-slate-300 dark:text-slate-600" />
-                    )}
+                ) : (
+                  <div className="rounded-2xl border border-slate-100 bg-white px-6 py-12 text-center shadow-[0_4px_20px_rgba(0,0,0,0.08)] dark:border-slate-700/80 dark:bg-slate-900 dark:shadow-[0_18px_40px_rgba(2,6,23,0.5)]">
+                    <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-slate-50 dark:bg-slate-800">
+                      {isInitialVehiclesLoad ? (
+                        <RefreshCw className="w-8 h-8 animate-spin text-emerald-500" />
+                      ) : (
+                        <Search className="w-8 h-8 text-slate-300 dark:text-slate-600" />
+                      )}
+                    </div>
+                    <h3 className="mb-1 text-lg font-semibold text-slate-700 dark:text-slate-100">
+                      {isInitialVehiclesLoad
+                        ? "Loading Vehicles"
+                        : filters.search.trim().length >= 2
+                          ? "No close matches"
+                          : t.noVehiclesFound}
+                    </h3>
+                    <p className="text-sm text-slate-500 dark:text-slate-400">
+                      {isInitialVehiclesLoad
+                        ? "Your VMS data will appear here as soon as it finishes loading."
+                        : filters.search.trim().length >= 2
+                          ? "Try a shorter brand, model, plate number, or clear filters."
+                          : t.tryAdjustingFilters}
+                    </p>
                   </div>
-                  <h3 className="mb-1 text-lg font-semibold text-slate-700 dark:text-slate-100">
-                    {isInitialVehiclesLoad ? "Loading Vehicles" : t.noVehiclesFound}
-                  </h3>
-                  <p className="text-sm text-slate-500 dark:text-slate-400">
-                    {isInitialVehiclesLoad
-                      ? "Your VMS data will appear here as soon as it finishes loading."
-                      : t.tryAdjustingFilters}
-                  </p>
-                </div>
+                )}
               </div>
             )}
           </div>
