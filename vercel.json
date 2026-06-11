@@ -15,12 +15,10 @@
   ],
   "functions": {
     "src/app/api/vehicles/route.ts": {
-      "maxDuration": 30,
-      "memory": 1024
+      "maxDuration": 30
     },
     "src/app/api/vehicles/[id]/route.ts": {
-      "maxDuration": 60,
-      "memory": 1024
+      "maxDuration": 60
     }
   }
 }
