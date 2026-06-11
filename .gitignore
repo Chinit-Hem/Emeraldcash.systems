@@ -80,6 +80,7 @@ build.log
 # Scripts
 /scripts/*
 !/scripts/README.md
+!/scripts/check-redis.mjs
 !/scripts/dev-reset.mjs
 !/scripts/test-neon-connection.mjs
 !/scripts/backup-verification/

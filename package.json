@@ -21,6 +21,7 @@
     "verify:ci": "npm run lint && npm run typecheck && npm run build && npm run audit:prod",
     "backup:create": "node scripts/backup-verification/create-vehicles-backup-table.mjs",
     "backup:verify": "node scripts/check-cleaned-table-data.mjs",
+    "redis:check": "node scripts/check-redis.mjs",
     "db:check": "node scripts/test-neon-connection.mjs"
   },
   "dependencies": {

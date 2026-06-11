@@ -11,18 +11,14 @@
  */
 
 import type { VercelKV } from '@vercel/kv';
+import { isRedisConfigured, redis } from '@/lib/redis';
 import type { LmsLesson } from '@/systems/lms/types/lms-schema';
 
-let kv: VercelKV | null = null;
+let kv: VercelKV | null = isRedisConfigured ? redis : null;
 
-async function ensureKv() {
-  if (kv || process.env.NODE_ENV === 'development') return;
-  try {
-    const vercelKv = await import('@vercel/kv');
-    kv = vercelKv.kv;
-  } catch (error) {
-    console.error('[LmsCache] Vercel KV import failed:', error);
-  }
+function ensureKv() {
+  if (kv || !isRedisConfigured) return;
+  kv = redis;
 }
 
 // ============================================================================
@@ -53,9 +49,9 @@ export async function getCachedLessonsByCategory(
   viewerRole = "all"
 ): Promise<LmsCacheResult<LmsLesson[]>> {
   const cacheKey = `${CACHE_PREFIX}lessons:${categoryId}:${viewerRole}`;
-  await ensureKv();
+  ensureKv();
 
-  if (process.env.NODE_ENV === 'development' || !kv) {
+  if (!kv) {
     return { success: false };
   }
 
@@ -89,7 +85,7 @@ export async function setCachedLessonsByCategory(
   viewerRole = "all"
 ): Promise<boolean> {
   const cacheKey = `${CACHE_PREFIX}lessons:${categoryId}:${viewerRole}`;
-  await ensureKv();
+  ensureKv();
 
   if (!kv) return false;
 
@@ -111,7 +107,7 @@ export async function getCachedSequentialLessons(
   viewerRole = "all"
 ): Promise<LmsCacheResult<LmsLesson[]>> {
   const cacheKey = `${CACHE_PREFIX}lessons-seq:${categoryId}:${staffId}:${viewerRole}`;
-  await ensureKv();
+  ensureKv();
 
   if (!kv) return { success: false };
 
@@ -146,7 +142,7 @@ export async function setCachedSequentialLessons(
   viewerRole = "all"
 ): Promise<boolean> {
   const cacheKey = `${CACHE_PREFIX}lessons-seq:${categoryId}:${staffId}:${viewerRole}`;
-  await ensureKv();
+  ensureKv();
 
   if (!kv) return false;
 
@@ -167,7 +163,7 @@ export async function setCachedSequentialLessons(
  * Invalidate all caches for a category (called on lesson/category update)
  */
 export async function invalidateCategoryCache(categoryId: number): Promise<void> {
-  await ensureKv();
+  ensureKv();
   if (!kv) return;
   const client = kv;
 
@@ -195,7 +191,7 @@ export async function invalidateSequentialLessonsCache(
   categoryId: number,
   staffId: number
 ): Promise<void> {
-  await ensureKv();
+  ensureKv();
   if (!kv) return;
 
   try {
@@ -214,7 +210,7 @@ export async function invalidateSequentialLessonsCache(
  * Invalidate all LMS caches (nuclear option - on major schema changes)
  */
 export async function clearAllLmsCache(): Promise<void> {
-  await ensureKv();
+  ensureKv();
   if (!kv) return;
   const client = kv;
 
@@ -238,15 +234,17 @@ export async function getCacheStats(): Promise<{
   lmsKeys: number;
   memoryUsage: number;
 }> {
+  ensureKv();
+
   if (!kv) {
     return { totalKeys: 0, lmsKeys: 0, memoryUsage: 0 };
   }
 
-interface RedisInfo {
-  keys?: string;
-  used_memory?: string;
-  [key: string]: string | undefined;
-}
+  interface RedisInfo {
+    keys?: string;
+    used_memory?: string;
+    [key: string]: string | undefined;
+  }
 
   try {
     const info = await (kv as VercelKV & { info(): Promise<RedisInfo> }).info();

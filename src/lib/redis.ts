@@ -1,6 +1,42 @@
-import { kv } from '@vercel/kv';
+import { createClient } from '@vercel/kv';
+import type { VercelKV } from '@vercel/kv';
 
-export const redis = kv;
+type RedisConfig = {
+  url: string;
+  token: string;
+};
+
+function getRedisConfig(): RedisConfig | null {
+  const url = process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL;
+  const token = process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN;
+
+  if (!url || !token) return null;
+  return { url, token };
+}
+
+function createUnavailableRedisClient(): VercelKV {
+  return new Proxy(
+    {},
+    {
+      get(_target, prop) {
+        if (prop === "then" || prop === "parse") return undefined;
+
+        return () => {
+          throw new Error(
+            "Redis is not configured. Set KV_REST_API_URL/KV_REST_API_TOKEN or UPSTASH_REDIS_REST_URL/UPSTASH_REDIS_REST_TOKEN."
+          );
+        };
+      },
+    }
+  ) as VercelKV;
+}
+
+const redisConfig = getRedisConfig();
+
+export const isRedisConfigured = Boolean(redisConfig);
+export const redis: VercelKV = redisConfig
+  ? createClient(redisConfig)
+  : createUnavailableRedisClient();
 
 type MemoryCacheEntry = {
   value: unknown;
