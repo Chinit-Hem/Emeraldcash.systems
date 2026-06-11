@@ -4,7 +4,7 @@ import Image from "next/image";
 import Script from "next/script";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useLanguage } from "@/shared/hooks/LanguageContext";
-import { useTranslation } from "@/shared/utils/i18n";
+import { translatePhrase, useTranslation } from "@/shared/utils/i18n";
 import React, { Suspense, useCallback, useEffect, useRef, useState } from "react";
 
 const SHOW_LOGIN_DEBUG = process.env.NODE_ENV !== "production";
@@ -70,6 +70,10 @@ function LoginForm() {
   
   const { language } = useLanguage();
   const { t } = useTranslation(language);
+  const brandName = translatePhrase("Emerald Cash", language);
+  const showPasswordLabel = translatePhrase("Show password", language);
+  const hidePasswordLabel = translatePhrase("Hide password", language);
+  const copyrightText = translatePhrase("© 2024 Emerald Cash", language);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -166,7 +170,7 @@ function LoginForm() {
         throw new Error(loginData.error || "Login failed");
       }
 
-      setSuccess("Login successful! Verifying session...");
+      setSuccess(translatePhrase("Login successful! Verifying session...", language));
 
       // Step 2: Verify session with retry logic
       let meData = null;
@@ -262,7 +266,7 @@ function LoginForm() {
               <div className="w-16 h-16 rounded-2xl bg-white shadow-lg shadow-emerald-500/25 flex items-center justify-center p-2 ring-4 ring-white/60 dark:bg-white dark:ring-slate-800/80">
                 <Image
                   src="/logo.png"
-                  alt="Emerald Cash"
+                  alt={brandName}
                   width={64}
                   height={64}
                   priority
@@ -277,7 +281,7 @@ function LoginForm() {
           <div className="pt-10 pb-6 px-6">
             <div className="text-center mb-6">
               <h1 className="text-xl font-bold text-slate-950 dark:text-white">
-                Emerald Cash
+                {brandName}
               </h1>
               <p className="mt-1 text-xs uppercase tracking-wider text-slate-500 dark:text-slate-400">
                 {t.vehicleManagementSystem}
@@ -326,7 +330,7 @@ function LoginForm() {
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
                     className="absolute right-3 top-1/2 -translate-y-1/2 rounded-lg p-2 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700 dark:text-slate-500 dark:hover:bg-slate-700 dark:hover:text-slate-200"
-                    aria-label={showPassword ? "Hide password" : "Show password"}
+                    aria-label={showPassword ? hidePasswordLabel : showPasswordLabel}
                     aria-controls={passwordInputId}
                     {...(showPassword ? { "aria-pressed": "true" as const } : { "aria-pressed": "false" as const })}
                   >
@@ -449,7 +453,7 @@ function LoginForm() {
 
             {/* Footer */}
             <footer className="mt-6 flex items-center justify-center border-t border-slate-100 pt-4 dark:border-slate-800">
-              <p className="text-xs text-slate-400 dark:text-slate-500">© 2024 Emerald Cash</p>
+              <p className="text-xs text-slate-400 dark:text-slate-500">{copyrightText}</p>
             </footer>
           </div>
         </div>
@@ -459,6 +463,9 @@ function LoginForm() {
 }
 
 export default function LoginPage() {
+  const { language } = useLanguage();
+  const preparingLoginText = translatePhrase("Preparing login...", language);
+
   return (
     <Suspense fallback={
       <div className="min-h-screen flex items-center justify-center p-4 bg-slate-50 dark:bg-slate-950">
@@ -466,7 +473,7 @@ export default function LoginPage() {
           <div className="relative overflow-hidden rounded-3xl bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 shadow-lg p-8">
             <div className="flex flex-col items-center">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-600 mb-4"></div>
-              <p className="text-gray-600 dark:text-gray-400">Preparing login...</p>
+              <p className="text-gray-600 dark:text-gray-400">{preparingLoginText}</p>
             </div>
           </div>
         </div>

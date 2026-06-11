@@ -1,5 +1,35 @@
 import { NextRequest } from "next/server";
 
+function isPrivateDevelopmentOrigin(origin: string): boolean {
+  try {
+    const url = new URL(origin);
+    if (url.protocol !== "http:" && url.protocol !== "https:") return false;
+
+    const hostname = url.hostname.toLowerCase();
+    if (hostname === "localhost" || hostname === "::1" || hostname === "[::1]") {
+      return true;
+    }
+
+    const ipv4Parts = hostname.split(".");
+    if (ipv4Parts.length !== 4) return false;
+
+    const octets = ipv4Parts.map((part) => Number(part));
+    if (octets.some((octet) => !Number.isInteger(octet) || octet < 0 || octet > 255)) {
+      return false;
+    }
+
+    const [first, second] = octets;
+    return (
+      first === 10 ||
+      first === 127 ||
+      (first === 172 && second >= 16 && second <= 31) ||
+      (first === 192 && second === 168)
+    );
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Builds CORS headers for cross-origin requests.
  * This utility is shared between API routes and middleware.
@@ -29,9 +59,12 @@ export function buildCorsHeaders(req: NextRequest): Headers {
     }
   }
 
-  const allowedOrigin = requestOrigin && allowedOrigins.has(requestOrigin)
-    ? requestOrigin
-    : appOrigin || vercelOrigin || "";
+  const allowedOrigin =
+    requestOrigin &&
+    (allowedOrigins.has(requestOrigin) ||
+      (process.env.NODE_ENV !== "production" && isPrivateDevelopmentOrigin(requestOrigin)))
+      ? requestOrigin
+      : appOrigin || vercelOrigin || "";
 
   const headers = new Headers({
     "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",

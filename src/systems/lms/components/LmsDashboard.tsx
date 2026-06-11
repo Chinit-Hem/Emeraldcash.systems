@@ -46,6 +46,7 @@ import {
 } from "@/systems/lms/types/lms-types";
 import { useAuthUser } from "@/shared/hooks/AuthContext";
 import { useDebouncedValue } from "@/shared/hooks/useDebouncedValue";
+import { SearchClearButton } from "@/shared/components/ui/SearchClearButton";
 import {
   getRememberedAppScrollSnapshot,
   rememberAppScrollSnapshot,
@@ -731,10 +732,16 @@ function LmsDashboard({ initialData }: LmsDashboardProps) {
                 placeholder="Search categories..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full rounded-2xl bg-white py-3 pl-12 pr-12 text-base text-slate-700 shadow-sm ring-1 ring-slate-200 transition-all placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 sm:py-4 sm:pl-14 sm:pr-14"
+                className="w-full rounded-2xl bg-white py-3 pl-12 pr-24 text-base text-slate-700 shadow-sm ring-1 ring-slate-200 transition-all placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 sm:py-4 sm:pl-14"
               />
+              {searchQuery && (
+                <SearchClearButton
+                  onClear={() => setSearchQuery("")}
+                  className="absolute right-4 top-1/2 h-8 w-8 -translate-y-1/2"
+                />
+              )}
               {debouncedSearch !== searchQuery && (
-                <div className="absolute inset-y-0 right-0 flex items-center pr-4 sm:pr-5">
+                <div className="absolute inset-y-0 right-14 flex items-center">
                   <div className="h-5 w-5 animate-spin rounded-full border-2 border-emerald-500 border-t-transparent" />
                 </div>
               )}

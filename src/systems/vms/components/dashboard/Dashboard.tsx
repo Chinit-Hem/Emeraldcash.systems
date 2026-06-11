@@ -25,6 +25,7 @@ import { safeGetMonthKey } from "@/shared/utils/safeDate";
 import { MotorcycleIcon } from "@/shared/components/icons/MotorcycleIcon";
 import { TukTukIcon } from "@/shared/components/icons/TukTukIcon";
 import { OptimizedLink } from "@/shared/components/OptimizedLink";
+import { SearchClearButton } from "@/shared/components/ui/SearchClearButton";
 
 // ============================================================================
 // Dynamic Chart Imports (ssr: false prevents hydration errors)
@@ -227,9 +228,10 @@ function DashboardStatCard({
     ? "cursor-pointer transition-transform duration-150 active:scale-[0.98] sm:hover:-translate-y-1"
     : "";
 
-  const subtitleContent = subtitle && subtitleHref ? (
+  const shouldRenderSubtitleLink = Boolean(subtitle && subtitleHref && !href && !onClick);
+  const subtitleContent = shouldRenderSubtitleLink ? (
     <OptimizedLink
-      href={subtitleHref}
+      href={subtitleHref!}
       prefetch
       priority="high"
       deferNavigation
@@ -239,7 +241,7 @@ function DashboardStatCard({
       {subtitle}
     </OptimizedLink>
   ) : subtitle ? (
-    <p className="text-xs text-[#4a4a5a] mt-1 truncate dark:text-slate-400">{subtitle}</p>
+    <p className={subtitleHref ? "text-xs text-red-700 mt-1 truncate dark:text-red-400" : "text-xs text-[#4a4a5a] mt-1 truncate dark:text-slate-400"}>{subtitle}</p>
   ) : null;
 
   const innerContent = (
@@ -274,22 +276,6 @@ function DashboardStatCard({
   }
 
   const cardClasses = `bg-slate-100 rounded-[24px] shadow-sm p-6 dark:bg-slate-900 dark:ring-1 dark:ring-slate-800 ${clickableClasses}`;
-
-  if (href && subtitleHref) {
-    return (
-      <OptimizedLink
-        href={href}
-        prefetch
-        priority="high"
-        deferNavigation
-        className="block no-underline"
-      >
-        <div className={cardClasses}>
-        {innerContent}
-        </div>
-      </OptimizedLink>
-    );
-  }
 
   if (href) {
     return (
@@ -396,6 +382,7 @@ export default function Dashboard({
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(initialError);
   const [searchQuery, setSearchQuery] = useState("");
+  const [isSearchSuggestionsOpen, setIsSearchSuggestionsOpen] = useState(false);
   const [vehicles, setVehicles] = useState<Vehicle[]>(initialVehicles);
   const [meta, setMeta] = useState<DashboardMeta>(initialMeta);
   const { debouncedSearch, searchResults, isSearching } = useDashboardVehicleSearch({
@@ -470,7 +457,7 @@ export default function Dashboard({
     () => searchResults.slice(0, 6),
     [searchResults]
   );
-  const showSearchSuggestions = searchQuery.trim().length >= 2;
+  const showSearchSuggestions = isSearchSuggestionsOpen && searchQuery.trim().length >= 2;
 
   const categoryChartData = useMemo(() => {
     if (!meta) return [];
@@ -518,6 +505,29 @@ export default function Dashboard({
     } finally {
       setIsRefreshing(false);
     }
+  }, []);
+
+  const handleSearchQueryChange = useCallback((value: string) => {
+    setSearchQuery(value);
+    setIsSearchSuggestionsOpen(true);
+  }, []);
+
+  const handleSearchClear = useCallback(() => {
+    setSearchQuery("");
+    setIsSearchSuggestionsOpen(false);
+  }, []);
+
+  const handleSearchSuggestionSelect = useCallback((vehicle: Vehicle) => {
+    const nextSearch =
+      `${vehicle.Brand || ""} ${vehicle.Model || ""}`.trim() ||
+      vehicle.Plate ||
+      vehicle.VehicleId ||
+      "";
+
+    if (!nextSearch) return;
+
+    setSearchQuery(nextSearch);
+    setIsSearchSuggestionsOpen(false);
   }, []);
 
   if (error) {
@@ -633,19 +643,26 @@ export default function Dashboard({
           type="text"
           placeholder="Search vehicles..."
           value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
+          onChange={(e) => handleSearchQueryChange(e.target.value)}
+          onFocus={() => setIsSearchSuggestionsOpen(true)}
           autoComplete="off"
           enterKeyHint="search"
           inputMode="search"
-          className="w-full pl-12 pr-4 py-4 rounded-[20px] bg-slate-100 shadow-sm text-[#1a1a2e] placeholder-[#4a4a5a] focus:outline-none focus:ring-2 focus:ring-emerald-500/20 text-sm sm:text-base dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-500 dark:ring-1 dark:ring-slate-800"
+          className="w-full pl-12 pr-20 py-4 rounded-[20px] bg-slate-100 shadow-sm text-[#1a1a2e] placeholder-[#4a4a5a] focus:outline-none focus:ring-2 focus:ring-emerald-500/20 text-sm sm:text-base dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-500 dark:ring-1 dark:ring-slate-800"
         />
+        {searchQuery && (
+          <SearchClearButton
+            onClear={handleSearchClear}
+            className="absolute right-3 top-1/2 h-8 w-8 -translate-y-1/2"
+          />
+        )}
         {debouncedSearch !== searchQuery && (
-          <div className="absolute inset-y-0 right-0 pr-4 flex items-center">
+          <div className="absolute inset-y-0 right-11 flex items-center">
             <div className="w-5 h-5 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
           </div>
         )}
         {showSearchSuggestions && (
-          <div className="absolute left-0 right-0 top-[calc(100%+0.5rem)] z-50 overflow-hidden rounded-[20px] border border-slate-200 bg-white shadow-xl dark:border-slate-800 dark:bg-slate-900">
+          <div className="ec-popover-in absolute left-0 right-0 top-[calc(100%+0.5rem)] z-50 overflow-hidden rounded-[20px] border border-slate-200 bg-white shadow-xl dark:border-slate-800 dark:bg-slate-900">
             {isSearching || debouncedSearch !== searchQuery ? (
               <div className="flex items-center gap-3 px-4 py-3 text-sm text-[#4a4a5a] dark:text-slate-400">
                 <div className="h-4 w-4 rounded-full border-2 border-emerald-500 border-t-transparent animate-spin" />
@@ -654,10 +671,12 @@ export default function Dashboard({
             ) : searchSuggestionVehicles.length > 0 ? (
               <div className="max-h-80 overflow-y-auto py-1">
                 {searchSuggestionVehicles.map((vehicle) => (
-                  <Link
+                  <button
                     key={vehicle.VehicleId}
-                    href={`/vehicles/${encodeURIComponent(vehicle.VehicleId)}/view`}
-                    className="flex items-center gap-3 px-4 py-3 text-left transition hover:bg-emerald-50 dark:hover:bg-emerald-500/10"
+                    type="button"
+                    onPointerDown={(event) => event.preventDefault()}
+                    onClick={() => handleSearchSuggestionSelect(vehicle)}
+                    className="ec-pressable ec-row-motion flex w-full items-center gap-3 px-4 py-3 text-left transition hover:bg-emerald-50 active:bg-emerald-100 dark:hover:bg-emerald-500/10 dark:active:bg-emerald-500/15"
                   >
                     <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-300">
                       {Icons.car}
@@ -671,7 +690,7 @@ export default function Dashboard({
                       </span>
                     </span>
                     <span className="text-slate-300 dark:text-slate-600">&rsaquo;</span>
-                  </Link>
+                  </button>
                 ))}
               </div>
             ) : (

@@ -20,6 +20,7 @@ import {
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { SearchClearButton } from "@/shared/components/ui/SearchClearButton";
 
 type ManagedUser = {
   username: string;
@@ -618,8 +619,14 @@ export default function StaffAdminPage() {
               placeholder="Search name, email, phone, or lesson..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="h-12 w-full rounded-2xl border border-slate-100 bg-slate-50 pl-12 pr-4 text-sm text-slate-700 placeholder-slate-400 focus:border-purple-300 focus:outline-none focus:ring-2 focus:ring-purple-500/20"
+              className="h-12 w-full rounded-2xl border border-slate-100 bg-slate-50 pl-12 pr-12 text-sm text-slate-700 placeholder-slate-400 focus:border-purple-300 focus:outline-none focus:ring-2 focus:ring-purple-500/20"
             />
+            {searchQuery && (
+              <SearchClearButton
+                onClear={() => setSearchQuery("")}
+                className="absolute right-2 top-1/2 h-8 w-8 -translate-y-1/2 focus:ring-purple-500/30"
+              />
+            )}
           </div>
           <div className="relative">
             <ListFilter className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />

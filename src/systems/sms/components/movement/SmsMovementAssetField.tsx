@@ -9,6 +9,7 @@ import {
   smsLabelClass,
   smsLoadingFieldClass,
 } from "@/systems/sms/components/SmsShared";
+import { SearchClearButton } from "@/shared/components/ui/SearchClearButton";
 import type { MovementMode, SmsAssetOption } from "@/systems/sms/types/sms-movement";
 import { getVisibleMovementAssets } from "@/systems/sms/utils/smsMovementAssets";
 
@@ -72,21 +73,33 @@ export const SmsMovementAssetField = memo(function SmsMovementAssetField({
         </div>
       ) : (
         <>
-          <input
-            type="text"
-            value={value}
-            onChange={(event) => {
-              onSearchChange(event.target.value);
-              setDropdownOpen(true);
-            }}
-            onFocus={() => setDropdownOpen(true)}
-            className={`${smsInputClass} ${error ? smsInvalidFieldClass : ""}`}
-            placeholder={inputLabel}
-            disabled={loading}
-            autoComplete="off"
-            title={inputLabel}
-            {...(error ? { "aria-invalid": "true" as const } : {})}
-          />
+          <div className="relative">
+            <input
+              type="text"
+              value={value}
+              onChange={(event) => {
+                onSearchChange(event.target.value);
+                setDropdownOpen(true);
+              }}
+              onFocus={() => setDropdownOpen(true)}
+              className={`${smsInputClass} pr-12 ${error ? smsInvalidFieldClass : ""}`}
+              placeholder={inputLabel}
+              disabled={loading}
+              autoComplete="off"
+              title={inputLabel}
+              {...(error ? { "aria-invalid": "true" as const } : {})}
+            />
+            {!loading && value && (
+              <SearchClearButton
+                onClear={() => {
+                  onSearchChange("");
+                  setDropdownOpen(false);
+                }}
+                label="Clear asset search"
+                className="absolute right-2 top-1/2 h-8 w-8 -translate-y-1/2"
+              />
+            )}
+          </div>
           {!loading && selectableAssets.length > 0 && dropdownOpen && (
             <div className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-lg bg-white py-1 shadow-xl ring-1 ring-gray-200 dark:bg-gray-900 dark:ring-gray-700">
               {visibleAssets.length > 0 ? (

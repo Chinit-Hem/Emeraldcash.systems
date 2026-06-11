@@ -117,6 +117,32 @@ function normalizeOrigin(origin: string): string {
   return origin.trim().replace(/\/+$/, "");
 }
 
+function isPrivateDevelopmentHostname(hostname: string): boolean {
+  if (
+    hostname === "localhost" ||
+    hostname === "::1" ||
+    hostname === "[::1]"
+  ) {
+    return true;
+  }
+
+  const ipv4Parts = hostname.split(".");
+  if (ipv4Parts.length !== 4) return false;
+
+  const octets = ipv4Parts.map((part) => Number(part));
+  if (octets.some((octet) => !Number.isInteger(octet) || octet < 0 || octet > 255)) {
+    return false;
+  }
+
+  const [first, second] = octets;
+  return (
+    first === 10 ||
+    first === 127 ||
+    (first === 172 && second >= 16 && second <= 31) ||
+    (first === 192 && second === 168)
+  );
+}
+
 function getConfiguredAllowedHosts(): Set<string> {
   return new Set(
     (process.env.ALLOWED_HOSTS?.split(",") ?? [])
@@ -171,9 +197,7 @@ function isLocalDevelopmentOrigin(origin: string): boolean {
 
     return (
       (url.protocol === "http:" || url.protocol === "https:") &&
-      (hostname === "localhost" ||
-        hostname === "127.0.0.1" ||
-        hostname === "::1" ||
+      (isPrivateDevelopmentHostname(hostname) ||
         (devLanIp ? hostname === devLanIp : false))
     );
   } catch {

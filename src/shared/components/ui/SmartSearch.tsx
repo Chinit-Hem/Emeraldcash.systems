@@ -11,6 +11,7 @@
 
 import { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import type { Vehicle } from "@/shared/types/types";
+import { SearchClearButton } from "@/shared/components/ui/SearchClearButton";
 
 // Debounce hook with 300ms delay
 function useDebounce<T>(value: T, delay: number): T {
@@ -148,7 +149,7 @@ export default function SmartSearch({
           onKeyDown={handleKeyDown}
           placeholder={placeholder}
           title={placeholder}
-          className="w-full px-4 py-2 pl-10 pr-4 text-sm bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
+          className="w-full px-4 py-2 pl-10 pr-10 text-sm bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
           aria-label="Search vehicles"
           aria-haspopup="listbox"
           aria-controls="search-results"
@@ -161,19 +162,14 @@ export default function SmartSearch({
         </div>
         {/* Clear Button */}
         {query && (
-          <button
-            onClick={() => {
+          <SearchClearButton
+            onClear={() => {
               setQuery("");
               setIsOpen(false);
               inputRef.current?.focus();
             }}
-            className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-            aria-label="Clear search"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
+            className="absolute right-1.5 top-1/2 h-7 w-7 -translate-y-1/2"
+          />
         )}
       </div>
 
@@ -182,7 +178,7 @@ export default function SmartSearch({
         <div
           id="search-results"
           role="listbox"
-          className="absolute z-50 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg max-h-80 overflow-auto"
+          className="ec-popover-in absolute z-50 mt-1 max-h-80 w-full overflow-auto rounded-lg border border-gray-200 bg-white shadow-lg dark:border-gray-700 dark:bg-gray-800"
         >
           {filteredVehicles.length === 0 ? (
             <div className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">
@@ -192,7 +188,7 @@ export default function SmartSearch({
             <ul className="py-1" role="presentation">
               {filteredVehicles.map((vehicle, index) => {
                 const isHighlighted = index === highlightedIndex;
-                const className = `px-4 py-2 cursor-pointer text-sm ${
+                const className = `ec-row-motion px-4 py-2 cursor-pointer text-sm ${
                   isHighlighted
                     ? "bg-emerald-50 dark:bg-emerald-900/30 text-emerald-900 dark:text-emerald-100"
                     : "text-gray-900 dark:text-white hover:bg-gray-50 dark:hover:bg-gray-700"

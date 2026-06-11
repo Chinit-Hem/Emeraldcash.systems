@@ -31,6 +31,8 @@ import {
 } from "lucide-react";
 import { GlassCard } from "@/shared/components/ui/glass/GlassCard";
 import { GlassButton } from "@/shared/components/ui/glass/GlassButton";
+import { useLanguage } from "@/shared/hooks/LanguageContext";
+import { translatePhrase } from "@/shared/utils/i18n";
 import { VideoPlayer } from "@/systems/lms/components/VideoPlayer";
 
 // ============================================================================
@@ -239,6 +241,8 @@ const LessonGuard: React.FC<{
 export default function LessonPlayerPage() {
   const params = useParams();
   const router = useRouter();
+  const { language } = useLanguage();
+  const tr = useCallback((text: string) => translatePhrase(text, language), [language]);
   const lessonId = parseInt(params.id as string);
   
   const [loading, setLoading] = useState(true);
@@ -498,13 +502,15 @@ export default function LessonPlayerPage() {
       : watchProgress.canComplete
         ? "Ready to complete"
         : `Watched ${watchedPercentage}%`;
+  const lessonCountLabel = tr(`${lessonPosition} / ${totalLessonCount || 0} lessons`);
+  const coursePositionLabel = tr(`Course ${completedCount} / ${totalLessonCount || 0}`);
   
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
         <div className="flex items-center gap-3 text-gray-500 dark:text-gray-400">
           <Loader2 className="w-6 h-6 animate-spin" />
-          <span>Loading lesson...</span>
+          <span>{tr("Loading lesson...")}</span>
         </div>
       </div>
     );
@@ -516,10 +522,10 @@ export default function LessonPlayerPage() {
         <div className="text-center">
           <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
           <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
-            {error || "Lesson not found"}
+            {tr(error || "Lesson not found")}
           </h2>
           <GlassButton variant="primary" onClick={() => router.push("/lms", { scroll: false })}>
-            Back to Dashboard
+            {tr("Back to Dashboard")}
           </GlassButton>
         </div>
       </div>
@@ -545,8 +551,8 @@ export default function LessonPlayerPage() {
               <button
                 type="button"
                 onClick={() => router.push("/lms", { scroll: false })}
-                aria-label="Back to LMS"
-                title="Back to LMS"
+                aria-label={tr("Back to LMS")}
+                title={tr("Back to LMS")}
                 className="flex-shrink-0 p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
               >
                 <ChevronLeft className="w-5 h-5 text-gray-600 dark:text-gray-400" />
@@ -564,12 +570,12 @@ export default function LessonPlayerPage() {
             <div className="flex flex-wrap items-center gap-2 sm:flex-nowrap sm:justify-end">
               <div className="inline-flex items-center gap-2 rounded-full bg-gray-100 px-3 py-1.5 text-sm font-medium text-gray-700 dark:bg-gray-700/60 dark:text-gray-200">
                 <Clock className="h-4 w-4 text-gray-500 dark:text-gray-300" />
-                <span>{lessonPosition} / {totalLessonCount || 0} lessons</span>
+                <span>{lessonCountLabel}</span>
               </div>
 
               <div className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1.5 text-sm font-medium text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300">
                 <Trophy className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
-                <span>Course {completedCount} / {totalLessonCount || 0}</span>
+                <span>{coursePositionLabel}</span>
               </div>
 
               <div
@@ -584,7 +590,7 @@ export default function LessonPlayerPage() {
                 ) : (
                   <Play className="h-4 w-4" />
                 )}
-                <span>{lessonStatusLabel}</span>
+                <span>{tr(lessonStatusLabel)}</span>
               </div>
             </div>
           </div>

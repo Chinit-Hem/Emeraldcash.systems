@@ -59,6 +59,7 @@ import {
   type VehicleListScrollSnapshot
 } from "@/systems/vms/utils/vehicleListState";
 import SearchSuggestions from "@/shared/components/SearchSuggestions";
+import { VehicleFormModalSkeleton } from "@/shared/components/skeletons/NeuVehicleFormSkeleton";
 import {
   AlertCircle,
   ArrowDown,
@@ -103,7 +104,7 @@ const AddVehicleModalOptimistic = dynamic(
   () => import("@/systems/vms/components/vehicles/AddVehicleModalOptimistic"),
   {
     ssr: false,
-    loading: () => null,
+    loading: () => <VehicleFormModalSkeleton />,
   }
 );
 
@@ -138,6 +139,21 @@ interface FilterState {
   taxType: string;
   hasImage: string;
 }
+
+const DEFAULT_FILTER_STATE: FilterState = {
+  search: "",
+  category: "all",
+  condition: "all",
+  brand: "",
+  model: "",
+  year: "",
+  plate: "",
+  bodyType: "",
+  minPrice: "",
+  maxPrice: "",
+  taxType: "",
+  hasImage: "",
+};
 
 // ============================================================================
 // Configuration
@@ -479,6 +495,7 @@ function NeuCard({
         active
           ? "shadow-[inset_4px_4px_8px_#cbd5e1,inset_-4px_-4px_8px_#ffffff] dark:shadow-[inset_4px_4px_10px_rgba(2,6,23,0.72),inset_-4px_-4px_10px_rgba(51,65,85,0.22)]"
           : "shadow-[6px_6px_12px_#cbd5e1,-6px_-6px_12px_#ffffff] dark:shadow-[0_14px_30px_rgba(2,6,23,0.45)]",
+        hover && !active && "ec-motion ec-motion-soft ec-live-card",
         hover && !active && "hover:-translate-y-0.5 hover:shadow-[8px_8px_16px_#cbd5e1,-8px_-8px_16px_#ffffff] dark:hover:shadow-[0_18px_38px_rgba(2,6,23,0.6)]",
         className
       )}
@@ -566,7 +583,7 @@ function NeuButton({
       onClick={onClick}
       disabled={disabled || loading}
       className={cn(
-        "flex items-center justify-center gap-2 rounded-xl font-medium",
+        "ec-pressable ec-motion ec-motion-soft flex items-center justify-center gap-2 rounded-xl font-medium",
         sizeClasses[size],
         variantClasses[variant],
         (disabled || loading) && "opacity-50 cursor-not-allowed",
@@ -584,6 +601,7 @@ function NeuButton({
 function NeuInput({
   value,
   onChange,
+  onClear,
   onFocus,
   onBlur,
   placeholder,
@@ -593,9 +611,11 @@ function NeuInput({
   autoComplete,
   enterKeyHint,
   inputMode,
+  clearLabel = "Clear input",
 }: {
   value: string;
   onChange: (value: string) => void;
+  onClear?: () => void;
   onFocus?: () => void;
   onBlur?: () => void;
   placeholder?: string;
@@ -605,7 +625,10 @@ function NeuInput({
   autoComplete?: string;
   enterKeyHint?: React.HTMLAttributes<HTMLInputElement>["enterKeyHint"];
   inputMode?: React.HTMLAttributes<HTMLInputElement>["inputMode"];
+  clearLabel?: string;
 }) {
+  const showClearButton = Boolean(onClear && value);
+
   return (
     <div className={cn("relative", className)}>
       {Icon && <Icon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 dark:text-slate-500 sm:left-4 sm:h-5 sm:w-5" />}
@@ -628,9 +651,22 @@ function NeuInput({
           "dark:focus:shadow-[0_14px_30px_rgba(2,6,23,0.58)]",
           "focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500/40",
           "text-xs text-slate-700 placeholder-slate-400 outline-none dark:text-slate-100 dark:placeholder-slate-500 sm:text-sm",
-          Icon ? "py-2 pl-9 pr-3 sm:py-3 sm:pl-12 sm:pr-4" : "px-3 py-2 sm:px-4 sm:py-3"
+          Icon ? "py-2 pl-9 sm:py-3 sm:pl-12" : "py-2 pl-3 sm:py-3 sm:pl-4",
+          showClearButton ? "pr-10 sm:pr-12" : "pr-3 sm:pr-4"
         )}
       />
+      {showClearButton && (
+        <button
+          type="button"
+          aria-label={clearLabel}
+          title={clearLabel}
+          onPointerDown={(event) => event.preventDefault()}
+          onClick={onClear}
+          className="ec-pressable absolute right-2 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 dark:text-slate-500 dark:hover:bg-slate-800 dark:hover:text-slate-200 sm:right-3 sm:h-8 sm:w-8"
+        >
+          <X className="h-4 w-4" aria-hidden="true" />
+        </button>
+      )}
     </div>
   );
 }
@@ -639,10 +675,40 @@ function NeuInput({
 // Brand Filter Component
 // ============================================================================
 
+const BRAND_LOGO_SIZE_CLASS_BY_KEY: Record<string, string> = {
+  aeolus: "h-auto max-h-none w-[34px] max-w-none sm:w-[68px] sm:max-w-none",
+  "aston martin": "h-[34px] max-h-none w-[34px] max-w-none sm:h-[84px] sm:max-h-none sm:w-[84px] sm:max-w-none",
+  audi: "h-[38px] max-h-none w-[38px] max-w-none sm:h-[94px] sm:max-h-none sm:w-[94px] sm:max-w-none",
+  bentley: "h-[38px] max-h-none w-[38px] max-w-none sm:h-[94px] sm:max-h-none sm:w-[94px] sm:max-w-none",
+  baw: "h-auto max-h-none w-[38px] max-w-none sm:w-[82px] sm:max-w-none",
+  byd: "h-auto max-h-none w-[28px] max-w-none sm:w-[58px] sm:max-w-none",
+  chevrolet: "h-auto max-h-none w-[38px] max-w-none sm:w-[94px] sm:max-w-none",
+  chrysler: "h-auto max-h-none w-[28px] max-w-none sm:w-[58px] sm:max-w-none",
+  dodge: "h-auto max-h-none w-[38px] max-w-none sm:w-[88px] sm:max-w-none",
+  ford: "h-[38px] max-h-none w-[38px] max-w-none sm:h-[94px] sm:max-h-none sm:w-[94px] sm:max-w-none",
+  gmc: "h-auto max-h-none w-[34px] max-w-none sm:w-[76px] sm:max-w-none",
+  gtr: "h-[24px] max-h-none w-[24px] max-w-none sm:h-[58px] sm:max-h-none sm:w-[58px] sm:max-w-none",
+  hyosung: "h-auto max-h-none w-[38px] max-w-none sm:w-[88px] sm:max-w-none",
+  infiniti: "h-[38px] max-h-none w-[38px] max-w-none sm:h-[96px] sm:max-h-none sm:w-[96px] sm:max-w-none",
+  italjet: "h-auto max-h-none w-[38px] max-w-none sm:w-[88px] sm:max-w-none",
+  "italjet dragster": "h-auto max-h-none w-[38px] max-w-none sm:w-[88px] sm:max-w-none",
+  jaguar: "h-auto max-h-none w-[44px] max-w-none sm:w-[96px] sm:max-w-none",
+  jeep: "h-[31px] max-h-none w-[31px] max-w-none sm:h-[76px] sm:max-h-none sm:w-[76px] sm:max-w-none",
+  kamax: "h-auto max-h-none w-[38px] max-w-none sm:w-[88px] sm:max-w-none",
+  lambretta: "h-auto max-h-none w-[38px] max-w-none sm:w-[88px] sm:max-w-none",
+  "land rover": "h-[36px] max-h-none w-[36px] max-w-none sm:h-[88px] sm:max-h-none sm:w-[88px] sm:max-w-none",
+  mclaren: "h-[34px] max-h-none w-[34px] max-w-none sm:h-[84px] sm:max-h-none sm:w-[84px] sm:max-w-none",
+  mini: "h-[38px] max-h-none w-[38px] max-w-none sm:h-[96px] sm:max-h-none sm:w-[96px] sm:max-w-none",
+  ssangyong: "h-[30px] max-h-none w-[30px] max-w-none sm:h-[70px] sm:max-h-none sm:w-[70px] sm:max-w-none",
+  sym: "h-auto max-h-none w-[38px] max-w-none sm:w-[88px] sm:max-w-none",
+};
+
 function BrandLogoMark({ brand }: { brand: string }) {
+  const brandKey = useMemo(() => getBrandKey(brand), [brand]);
   const logoSources = useMemo(() => getBrandLogoSources(brand), [brand]);
   const fallbackLabel = useMemo(() => getBrandFallbackLabel(brand), [brand]);
-  const isOtherBrand = getBrandKey(brand).startsWith("other");
+  const isOtherBrand = brandKey.startsWith("other");
+  const brandLogoSizeClass = BRAND_LOGO_SIZE_CLASS_BY_KEY[brandKey];
   const [logoSourceIndex, setLogoSourceIndex] = useState(0);
 
   useEffect(() => {
@@ -652,7 +718,7 @@ function BrandLogoMark({ brand }: { brand: string }) {
   const logoSource = logoSources[logoSourceIndex];
 
   return (
-    <span className="flex h-7 w-7 items-center justify-center overflow-hidden rounded-full bg-[#f6fbff] p-1 shadow-[0_5px_10px_rgba(15,23,42,0.12)] ring-1 ring-slate-200/80 dark:bg-[#f6fbff] dark:shadow-[0_8px_18px_rgba(0,0,0,0.35)] dark:ring-transparent sm:h-[72px] sm:w-[72px] sm:p-2">
+    <span className="ec-mark-motion relative flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#f6fbff] p-0.5 shadow-[0_5px_10px_rgba(15,23,42,0.12)] ring-1 ring-slate-200/80 dark:bg-[#f6fbff] dark:shadow-[0_8px_18px_rgba(0,0,0,0.35)] dark:ring-transparent sm:h-[72px] sm:w-[72px] sm:p-0">
       {logoSource ? (
         <img
           key={logoSource}
@@ -662,14 +728,17 @@ function BrandLogoMark({ brand }: { brand: string }) {
           loading="lazy"
           decoding="async"
           onError={() => setLogoSourceIndex((index) => index + 1)}
-          className="h-auto max-h-5 w-auto max-w-6 object-contain saturate-100 sm:max-h-12 sm:max-w-14"
+          className={cn(
+            "h-auto max-h-[24px] w-auto max-w-[30px] shrink-0 object-contain saturate-100 sm:max-h-[58px] sm:max-w-[64px]",
+            brandLogoSizeClass
+          )}
         />
       ) : isOtherBrand ? (
-        <Shapes className="h-4 w-4 text-sky-600 sm:h-9 sm:w-9" aria-hidden="true" />
+        <Shapes className="h-5 w-5 text-sky-600 sm:h-10 sm:w-10" aria-hidden="true" />
       ) : (
         <span
           aria-hidden="true"
-          className="max-w-full px-0.5 text-center text-[7px] font-black leading-none tracking-normal text-slate-700 sm:text-sm"
+          className="max-w-[110%] px-0.5 text-center text-[8px] font-black leading-none tracking-normal text-slate-700 sm:text-sm"
         >
           {fallbackLabel}
         </span>
@@ -712,7 +781,7 @@ function BrandFilterSection({
               {...(isActive ? { "aria-pressed": "true" as const } : { "aria-pressed": "false" as const })}
               onClick={() => onBrandSelect(brand.name)}
               className={cn(
-                "group flex min-h-[58px] min-w-0 flex-col items-center justify-start gap-1 rounded-xl px-0 py-1 text-center transition sm:min-h-[122px] sm:gap-3 sm:px-2 sm:py-2",
+                "ec-pressable ec-motion ec-motion-soft group flex min-h-[58px] min-w-0 flex-col items-center justify-start gap-1 rounded-xl px-0 py-1 text-center transition sm:min-h-[122px] sm:gap-3 sm:px-2 sm:py-2",
                 "hover:bg-slate-100/75 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/70 dark:hover:bg-white/5 dark:focus-visible:ring-emerald-400/80",
                 isActive && "bg-emerald-50 ring-2 ring-emerald-500/70 dark:bg-white/10 dark:ring-emerald-400/90"
               )}
@@ -787,7 +856,7 @@ function ModelFilterSection({
               {...(isActive ? { "aria-pressed": "true" as const } : { "aria-pressed": "false" as const })}
               onClick={() => onModelSelect(model.value)}
               className={cn(
-                "flex min-h-12 items-center justify-center rounded-xl px-3 py-2 text-center text-xs font-medium leading-tight transition focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/70 sm:min-h-14 sm:text-base",
+                "ec-pressable ec-motion ec-motion-soft flex min-h-12 items-center justify-center rounded-xl px-3 py-2 text-center text-xs font-medium leading-tight transition focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/70 sm:min-h-14 sm:text-base",
                 "bg-slate-100 text-slate-700 hover:bg-slate-200 hover:text-slate-950 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700 dark:hover:text-white",
                 isActive && "text-sky-600 ring-2 ring-sky-500/70 dark:text-sky-400 dark:ring-sky-400/80"
               )}
@@ -880,7 +949,7 @@ function BodyTypeMark({ option }: { option: BodyTypeOption }) {
   const isOtherBodyType = getBodyTypeKey(option.value) === "other";
 
   return (
-    <span className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-full bg-[#f6fbff] shadow-[0_5px_10px_rgba(15,23,42,0.12)] ring-1 ring-slate-200/80 dark:bg-[#f6fbff] dark:shadow-[0_8px_18px_rgba(0,0,0,0.35)] dark:ring-transparent sm:h-[72px] sm:w-[72px]">
+    <span className="ec-mark-motion flex h-8 w-8 items-center justify-center overflow-hidden rounded-full bg-[#f6fbff] shadow-[0_5px_10px_rgba(15,23,42,0.12)] ring-1 ring-slate-200/80 dark:bg-[#f6fbff] dark:shadow-[0_8px_18px_rgba(0,0,0,0.35)] dark:ring-transparent sm:h-[72px] sm:w-[72px]">
       {isOtherBodyType ? (
         <Shapes className="h-5 w-5 text-sky-600 sm:h-9 sm:w-9" aria-hidden="true" />
       ) : (
@@ -920,7 +989,7 @@ function BodyTypeFilterSection({
               {...(isActive ? { "aria-pressed": "true" as const } : { "aria-pressed": "false" as const })}
               onClick={() => onBodyTypeSelect(bodyType.value)}
               className={cn(
-                "group flex min-h-[58px] min-w-0 flex-col items-center justify-start gap-1 rounded-xl px-0 py-1 text-center transition sm:min-h-[122px] sm:gap-3 sm:px-2 sm:py-2",
+                "ec-pressable ec-motion ec-motion-soft group flex min-h-[58px] min-w-0 flex-col items-center justify-start gap-1 rounded-xl px-0 py-1 text-center transition sm:min-h-[122px] sm:gap-3 sm:px-2 sm:py-2",
                 "hover:bg-slate-100/75 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/70 dark:hover:bg-white/5 dark:focus-visible:ring-emerald-400/80",
                 isActive && "bg-emerald-50 ring-2 ring-emerald-500/70 dark:bg-white/10 dark:ring-emerald-400/90"
               )}
@@ -1292,7 +1361,7 @@ return (
         event.preventDefault();
         onView(vehicle.VehicleId);
       }}
-      className="group scroll-mt-24 cursor-pointer overflow-hidden rounded-md border border-slate-100 bg-white shadow-[0_3px_12px_rgba(0,0,0,0.08)] transition-all duration-150 hover:border-emerald-200 hover:shadow-[0_8px_30px_rgba(0,0,0,0.12)] focus:outline-none focus:ring-2 focus:ring-emerald-400/40 active:scale-[0.98] dark:border-slate-700/80 dark:bg-slate-900 dark:shadow-[0_16px_32px_rgba(2,6,23,0.45)] dark:hover:border-emerald-500/35 dark:hover:shadow-[0_20px_42px_rgba(2,6,23,0.62)] sm:rounded-xl sm:shadow-[0_4px_16px_rgba(0,0,0,0.08)]"
+      className="ec-motion ec-live-card group scroll-mt-24 cursor-pointer overflow-hidden rounded-md border border-slate-100 bg-white shadow-[0_3px_12px_rgba(0,0,0,0.08)] transition-all duration-150 hover:border-emerald-200 hover:shadow-[0_8px_30px_rgba(0,0,0,0.12)] focus:outline-none focus:ring-2 focus:ring-emerald-400/40 active:scale-[0.98] dark:border-slate-700/80 dark:bg-slate-900 dark:shadow-[0_16px_32px_rgba(2,6,23,0.45)] dark:hover:border-emerald-500/35 dark:hover:shadow-[0_20px_42px_rgba(2,6,23,0.62)] sm:rounded-xl sm:shadow-[0_4px_16px_rgba(0,0,0,0.08)]"
     >
       {/* Image */}
       <div className="relative aspect-[4/3] overflow-hidden bg-slate-100 dark:bg-slate-800">
@@ -1303,7 +1372,7 @@ return (
               fill
               sizes="(max-width: 640px) 25vw, (max-width: 1024px) 33vw, (max-width: 1280px) 25vw, (max-width: 1536px) 20vw, 16vw"
               unoptimized={shouldBypassNextImageOptimization(imageUrl)}
-              className="object-cover group-hover:scale-105 transition-transform duration-500"
+              className="object-cover transition-transform duration-300 group-hover:scale-105 motion-reduce:transform-none"
               onError={(e) => {
                 e.currentTarget.style.display = "none";
               }}
@@ -1400,7 +1469,7 @@ const MobileVehicleListCard = memo(function MobileVehicleListCard({
         event.preventDefault();
         onView(vehicle.VehicleId);
       }}
-      className="grid min-h-[74px] scroll-mt-24 cursor-pointer grid-cols-[92px_minmax(0,1fr)] overflow-hidden rounded-md border border-slate-100 bg-white shadow-[0_3px_12px_rgba(15,23,42,0.07)] transition-transform focus:outline-none focus:ring-2 focus:ring-emerald-400/40 active:scale-[0.99] dark:border-slate-700/80 dark:bg-slate-900 dark:shadow-[0_14px_30px_rgba(2,6,23,0.45)] sm:min-h-[132px] sm:grid-cols-[164px_minmax(0,1fr)] sm:rounded-lg sm:shadow-[0_4px_16px_rgba(15,23,42,0.07)] lg:min-h-[154px] lg:grid-cols-[196px_minmax(0,1fr)]"
+      className="ec-motion ec-motion-soft ec-live-card grid min-h-[74px] scroll-mt-24 cursor-pointer grid-cols-[92px_minmax(0,1fr)] overflow-hidden rounded-md border border-slate-100 bg-white shadow-[0_3px_12px_rgba(15,23,42,0.07)] transition-transform focus:outline-none focus:ring-2 focus:ring-emerald-400/40 active:scale-[0.99] dark:border-slate-700/80 dark:bg-slate-900 dark:shadow-[0_14px_30px_rgba(2,6,23,0.45)] sm:min-h-[132px] sm:grid-cols-[164px_minmax(0,1fr)] sm:rounded-lg sm:shadow-[0_4px_16px_rgba(15,23,42,0.07)] lg:min-h-[154px] lg:grid-cols-[196px_minmax(0,1fr)]"
     >
       <div className="relative min-h-[74px] overflow-hidden bg-slate-100 dark:bg-slate-800 sm:min-h-[132px] lg:min-h-[154px]">
         <Car className="absolute inset-0 m-auto h-5 w-5 text-slate-300 dark:text-slate-600 sm:h-12 sm:w-12" aria-hidden="true" />
@@ -1411,7 +1480,7 @@ const MobileVehicleListCard = memo(function MobileVehicleListCard({
             fill
             sizes="(max-width: 640px) 92px, (max-width: 1024px) 164px, 196px"
             unoptimized={shouldBypassNextImageOptimization(imageUrl)}
-            className="object-cover"
+            className="object-cover transition-transform duration-300 group-hover:scale-105 motion-reduce:transform-none"
             loading="lazy"
             onError={(e) => {
               e.currentTarget.style.display = "none";
@@ -1506,17 +1575,17 @@ export default function VehiclesClientEnhanced() {
 
   // Filter state
   const [filters, setFilters] = useState<FilterState>({
-    search: "",
-    category: "all",
-    condition: "all",
-    brand: "",
-    model: "",
-    year: "",
-    plate: "",
-    bodyType: "",
-    minPrice: "",
-    maxPrice: "",
-    taxType: "",
+    ...DEFAULT_FILTER_STATE,
+    search: effectiveVehicleListSearchParams.get("search") ?? DEFAULT_FILTER_STATE.search,
+    condition: effectiveVehicleListSearchParams.get("condition") ?? DEFAULT_FILTER_STATE.condition,
+    brand: effectiveVehicleListSearchParams.get("brand") ?? DEFAULT_FILTER_STATE.brand,
+    model: effectiveVehicleListSearchParams.get("model") ?? DEFAULT_FILTER_STATE.model,
+    year: effectiveVehicleListSearchParams.get("year") ?? DEFAULT_FILTER_STATE.year,
+    plate: effectiveVehicleListSearchParams.get("plate") ?? DEFAULT_FILTER_STATE.plate,
+    bodyType: effectiveVehicleListSearchParams.get("bodyType") ?? DEFAULT_FILTER_STATE.bodyType,
+    minPrice: effectiveVehicleListSearchParams.get("minPrice") ?? DEFAULT_FILTER_STATE.minPrice,
+    maxPrice: effectiveVehicleListSearchParams.get("maxPrice") ?? DEFAULT_FILTER_STATE.maxPrice,
+    taxType: effectiveVehicleListSearchParams.get("taxType") ?? DEFAULT_FILTER_STATE.taxType,
     hasImage: isTruthyQueryParam(
       effectiveVehicleListSearchParams.get("withoutImage") ??
       effectiveVehicleListSearchParams.get("noImage")
@@ -1535,16 +1604,16 @@ export default function VehiclesClientEnhanced() {
     return null;
   });
   const filterResetValuesRef = useRef({
-    hasImage: filters.hasImage,
+    filters,
     quickFilter,
   });
 
   useEffect(() => {
     filterResetValuesRef.current = {
-      hasImage: filters.hasImage,
+      filters,
       quickFilter,
     };
-  }, [filters.hasImage, quickFilter]);
+  }, [filters, quickFilter]);
 
   // Visible columns - load from localStorage or use defaults
   const [visibleColumns, setVisibleColumns] = useState<ColumnKey[]>(() => {
@@ -1853,7 +1922,30 @@ export default function VehiclesClientEnhanced() {
       const noImageParam =
         effectiveVehicleListSearchParams.get("withoutImage") ??
         effectiveVehicleListSearchParams.get("noImage");
-      const nextHasImage = isTruthyQueryParam(noImageParam) ? "no" : "";
+      const currentFilters = filterResetValuesRef.current.filters;
+      const nextFilters: FilterState = {
+        ...currentFilters,
+        hasImage: isTruthyQueryParam(noImageParam) ? "no" : "",
+      };
+      const filterParamKeys = [
+        "search",
+        "condition",
+        "brand",
+        "model",
+        "year",
+        "plate",
+        "bodyType",
+        "minPrice",
+        "maxPrice",
+        "taxType",
+      ] as const;
+
+      for (const key of filterParamKeys) {
+        if (effectiveVehicleListSearchParams.has(key)) {
+          nextFilters[key] = effectiveVehicleListSearchParams.get(key) ?? DEFAULT_FILTER_STATE[key];
+        }
+      }
+
       const nextGroupBy = parseVehicleGroupByParam(effectiveVehicleListSearchParams.get("groupBy"));
       const isMobileVehicleList = detectMobileVehicleViewport();
       const explicitPageParam = activeVehicleListSearchParams.get(VEHICLE_LIST_PAGE_PARAM);
@@ -1882,8 +1974,16 @@ export default function VehiclesClientEnhanced() {
         if (normalized.includes("tuk")) return "tuktuks";
         return null;
       })();
+      if (nextQuickFilter) {
+        nextFilters.category = DEFAULT_FILTER_STATE.category;
+      } else if (categoryParam) {
+        nextFilters.category = categoryParam;
+      }
+
       const willUpdateFilterState =
-        filterResetValuesRef.current.hasImage !== nextHasImage ||
+        Object.keys(nextFilters).some((key) => (
+          filterResetValuesRef.current.filters[key as keyof FilterState] !== nextFilters[key as keyof FilterState]
+        )) ||
         filterResetValuesRef.current.quickFilter !== nextQuickFilter;
 
       if (hasPositionQuery && willUpdateFilterState) {
@@ -1891,9 +1991,11 @@ export default function VehiclesClientEnhanced() {
       }
 
       setFilters(prev =>
-        prev.hasImage === nextHasImage
+        Object.keys(nextFilters).every((key) => (
+          prev[key as keyof FilterState] === nextFilters[key as keyof FilterState]
+        ))
           ? prev
-          : { ...prev, hasImage: nextHasImage }
+          : nextFilters
       );
 
       setQuickFilter(prev => (prev === nextQuickFilter ? prev : nextQuickFilter));
@@ -2382,6 +2484,39 @@ export default function VehiclesClientEnhanced() {
     const nextParams = new URLSearchParams(currentVehicleListSearchParams.toString());
     const nextPage = Math.max(1, options.page ?? currentPage);
     const nextViewMode = options.viewMode ?? viewMode;
+    const filterQueryValues: Array<[string, string]> = [
+      ["search", filters.search.trim()],
+      ["condition", filters.condition !== "all" ? filters.condition : ""],
+      ["brand", filters.brand.trim()],
+      ["model", filters.model.trim()],
+      ["year", filters.year.trim()],
+      ["plate", filters.plate.trim()],
+      ["bodyType", filters.bodyType.trim()],
+      ["minPrice", filters.minPrice.trim()],
+      ["maxPrice", filters.maxPrice.trim()],
+      ["taxType", filters.taxType.trim()],
+    ];
+
+    for (const [key, value] of filterQueryValues) {
+      nextParams.delete(key);
+      if (value) nextParams.set(key, value);
+    }
+
+    if (quickFilter) {
+      nextParams.set("category", quickFilter);
+    } else if (filters.category !== "all") {
+      nextParams.set("category", filters.category);
+    } else {
+      nextParams.set("category", "all");
+    }
+
+    if (filters.hasImage === "no") {
+      nextParams.set("withoutImage", "1");
+      nextParams.delete("noImage");
+    } else {
+      nextParams.delete("withoutImage");
+      nextParams.delete("noImage");
+    }
 
     if (nextPage > 1) {
       nextParams.set(VEHICLE_LIST_PAGE_PARAM, String(nextPage));
@@ -2398,7 +2533,7 @@ export default function VehiclesClientEnhanced() {
     }
 
     return nextParams;
-  }, [currentPage, currentVehicleListSearchParams, viewMode]);
+  }, [currentPage, currentVehicleListSearchParams, filters, quickFilter, viewMode]);
 
   const replaceCurrentHistoryWithListState = useCallback((params: URLSearchParams) => {
     if (typeof window === "undefined") return;
@@ -2442,6 +2577,7 @@ export default function VehiclesClientEnhanced() {
     const selectedBrandKey = getBrandKey(brand);
     setFilters(prev => ({
       ...prev,
+      search: "",
       brand: getBrandKey(prev.brand) === selectedBrandKey ? "" : getCanonicalBrandName(brand),
       model: "",
     }));
@@ -2465,14 +2601,62 @@ export default function VehiclesClientEnhanced() {
     preserveVehicleListScrollForUpdate();
     setFilters(prev => ({
       ...prev,
+      search: "",
       model: getModelKey(prev.model) === getModelKey(model) ? "" : model,
     }));
     resetVisibleVehicleBatch();
   }, [preserveVehicleListScrollForUpdate, resetVisibleVehicleBatch]);
 
   const handleVehicleSearchChange = useCallback((value: string) => {
-    setFilters(prev => (prev.search === value ? prev : { ...prev, search: value }));
+    const nextSearch = value;
+    const shouldClearLogoFilters = nextSearch.trim().length > 0;
+
+    setFilters(prev => {
+      const nextFilters = {
+        ...prev,
+        search: nextSearch,
+        ...(shouldClearLogoFilters ? { brand: "", model: "" } : {}),
+      };
+
+      return (
+        prev.search === nextFilters.search &&
+        prev.brand === nextFilters.brand &&
+        prev.model === nextFilters.model
+      )
+        ? prev
+        : nextFilters;
+    });
   }, []);
+
+  const handleVehicleSearchClear = useCallback(() => {
+    handleVehicleSearchChange("");
+    setIsVehicleSearchFocused(false);
+    resetVisibleVehicleBatch();
+
+    if (!effectiveVehicleListSearchParams.has("search")) return;
+
+    const nextParams = new URLSearchParams(currentVehicleListSearchParams.toString());
+    nextParams.delete("search");
+    nextParams.delete(VEHICLE_LIST_PAGE_PARAM);
+    nextParams.delete(VEHICLE_LIST_FOCUS_PARAM);
+    navigateVehicleListInPlace(getVehicleListUrl(nextParams), "replace");
+  }, [
+    currentVehicleListSearchParams,
+    effectiveVehicleListSearchParams,
+    getVehicleListUrl,
+    handleVehicleSearchChange,
+    navigateVehicleListInPlace,
+    resetVisibleVehicleBatch,
+  ]);
+
+  const applyVehicleSuggestionSearch = useCallback((vehicle: Vehicle) => {
+    const suggestedSearch = `${vehicle.Brand || ""} ${vehicle.Model || ""}`.trim() || vehicle.Plate || "";
+    if (!suggestedSearch) return;
+
+    handleVehicleSearchChange(suggestedSearch);
+    setIsVehicleSearchFocused(false);
+    resetVisibleVehicleBatch();
+  }, [handleVehicleSearchChange, resetVisibleVehicleBatch]);
 
   const handleVehicleSearchFocus = useCallback(() => {
     if (searchBlurTimerRef.current !== null) {
@@ -2525,18 +2709,7 @@ export default function VehiclesClientEnhanced() {
 
   const resetFilters = () => {
     setFilters({
-      search: "",
-      category: "all",
-      condition: "all",
-      brand: "",
-      model: "",
-      year: "",
-      plate: "",
-      bodyType: "",
-      minPrice: "",
-      maxPrice: "",
-      taxType: "",
-      hasImage: "",
+      ...DEFAULT_FILTER_STATE,
     });
     setQuickFilter(null);
     resetVisibleVehicleBatch();
@@ -2808,6 +2981,7 @@ const getVehicleImageUrl = useCallback((imageValue: unknown): string | null => {
                 <NeuInput
                   value={filters.search}
                   onChange={handleVehicleSearchChange}
+                  onClear={handleVehicleSearchClear}
                   onFocus={handleVehicleSearchFocus}
                   onBlur={handleVehicleSearchBlur}
                   placeholder={t.searchByBrandModel}
@@ -2815,9 +2989,10 @@ const getVehicleImageUrl = useCallback((imageValue: unknown): string | null => {
                   autoComplete="off"
                   enterKeyHint="search"
                   inputMode="search"
+                  clearLabel="Clear search"
                 />
                 {showVehicleSearchSuggestions && (
-                  <div className="absolute left-0 right-0 top-[calc(100%+0.35rem)] z-[950] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl ring-1 ring-slate-900/5 dark:border-slate-800 dark:bg-slate-900 dark:ring-white/10">
+                  <div className="ec-popover-in absolute left-0 right-0 top-[calc(100%+0.35rem)] z-[950] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl ring-1 ring-slate-900/5 dark:border-slate-800 dark:bg-slate-900 dark:ring-white/10">
                     {searchSuggestionVehicles.length === 0 && fuzzySuggestions.length > 0 && (
                       <div className="flex items-center gap-2 border-b border-slate-100 px-4 py-2 text-xs font-semibold text-emerald-700 dark:border-slate-800 dark:text-emerald-300">
                         <Sparkles className="h-4 w-4" aria-hidden="true" />
@@ -2837,15 +3012,9 @@ const getVehicleImageUrl = useCallback((imageValue: unknown): string | null => {
                             type="button"
                             onPointerDown={(event) => event.preventDefault()}
                             onClick={() => {
-                              if (score === null) {
-                                setIsVehicleSearchFocused(false);
-                                handleView(vehicle.VehicleId);
-                                return;
-                              }
-
-                              handleVehicleSearchChange(suggestedSearch);
+                              applyVehicleSuggestionSearch(vehicle);
                             }}
-                            className="flex w-full items-center gap-3 px-4 py-3 text-left transition hover:bg-emerald-50 active:bg-emerald-100 dark:hover:bg-emerald-500/10 dark:active:bg-emerald-500/15"
+                            className="ec-pressable ec-row-motion flex w-full items-center gap-3 px-4 py-3 text-left transition hover:bg-emerald-50 active:bg-emerald-100 dark:hover:bg-emerald-500/10 dark:active:bg-emerald-500/15"
                           >
                             <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-300">
                               <Car className="h-5 w-5" aria-hidden="true" />
@@ -3627,9 +3796,7 @@ const getVehicleImageUrl = useCallback((imageValue: unknown): string | null => {
                     suggestions={fuzzySuggestions}
                     searchTerm={filters.search}
                     onSelect={(suggestion) => {
-                      // Apply the suggested vehicle's brand+model as the new search
-                      const suggestedSearch = `${suggestion.vehicle.Brand} ${suggestion.vehicle.Model}`.trim();
-                      setFilters(prev => ({ ...prev, search: suggestedSearch }));
+                      applyVehicleSuggestionSearch(suggestion.vehicle);
                     }}
                   />
                 ) : (

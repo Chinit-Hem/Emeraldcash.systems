@@ -154,6 +154,7 @@ export const MOTORCYCLE_BRAND_OPTIONS = [
   "Bajaj",
   "KR Motor",
   "GPX",
+  "GTR",
   "Keeway",
   "Benelli",
   "Stallion",
@@ -285,6 +286,10 @@ export const MOTORCYCLE_MODEL_OPTIONS_BY_BRAND = {
     "Popz",
     "Rock",
     "Raptor",
+    "Other - ផ្សេងៗ",
+  ],
+  GTR: [
+    "Spring",
     "Other - ផ្សេងៗ",
   ],
   Keeway: [

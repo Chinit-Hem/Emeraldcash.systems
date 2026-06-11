@@ -23,6 +23,7 @@ import { useDashboardVehicleSearch } from "@/systems/vms/hooks/useDashboardVehic
 import { safeGetMonthKey } from "@/shared/utils/safeDate";
 import { TukTukIcon } from "@/shared/components/icons/TukTukIcon";
 import { OptimizedLink } from "@/shared/components/OptimizedLink";
+import { SearchClearButton } from "@/shared/components/ui/SearchClearButton";
 import {
   Bike,
   Car,
@@ -402,6 +403,7 @@ export default function EnhancedDashboard({
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(initialError);
   const [searchQuery, setSearchQuery] = useState("");
+  const [isSearchSuggestionsOpen, setIsSearchSuggestionsOpen] = useState(false);
   const [vehicles, setVehicles] = useState<Vehicle[]>(initialVehicles);
   const [meta, setMeta] = useState<DashboardMeta>(initialMeta);
   const [activeFilter, setActiveFilter] = useState<string | null>(null);
@@ -458,7 +460,7 @@ export default function EnhancedDashboard({
     () => searchResults.slice(0, 6),
     [searchResults]
   );
-  const showSearchSuggestions = searchQuery.trim().length >= 2;
+  const showSearchSuggestions = isSearchSuggestionsOpen && searchQuery.trim().length >= 2;
 
   // Chart data preparation
   const categoryChartData = useMemo(() => {
@@ -508,6 +510,29 @@ export default function EnhancedDashboard({
     } finally {
       setIsRefreshing(false);
     }
+  }, []);
+
+  const handleSearchQueryChange = useCallback((value: string) => {
+    setSearchQuery(value);
+    setIsSearchSuggestionsOpen(true);
+  }, []);
+
+  const handleSearchClear = useCallback(() => {
+    setSearchQuery("");
+    setIsSearchSuggestionsOpen(false);
+  }, []);
+
+  const handleSearchSuggestionSelect = useCallback((vehicle: Vehicle) => {
+    const nextSearch =
+      `${vehicle.Brand || ""} ${vehicle.Model || ""}`.trim() ||
+      vehicle.Plate ||
+      vehicle.VehicleId ||
+      "";
+
+    if (!nextSearch) return;
+
+    setSearchQuery(nextSearch);
+    setIsSearchSuggestionsOpen(false);
   }, []);
 
   const handleFilterClick = useCallback((filter: string) => {
@@ -862,19 +887,26 @@ export default function EnhancedDashboard({
               type="text"
               placeholder="Search by brand, model, category, plate number, or year..."
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={(e) => handleSearchQueryChange(e.target.value)}
+              onFocus={() => setIsSearchSuggestionsOpen(true)}
               autoComplete="off"
               enterKeyHint="search"
               inputMode="search"
-              className="w-full pl-14 pr-14 py-4 rounded-2xl bg-white shadow-sm text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 transition-all text-base dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-500 dark:ring-1 dark:ring-slate-800"
+              className="w-full pl-14 pr-24 py-4 rounded-2xl bg-white shadow-sm text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 transition-all text-base dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-500 dark:ring-1 dark:ring-slate-800"
             />
+            {searchQuery && (
+              <SearchClearButton
+                onClear={handleSearchClear}
+                className="absolute right-4 top-1/2 h-8 w-8 -translate-y-1/2"
+              />
+            )}
             {debouncedSearch !== searchQuery && (
-              <div className="absolute inset-y-0 right-0 pr-5 flex items-center">
+              <div className="absolute inset-y-0 right-14 flex items-center">
                 <div className="w-5 h-5 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
               </div>
             )}
             {showSearchSuggestions && (
-              <div className="absolute left-0 right-0 top-[calc(100%+0.5rem)] z-50 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl ring-1 ring-slate-900/5 dark:border-slate-800 dark:bg-slate-900 dark:ring-white/10">
+              <div className="ec-popover-in absolute left-0 right-0 top-[calc(100%+0.5rem)] z-50 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl ring-1 ring-slate-900/5 dark:border-slate-800 dark:bg-slate-900 dark:ring-white/10">
                 {isSearching || debouncedSearch !== searchQuery ? (
                   <div className="flex items-center gap-3 px-4 py-3 text-sm text-slate-500 dark:text-slate-400">
                     <div className="h-4 w-4 rounded-full border-2 border-emerald-500 border-t-transparent animate-spin" />
@@ -883,10 +915,12 @@ export default function EnhancedDashboard({
                 ) : searchSuggestionVehicles.length > 0 ? (
                   <div className="max-h-80 overflow-y-auto py-1">
                     {searchSuggestionVehicles.map((vehicle) => (
-                      <Link
+                      <button
                         key={vehicle.VehicleId}
-                        href={`/vehicles/${encodeURIComponent(vehicle.VehicleId)}/view`}
-                        className="flex items-center gap-3 px-4 py-3 text-left transition hover:bg-emerald-50 dark:hover:bg-emerald-500/10"
+                        type="button"
+                        onPointerDown={(event) => event.preventDefault()}
+                        onClick={() => handleSearchSuggestionSelect(vehicle)}
+                        className="ec-pressable ec-row-motion flex w-full items-center gap-3 px-4 py-3 text-left transition hover:bg-emerald-50 active:bg-emerald-100 dark:hover:bg-emerald-500/10 dark:active:bg-emerald-500/15"
                       >
                         <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-300">
                           <Car className="h-5 w-5" />
@@ -900,7 +934,7 @@ export default function EnhancedDashboard({
                           </span>
                         </span>
                         <ChevronRight className="h-4 w-4 flex-shrink-0 text-slate-300 dark:text-slate-600" />
-                      </Link>
+                      </button>
                     ))}
                   </div>
                 ) : (

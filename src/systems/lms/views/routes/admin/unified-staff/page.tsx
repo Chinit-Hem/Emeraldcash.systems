@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
+import { SearchClearButton } from "@/shared/components/ui/SearchClearButton";
 
 interface SettingsUser {
   username: string;
@@ -383,8 +384,14 @@ export default function UnifiedStaffPage() {
             placeholder="Search by name, email, branch, or role..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-12 pr-4 py-3 rounded-2xl bg-white shadow-[4px_4px_12px_#e2e8f0,-4px_-4px_12px_#ffffff] text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+            className="w-full pl-12 pr-12 py-3 rounded-2xl bg-white shadow-[4px_4px_12px_#e2e8f0,-4px_-4px_12px_#ffffff] text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
           />
+          {searchQuery && (
+            <SearchClearButton
+              onClear={() => setSearchQuery("")}
+              className="absolute right-2 top-1/2 h-8 w-8 -translate-y-1/2"
+            />
+          )}
         </div>
 
         {/* Staff List */}

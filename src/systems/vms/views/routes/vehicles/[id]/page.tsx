@@ -6,7 +6,7 @@ import { useAuthUser } from "@/shared/hooks/AuthContext";
 import { VehicleDetailsCard } from "@/systems/vms/components/vehicles/VehicleDetailsCard";
 import { VehicleForm } from "@/systems/vms/components/vehicles/VehicleForm";
 import { GlassCard } from "@/shared/components/ui/glass/GlassCard";
-import { CardSkeleton } from "@/shared/components/LoadingSkeleton";
+import { NeuVehicleFormSkeleton } from "@/shared/components/skeletons/NeuVehicleFormSkeleton";
 
 import { extractDriveFileId } from "@/shared/utils/drive";
 import { refreshVehicleCache, writeVehicleCache } from "@/systems/vms/utils/vehicleCache";
@@ -281,17 +281,7 @@ function VehicleDetailInner() {
 
   // Loading state
   if (loading) {
-    return (
-      <div className="p-4 sm:p-6 lg:p-8">
-        <div className="max-w-6xl mx-auto space-y-6">
-          <CardSkeleton className="h-96" />
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <CardSkeleton className="h-64" />
-            <CardSkeleton className="h-64" />
-          </div>
-        </div>
-      </div>
-    );
+    return <NeuVehicleFormSkeleton />;
   }
 
 

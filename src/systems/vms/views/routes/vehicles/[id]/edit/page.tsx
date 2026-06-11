@@ -6,7 +6,7 @@ import { useAuthUser } from "@/shared/hooks/AuthContext";
 import { useToast } from "@/shared/components/ui/glass/GlassToast";
 import { GlassCard } from "@/shared/components/ui/glass/GlassCard";
 import { GlassButton } from "@/shared/components/ui/glass/GlassButton";
-import { CardSkeleton } from "@/shared/components/LoadingSkeleton";
+import { NeuVehicleFormSkeleton } from "@/shared/components/skeletons/NeuVehicleFormSkeleton";
 
 import { ConfirmDeleteModal } from "@/systems/vms/components/vehicles/ConfirmDeleteModal";
 import BasicVehicleForm from "@/systems/vms/components/dashboard/BasicVehicleForm";
@@ -182,13 +182,7 @@ function EditVehicleInner() {
 
   // Loading state
   if (loading) {
-    return (
-      <div className="p-4 sm:p-6 lg:p-8">
-        <div className="max-w-6xl mx-auto">
-          <CardSkeleton className="h-[600px]" />
-        </div>
-      </div>
-    );
+    return <NeuVehicleFormSkeleton />;
   }
 
   // Error state

@@ -4,6 +4,7 @@ import * as React from 'react'
 import { Search } from 'lucide-react'
 
 import { cn } from '@/shared/utils/ui'
+import { SearchClearButton } from '@/shared/components/ui/SearchClearButton'
 
 const Command = React.forwardRef<React.ElementRef<'div'>, React.ComponentPropsWithoutRef<'div'>>(
   ({ className, ...props }, ref) => (
@@ -16,15 +17,21 @@ const Command = React.forwardRef<React.ElementRef<'div'>, React.ComponentPropsWi
 )
 Command.displayName = 'Command'
 
-const CommandInput = React.forwardRef<React.ElementRef<'div'>, React.ComponentPropsWithoutRef<'div'> & { value?: string }>(
-  ({ className, value, ...props }, ref) => (
+const CommandInput = React.forwardRef<React.ElementRef<'div'>, React.ComponentPropsWithoutRef<'div'> & { value?: string; onClear?: () => void }>(
+  ({ className, value, onClear, ...props }, ref) => (
     <div
       ref={ref}
       className={cn('flex items-center border-b px-3 py-2.5 text-sm ring-offset-background backdrop-blur-sm', className)}
       {...props}
     >
       <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
-      <input className="flex h-11 w-full rounded-md bg-transparent px-3 py-2 text-sm outline-none placeholder:text-slate-500 disabled:cursor-not-allowed disabled:opacity-50 flex-1" placeholder="Type to search..." readOnly value={value} />
+      <input className="flex h-11 w-full flex-1 rounded-md bg-transparent px-3 py-2 text-sm outline-none placeholder:text-slate-500 disabled:cursor-not-allowed disabled:opacity-50" placeholder="Type to search..." readOnly value={value} />
+      {value && onClear && (
+        <SearchClearButton
+          onClear={onClear}
+          className="h-8 w-8 shrink-0"
+        />
+      )}
     </div>
   )
 )

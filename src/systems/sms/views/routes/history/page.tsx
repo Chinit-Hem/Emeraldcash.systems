@@ -45,6 +45,7 @@ import {
   smsPrimaryButtonClass,
   smsSecondaryButtonClass,
 } from "@/systems/sms/components/SmsShared";
+import { SearchClearButton } from "@/shared/components/ui/SearchClearButton";
 import { useSmsUsers } from "@/systems/sms/hooks/useSmsUsers";
 import type { SmsSettingsUser } from "@/systems/sms/utils/smsUsers";
 
@@ -498,8 +499,15 @@ export default function HistoryPage() {
                     value={assetSearch}
                     onChange={(e) => setAssetSearch(e.target.value)}
                     placeholder={t.searchAssets || "Search assets..."}
-                    className={`${smsInputClass} pl-10`}
+                    className={`${smsInputClass} pl-10 pr-12`}
                   />
+                  {assetSearch && (
+                    <SearchClearButton
+                      onClear={() => setAssetSearch("")}
+                      label={t.clearFiltersAdd || "Clear search"}
+                      className="absolute right-2 top-1/2 h-8 w-8 -translate-y-1/2"
+                    />
+                  )}
                 </div>
               </div>
 

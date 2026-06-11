@@ -31,6 +31,16 @@ export type VehicleListViewMode = "grid" | "list";
 type SearchParamsLike = Pick<URLSearchParams, "get" | "getAll" | "toString">;
 type VehicleListQueryKey =
   | "category"
+  | "search"
+  | "condition"
+  | "brand"
+  | "model"
+  | "year"
+  | "plate"
+  | "bodyType"
+  | "minPrice"
+  | "maxPrice"
+  | "taxType"
   | "withoutImage"
   | "noImage"
   | "groupBy"
@@ -40,6 +50,16 @@ type VehicleListQueryKey =
 
 const VEHICLE_LIST_QUERY_KEYS: VehicleListQueryKey[] = [
   "category",
+  "search",
+  "condition",
+  "brand",
+  "model",
+  "year",
+  "plate",
+  "bodyType",
+  "minPrice",
+  "maxPrice",
+  "taxType",
   "withoutImage",
   "noImage",
   "groupBy",

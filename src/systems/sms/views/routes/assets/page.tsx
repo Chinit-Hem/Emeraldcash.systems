@@ -18,6 +18,7 @@ import {
   smsSecondaryButtonClass,
   smsSelectClass,
 } from '@/systems/sms/components/SmsShared';
+import { SearchClearButton } from '@/shared/components/ui/SearchClearButton';
 import {
   areAssetListFiltersEqual,
   buildAssetDetailPath,
@@ -458,11 +459,22 @@ export default function AssetsPage() {
                   commitSearchFilter();
                   e.currentTarget.blur();
                 }}
-                className={`${smsInputClass} pl-12`}
+                className={`${smsInputClass} pl-12 pr-12`}
                 autoComplete="off"
                 enterKeyHint="search"
                 inputMode="search"
               />
+              {filters.search && (
+                <SearchClearButton
+                  onClear={() => {
+                    const nextFilters = { ...filters, search: '', page: 1 };
+                    setFilters(nextFilters);
+                    syncFiltersToUrl(nextFilters);
+                  }}
+                  label="Clear asset search"
+                  className="absolute right-2 top-1/2 h-8 w-8 -translate-y-1/2"
+                />
+              )}
             </div>
             <div className="relative lg:col-span-3">
               <Filter className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />

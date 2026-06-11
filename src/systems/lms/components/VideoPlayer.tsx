@@ -29,6 +29,7 @@ import {
 } from "lucide-react";
 import { GlassButton } from "@/shared/components/ui/glass/GlassButton";
 import { GlassCard } from "@/shared/components/ui/glass/GlassCard";
+import { SearchClearButton } from "@/shared/components/ui/SearchClearButton";
 import {
   COMPLETE_END_TOLERANCE_SECONDS,
   DOUBLE_TAP_WINDOW_MS,
@@ -82,6 +83,64 @@ interface VideoPlayerProps {
   canGoPrevious?: boolean;
   canGoNext?: boolean;
   onProgressChange?: (progress: VideoProgressSnapshot) => void;
+}
+
+type YouTubePlayerMethodName =
+  | "destroy"
+  | "getCurrentTime"
+  | "getDuration"
+  | "getPlaybackRate"
+  | "pauseVideo"
+  | "playVideo"
+  | "seekTo"
+  | "setPlaybackRate";
+
+function getPlayerMethod(
+  player: YouTubePlayer | null | undefined,
+  method: YouTubePlayerMethodName
+): ((...args: unknown[]) => unknown) | null {
+  const value =
+    player && typeof player === "object"
+      ? (player as unknown as Record<string, unknown>)[method]
+      : null;
+
+  return typeof value === "function" ? (value as (...args: unknown[]) => unknown) : null;
+}
+
+function readPlayerNumber(
+  player: YouTubePlayer | null | undefined,
+  method: "getCurrentTime" | "getDuration" | "getPlaybackRate",
+  fallback: number
+) {
+  const playerMethod = getPlayerMethod(player, method);
+  if (!playerMethod) {
+    return fallback;
+  }
+
+  try {
+    const value = playerMethod.call(player);
+    return typeof value === "number" && Number.isFinite(value) ? value : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function runPlayerCommand(
+  player: YouTubePlayer | null | undefined,
+  method: YouTubePlayerMethodName,
+  ...args: unknown[]
+) {
+  const playerMethod = getPlayerMethod(player, method);
+  if (!playerMethod) {
+    return false;
+  }
+
+  try {
+    playerMethod.call(player, ...args);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function InstructionsPanel({
@@ -270,7 +329,7 @@ function MobileTranscriptSheet({
         </div>
 
         <div className="lms-mobile-transcript-scroll flex-1 overflow-y-auto px-4 py-3">
-          <label className="lms-mobile-transcript-search flex h-10 items-center gap-2 rounded-full px-3.5 text-slate-500">
+          <div className="lms-mobile-transcript-search flex h-10 items-center gap-2 rounded-full px-3.5 text-slate-500">
             <Search className="h-4 w-4 flex-shrink-0" />
             <input
               value={searchValue}
@@ -279,7 +338,14 @@ function MobileTranscriptSheet({
               className="min-w-0 flex-1 bg-transparent text-base font-medium text-slate-700 outline-none placeholder:text-slate-500"
               aria-label="Search transcript"
             />
-          </label>
+            {searchValue && (
+              <SearchClearButton
+                onClear={() => onSearchChange("")}
+                label="Clear transcript search"
+                className="h-7 w-7 flex-shrink-0 rounded-full"
+              />
+            )}
+          </div>
 
           <div className="mt-3 flex min-w-0 items-center gap-3 rounded-xl bg-sky-100 p-2.5">
             {thumbnailUrl ? (
@@ -690,8 +756,8 @@ export function VideoPlayer({
 
         const player = playerRef.current;
         if (player && !isScrubbingRef.current) {
-          const duration = player.getDuration() || durationRef.current;
-          const nextCurrent = player.getCurrentTime();
+          const duration = readPlayerNumber(player, "getDuration", durationRef.current);
+          const nextCurrent = readPlayerNumber(player, "getCurrentTime", currentTimeRef.current);
           const heldSeekTime = getSeekHoldTime(nextCurrent, duration);
 
           if (heldSeekTime !== null) {
@@ -928,7 +994,7 @@ export function VideoPlayer({
           );
         }
 
-playerRef.current = new yt.Player(playerMountRef.current, {
+        playerRef.current = new yt.Player(playerMountRef.current, {
           videoId: youtubeVideoId,
           playerVars: {
             autoplay: 0,
@@ -950,14 +1016,14 @@ playerRef.current = new yt.Player(playerMountRef.current, {
                 return;
               }
 
-              const duration = event.target.getDuration();
+              const duration = readPlayerNumber(event.target, "getDuration", durationRef.current);
               const resumeAt = Math.min(resumeTimeRef.current, Math.max(0, duration - 3));
 
               setIsReady(true);
               updateWatchState(resumeAt, Math.max(maxWatchedRef.current, resumeAt), duration);
 
               if (resumeAt > 0) {
-                event.target.seekTo(resumeAt, true);
+                runPlayerCommand(event.target, "seekTo", resumeAt, true);
               }
 
               void saveProgress();
@@ -977,7 +1043,7 @@ playerRef.current = new yt.Player(playerMountRef.current, {
               clearProgressInterval();
 
               if (event.data === yt.PlayerState.ENDED) {
-                const duration = event.target.getDuration() || durationRef.current;
+                const duration = readPlayerNumber(event.target, "getDuration", durationRef.current);
                 const completedDuration = Math.max(duration, durationRef.current);
                 playbackUnlockedRef.current = true;
                 updateWatchState(completedDuration, completedDuration, completedDuration);
@@ -986,8 +1052,16 @@ playerRef.current = new yt.Player(playerMountRef.current, {
               }
 
               if (!isNowPlaying) {
-                const nextCurrent = event.target.getCurrentTime();
-                const duration = event.target.getDuration() || durationRef.current || 1;
+                const nextCurrent = readPlayerNumber(
+                  event.target,
+                  "getCurrentTime",
+                  currentTimeRef.current
+                );
+                const duration = readPlayerNumber(
+                  event.target,
+                  "getDuration",
+                  durationRef.current || 1
+                );
                 const heldSeekTime = getSeekHoldTime(nextCurrent, duration);
 
                 if (heldSeekTime !== null) {
@@ -1010,8 +1084,16 @@ playerRef.current = new yt.Player(playerMountRef.current, {
                     return;
                   }
 
-                  const nextCurrent = player.getCurrentTime();
-                  const duration = player.getDuration() || durationRef.current || 1;
+                  const nextCurrent = readPlayerNumber(
+                    player,
+                    "getCurrentTime",
+                    currentTimeRef.current
+                  );
+                  const duration = readPlayerNumber(
+                    player,
+                    "getDuration",
+                    durationRef.current || 1
+                  );
                   const heldSeekTime = getSeekHoldTime(nextCurrent, duration);
 
                   if (heldSeekTime !== null) {
@@ -1024,11 +1106,11 @@ playerRef.current = new yt.Player(playerMountRef.current, {
               }
             },
             onPlaybackRateChange: (event) => {
-              const playbackRate = event.target.getPlaybackRate();
+              const playbackRate = readPlayerNumber(event.target, "getPlaybackRate", 1);
               setPlaybackRate(playbackRate);
 
               if (!playbackUnlockedRef.current && playbackRate > MAX_PLAYBACK_RATE) {
-                event.target.setPlaybackRate(1);
+                runPlayerCommand(event.target, "setPlaybackRate", 1);
                 setPlaybackRate(1);
                 showWarning("Playback speed above 1.25x is not allowed. Speed reset to 1x.");
                 saveProgress({ playbackRateViolation: true });
@@ -1053,7 +1135,7 @@ playerRef.current = new yt.Player(playerMountRef.current, {
       clearProgressInterval();
       clearSaveInterval();
       saveProgress();
-      playerRef.current?.destroy();
+      runPlayerCommand(playerRef.current, "destroy");
       playerRef.current = null;
     };
   }, [
@@ -1068,10 +1150,9 @@ playerRef.current = new yt.Player(playerMountRef.current, {
     youtubeVideoId,
   ]);
 
-useEffect(() => {
+  useEffect(() => {
     const handleVisibilityChange = () => {
-      if (document.hidden && playerRef.current) {
-        playerRef.current.pauseVideo();
+      if (document.hidden && runPlayerCommand(playerRef.current, "pauseVideo")) {
         setIsPlaying(false);
         showWarning("Video paused because the tab is no longer active.");
         saveProgress({ tabHiddenPause: true });
@@ -1132,11 +1213,13 @@ useEffect(() => {
     revealVideoControls();
 
     if (isPlaying) {
-      playerRef.current.pauseVideo();
-      saveProgress();
-    } else {
-      playerRef.current.playVideo();
+      if (runPlayerCommand(playerRef.current, "pauseVideo")) {
+        saveProgress();
+      }
+      return;
     }
+
+    runPlayerCommand(playerRef.current, "playVideo");
   }, [isPlaying, isReady, revealVideoControls, saveProgress]);
 
   const handlePreviousLesson = useCallback(() => {
@@ -1176,7 +1259,8 @@ useEffect(() => {
   const commitSeek = useCallback(
     (requestedProgress: number) => {
       const safeDuration = durationRef.current;
-      if (!playerRef.current || safeDuration <= 0) {
+      const player = playerRef.current;
+      if (!player || safeDuration <= 0) {
         seekPreviewPercentRef.current = null;
         setSeekPreviewPercent(null);
         return false;
@@ -1198,7 +1282,9 @@ useEffect(() => {
         lockSeekDisplay(maxWatchedRef.current, safeDuration);
         setSmoothCurrentTime(maxWatchedRef.current);
         lastSmoothProgressFrameAtRef.current = performance.now();
-        playerRef.current.seekTo(maxWatchedRef.current, true);
+        if (!runPlayerCommand(player, "seekTo", maxWatchedRef.current, true)) {
+          return false;
+        }
         updateWatchState(maxWatchedRef.current, maxWatchedRef.current, safeDuration);
         showWarning("Seeking forward is locked until you watch that part of the lesson.");
         return false;
@@ -1207,7 +1293,9 @@ useEffect(() => {
       lockSeekDisplay(requestedTime, safeDuration);
       setSmoothCurrentTime(requestedTime);
       lastSmoothProgressFrameAtRef.current = performance.now();
-      playerRef.current.seekTo(requestedTime, true);
+      if (!runPlayerCommand(player, "seekTo", requestedTime, true)) {
+        return false;
+      }
       updateWatchState(
         requestedTime,
         isUnlockedForReplay
@@ -1307,14 +1395,15 @@ useEffect(() => {
   const jumpVideoBySeconds = useCallback(
     (direction: SeekJumpDirection) => {
       const player = playerRef.current;
-      const duration = durationRef.current || player?.getDuration() || videoDuration;
+      const duration =
+        durationRef.current || readPlayerNumber(player, "getDuration", videoDuration);
 
       if (!isReady || !player || duration <= 0) {
         revealVideoControls();
         return;
       }
 
-      const playerTime = player.getCurrentTime();
+      const playerTime = readPlayerNumber(player, "getCurrentTime", currentTimeRef.current);
       const currentTime =
         getPendingSeekDisplayTime(duration) ??
         (Number.isFinite(playerTime) ? playerTime : currentTimeRef.current);
@@ -1520,28 +1609,30 @@ useEffect(() => {
   const handlePlaybackRateChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
     revealVideoControls();
     const nextRate = Number(event.target.value);
+    const player = playerRef.current;
 
-    if (!playerRef.current || !Number.isFinite(nextRate)) {
+    if (!player || !Number.isFinite(nextRate)) {
       return;
     }
 
     if (!playbackUnlockedRef.current && nextRate > MAX_PLAYBACK_RATE) {
-      playerRef.current.setPlaybackRate(1);
+      runPlayerCommand(player, "setPlaybackRate", 1);
       setPlaybackRate(1);
       showWarning("Higher playback speeds unlock after you finish watching this lesson.");
       saveProgress({ playbackRateViolation: true });
       return;
     }
 
-    playerRef.current.setPlaybackRate(nextRate);
-    setPlaybackRate(nextRate);
+    if (runPlayerCommand(player, "setPlaybackRate", nextRate)) {
+      setPlaybackRate(nextRate);
+    }
   };
 
   const restartVideo = () => {
     revealVideoControls();
     const safeDuration = durationRef.current;
-    playerRef.current?.seekTo(0, true);
-    playerRef.current?.playVideo();
+    runPlayerCommand(playerRef.current, "seekTo", 0, true);
+    runPlayerCommand(playerRef.current, "playVideo");
     setSmoothCurrentTime(0);
     lastSmoothProgressFrameAtRef.current = performance.now();
     updateWatchState(0, maxWatchedRef.current, safeDuration);

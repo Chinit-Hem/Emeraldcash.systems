@@ -22,7 +22,7 @@ export const ui = {
     error: "border-red-500 focus-visible:ring-red-500",
   },
   button: {
-    base: "inline-flex select-none justify-center rounded-xl text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-green)] focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50",
+    base: "ec-pressable ec-motion ec-motion-soft inline-flex select-none justify-center rounded-xl text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-green)] focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50",
     size: {
       sm: "h-9 px-3 py-1.5",
       md: "h-10 px-4 py-2",
