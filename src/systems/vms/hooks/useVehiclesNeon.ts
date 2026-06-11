@@ -43,8 +43,14 @@ interface VehiclesResponse {
 interface UseVehiclesOptions {
   /** Cursor for pagination */
   cursor?: string;
+  /** Offset for incremental pagination */
+  offset?: number;
   /** Number of items to fetch */
   limit?: number;
+  /** Fetch remaining pages after the first paint without blocking initial render */
+  backgroundLoadAll?: boolean;
+  /** Page size for background fetches */
+  backgroundPageSize?: number;
   /** Category filter */
   category?: string;
   /** Brand filter */
@@ -78,10 +84,11 @@ const VEHICLE_IMAGE_CACHE_VERSION = "7";
 /**
  * SWR fetcher for vehicles API
  */
-async function fetcher(url: string): Promise<VehiclesResponse> {
+async function fetcher(url: string, signal?: AbortSignal): Promise<VehiclesResponse> {
   const response = await fetch(url, {
     credentials: "include",
     cache: "no-store",
+    signal,
   });
 
   if (!response.ok) {
@@ -96,6 +103,25 @@ async function fetcher(url: string): Promise<VehiclesResponse> {
   }
 
   return data;
+}
+
+function waitForIdle(timeout = 650): Promise<void> {
+  if (typeof window === "undefined") {
+    return Promise.resolve();
+  }
+
+  return new Promise((resolve) => {
+    const scheduler = window as Window & {
+      requestIdleCallback?: (callback: () => void, options?: { timeout?: number }) => number;
+    };
+
+    if (typeof scheduler.requestIdleCallback === "function") {
+      scheduler.requestIdleCallback(() => resolve(), { timeout });
+      return;
+    }
+
+    globalThis.setTimeout(resolve, Math.min(timeout, 250));
+  });
 }
 
 // ============================================================================
@@ -115,7 +141,10 @@ async function fetcher(url: string): Promise<VehiclesResponse> {
 export function useVehiclesNeon(options: UseVehiclesOptions = {}): UseVehiclesReturn {
   const {
     cursor,
-limit = 500, // Increased for dashboard pagination fix (total 1218 vehicles)
+    offset = 0,
+    limit = 500, // Increased for dashboard pagination fix (total 1218 vehicles)
+    backgroundLoadAll = false,
+    backgroundPageSize = limit,
     category,
     brand,
     search,
@@ -133,6 +162,7 @@ limit = 500, // Increased for dashboard pagination fix (total 1218 vehicles)
     params.set("cacheVersion", VEHICLE_IMAGE_CACHE_VERSION);
     if (forceRefreshKey > 0) params.set("refreshKey", String(forceRefreshKey));
     if (cursor) params.set("cursor", cursor);
+    if (offset > 0) params.set("offset", String(offset));
     // Always set the limit if provided, let the API handle defaults/max
     if (limit) params.set("limit", String(limit));
 
@@ -141,7 +171,7 @@ limit = 500, // Increased for dashboard pagination fix (total 1218 vehicles)
     if (search) params.set("searchTerm", search);
     if (withoutImage) params.set("withoutImage", "true");
     return params.toString();
-  }, [cursor, forceRefreshKey, limit, category, brand, search, withoutImage]);
+  }, [cursor, offset, forceRefreshKey, limit, category, brand, search, withoutImage]);
 
   // SWR key. Use the canonical vehicles endpoint; nested static vehicle routes
   // are not reliably served in the current Next dev runtime.
@@ -193,11 +223,78 @@ limit = 500, // Increased for dashboard pagination fix (total 1218 vehicles)
     }
   );
 
+  const [backgroundVehicles, setBackgroundVehicles] = useState<Vehicle[]>([]);
+
+  useEffect(() => {
+    setBackgroundVehicles([]);
+  }, [key]);
+
+  useEffect(() => {
+    if (!backgroundLoadAll || !data?.data?.length || !data.meta?.total) return;
+
+    const firstPageCount = data.data.length;
+    const total = data.meta.total;
+    const nextOffset = offset + firstPageCount;
+    if (nextOffset >= total) return;
+
+    const controller = new AbortController();
+    let cancelled = false;
+
+    async function loadRemainingVehicles() {
+      let currentOffset = nextOffset;
+      const pageSize = Math.max(1, Math.min(backgroundPageSize, 500));
+
+      while (!cancelled && currentOffset < total) {
+        await waitForIdle();
+        if (cancelled) return;
+
+        const params = new URLSearchParams(queryString);
+        params.set("offset", String(currentOffset));
+        params.set("limit", String(pageSize));
+
+        const page = await fetcher(`/api/vehicles?${params.toString()}`, controller.signal);
+        if (cancelled || !page.data.length) return;
+
+        setBackgroundVehicles((previousVehicles) => {
+          const seenIds = new Set(previousVehicles.map((vehicle) => vehicle.VehicleId));
+          const uniqueVehicles = page.data.filter((vehicle) => !seenIds.has(vehicle.VehicleId));
+          return uniqueVehicles.length > 0
+            ? [...previousVehicles, ...uniqueVehicles]
+            : previousVehicles;
+        });
+
+        currentOffset += page.data.length;
+      }
+    }
+
+    loadRemainingVehicles().catch((fetchError) => {
+      if (!cancelled && !(fetchError instanceof DOMException && fetchError.name === "AbortError")) {
+        console.warn("[Vehicles] Background vehicle load failed:", fetchError);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
+  }, [backgroundLoadAll, backgroundPageSize, data, offset, queryString]);
+
   // Transform response to legacy format
   const vehicles = useMemo(() => {
     if (!data?.data) return [];
-    return data.data;
-  }, [data]);
+    if (backgroundVehicles.length === 0) return data.data;
+
+    const seenIds = new Set<string>();
+    const mergedVehicles: Vehicle[] = [];
+
+    for (const vehicle of [...data.data, ...backgroundVehicles]) {
+      if (seenIds.has(vehicle.VehicleId)) continue;
+      seenIds.add(vehicle.VehicleId);
+      mergedVehicles.push(vehicle);
+    }
+
+    return mergedVehicles;
+  }, [backgroundVehicles, data]);
 
   // Build meta object
   const meta = useMemo((): VehicleMeta | null => {
@@ -209,7 +306,7 @@ limit = 500, // Increased for dashboard pagination fix (total 1218 vehicles)
       countsByCategory: data.meta.countsByCategory || {},
       countsByCondition: data.meta.countsByCondition || {},
     };
-  }, [data]);
+  }, [data, vehicles.length]);
 
   // Load more function
   const loadMore = useCallback(() => {

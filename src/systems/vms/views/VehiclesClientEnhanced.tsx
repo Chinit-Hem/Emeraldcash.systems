@@ -178,7 +178,9 @@ const COLUMNS: ColumnConfig[] = [
 ];
 
 const DEFAULT_ITEMS_PER_PAGE = 50;
-const MOBILE_VEHICLE_FETCH_LIMIT = 2000;
+const MOBILE_ITEMS_PER_PAGE = 24;
+const MOBILE_INITIAL_VEHICLE_FETCH_LIMIT = 320;
+const MOBILE_BACKGROUND_VEHICLE_FETCH_LIMIT = 320;
 const DESKTOP_VEHICLE_FETCH_LIMIT = 2000;
 const FILTER_LABEL_CLASS = "mb-1.5 block text-xs font-medium text-slate-600 dark:text-slate-400";
 const FILTER_FIELD_CLASS =
@@ -1336,13 +1338,15 @@ const VehicleCard = memo(function VehicleCard({
   onView,
   getImageUrl,
   t,
-  language
+  language,
+  priority
 }: {
   vehicle: Vehicle;
   onView: (id: string) => void;
   getImageUrl: (imageValue: unknown) => string | null;
   t: Translations;
   language: Language;
+  priority?: boolean;
 }) {
   const imageUrl = getImageUrl(vehicle.Image);
   const photoCount = Math.max(mergeVehicleImages(vehicle.Images, vehicle.Image).length, imageUrl ? 1 : 0);
@@ -1370,7 +1374,8 @@ return (
               src={imageUrl}
               alt={`${vehicle.Brand} ${vehicle.Model}`}
               fill
-              sizes="(max-width: 640px) 25vw, (max-width: 1024px) 33vw, (max-width: 1280px) 25vw, (max-width: 1536px) 20vw, 16vw"
+              sizes="(max-width: 640px) 22vw, (max-width: 1024px) 33vw, (max-width: 1280px) 25vw, (max-width: 1536px) 20vw, 16vw"
+              {...(priority ? { priority: true } : { loading: "lazy" as const })}
               unoptimized={shouldBypassNextImageOptimization(imageUrl)}
               className="object-cover transition-transform duration-300 group-hover:scale-105 motion-reduce:transform-none"
               onError={(e) => {
@@ -1437,6 +1442,7 @@ const MobileVehicleListCard = memo(function MobileVehicleListCard({
   vehicle,
   onView,
   getImageUrl,
+  priority,
 }: {
   vehicle: Vehicle;
   isAdmin: boolean;
@@ -1444,6 +1450,7 @@ const MobileVehicleListCard = memo(function MobileVehicleListCard({
   onEdit: (id: string) => void;
   onDelete: (vehicle: Vehicle) => void;
   getImageUrl: (imageValue: unknown) => string | null;
+  priority?: boolean;
 }) {
   const imageUrl = getImageUrl(vehicle.Image);
   const photoCount = Math.max(mergeVehicleImages(vehicle.Images, vehicle.Image).length, imageUrl ? 1 : 0);
@@ -1479,9 +1486,9 @@ const MobileVehicleListCard = memo(function MobileVehicleListCard({
             alt={vehicle.Model || "Vehicle"}
             fill
             sizes="(max-width: 640px) 92px, (max-width: 1024px) 164px, 196px"
+            {...(priority ? { priority: true } : { loading: "lazy" as const })}
             unoptimized={shouldBypassNextImageOptimization(imageUrl)}
             className="object-cover transition-transform duration-300 group-hover:scale-105 motion-reduce:transform-none"
-            loading="lazy"
             onError={(e) => {
               e.currentTarget.style.display = "none";
             }}
@@ -1544,6 +1551,7 @@ export default function VehiclesClientEnhanced() {
   const { success, error: showError } = useToast();
   const isAdmin = user?.role === "Admin";
   const [isMobileSafeMode, setIsMobileSafeMode] = useState(detectMobileSafariLike);
+  const [isMobileVehicleViewport, setIsMobileVehicleViewport] = useState(detectMobileVehicleViewport);
   const activeListHrefRef = useRef<string | null>(null);
   const pendingListScrollRestoreRef = useRef<VehicleListScrollSnapshot | null>(null);
   const userSelectedViewModeRef = useRef(Boolean(effectiveVehicleListSearchParams.get(VEHICLE_LIST_VIEW_PARAM)));
@@ -1649,7 +1657,7 @@ export default function VehiclesClientEnhanced() {
     parseVehicleGroupByParam(effectiveVehicleListSearchParams.get("groupBy"))
   );
 
-  const itemsPerPage = DEFAULT_ITEMS_PER_PAGE;
+  const itemsPerPage = isMobileVehicleViewport ? MOBILE_ITEMS_PER_PAGE : DEFAULT_ITEMS_PER_PAGE;
 
   // Refs for click outside
   const columnMenuRef = useRef<HTMLDivElement>(null);
@@ -1729,6 +1737,17 @@ export default function VehiclesClientEnhanced() {
     setIsMobileSafeMode(detectMobileSafariLike());
   }, []);
 
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.matchMedia) return;
+
+    const mobileQuery = window.matchMedia("(max-width: 767px)");
+    const syncMobileViewport = () => setIsMobileVehicleViewport(mobileQuery.matches);
+
+    syncMobileViewport();
+    mobileQuery.addEventListener("change", syncMobileViewport);
+    return () => mobileQuery.removeEventListener("change", syncMobileViewport);
+  }, []);
+
   // ==========================================================================
   // Data Fetching
   // ==========================================================================
@@ -1741,8 +1760,11 @@ export default function VehiclesClientEnhanced() {
     [quickFilter, filters.category]
   );
 
+  const shouldUseMobileVehicleFetch = isMobileVehicleViewport || isMobileSafeMode;
   const { vehicles, meta, loading, error, refresh, isValidating } = useVehiclesNeon({
-    limit: isMobileSafeMode ? MOBILE_VEHICLE_FETCH_LIMIT : DESKTOP_VEHICLE_FETCH_LIMIT,
+    limit: shouldUseMobileVehicleFetch ? MOBILE_INITIAL_VEHICLE_FETCH_LIMIT : DESKTOP_VEHICLE_FETCH_LIMIT,
+    backgroundLoadAll: shouldUseMobileVehicleFetch,
+    backgroundPageSize: MOBILE_BACKGROUND_VEHICLE_FETCH_LIMIT,
     category: apiCategoryFilter,
     withoutImage: filters.hasImage === "no",
     refreshInterval: 0,
@@ -3551,7 +3573,7 @@ const getVehicleImageUrl = useCallback((imageValue: unknown): string | null => {
                 </div>
                 {/* Group Vehicles Grid */}
                 <div className="grid grid-cols-4 gap-1.5 sm:grid-cols-3 sm:gap-3 md:grid-cols-4 lg:gap-4 xl:grid-cols-5 2xl:grid-cols-6">
-                  {group.vehicles.map((vehicle) => (
+                  {group.vehicles.map((vehicle, index) => (
                     <VehicleCard
                       key={vehicle.VehicleId}
                       vehicle={vehicle}
@@ -3559,6 +3581,7 @@ const getVehicleImageUrl = useCallback((imageValue: unknown): string | null => {
                       getImageUrl={getVehicleImageUrl}
                       t={t}
                       language={language}
+                      priority={index < 4}
                     />
                   ))}
                 </div>
@@ -3576,7 +3599,7 @@ const getVehicleImageUrl = useCallback((imageValue: unknown): string | null => {
                 </div>
                 {/* Group Vehicles List */}
                 <div className="space-y-1.5 sm:space-y-3 lg:space-y-4">
-                  {group.vehicles.map((vehicle) => (
+                  {group.vehicles.map((vehicle, index) => (
                     <MobileVehicleListCard
                       key={vehicle.VehicleId}
                       vehicle={vehicle}
@@ -3585,6 +3608,7 @@ const getVehicleImageUrl = useCallback((imageValue: unknown): string | null => {
                       onEdit={handleEdit}
                       onDelete={handleDelete}
                       getImageUrl={getVehicleImageUrl}
+                      priority={index < 2}
                     />
                   ))}
                 </div>
