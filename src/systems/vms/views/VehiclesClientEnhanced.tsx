@@ -703,6 +703,8 @@ const BRAND_LOGO_SIZE_CLASS_BY_KEY: Record<string, string> = {
   mini: "h-[38px] max-h-none w-[38px] max-w-none sm:h-[96px] sm:max-h-none sm:w-[96px] sm:max-w-none",
   ssangyong: "h-[30px] max-h-none w-[30px] max-w-none sm:h-[70px] sm:max-h-none sm:w-[70px] sm:max-w-none",
   sym: "h-auto max-h-none w-[38px] max-w-none sm:w-[88px] sm:max-w-none",
+  zotye: "h-[32px] max-h-none w-[32px] max-w-none sm:h-[62px] sm:max-h-none sm:w-[62px] sm:max-w-none",
+  zxauto: "h-[32px] max-h-none w-[32px] max-w-none sm:h-[62px] sm:max-h-none sm:w-[62px] sm:max-w-none",
 };
 
 function BrandLogoMark({ brand }: { brand: string }) {

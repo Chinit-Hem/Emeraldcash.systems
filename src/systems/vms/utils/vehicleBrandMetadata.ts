@@ -464,9 +464,9 @@ const LOCAL_BRAND_LOGOS: Record<string, string> = {
   yamaha: "/assets/brand-logos/custom/yamaha.png",
   zeekr: "/assets/brand-logos/custom/zeekr.png",
   zontes: "/assets/brand-logos/custom/zontes.png",
-  zotye: "/assets/brand-logos/custom/zotye.jpg",
-  "zx auto": "/assets/brand-logos/custom/zx-auto.ico",
-  zxauto: "/assets/brand-logos/custom/zx-auto.ico",
+  zotye: "/assets/brand-logos/custom/zotye-clean.svg",
+  "zx auto": "/assets/brand-logos/custom/zx-auto-clean.svg",
+  zxauto: "/assets/brand-logos/custom/zx-auto-clean.svg",
 };
 
 function normalizeBrandName(value: unknown): string {

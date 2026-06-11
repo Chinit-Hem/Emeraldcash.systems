@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="Zotye">
+  <defs>
+    <linearGradient id="zotye-shell" x1="22" y1="18" x2="106" y2="94" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="0.2" stop-color="#b9c0c8"/>
+      <stop offset="0.5" stop-color="#f7f9fb"/>
+      <stop offset="0.76" stop-color="#6f7882"/>
+      <stop offset="1" stop-color="#111827"/>
+    </linearGradient>
+    <linearGradient id="zotye-z" x1="39" y1="35" x2="90" y2="88" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="0.22" stop-color="#9aa2ad"/>
+      <stop offset="0.5" stop-color="#f8fafc"/>
+      <stop offset="0.78" stop-color="#6b7280"/>
+      <stop offset="1" stop-color="#111827"/>
+    </linearGradient>
+    <linearGradient id="zotye-dark" x1="37" y1="36" x2="93" y2="78" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#101827"/>
+      <stop offset="0.55" stop-color="#020617"/>
+      <stop offset="1" stop-color="#475569"/>
+    </linearGradient>
+  </defs>
+  <rect x="22" y="18" width="84" height="84" rx="20" fill="url(#zotye-shell)"/>
+  <rect x="28" y="24" width="72" height="72" rx="15" fill="#ffffff"/>
+  <rect x="32" y="28" width="64" height="64" rx="12" fill="none" stroke="#1f2937" stroke-width="5"/>
+  <path d="M42 39h43c5 0 8 6 4 10L63 75h25c3 0 5 2 5 5v3c0 3-2 5-5 5H42c-5 0-8-6-4-10l27-27H42c-3 0-5-2-5-5v-2c0-3 2-5 5-5z" fill="url(#zotye-dark)"/>
+  <path d="M43 42h41L52 76h36v9H43l33-34H43v-9z" fill="url(#zotye-z)"/>
+  <path d="M45 44h32L61 61 45 50v-6z" fill="#ffffff" opacity="0.8"/>
+  <path d="M52 78h35v5H47l5-5z" fill="#111827" opacity="0.2"/>
+</svg>

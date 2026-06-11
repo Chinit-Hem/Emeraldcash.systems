@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="ZX Auto">
+  <defs>
+    <linearGradient id="zx-metal" x1="24" y1="42" x2="104" y2="86" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#f8fafc"/>
+      <stop offset="0.18" stop-color="#9ca3af"/>
+      <stop offset="0.42" stop-color="#ffffff"/>
+      <stop offset="0.68" stop-color="#4b5563"/>
+      <stop offset="1" stop-color="#111827"/>
+    </linearGradient>
+    <linearGradient id="zx-dark" x1="28" y1="50" x2="100" y2="78" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#111827"/>
+      <stop offset="0.45" stop-color="#020617"/>
+      <stop offset="1" stop-color="#6b7280"/>
+    </linearGradient>
+  </defs>
+  <ellipse cx="64" cy="64" rx="48" ry="30" fill="none" stroke="url(#zx-metal)" stroke-width="9"/>
+  <ellipse cx="64" cy="64" rx="41" ry="23" fill="none" stroke="#f8fafc" stroke-width="3" opacity="0.9"/>
+  <path d="M22 66c14-12 28-16 45-13 15 3 26 1 40-9-11 18-27 27-47 24-13-2-24 0-38 8v-10z" fill="url(#zx-dark)"/>
+  <path d="M20 73c15-7 29-9 43-7 16 3 30-1 45-13-11 18-27 30-48 28-14-2-25-1-40 5V73z" fill="url(#zx-metal)"/>
+  <path d="M29 67c13-7 25-9 38-7 10 2 20 1 31-5" fill="none" stroke="#ffffff" stroke-width="4" stroke-linecap="round" opacity="0.85"/>
+</svg>
