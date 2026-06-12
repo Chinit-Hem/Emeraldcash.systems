@@ -44,7 +44,7 @@ const ALLOWED_MIME_TYPES = [
 
 const BASE64_DATA_URL_PREFIX = "data:";
 const REMOTE_IMAGE_PROTOCOLS = new Set(["http:", "https:"]);
-const SAFE_VEHICLE_UPLOAD_ID_PATTERN = /^\d{1,18}$/;
+const SAFE_UPLOAD_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]{0,120}$/;
 
 // ============================================================================
 // Helper Functions
@@ -146,8 +146,11 @@ function dataUrlToFile(
 function normalizeVehicleUploadId(vehicleId: string | null): { value: string | null; error?: string } {
   const trimmed = vehicleId?.trim();
   if (!trimmed) return { value: null };
-  if (!SAFE_VEHICLE_UPLOAD_ID_PATTERN.test(trimmed)) {
-    return { value: null, error: "Invalid vehicleId. Expected a numeric vehicle ID." };
+  if (!SAFE_UPLOAD_ID_PATTERN.test(trimmed) || trimmed.includes("..")) {
+    return {
+      value: null,
+      error: "Invalid vehicleId. Use letters, numbers, underscores, hyphens, or dots only.",
+    };
   }
   return { value: trimmed };
 }
