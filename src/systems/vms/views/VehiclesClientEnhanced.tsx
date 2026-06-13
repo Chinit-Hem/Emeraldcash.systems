@@ -895,56 +895,63 @@ function BodyTypeVehicleSvg({ type }: { type: string }) {
   const isHatchback = key === "hatchback";
 
   const bodyPath = isPickup
-    ? "M10 38 C14 33 20 30 30 30 H50 L57 37 H82 C86 37 90 41 91 46 L87 50 H15 L9 46 Z"
+    ? "M12 47 C16 40 24 36 36 36 H62 L70 45 H104 C109 45 113 49 114 54 L109 59 H18 C13 59 10 55 11 51 Z"
     : isSports
-      ? "M8 40 C17 33 30 30 45 30 H68 C78 30 88 36 92 45 L88 49 H14 L8 45 Z"
+      ? "M9 48 C19 39 35 35 55 35 H80 C94 35 106 43 112 54 L107 59 H17 C11 59 8 55 9 48 Z"
       : isConvertible
-        ? "M10 40 C18 34 27 31 42 31 H67 C79 31 87 37 91 46 L87 50 H15 L9 46 Z"
+        ? "M11 49 C22 40 35 36 55 36 H80 C96 36 107 44 113 55 L108 59 H18 C12 59 9 55 11 49 Z"
         : isMpv
-          ? "M9 40 C11 31 20 25 33 24 H67 C80 25 88 34 91 46 L87 50 H14 L9 46 Z"
+          ? "M10 48 C13 36 25 28 43 27 H79 C96 28 108 41 114 55 L109 60 H17 C12 60 9 55 10 48 Z"
           : isWagon
-            ? "M9 40 C13 31 22 27 35 27 H69 C80 28 88 36 91 46 L87 50 H14 L9 46 Z"
+            ? "M10 48 C15 37 28 31 45 31 H83 C98 32 109 43 114 55 L109 60 H17 C12 60 9 55 10 48 Z"
             : isSuv
-              ? "M9 40 C12 31 22 26 35 26 H67 C80 27 88 36 91 46 L87 50 H14 L9 46 Z"
+              ? "M10 48 C14 36 27 30 45 30 H80 C97 31 109 43 114 55 L109 60 H17 C12 60 9 55 10 48 Z"
               : isHatchback
-                ? "M10 40 C15 32 24 28 38 28 H66 C78 29 87 37 91 46 L87 50 H15 L9 46 Z"
-                : "M9 40 C16 32 27 28 42 28 H68 C79 29 88 37 91 46 L87 50 H14 L9 46 Z";
+                ? "M11 48 C18 38 31 33 49 33 H79 L108 54 L104 59 H18 C12 59 9 55 11 48 Z"
+                : "M10 48 C18 38 33 33 52 33 H82 C98 34 109 44 114 55 L109 60 H17 C12 60 9 55 10 48 Z";
 
   const roofPath = isPickup
-    ? "M30 30 L38 20 H52 L61 37 H49 L44 28 H32 Z"
+    ? "M36 36 L46 24 H64 L75 45 H59 L54 34 H39 Z"
     : isSports
-      ? "M31 30 L43 22 H60 L72 31 H58 L53 27 H43 L38 31 Z"
+      ? "M41 35 L53 27 H72 L86 36 H68 L63 32 H52 L47 36 Z"
       : isConvertible
-        ? "M35 31 H63"
+        ? "M44 36 H76"
         : isMpv
-          ? "M31 25 L39 16 H65 L77 34 H36 Z"
+          ? "M39 28 L50 15 H80 C90 18 99 31 103 45 H44 Z"
           : isWagon
-            ? "M31 27 L40 18 H66 L77 35 H36 Z"
+            ? "M39 31 L51 18 H81 L96 45 H44 Z"
             : isSuv
-              ? "M32 26 L41 17 H65 L77 35 H37 Z"
+              ? "M39 30 L52 17 H80 L96 45 H44 Z"
               : isHatchback
-                ? "M32 28 L42 18 H62 L76 36 H38 Z"
-                : "M31 28 L41 18 H60 L74 36 H36 Z";
+                ? "M40 33 L53 20 H77 L94 46 H45 Z"
+                : "M40 33 L52 20 H76 L91 46 H45 Z";
+
+  const rearWheelX = isPickup ? 36 : isSports || isConvertible ? 34 : 35;
+  const frontWheelX = isPickup ? 91 : isHatchback ? 88 : 90;
 
   return (
-    <svg viewBox="0 0 96 64" role="img" aria-hidden="true" className="h-6 w-8 sm:h-12 sm:w-14">
-      <ellipse cx="48" cy="51" rx="38" ry="4" fill="#cbd5e1" opacity="0.45" />
-      <path d={bodyPath} fill="#0ea5e9" stroke="#0369a1" strokeWidth="2" strokeLinejoin="round" />
+    <svg viewBox="0 0 120 72" role="img" aria-hidden="true" className="h-6 w-10 sm:h-12 sm:w-[70px]">
+      <ellipse cx="61" cy="62" rx="48" ry="5" fill="#94a3b8" opacity="0.32" />
+      <path d={bodyPath} fill="#0ea5e9" stroke="#075985" strokeWidth="2.2" strokeLinejoin="round" />
       <path
         d={roofPath}
-        fill={isConvertible ? "none" : "#e0f2fe"}
-        stroke="#0369a1"
-        strokeWidth="2"
+        fill={isConvertible ? "none" : "#e5f8ff"}
+        stroke="#075985"
+        strokeWidth="2.2"
         strokeLinecap="round"
         strokeLinejoin="round"
       />
-      {!isConvertible && <path d="M43 20 V35 M62 21 V36" stroke="#7dd3fc" strokeWidth="2" opacity="0.8" />}
-      {isPickup && <path d="M58 38 H82" stroke="#e0f2fe" strokeWidth="2" strokeLinecap="round" />}
-      <circle cx="27" cy="49" r="7" fill="#0f172a" />
-      <circle cx="76" cy="49" r="7" fill="#0f172a" />
-      <circle cx="27" cy="49" r="3" fill="#e2e8f0" />
-      <circle cx="76" cy="49" r="3" fill="#e2e8f0" />
-      <path d="M15 41 H8 M91 42 H84" stroke="#fef3c7" strokeWidth="2" strokeLinecap="round" />
+      <path d="M19 47 C39 41 80 41 105 51" stroke="#38bdf8" strokeWidth="5" strokeLinecap="round" opacity="0.58" />
+      {!isConvertible && <path d="M59 22 V45 M78 23 V46" stroke="#93e2ff" strokeWidth="2" opacity="0.86" />}
+      {isPickup && <path d="M72 46 H103" stroke="#dff7ff" strokeWidth="2.4" strokeLinecap="round" />}
+      {isConvertible && <path d="M45 36 C55 30 67 30 78 36" stroke="#075985" strokeWidth="2.4" strokeLinecap="round" />}
+      <path d="M16 50 H28" stroke="#bae6fd" strokeWidth="2.4" strokeLinecap="round" opacity="0.9" />
+      <path d="M104 51 H113" stroke="#fef3c7" strokeWidth="2.4" strokeLinecap="round" />
+      <circle cx={rearWheelX} cy="59" r="8.5" fill="#0f172a" />
+      <circle cx={frontWheelX} cy="59" r="8.5" fill="#0f172a" />
+      <circle cx={rearWheelX} cy="59" r="3.5" fill="#e2e8f0" />
+      <circle cx={frontWheelX} cy="59" r="3.5" fill="#e2e8f0" />
+      <path d="M24 54 H101" stroke="#0369a1" strokeWidth="2" strokeLinecap="round" opacity="0.72" />
     </svg>
   );
 }
@@ -955,7 +962,11 @@ function BodyTypeMark({ option }: { option: BodyTypeOption }) {
   return (
     <span className="ec-mark-motion flex h-8 w-8 items-center justify-center overflow-hidden rounded-full bg-[#f6fbff] shadow-[0_5px_10px_rgba(15,23,42,0.12)] ring-1 ring-slate-200/80 dark:bg-[#f6fbff] dark:shadow-[0_8px_18px_rgba(0,0,0,0.35)] dark:ring-transparent sm:h-[72px] sm:w-[72px]">
       {isOtherBodyType ? (
-        <Shapes className="h-5 w-5 text-sky-600 sm:h-9 sm:w-9" aria-hidden="true" />
+        <span className="grid h-5 w-5 grid-cols-2 gap-1 sm:h-9 sm:w-9 sm:gap-1.5" aria-hidden="true">
+          {[0, 1, 2, 3].map((item) => (
+            <span key={item} className="rounded-[3px] bg-[#087cc1] shadow-[inset_0_1px_0_rgba(255,255,255,0.35)]" />
+          ))}
+        </span>
       ) : (
         <BodyTypeVehicleSvg type={option.value} />
       )}
