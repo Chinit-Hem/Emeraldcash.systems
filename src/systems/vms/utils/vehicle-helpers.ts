@@ -4,6 +4,7 @@
  */
 
 import { driveThumbnailUrl, extractDriveFileId } from "@/shared/utils/drive";
+import type { Vehicle } from "@/shared/types/types";
 
 function isBlankImageValue(value: string): boolean {
   const normalized = value.trim().toLowerCase();
@@ -167,6 +168,60 @@ function cloudinaryUrlWithTransform(imageUrl: string, size?: string): string {
   }
 }
 
+function getCloudinaryImageIdentity(value: string): string | null {
+  if (!value.startsWith("http://") && !value.startsWith("https://")) {
+    return isCloudinaryPublicId(value) ? value.replace(/^\/+/, "").toLowerCase() : null;
+  }
+
+  try {
+    const url = new URL(value);
+    if (url.hostname !== "res.cloudinary.com") return null;
+
+    const parts = url.pathname.split("/").filter(Boolean);
+    const uploadIndex = parts.findIndex((part) => part === "upload");
+    if (uploadIndex === -1) return null;
+
+    const publicParts = parts.slice(uploadIndex + 1);
+    if (publicParts[0]?.startsWith("s--")) publicParts.shift();
+    while (publicParts[0] && isCloudinaryTransformationSegment(publicParts[0])) {
+      publicParts.shift();
+    }
+    if (publicParts[0] && /^v\d+$/i.test(publicParts[0])) {
+      publicParts.shift();
+    }
+
+    const publicId = publicParts.join("/");
+    return publicId ? publicId.toLowerCase() : null;
+  } catch {
+    return null;
+  }
+}
+
+function getVehicleImageIdentity(image: string): string | null {
+  const raw = image.trim();
+  if (!raw) return null;
+
+  const driveFileId = extractDriveFileId(raw);
+  if (driveFileId) return `drive:${driveFileId}`;
+
+  const cloudinaryIdentity = getCloudinaryImageIdentity(raw);
+  if (cloudinaryIdentity) return `cloudinary:${cloudinaryIdentity}`;
+
+  const resolvedUrl = getVehicleThumbnailUrl(raw, "w400-h300");
+  if (!resolvedUrl) return null;
+  if (resolvedUrl.startsWith("data:image/") || resolvedUrl.startsWith("blob:")) {
+    return resolvedUrl;
+  }
+
+  try {
+    const url = new URL(resolvedUrl);
+    url.hash = "";
+    return `url:${url.toString()}`;
+  } catch {
+    return `raw:${resolvedUrl}`;
+  }
+}
+
 /**
  * Get thumbnail URL for vehicle image
  */
@@ -204,8 +259,48 @@ export function getVehicleImageUrls(imageValue: unknown, size: string = "w400-h3
     .filter((image): image is string => Boolean(image));
 }
 
+export function getVehicleImageCount(...values: unknown[]): number {
+  const uniqueImages = new Set<string>();
+
+  mergeVehicleImages(...values).forEach((image) => {
+    const identity = getVehicleImageIdentity(image);
+    if (identity) uniqueImages.add(identity);
+  });
+
+  return uniqueImages.size;
+}
+
 export function getVehiclePrimaryImageUrl(imageValue: unknown, size: string = "w400-h300"): string | null {
   return getVehicleImageUrls(imageValue, size)[0] ?? null;
+}
+
+type VehicleSuggestionSearchSource = Pick<
+  Vehicle,
+  "VehicleId" | "Category" | "Brand" | "Model" | "Year" | "Plate"
+>;
+
+function cleanVehicleSearchPart(value: string | number | null | undefined): string {
+  return String(value ?? "").trim();
+}
+
+export function getVehicleSuggestionSearchText(vehicle: VehicleSuggestionSearchSource): string {
+  const plate = cleanVehicleSearchPart(vehicle.Plate);
+  if (plate) return plate;
+
+  const brandModelYear = [
+    vehicle.Brand,
+    vehicle.Model,
+    vehicle.Year,
+  ]
+    .map(cleanVehicleSearchPart)
+    .filter(Boolean)
+    .join(" ");
+  if (brandModelYear) return brandModelYear;
+
+  return [vehicle.Category, vehicle.VehicleId]
+    .map(cleanVehicleSearchPart)
+    .filter(Boolean)
+    .join(" ");
 }
 
 /**

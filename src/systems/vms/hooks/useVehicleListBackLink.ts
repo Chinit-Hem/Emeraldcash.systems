@@ -9,7 +9,10 @@ import {
 
 export function useVehicleListBackLink() {
   const searchParams = useSearchParams();
-  const href = useMemo(() => getVehicleListHrefWithFallback(searchParams), [searchParams]);
+  const href = useMemo(
+    () => getVehicleListHrefWithFallback(searchParams, { includeStoredFallback: false }),
+    [searchParams]
+  );
   const label = useMemo(() => getVehicleListBackLabel(href), [href]);
 
   return { href, label, searchParams };

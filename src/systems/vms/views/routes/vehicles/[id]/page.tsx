@@ -32,7 +32,7 @@ function VehicleDetailInner() {
   const id = typeof params?.id === "string" ? params.id : "";
   const user = useAuthUser();
   const isMounted = useMounted();
-  
+
   const [vehicle, setVehicle] = useState<Vehicle | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -45,7 +45,7 @@ function VehicleDetailInner() {
   const userRole = user?.role || "Viewer";
 
   const handleBackToList = useCallback(() => {
-    router.push(listHref, { scroll: false });
+    router.replace(listHref, { scroll: false });
   }, [listHref, router]);
 
   // Load vehicle data (client-side only)
@@ -92,7 +92,7 @@ function VehicleDetailInner() {
         if (!alive) return;
         const fetchedVehicle = data.data || data.vehicle;
         setVehicle(fetchedVehicle);
-        
+
         // Update cache
         try {
           const cached = localStorage.getItem("vms-vehicles");
@@ -128,7 +128,7 @@ function VehicleDetailInner() {
   // Handle delete
   const handleDelete = useCallback(async () => {
     if (!vehicle) return;
-    
+
     setIsDeleting(true);
     try {
       const imageFileId = extractDriveFileId(vehicle.Image);
@@ -149,7 +149,7 @@ function VehicleDetailInner() {
       }
 
       await refreshVehicleCache();
-      router.push(listHref, { scroll: false });
+      router.replace(listHref, { scroll: false });
     } catch (err) {
       alert(err instanceof Error ? err.message : "Delete failed");
     } finally {
@@ -181,7 +181,7 @@ function VehicleDetailInner() {
         uploadFormData.append("file", formData.imageFile);
         uploadFormData.append("upload_preset", CLOUDINARY_UPLOAD_PRESET);
         uploadFormData.append("folder", "vms/vehicles");
-        
+
         const uploadRes = await fetch(url, {
           method: "POST",
           body: uploadFormData,
@@ -200,9 +200,9 @@ function VehicleDetailInner() {
       // IMPORTANT: Exclude Image from formData if we're uploading a new image
       // to prevent data URLs from being saved to the database
       const { imageFile: _imageFile, Image: _imageFromForm, ...dataWithoutFile } = formData;
-      
+
       const derived = derivePrices(dataWithoutFile.PriceNew);
-      
+
       const payload = {
         ...dataWithoutFile,
         VehicleId: vehicle.VehicleId,
@@ -233,7 +233,7 @@ function VehicleDetailInner() {
 
       // Get the updated vehicle from API response (includes Cloudinary URL)
       const responseData = json.data || json.vehicle || {};
-      
+
       // Update local state with API response data (includes new Cloudinary URL)
       const updatedVehicle: Vehicle = {
         ...vehicle,
@@ -264,11 +264,11 @@ function VehicleDetailInner() {
 
       await refreshVehicleCache();
       setIsEditModalOpen(false);
-      
+
       // Redirect to view page with refresh parameter to skip cache
       const viewHref = withVehicleListQueryFallback(`/vehicles/${vehicle.VehicleId}/view`, searchParams);
-      router.push(`${viewHref}${viewHref.includes("?") ? "&" : "?"}refresh=1`);
-      
+      router.replace(`${viewHref}${viewHref.includes("?") ? "&" : "?"}refresh=1`);
+
       // Show success toast (you can integrate with your toast system)
       // toast.success("Vehicle updated successfully");
     } catch (err) {

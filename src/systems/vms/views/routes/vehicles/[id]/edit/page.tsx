@@ -55,13 +55,13 @@ function EditVehicleInner() {
   const userRole = user?.role || "Viewer";
 
   const handleBackToList = useCallback(() => {
-    router.push(listHref, { scroll: false });
+    router.replace(listHref, { scroll: false });
   }, [listHref, router]);
 
   // Redirect to vehicles list if ID is a reserved word
   useEffect(() => {
     if (isReservedId) {
-      router.push(listHref, { scroll: false });
+      router.replace(listHref, { scroll: false });
     }
   }, [isReservedId, listHref, router]);
 
@@ -117,7 +117,7 @@ function EditVehicleInner() {
     refetch();
 
     // Navigate to view immediately (no delay needed)
-    router.push(getViewHref(id));
+    router.replace(getViewHref(id));
   }, [success, router, getViewHref, id, refetch]);
 
 
@@ -134,7 +134,7 @@ function EditVehicleInner() {
   const handleDeleteSuccess = useCallback(() => {
     success("Vehicle deleted successfully");
     setIsDeleteModalOpen(false);
-    router.push(listHref, { scroll: false });
+    router.replace(listHref, { scroll: false });
   }, [success, router, listHref]);
 
   const handleDeleteError = useCallback((err: string) => {
@@ -165,7 +165,7 @@ function EditVehicleInner() {
 
   // Handle cancel with unsaved changes warning
   const handleCancel = useCallback(() => {
-    router.push(getViewHref(id));
+    router.replace(getViewHref(id));
   }, [router, getViewHref, id]);
 
   // Handle delete (simplified)
@@ -296,7 +296,7 @@ function EditVehicleInner() {
                 {backToListLabel}
               </GlassButton>
               <GlassButton
-                onClick={() => vehicle && router.push(getViewHref(vehicle.VehicleId))}
+                onClick={() => vehicle && router.replace(getViewHref(vehicle.VehicleId))}
                 variant="primary"
               >
                 View Vehicle

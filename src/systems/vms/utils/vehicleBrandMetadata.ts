@@ -91,11 +91,11 @@ const FEATURED_CAR_BRAND_NAMES = [
   "Suzuki",
   "VENUCIA",
   "Volvo",
-  "VOYAH",
+  "Voyah",
   "WULING",
   "Xiaomi",
-  "XPENG",
-  "ZEEKR",
+  "Xpeng",
+  "Zeekr",
   "ZOTYE",
   "ZX AUTO",
   "Other - ផ្សេងៗ",
@@ -204,7 +204,7 @@ const TOYOTA_MODEL_NAMES = [
   "C-HR",
   "Coaster",
   "Corolla Altis",
-  "Corolla CROSS",
+  "Corolla Cross",
   "Corona Avante",
   "Crown",
   "Estima",
@@ -225,7 +225,7 @@ const TOYOTA_MODEL_NAMES = [
   "Vios",
   "Voxy",
   "Wigo",
-  "Yaris CROSS",
+  "Yaris Cross",
   "Other - ផ្សេងៗ",
 ] as const;
 
@@ -241,10 +241,17 @@ const BRAND_CANONICAL_NAMES: Record<string, string> = {
   "mercede": "Mercedes-Benz",
   mercedes: "Mercedes-Benz",
   "mercedes benz": "Mercedes-Benz",
+  // Handle exact fully-uppercase variants that may come from DB/cache
+  MERCEDES: "Mercedes-Benz",
+  "Mercedes Benz": "Mercedes-Benz",
   "masda": "Mazda",
   "rang rover": "Land Rover",
   "range rover": "Land Rover",
-  "voyah dreamer": "VOYAH",
+  "toyota": "Toyota",
+  bmw: "BMW",
+  "toyota motor corporation": "Toyota",
+  "toyota motors": "Toyota",
+  "voyah dreamer": "Voyah",
   xioami: "Xiaomi",
   xiomi: "Xiaomi",
   aiqar: "AIQAR",
@@ -276,10 +283,14 @@ const BRAND_CANONICAL_NAMES: Record<string, string> = {
   nio: "NIO",
   "li auto": "Li",
   "kamax group": "KAMAX",
-  xpeng: "XPENG",
+  xpeng: "Xpeng",
   "zxauto": "ZX AUTO",
   "zx auto": "ZX AUTO",
-  zeekr: "ZEEKR",
+  zeekr: "Zeekr",
+  byd: "BYD",
+  gac: "GAC",
+  "g-a-c": "GAC",
+  "gac motor": "GAC",
 };
 
 const BRAND_ICON_SLUGS: Record<string, string> = {
@@ -544,6 +555,65 @@ export function getCanonicalBrandName(brand: unknown): string {
   if (!normalizedBrandName) return "";
 
   return getBrandRecordValue(BRAND_CANONICAL_NAMES, normalizedBrandName) ?? normalizedBrandName;
+}
+
+export function getDisplayBrandName(brand: unknown): string {
+  const name = getCanonicalBrandName(brand);
+
+  // Preserve common uppercase acronyms everywhere.
+  if (name === "BMW") return name;
+  if (name === "BYD") return name;
+  if (name === "GAC") return name;
+  if (name === "GTR") return name;
+  if (name === "KTM") return name;
+  if (name === "GPX") return name;
+
+  // Title-case for fully uppercase brands (e.g., TOYOTA -> Toyota).
+  if (typeof name === "string" && name === name.toUpperCase() && name.length > 2) {
+    return name.charAt(0).toUpperCase() + name.slice(1).toLowerCase();
+  }
+
+  // Title-case for fully lowercase brands (e.g., toyota -> Toyota).
+  if (typeof name === "string" && name === name.toLowerCase() && name.length > 2) {
+    return name.charAt(0).toUpperCase() + name.slice(1);
+  }
+
+  return name;
+}
+
+export function getDisplayModelName(value: unknown): string {
+  const model = normalizeModelName(value);
+  if (!model) return "";
+
+  const wantsTitleCase = model === model.toLowerCase() && model.length > 2;
+  if ((model === model.toUpperCase() && model.length > 2) || wantsTitleCase) {
+    // If the model is all lowercase, operate on its uppercase form so
+    // we can apply consistent token casing rules.
+    const source = wantsTitleCase ? model.toUpperCase() : model;
+
+    return source
+      .split(/([\s-]+)/)
+      .map((token) => {
+        if (/^[\s-]+$/.test(token)) return token;
+
+        // Keep short alnum codes as-is (e.g., BZ3X may stay BZ3X depending on length).
+        if (/^[A-Z0-9]{1,3}$/.test(token)) return token;
+
+        // For alnum sequences longer than 3, apply first-letter uppercase then lowercase rest.
+        if (/^[A-Z0-9]+$/.test(token)) {
+          return token.charAt(0).toUpperCase() + token.slice(1).toLowerCase();
+        }
+
+        // Preserve common uppercase model suffixes/acronyms.
+        if (token === "HYBRID") return token;
+
+        // Default Title-case for letter words.
+        return token.charAt(0).toUpperCase() + token.slice(1).toLowerCase();
+      })
+      .join("");
+  }
+
+  return model;
 }
 
 export function brandMatchesFilter(brand: unknown, filterValue: string): boolean {

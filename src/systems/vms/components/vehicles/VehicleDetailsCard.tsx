@@ -10,6 +10,7 @@ import { TAX_TYPE_METADATA } from "@/shared/types/types";
 import { cn } from "@/shared/utils/ui";
 import { withVehicleListQueryFallback } from "@/systems/vms/utils/vehicleListState";
 import { useVehicleListBackLink } from "@/systems/vms/hooks/useVehicleListBackLink";
+import { getCanonicalBrandName, getDisplayBrandName, getDisplayModelName } from "@/systems/vms/utils/vehicleBrandMetadata";
 
 // Modern Icon Components
 const Icons = {
@@ -165,13 +166,13 @@ export function VehicleDetailsCard({
   };
 
   const handleBackToList = () => {
-    router.push(listHref, { scroll: false });
+    router.replace(listHref, { scroll: false });
   };
 
   // Helper to get proper image URL
   const getImageUrl = (imageUrl: unknown): string | null => {
     if (imageUrl === null || imageUrl === undefined) return null;
-    
+
     let url: string;
     if (Array.isArray(imageUrl)) {
       if (imageUrl.length === 0) return null;
@@ -188,21 +189,23 @@ export function VehicleDetailsCard({
         return null;
       }
     }
-    
+
     if (!url || typeof url !== 'string' || !url.trim() || url === 'undefined' || url === 'null') return null;
-    
+
     if (url.includes('res.cloudinary.com')) return url;
-    
+
     const fileId = extractDriveFileId(url);
     if (fileId) {
       return driveThumbnailUrl(fileId, "w800-h600");
     }
-    
+
     return url;
   };
 
   const displayImageUrl = getImageUrl(vehicle.Image);
   const taxTypeMeta = TAX_TYPE_METADATA.find((tt) => tt.value === vehicle.TaxType);
+  const displayBrand = getDisplayBrandName(vehicle.Brand);
+  const modelDisplay = getDisplayModelName(vehicle.Model);
 
   // Color mapping for visual indicator
   const getColorHex = (colorName: string): string => {
@@ -220,16 +223,16 @@ export function VehicleDetailsCard({
       "slate": "#475569", "emerald": "#10b981", "ruby": "#e11d48", "sapphire": "#1d4ed8",
       "amber": "#f59e0b", "jade": "#00a86b", "pearl": "#f0e6d2", "graphite": "#4b5563",
     };
-    
+
     const normalizedColor = colorName.toLowerCase().trim();
     if (colorMap[normalizedColor]) return colorMap[normalizedColor];
-    
+
     for (const [name, hex] of Object.entries(colorMap)) {
       if (normalizedColor.includes(name) || name.includes(normalizedColor)) {
         return hex;
       }
     }
-    
+
     let hash = 0;
     for (let i = 0; i < colorName.length; i++) {
       hash = colorName.charCodeAt(i) + ((hash << 5) - hash);
@@ -264,7 +267,7 @@ export function VehicleDetailsCard({
                   </p>
                 </div>
               </div>
-              
+
               {/* Category Badge */}
               <span className={cn(
                 "px-4 py-2 rounded-full text-sm font-semibold shadow-sm",
@@ -282,7 +285,7 @@ export function VehicleDetailsCard({
         {/* Main Content */}
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-            
+
             {/* Left Column - Image (7 columns) */}
             <div className="lg:col-span-7 space-y-6">
               {/* Main Image Card */}
@@ -299,7 +302,7 @@ export function VehicleDetailsCard({
                     />
                     {/* Overlay on hover */}
                     <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                    
+
                     {/* Click to expand button */}
                     <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300">
                       <div className="bg-white/95 dark:bg-slate-800/95 backdrop-blur-sm px-6 py-3 rounded-2xl shadow-2xl flex items-center gap-3 transform translate-y-4 group-hover:translate-y-0 transition-transform duration-300">
@@ -307,7 +310,7 @@ export function VehicleDetailsCard({
                         <span className="text-sm font-semibold text-slate-900 dark:text-white">Click to Enlarge</span>
                       </div>
                     </div>
-                    
+
                     {/* Thumbnail label */}
                     <div className="absolute top-4 left-4">
                       <span className="bg-black/50 backdrop-blur-sm text-white px-3 py-1.5 rounded-full text-xs font-medium">
@@ -333,7 +336,7 @@ export function VehicleDetailsCard({
               {/* Vehicle Title Card - Mobile Only */}
               <div className="lg:hidden bg-white dark:bg-slate-800 rounded-2xl shadow-lg shadow-slate-200/50 dark:shadow-slate-900/30 p-6 border border-slate-100 dark:border-slate-700">
                 <h2 className="text-2xl font-bold text-slate-900 dark:text-white">
-                  {vehicle.Brand} {vehicle.Model}
+                  {displayBrand} {modelDisplay}
                 </h2>
                 <div className="flex items-center gap-3 mt-3 text-slate-600 dark:text-slate-400">
                   <span className="font-mono text-sm bg-slate-100 dark:bg-slate-700 px-3 py-1 rounded-lg">
@@ -347,11 +350,11 @@ export function VehicleDetailsCard({
 
             {/* Right Column - Details (5 columns) */}
             <div className="lg:col-span-5 space-y-6">
-              
+
               {/* Vehicle Identity - Desktop */}
               <div className="hidden lg:block">
                 <h2 className="text-3xl font-bold text-slate-900 dark:text-white tracking-tight leading-tight">
-                  {vehicle.Brand} {vehicle.Model}
+                  {displayBrand} {modelDisplay}
                 </h2>
                 <div className="flex items-center gap-3 mt-3 text-slate-600 dark:text-slate-400">
                   <span className="font-mono text-sm bg-slate-100 dark:bg-slate-700 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-600">
@@ -370,7 +373,7 @@ export function VehicleDetailsCard({
                   </div>
                   <h3 className="text-lg font-bold text-slate-900 dark:text-white">Information</h3>
                 </div>
-                
+
                 <div className="grid grid-cols-2 gap-4">
                   {/* Category */}
                   <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-700/50 border border-slate-100 dark:border-slate-600 hover:border-emerald-200 dark:hover:border-emerald-700 transition-colors">
@@ -407,7 +410,7 @@ export function VehicleDetailsCard({
                     </div>
                     <div className="flex items-center gap-2">
                       {vehicle.Color && (
-                        <div 
+                        <div
                           className="w-4 h-4 rounded-full border-2 border-white dark:border-slate-600 shadow-sm"
                           style={{ backgroundColor: getColorHex(vehicle.Color) }}
                         />
@@ -513,8 +516,8 @@ export function VehicleDetailsCard({
             <p className="text-sm text-slate-500 dark:text-slate-400">Manage this vehicle</p>
             <div className="flex items-center gap-3">
               {canEdit && (
-                <button 
-                  onClick={handleEdit} 
+                <button
+                  onClick={handleEdit}
                   className="flex items-center gap-2 px-6 py-3 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl font-semibold shadow-lg shadow-emerald-200 dark:shadow-emerald-900/30 transition-all duration-200 hover:scale-105 active:scale-95"
                 >
                   <Icons.Edit />
@@ -531,7 +534,7 @@ export function VehicleDetailsCard({
                   <span>Delete</span>
                 </button>
               )}
-              <button 
+              <button
                 onClick={handleBackToList}
                 className="flex items-center gap-2 px-6 py-3 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-300 rounded-xl font-semibold transition-all duration-200"
               >
@@ -598,23 +601,23 @@ export function VehicleDetailsCard({
                   </div>
                 </div>
               </div>
-              
+
               {/* Content */}
               <div className="p-6">
                 <div className="bg-slate-50 dark:bg-slate-700/50 rounded-xl p-4 mb-6">
                   <p className="font-bold text-slate-900 dark:text-white text-lg">
-                    {vehicle.Brand} {vehicle.Model}
+                    {displayBrand} {modelDisplay}
                   </p>
                   <div className="flex items-center gap-2 mt-2 text-slate-500 dark:text-slate-400">
                     <Icons.Plate />
                     <span className="font-mono text-sm uppercase">{vehicle.Plate || "-"}</span>
                   </div>
                 </div>
-                
+
                 <p className="text-slate-600 dark:text-slate-400 text-sm leading-relaxed mb-6">
                   Are you sure you want to delete this vehicle? All data including images and pricing information will be permanently removed from the system.
                 </p>
-                
+
                 {/* Actions */}
                 <div className="flex gap-3">
                   <button

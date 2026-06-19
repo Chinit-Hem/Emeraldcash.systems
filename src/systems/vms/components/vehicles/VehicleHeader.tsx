@@ -1,12 +1,5 @@
 import { useRouter } from "next/navigation";
-
-interface VehicleHeaderProps {
-  vehicleId: string;
-  brand: string;
-  model: string;
-  onEdit: () => void;
-  onDelete: () => void;
-}
+import { getDisplayBrandName, getDisplayModelName } from "@/systems/vms/utils/vehicleBrandMetadata";
 
 // Custom button styles instead of shadcn
 
@@ -39,7 +32,7 @@ export function VehicleHeader({ vehicleId, brand, model, onEdit, onDelete }: Veh
             <div>
               <p className="text-sm text-slate-500 uppercase tracking-wider font-semibold">Vehicle Details</p>
               <h1 className="text-2xl lg:text-3xl font-black bg-gradient-to-r from-slate-900 to-slate-700 bg-clip-text text-transparent">
-                {brand} {model}
+                {getDisplayBrandName(brand)} {getDisplayModelName(model)}
               </h1>
               <p className="text-sm text-slate-500">ID: #{vehicleId}</p>
             </div>

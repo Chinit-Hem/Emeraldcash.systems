@@ -349,14 +349,19 @@ conditions.push(`(NULLIF(TRIM(COALESCE(image_id, '')), '') IS NULL AND NULLIF(TR
       _paramIndex++;
     }
 
-    // Global search term - OPTIMIZED: search only brand and model (removed plate and category)
-    // This reduces the number of OR conditions and improves performance
     if (filters?.searchTerm) {
-      const pattern = VehicleService.buildIlikePattern(filters.searchTerm);
-      // Simplified: only search brand and model for better performance
-      conditions.push(`(brand ILIKE $${_paramIndex} OR model ILIKE $${_paramIndex})`);
-      params.push(pattern);
-      _paramIndex++;
+      const searchTokens = filters.searchTerm
+        .trim()
+        .split(/\s+/)
+        .filter(Boolean);
+
+      for (const token of searchTokens) {
+        conditions.push(
+          `(brand ILIKE $${_paramIndex} OR model ILIKE $${_paramIndex} OR plate ILIKE $${_paramIndex} OR category ILIKE $${_paramIndex} OR CAST(year AS TEXT) ILIKE $${_paramIndex})`
+        );
+        params.push(VehicleService.buildIlikePattern(token));
+        _paramIndex++;
+      }
     }
 
     // Build WHERE clause
@@ -1392,7 +1397,7 @@ conditions.push(`(NULLIF(TRIM(COALESCE(image_id, '')), '') IS NULL AND NULLIF(TR
         console.error(`${logPrefix} ${err}`);
         return { success: false, error: err, meta: { durationMs: 0, queryCount: 0 } };
       }
-      
+
       // ✅ FIXED: No format rejection - accepts ANY valid string <=1000 chars
       vehicle.image_id = img;
     }
@@ -1411,7 +1416,7 @@ conditions.push(`(NULLIF(TRIM(COALESCE(image_id, '')), '') IS NULL AND NULLIF(TR
           data: this.toVehicle(result.data),
         };
       }
-      
+
       const baseError = result.error || 'BaseService.update returned success:false without error message';
       console.error(`${logPrefix} Base service failed:`, baseError);
       return {

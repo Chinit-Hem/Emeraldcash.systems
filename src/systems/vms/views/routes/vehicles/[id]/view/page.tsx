@@ -11,8 +11,8 @@ import { TAX_TYPE_METADATA } from "@/shared/types/types";
 import { useMounted } from "@/shared/hooks/useMounted";
 import { getVehicleImageUrls, getVehiclePrimaryImageUrl, mergeVehicleImages } from "@/systems/vms/utils/vehicle-helpers";
 import { useVehicleListBackLink } from "@/systems/vms/hooks/useVehicleListBackLink";
-import { 
-  ArrowLeft, 
+import {
+  ArrowLeft,
   Car,
   ChevronRight,
   Loader2,
@@ -38,6 +38,7 @@ import { useDeleteVehicle } from "@/systems/vms/components/vehicles/useDeleteVeh
 import { useToast } from "@/shared/components/ui/glass/GlassToast";
 import { ImageInput } from "@/shared/components/ui/ImageInput";
 import { TukTukIcon } from "@/shared/components/icons/TukTukIcon";
+import { getCanonicalBrandName, getDisplayBrandName, getDisplayModelName } from "@/systems/vms/utils/vehicleBrandMetadata";
 
 // Helper to get proper image URL
 const getImageUrl = (imageUrl: unknown): string | null => {
@@ -158,11 +159,11 @@ function ColorSwatch({ color, className }: { color: string; className?: string }
 // Status Badge Component
 function StatusBadge({ condition }: { condition: string }) {
   const normalized = condition?.toLowerCase() || "";
-  
+
   let bgColor = "bg-slate-100";
   let textColor = "text-slate-700";
   let dotColor = "bg-slate-400";
-  
+
   if (normalized === "used") {
     bgColor = "bg-emerald-100";
     textColor = "text-emerald-700";
@@ -176,7 +177,7 @@ function StatusBadge({ condition }: { condition: string }) {
     textColor = "text-amber-700";
     dotColor = "bg-amber-500";
   }
-  
+
   return (
     <span className={cn(
       "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold",
@@ -217,7 +218,7 @@ function FloatingLabelInput({
   const hasValue = value !== "" && value !== null && value !== undefined;
   const id = useId();
   const errorId = error ? `${id}-error` : undefined;
-  
+
   return (
     <div className="relative">
       <div className={cn(
@@ -271,9 +272,9 @@ function FloatingLabelInput({
 }
 
 // Form Section Component
-function FormSection({ title, icon: Icon, children, className }: { 
-  title: string; 
-  icon: React.ComponentType<{ className?: string }>; 
+function FormSection({ title, icon: Icon, children, className }: {
+  title: string;
+  icon: React.ComponentType<{ className?: string }>;
   children: React.ReactNode;
   className?: string;
 }) {
@@ -424,14 +425,14 @@ function ViewVehicleInner() {
   const { href: listHref, label: backToListLabel, searchParams } = useVehicleListBackLink();
   const params = useParams<{ id: string }>();
   const rawId = typeof params?.id === "string" ? params.id : "";
-  
+
   const isReservedId = RESERVED_IDS.includes(rawId.toLowerCase());
   const id = isReservedId ? "" : rawId;
-  
+
   const user = useAuthUser();
   const isMounted = useMounted();
   const { success, error: showError } = useToast();
-  
+
   const isAdmin = user?.role === "Admin";
   const userRole = user?.role || "Viewer";
   const canEdit = isAdmin;  // Only Admin can edit vehicles
@@ -453,16 +454,16 @@ function ViewVehicleInner() {
   const descriptionInputId = useId();
 
   const handleBackToList = useCallback(() => {
-    router.push(listHref, { scroll: false });
+    router.replace(listHref, { scroll: false });
   }, [listHref, router]);
 
   // Redirect to vehicles list if ID is a reserved word
   useEffect(() => {
     if (isReservedId) {
-      router.push(listHref, { scroll: false });
+      router.replace(listHref, { scroll: false });
     }
   }, [isReservedId, listHref, router]);
-  
+
   // Check for auto-print
   const shouldAutoPrint = (() => {
     const value = searchParams?.get("print") ?? "";
@@ -475,7 +476,7 @@ function ViewVehicleInner() {
 
     const urlParams = new URLSearchParams(window.location.search);
     const skipCache = urlParams.get('refresh') === '1';
-    
+
     if (!skipCache) {
       const found = readVehicleFromListCache(id);
       if (found) {
@@ -494,7 +495,7 @@ function ViewVehicleInner() {
           cache: "no-store",
           credentials: "include",
         });
-        
+
         if (res.status === 401) {
           if (!authFailed) {
             authFailed = true;
@@ -518,7 +519,7 @@ function ViewVehicleInner() {
         } catch {
           // Ignore detail cache write errors.
         }
-        
+
         try {
           const cached = localStorage.getItem("vms-vehicles");
           if (cached) {
@@ -624,22 +625,22 @@ function ViewVehicleInner() {
 
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {};
-    
+
     if (!formData.Brand?.trim()) newErrors.Brand = "Brand is required";
     if (!formData.Model?.trim()) newErrors.Model = "Model is required";
     if (!formData.Year) newErrors.Year = "Year is required";
     if (!formData.Category) newErrors.Category = "Category is required";
-    
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
   const handleSubmit = async () => {
     if (!validateForm() || !vehicle) return;
-    
+
     setIsSubmitting(true);
     setSubmitError(null);
-    
+
     try {
       const finalImageUrls = await Promise.all(
         imageValues.map(async (imageValue, index) => {
@@ -673,7 +674,7 @@ function ViewVehicleInner() {
           return imageValue;
         })
       );
-      
+
       const updateRes = await fetch(`/api/vehicles/${vehicle.VehicleId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -683,9 +684,9 @@ function ViewVehicleInner() {
           Images: finalImageUrls,
         }),
       });
-      
+
       if (!updateRes.ok) throw new Error("Failed to update vehicle");
-      
+
       const result = await updateRes.json();
       setVehicle(result.data || result.vehicle);
       setIsEditMode(false);
@@ -708,7 +709,7 @@ function ViewVehicleInner() {
   const handleDeleteSuccess = () => {
     success("Vehicle deleted successfully");
     setIsDeleteModalOpen(false);
-    router.push(listHref, { scroll: false });
+    router.replace(listHref, { scroll: false });
   };
 
   const handleDeleteError = (err: string) => {
@@ -782,7 +783,11 @@ function ViewVehicleInner() {
   }
 
   const currentVehicle = vehicle;
+  const brandDisplay = getDisplayBrandName(currentVehicle.Brand);
+  const modelDisplay = getDisplayModelName(currentVehicle.Model);
+
   const vehicleImageSource = mergeVehicleImages(currentVehicle.Images, currentVehicle.Image);
+
   const displayImageUrls = mergeVehicleImages(
     getVehicleImageUrls(vehicleImageSource, "w800-h600"),
     getVehicleImageUrls(vehicleImageSource, "w400-h300"),
@@ -831,7 +836,7 @@ function ViewVehicleInner() {
                 </div>
               )}
               <h1 className="text-lg font-semibold text-slate-900">
-                {currentVehicle.Brand} {currentVehicle.Model}
+                {brandDisplay} {modelDisplay}
               </h1>
             </div>
 
@@ -920,7 +925,7 @@ function ViewVehicleInner() {
                   { }
                   <img
                     src={displayImageUrl}
-                    alt={`${currentVehicle.Brand} ${currentVehicle.Model}`}
+                    alt={`${brandDisplay} ${modelDisplay}`}
                     className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                     onError={() => {
                       setFailedImageUrls((prev) => {
@@ -953,7 +958,7 @@ function ViewVehicleInner() {
                   )}
                   <div className="absolute bottom-4 left-4 right-4">
                     <h2 className="text-2xl font-bold text-white mb-1">
-                      {currentVehicle.Brand} {currentVehicle.Model}
+                      {brandDisplay} {modelDisplay}
                     </h2>
                     <p className="text-white/80 text-sm">
                       {currentVehicle.Year} • {currentVehicle.Category}
@@ -1200,11 +1205,11 @@ function ViewVehicleInner() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="p-4 bg-slate-50 rounded-xl">
                         <p className="text-xs text-slate-500 uppercase tracking-wider mb-1">Brand</p>
-                        <p className="font-semibold text-slate-800 text-lg">{currentVehicle.Brand || "—"}</p>
+                        <p className="font-semibold text-slate-800 text-lg">{brandDisplay || "—"}</p>
                       </div>
                       <div className="p-4 bg-slate-50 rounded-xl">
                         <p className="text-xs text-slate-500 uppercase tracking-wider mb-1">Model</p>
-                        <p className="font-semibold text-slate-800 text-lg">{currentVehicle.Model || "—"}</p>
+                        <p className="font-semibold text-slate-800 text-lg">{modelDisplay || "—"}</p>
                       </div>
                       <div className="p-4 bg-slate-50 rounded-xl">
                         <p className="text-xs text-slate-500 uppercase tracking-wider mb-1">Year</p>
@@ -1273,7 +1278,7 @@ function ViewVehicleInner() {
         imageUrl={displayImageUrl || ""}
         images={galleryImageUrls}
         initialIndex={activeImageIndex}
-        alt={`${currentVehicle.Brand} ${currentVehicle.Model}`}
+        alt={`${brandDisplay} ${modelDisplay}`}
       />
 
       {/* Delete Confirmation Modal */}

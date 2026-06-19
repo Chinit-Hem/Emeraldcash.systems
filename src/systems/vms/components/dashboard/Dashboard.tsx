@@ -20,12 +20,14 @@ import Link from "next/link";
 import type { Vehicle } from "@/shared/types/types";
 import { useDashboardVehicleSearch } from "@/systems/vms/hooks/useDashboardVehicleSearch";
 import { CATEGORY_COLORS } from "@/systems/vms/utils/categoryColors";
+import { getVehicleSuggestionSearchText } from "@/systems/vms/utils/vehicle-helpers";
 import { VEHICLE_LIST_ALL_HREF } from "@/systems/vms/utils/vehicleListState";
 import { safeGetMonthKey } from "@/shared/utils/safeDate";
 import { MotorcycleIcon } from "@/shared/components/icons/MotorcycleIcon";
 import { TukTukIcon } from "@/shared/components/icons/TukTukIcon";
 import { OptimizedLink } from "@/shared/components/OptimizedLink";
 import { SearchClearButton } from "@/shared/components/ui/SearchClearButton";
+import { getDisplayBrandName, getDisplayModelName } from "@/systems/vms/utils/vehicleBrandMetadata";
 
 // ============================================================================
 // Dynamic Chart Imports (ssr: false prevents hydration errors)
@@ -423,7 +425,11 @@ export default function Dashboard({
                                    condition.includes("used") ? "Used" : "Other";
       stats.byCondition[normalizedCondition] = (stats.byCondition[normalizedCondition] || 0) + 1;
 
-      const brand = (vehicle.Brand || "Unknown").toUpperCase();
+      let brand = vehicle.Brand || "Unknown";
+      // Apply Title-case normalization if the brand is all-uppercase and longer than 2 chars
+      if (brand === brand.toUpperCase() && brand.length > 2) {
+        brand = brand.charAt(0).toUpperCase() + brand.slice(1).toLowerCase();
+      }
       stats.byBrand[brand] = (stats.byBrand[brand] || 0) + 1;
 
       if (vehicle.Time) {
@@ -518,11 +524,7 @@ export default function Dashboard({
   }, []);
 
   const handleSearchSuggestionSelect = useCallback((vehicle: Vehicle) => {
-    const nextSearch =
-      `${vehicle.Brand || ""} ${vehicle.Model || ""}`.trim() ||
-      vehicle.Plate ||
-      vehicle.VehicleId ||
-      "";
+    const nextSearch = getVehicleSuggestionSearchText(vehicle);
 
     if (!nextSearch) return;
 
@@ -683,7 +685,7 @@ export default function Dashboard({
                     </span>
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-sm font-semibold text-[#1a1a2e] dark:text-slate-100">
-                        {vehicle.Brand || "Vehicle"} {vehicle.Model || ""}
+                        {getDisplayBrandName(vehicle.Brand) || "Vehicle"} {getDisplayModelName(vehicle.Model) || ""}
                       </span>
                       <span className="mt-0.5 block truncate text-xs text-[#4a4a5a] dark:text-slate-400">
                         {[vehicle.Category, vehicle.Year, vehicle.Plate].filter(Boolean).join(" - ") || vehicle.VehicleId}

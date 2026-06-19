@@ -20,10 +20,12 @@ import { VEHICLE_LIST_ALL_HREF } from "@/systems/vms/utils/vehicleListState";
 import { useTranslation } from "@/shared/utils/i18n";
 import type { Vehicle } from "@/shared/types/types";
 import { useDashboardVehicleSearch } from "@/systems/vms/hooks/useDashboardVehicleSearch";
+import { getVehicleSuggestionSearchText } from "@/systems/vms/utils/vehicle-helpers";
 import { safeGetMonthKey } from "@/shared/utils/safeDate";
 import { TukTukIcon } from "@/shared/components/icons/TukTukIcon";
 import { OptimizedLink } from "@/shared/components/OptimizedLink";
 import { SearchClearButton } from "@/shared/components/ui/SearchClearButton";
+import { getDisplayBrandName, getDisplayModelName } from "@/systems/vms/utils/vehicleBrandMetadata";
 import {
   Bike,
   Car,
@@ -433,7 +435,11 @@ export default function EnhancedDashboard({
     };
 
     for (const vehicle of vehicles) {
-      const brand = (vehicle.Brand || "Unknown").toUpperCase();
+      let brand = vehicle.Brand || "Unknown";
+      // Apply Title-case normalization if the brand is all-uppercase and longer than 2 chars
+      if (brand === brand.toUpperCase() && brand.length > 2) {
+        brand = brand.charAt(0).toUpperCase() + brand.slice(1).toLowerCase();
+      }
       if (!INVALID_BRANDS.includes(brand)) {
         stats.byBrand[brand] = (stats.byBrand[brand] || 0) + 1;
       }
@@ -523,11 +529,7 @@ export default function EnhancedDashboard({
   }, []);
 
   const handleSearchSuggestionSelect = useCallback((vehicle: Vehicle) => {
-    const nextSearch =
-      `${vehicle.Brand || ""} ${vehicle.Model || ""}`.trim() ||
-      vehicle.Plate ||
-      vehicle.VehicleId ||
-      "";
+    const nextSearch = getVehicleSuggestionSearchText(vehicle);
 
     if (!nextSearch) return;
 
@@ -927,7 +929,7 @@ export default function EnhancedDashboard({
                         </span>
                         <span className="min-w-0 flex-1">
                           <span className="block truncate text-sm font-semibold text-slate-800 dark:text-slate-100">
-                            {vehicle.Brand || "Vehicle"} {vehicle.Model || ""}
+                            {getDisplayBrandName(vehicle.Brand) || "Vehicle"} {getDisplayModelName(vehicle.Model) || ""}
                           </span>
                           <span className="mt-0.5 block truncate text-xs text-slate-500 dark:text-slate-400">
                             {[vehicle.Category, vehicle.Year, vehicle.Plate].filter(Boolean).join(" - ") || vehicle.VehicleId}

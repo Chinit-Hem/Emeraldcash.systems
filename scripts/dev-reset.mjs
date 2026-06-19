@@ -3,6 +3,7 @@ import path from "node:path";
 
 const root = process.cwd();
 const targets = [
+  ".next/dev",
   ".next/cache",
   ".next/trace",
 ];

@@ -9,11 +9,16 @@ import { ConfirmDeleteModal } from "@/systems/vms/components/vehicles/ConfirmDel
 import { useDeleteVehicle } from "@/systems/vms/components/vehicles/useDeleteVehicle";
 import { useToast } from "@/shared/components/ui/glass/GlassToast";
 import { isDriveHostedImageUrl } from "@/shared/utils/drive";
-import { getVehicleThumbnailUrl, isCloudinaryUrl, mergeVehicleImages } from "@/systems/vms/utils/vehicle-helpers";
+import {
+  getVehicleImageCount,
+  getVehicleSuggestionSearchText,
+  getVehicleThumbnailUrl,
+  isCloudinaryUrl,
+  mergeVehicleImages,
+} from "@/systems/vms/utils/vehicle-helpers";
 import { getVehicleColorHex, translateVehicleColor } from "@/systems/vms/utils/vehicleColors";
 import type { Vehicle } from "@/shared/types/types";
 import { cn } from "@/shared/utils/ui";
-import { formatVehicleId } from "@/shared/utils/format";
 import { MOBILE_BACK_REQUEST_EVENT } from "@/shared/utils/mobileBack";
 import { useVehiclesNeon } from "@/systems/vms/hooks/useVehiclesNeon";
 import { getFuzzySuggestions } from "@/systems/vms/utils/fuzzySearch";
@@ -24,6 +29,8 @@ import {
   getBrandKey,
   getBrandLogoSources,
   getCanonicalBrandName,
+  getDisplayBrandName,
+  getDisplayModelName,
   getFeaturedBrandNamesForCategory,
   getFeaturedModelNamesForBrand,
   getModelFilterValue,
@@ -73,7 +80,6 @@ import {
   Bookmark,
   ChevronDown,
   Clock,
-  Columns,
   Eye,
   Filter,
   Grid3X3,
@@ -177,6 +183,8 @@ const COLUMNS: ColumnConfig[] = [
   { key: "actions", label: "Actions", width: "140px", sortable: false, defaultVisible: true },
 ];
 
+const DEFAULT_TABLE_COLUMNS = COLUMNS.filter((column) => column.defaultVisible);
+
 const DEFAULT_ITEMS_PER_PAGE = 50;
 const MOBILE_ITEMS_PER_PAGE = 24;
 const MOBILE_INITIAL_VEHICLE_FETCH_LIMIT = 320;
@@ -204,6 +212,8 @@ type BodyTypeOption = {
   aliases: string[];
   icon: LucideIcon;
   tone: string;
+  imageSrc?: string;
+  imageClassName?: string;
   count: number;
 };
 
@@ -214,6 +224,7 @@ const BODY_TYPE_OPTIONS: Omit<BodyTypeOption, "count">[] = [
     aliases: ["sedan", "saloon"],
     icon: Car,
     tone: "text-sky-600",
+    imageSrc: "/assets/body-types/sedan.webp",
   },
   {
     label: "Hatchback",
@@ -221,6 +232,7 @@ const BODY_TYPE_OPTIONS: Omit<BodyTypeOption, "count">[] = [
     aliases: ["hatchback", "hatch"],
     icon: CarFront,
     tone: "text-blue-600",
+    imageSrc: "/assets/body-types/hatchback.webp",
   },
   {
     label: "Pickup",
@@ -228,6 +240,8 @@ const BODY_TYPE_OPTIONS: Omit<BodyTypeOption, "count">[] = [
     aliases: ["pickup", "pick up", "pick-up", "truck"],
     icon: Truck,
     tone: "text-cyan-700",
+    imageSrc: "/assets/body-types/pickup.webp",
+    imageClassName: "w-[44px] sm:w-[82px]",
   },
   {
     label: "SUV",
@@ -235,6 +249,7 @@ const BODY_TYPE_OPTIONS: Omit<BodyTypeOption, "count">[] = [
     aliases: ["suv", "crossover"],
     icon: Car,
     tone: "text-indigo-600",
+    imageSrc: "/assets/body-types/suv.webp",
   },
   {
     label: "Convertible",
@@ -242,6 +257,7 @@ const BODY_TYPE_OPTIONS: Omit<BodyTypeOption, "count">[] = [
     aliases: ["convertible", "cabriolet", "roadster"],
     icon: CarTaxiFront,
     tone: "text-blue-500",
+    imageSrc: "/assets/body-types/convertible.webp",
   },
   {
     label: "MPV (Minivan)",
@@ -249,6 +265,7 @@ const BODY_TYPE_OPTIONS: Omit<BodyTypeOption, "count">[] = [
     aliases: ["mpv", "minivan", "mini van", "van"],
     icon: Van,
     tone: "text-sky-700",
+    imageSrc: "/assets/body-types/mpv.webp",
   },
   {
     label: "Sports",
@@ -256,6 +273,8 @@ const BODY_TYPE_OPTIONS: Omit<BodyTypeOption, "count">[] = [
     aliases: ["sports", "sport", "coupe"],
     icon: CarFront,
     tone: "text-blue-700",
+    imageSrc: "/assets/body-types/sports.webp",
+    imageClassName: "w-[40px] sm:w-[78px]",
   },
   {
     label: "Station Wagon",
@@ -263,6 +282,7 @@ const BODY_TYPE_OPTIONS: Omit<BodyTypeOption, "count">[] = [
     aliases: ["station wagon", "wagon", "estate"],
     icon: BusFront,
     tone: "text-slate-600",
+    imageSrc: "/assets/body-types/station-wagon.webp",
   },
   {
     label: "Other",
@@ -270,6 +290,7 @@ const BODY_TYPE_OPTIONS: Omit<BodyTypeOption, "count">[] = [
     aliases: ["other", "others"],
     icon: Shapes,
     tone: "text-sky-600",
+    imageSrc: "/assets/body-types/other.webp",
   },
 ];
 
@@ -614,6 +635,7 @@ function NeuInput({
   enterKeyHint,
   inputMode,
   clearLabel = "Clear input",
+  onKeyDown,
 }: {
   value: string;
   onChange: (value: string) => void;
@@ -628,6 +650,7 @@ function NeuInput({
   enterKeyHint?: React.HTMLAttributes<HTMLInputElement>["enterKeyHint"];
   inputMode?: React.HTMLAttributes<HTMLInputElement>["inputMode"];
   clearLabel?: string;
+  onKeyDown?: React.KeyboardEventHandler<HTMLInputElement>;
 }) {
   const showClearButton = Boolean(onClear && value);
 
@@ -645,6 +668,7 @@ function NeuInput({
         autoComplete={autoComplete}
         enterKeyHint={enterKeyHint}
         inputMode={inputMode}
+        onKeyDown={onKeyDown}
         className={cn(
           "w-full rounded-xl border border-slate-200/70 bg-white transition-all duration-200 dark:border-slate-700/70 dark:bg-slate-900 sm:rounded-2xl",
           "shadow-[4px_4px_8px_#e2e8f0,-4px_-4px_8px_#ffffff]",
@@ -960,13 +984,50 @@ function BodyTypeMark({ option }: { option: BodyTypeOption }) {
   const isOtherBodyType = getBodyTypeKey(option.value) === "other";
 
   return (
-    <span className="ec-mark-motion flex h-8 w-8 items-center justify-center overflow-hidden rounded-full bg-[#f6fbff] shadow-[0_5px_10px_rgba(15,23,42,0.12)] ring-1 ring-slate-200/80 dark:bg-[#f6fbff] dark:shadow-[0_8px_18px_rgba(0,0,0,0.35)] dark:ring-transparent sm:h-[72px] sm:w-[72px]">
+    <span className="ec-mark-motion flex h-8 w-12 items-center justify-center overflow-hidden bg-transparent dark:bg-transparent sm:h-[72px] sm:w-[96px]">
       {isOtherBodyType ? (
         <span className="grid h-5 w-5 grid-cols-2 gap-1 sm:h-9 sm:w-9 sm:gap-1.5" aria-hidden="true">
           {[0, 1, 2, 3].map((item) => (
             <span key={item} className="rounded-[3px] bg-[#087cc1] shadow-[inset_0_1px_0_rgba(255,255,255,0.35)]" />
           ))}
         </span>
+      ) : option.imageSrc ? (
+        (() => {
+          const src = option.imageSrc;
+          const isRemote = typeof src === "string" && /^https?:\/\//i.test(src);
+
+          if (isRemote) {
+            return (
+              <img
+                src={src}
+                alt=""
+                aria-hidden="true"
+                width={96}
+                height={72}
+                loading="lazy"
+                className={cn(
+                  "h-auto w-[40px] max-w-none select-none object-contain drop-shadow-[0_4px_6px_rgba(15,23,42,0.18)] sm:w-[76px]",
+                  option.imageClassName
+                )}
+              />
+            );
+          }
+
+          return (
+            <Image
+              src={src}
+              alt=""
+              width={96}
+              height={72}
+              sizes="(min-width: 640px) 76px, 40px"
+              aria-hidden="true"
+              className={cn(
+                "h-auto w-[40px] max-w-none select-none object-contain drop-shadow-[0_4px_6px_rgba(15,23,42,0.18)] sm:w-[76px]",
+                option.imageClassName
+              )}
+            />
+          );
+        })()
       ) : (
         <BodyTypeVehicleSvg type={option.value} />
       )}
@@ -1231,7 +1292,7 @@ function VehicleImageActions({ vehicle, photoCount }: { vehicle: Vehicle; photoC
     try {
       if (browserNavigator?.share) {
         await browserNavigator.share({
-          title: `${vehicle.Brand || ""} ${vehicle.Model || ""}`.trim() || "Vehicle",
+            title: `${getCanonicalBrandName(vehicle.Brand) || ""} ${vehicle.Model || ""}`.trim() || "Vehicle",
           url: shareUrl,
         });
       } else if (browserNavigator?.clipboard) {
@@ -1362,8 +1423,11 @@ const VehicleCard = memo(function VehicleCard({
   priority?: boolean;
 }) {
   const imageUrl = getImageUrl(vehicle.Image);
-  const photoCount = Math.max(mergeVehicleImages(vehicle.Images, vehicle.Image).length, imageUrl ? 1 : 0);
+  const photoCount = getVehicleImageCount(vehicle.Images, vehicle.Image);
   const colorLabel = translateVehicleColor(vehicle.Color, language);
+
+  const brandDisplay = getDisplayBrandName(vehicle.Brand);
+  const modelDisplay = getDisplayModelName(vehicle.Model);
 
 return (
     <div
@@ -1371,7 +1435,7 @@ return (
       data-vehicle-list-item-id={vehicle.VehicleId}
       role="button"
       tabIndex={0}
-      aria-label={`View ${vehicle.Brand || "vehicle"} ${vehicle.Model || ""}`.trim()}
+      aria-label={`View ${brandDisplay || "vehicle"} ${modelDisplay || ""}`.trim()}
       onClick={() => onView(vehicle.VehicleId)}
       onKeyDown={(event) => {
         if (event.key !== "Enter" && event.key !== " ") return;
@@ -1383,9 +1447,9 @@ return (
       {/* Image */}
       <div className="relative aspect-[4/3] overflow-hidden bg-slate-100 dark:bg-slate-800">
         {imageUrl ? (
-            <Image
-              src={imageUrl}
-              alt={`${vehicle.Brand} ${vehicle.Model}`}
+              <Image
+                src={imageUrl}
+                alt={`${brandDisplay} ${vehicle.Model}`}
               fill
               sizes="(max-width: 640px) 22vw, (max-width: 1024px) 33vw, (max-width: 1280px) 25vw, (max-width: 1536px) 20vw, 16vw"
               {...(priority ? { priority: true } : { loading: "lazy" as const })}
@@ -1407,8 +1471,10 @@ return (
       <div className="p-1 sm:p-2.5">
         <div className="mb-0.5 flex min-w-0 flex-col gap-0.5 sm:mb-1 sm:gap-1 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0">
-            <h3 className="truncate text-[9px] font-bold leading-tight text-slate-800 dark:text-slate-100 sm:text-base">{vehicle.Brand}</h3>
-            <p className="truncate text-[8px] leading-tight text-slate-500 dark:text-slate-400 sm:text-xs">{vehicle.Model}</p>
+            <h3 className="break-words text-[10px] font-bold leading-tight text-slate-800 dark:text-slate-100 sm:text-base">
+              {brandDisplay}
+            </h3>
+            <p className="truncate text-[8px] leading-tight text-slate-500 dark:text-slate-400 sm:text-xs">{modelDisplay}</p>
           </div>
           <div className="min-w-0 sm:text-right">
             <p className="truncate text-[9px] font-bold leading-tight text-emerald-600 sm:text-base">
@@ -1427,7 +1493,8 @@ return (
             <span className="text-slate-400 dark:text-slate-500">{t.plate}:</span>
             <span className="font-medium font-mono">{vehicle.Plate || "-"}</span>
           </div>
-          {vehicle.Color && (
+          {/* Color hidden on Vehicles list (Grid view) */}
+          {false && vehicle.Color && (
             <div className="flex items-center gap-2 text-slate-600 dark:text-slate-300">
               <span className="text-slate-400 dark:text-slate-500">{t.color}:</span>
               <span
@@ -1438,7 +1505,8 @@ return (
               <span className="font-medium">{colorLabel}</span>
             </div>
           )}
-          {vehicle.TaxType && (
+          {/* Tax Type hidden on Vehicles list (Grid view) */}
+          {false && vehicle.TaxType && (
             <div className="flex items-center gap-2 text-slate-600 dark:text-slate-300">
               <span className="text-slate-400 dark:text-slate-500">{t.taxType}:</span>
               <span className="font-medium">{vehicle.TaxType}</span>
@@ -1456,6 +1524,7 @@ const MobileVehicleListCard = memo(function MobileVehicleListCard({
   onView,
   getImageUrl,
   priority,
+  language,
 }: {
   vehicle: Vehicle;
   isAdmin: boolean;
@@ -1464,9 +1533,13 @@ const MobileVehicleListCard = memo(function MobileVehicleListCard({
   onDelete: (vehicle: Vehicle) => void;
   getImageUrl: (imageValue: unknown) => string | null;
   priority?: boolean;
+  language: Language;
 }) {
   const imageUrl = getImageUrl(vehicle.Image);
-  const photoCount = Math.max(mergeVehicleImages(vehicle.Images, vehicle.Image).length, imageUrl ? 1 : 0);
+  const photoCount = getVehicleImageCount(vehicle.Images, vehicle.Image);
+
+  const brandDisplay = getDisplayBrandName(vehicle.Brand);
+  const modelDisplay = getDisplayModelName(vehicle.Model);
 
   const getMobileCategoryClass = (category: string) => {
     const cat = category?.toLowerCase() || "";
@@ -1482,7 +1555,7 @@ const MobileVehicleListCard = memo(function MobileVehicleListCard({
       data-vehicle-list-item-id={vehicle.VehicleId}
       role="button"
       tabIndex={0}
-      aria-label={`View ${vehicle.Brand || "vehicle"} ${vehicle.Model || ""}`.trim()}
+      aria-label={`View ${brandDisplay || (vehicle.Brand || "vehicle")} ${modelDisplay || ""}`.trim()}
       onClick={() => onView(vehicle.VehicleId)}
       onKeyDown={(event) => {
         if (event.key !== "Enter" && event.key !== " ") return;
@@ -1513,8 +1586,8 @@ const MobileVehicleListCard = memo(function MobileVehicleListCard({
       <div className="flex min-w-0 flex-col px-2 py-1.5 sm:px-4 sm:py-3 lg:px-5 lg:py-4">
         <div className="flex min-w-0 items-start justify-between gap-1 sm:gap-2">
           <div className="min-w-0 pr-1">
-            <h3 className="line-clamp-1 text-[11px] font-bold leading-tight text-slate-900 dark:text-slate-100 sm:line-clamp-2 sm:text-base sm:leading-snug lg:text-lg">
-              {vehicle.Brand || "-"} {vehicle.Model || "-"}
+            <h3 className="break-words text-[11px] font-bold leading-tight text-slate-900 dark:text-slate-100 sm:text-base sm:leading-snug lg:text-lg">
+              {brandDisplay || "-"} {modelDisplay || "-"}
             </h3>
             <p className="mt-0.5 truncate text-[9px] leading-tight text-slate-500 dark:text-slate-400 sm:mt-1 sm:text-xs">
               {vehicle.Year || "-"} {vehicle.Plate ? `- ${vehicle.Plate}` : ""}
@@ -1535,6 +1608,20 @@ const MobileVehicleListCard = memo(function MobileVehicleListCard({
           <div className="truncate text-[11px] font-bold text-emerald-600 sm:text-base lg:text-lg">
             {vehicle.PriceNew == null ? "-" : `$${vehicle.PriceNew.toLocaleString()}`}
           </div>
+
+          {/* Color hidden on Vehicles list */}
+          {false && vehicle.Color && (
+            <div className="mt-1.5 flex items-center gap-2">
+              <span
+                className="h-4 w-4 rounded-full border border-slate-200 shadow-sm dark:border-slate-600"
+                style={{ backgroundColor: getVehicleColorHex(vehicle.Color) }}
+                title={translateVehicleColor(vehicle.Color, language)}
+              />
+              <span className="truncate text-[10px] font-medium text-slate-700 dark:text-slate-300">
+                {translateVehicleColor(vehicle.Color, language)}
+              </span>
+            </div>
+          )}
         </div>
       </div>
     </article>
@@ -1589,7 +1676,6 @@ export default function VehiclesClientEnhanced() {
   });
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [lastSync, setLastSync] = useState<Date>(new Date());
-  const [showColumnMenu, setShowColumnMenu] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [showAllBrands, setShowAllBrands] = useState(false);
   const [showAllModels, setShowAllModels] = useState(true);
@@ -1636,31 +1722,6 @@ export default function VehiclesClientEnhanced() {
     };
   }, [filters, quickFilter]);
 
-  // Visible columns - load from localStorage or use defaults
-  const [visibleColumns, setVisibleColumns] = useState<ColumnKey[]>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('vehiclesVisibleColumns');
-      if (saved) {
-        try {
-          const parsed = JSON.parse(saved) as ColumnKey[];
-          // Validate that all saved columns exist in COLUMNS
-          const validColumns = parsed.filter(key => COLUMNS.some(c => c.key === key));
-          if (validColumns.length > 0) return validColumns;
-        } catch {
-          // Invalid JSON, fall back to defaults
-        }
-      }
-    }
-    return COLUMNS.filter(c => c.defaultVisible).map(c => c.key);
-  });
-
-  // Save visible columns to localStorage whenever they change
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('vehiclesVisibleColumns', JSON.stringify(visibleColumns));
-    }
-  }, [visibleColumns]);
-
   // Sorting
   const [sortField, setSortField] = useState<keyof Vehicle>("Time");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
@@ -1673,8 +1734,6 @@ export default function VehiclesClientEnhanced() {
   const itemsPerPage = isMobileVehicleViewport ? MOBILE_ITEMS_PER_PAGE : DEFAULT_ITEMS_PER_PAGE;
 
   // Refs for click outside
-  const columnMenuRef = useRef<HTMLDivElement>(null);
-  const columnsButtonRef = useRef<HTMLButtonElement>(null);
   const infiniteScrollSentinelRef = useRef<HTMLDivElement>(null);
   const searchBlurTimerRef = useRef<number | null>(null);
 
@@ -2070,35 +2129,6 @@ export default function VehiclesClientEnhanced() {
     return () => clearTimeout(timeoutId);
   }, [filters, quickFilter]);
 
-  // Click outside to close menus
-  useEffect(() => {
-    function handlePointerOutside(event: MouseEvent) {
-      const target = event.target as Node;
-      // Close column menu if click is outside both the menu and the button
-      if (
-        showColumnMenu &&
-        columnMenuRef.current &&
-        !columnMenuRef.current.contains(target) &&
-        columnsButtonRef.current &&
-        !columnsButtonRef.current.contains(target)
-      ) {
-        setShowColumnMenu(false);
-      }
-    }
-
-    function handleEscape(event: KeyboardEvent) {
-      if (showColumnMenu && event.key === "Escape") {
-        setShowColumnMenu(false);
-      }
-    }
-
-    document.addEventListener("mousedown", handlePointerOutside);
-    document.addEventListener("keydown", handleEscape);
-    return () => {
-      document.removeEventListener("mousedown", handlePointerOutside);
-      document.removeEventListener("keydown", handleEscape);
-    };
-  }, [showColumnMenu]);
 
   // ==========================================================================
   // Helper Functions
@@ -2121,6 +2151,13 @@ export default function VehiclesClientEnhanced() {
     vehicles: Vehicle[];
   }
 
+  // Brand “big text” casing (must preserve acronyms like BMW/BYD/etc).
+  // Reuse the central brand display logic.
+  const displayCanonicalBrand = useCallback((brand: unknown) => {
+    return getDisplayBrandName(brand);
+  }, []);
+
+
   const getGroupLabel = useCallback((value: string, groupBy: GroupByOption): string => {
     if (groupBy === "none") return "All Vehicles";
     const normalizedValue = normalizeGroupKey(value, groupBy);
@@ -2133,6 +2170,7 @@ export default function VehiclesClientEnhanced() {
         case "color": return "Unknown Color";
       }
     }
+    if (groupBy === "brand") return displayCanonicalBrand(value);
     if (groupBy === "color") return translateVehicleColor(value, language);
     return value;
   }, [language]);
@@ -2685,13 +2723,27 @@ export default function VehiclesClientEnhanced() {
   ]);
 
   const applyVehicleSuggestionSearch = useCallback((vehicle: Vehicle) => {
-    const suggestedSearch = `${vehicle.Brand || ""} ${vehicle.Model || ""}`.trim() || vehicle.Plate || "";
+    const suggestedSearch = getVehicleSuggestionSearchText(vehicle);
     if (!suggestedSearch) return;
 
     handleVehicleSearchChange(suggestedSearch);
     setIsVehicleSearchFocused(false);
     resetVisibleVehicleBatch();
-  }, [handleVehicleSearchChange, resetVisibleVehicleBatch]);
+
+    const nextParams = new URLSearchParams(currentVehicleListSearchParams.toString());
+    nextParams.set("search", suggestedSearch);
+    nextParams.delete("brand");
+    nextParams.delete("model");
+    nextParams.delete(VEHICLE_LIST_PAGE_PARAM);
+    nextParams.delete(VEHICLE_LIST_FOCUS_PARAM);
+    navigateVehicleListInPlace(getVehicleListUrl(nextParams), "replace");
+  }, [
+    currentVehicleListSearchParams,
+    getVehicleListUrl,
+    handleVehicleSearchChange,
+    navigateVehicleListInPlace,
+    resetVisibleVehicleBatch,
+  ]);
 
   const handleVehicleSearchFocus = useCallback(() => {
     if (searchBlurTimerRef.current !== null) {
@@ -2735,12 +2787,6 @@ export default function VehiclesClientEnhanced() {
     }));
     resetVisibleVehicleBatch();
   }, [preserveVehicleListScrollForUpdate, resetVisibleVehicleBatch]);
-
-  const toggleColumn = (key: ColumnKey) => {
-    setVisibleColumns(prev =>
-      prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]
-    );
-  };
 
   const resetFilters = () => {
     setFilters({
@@ -3019,6 +3065,12 @@ const getVehicleImageUrl = useCallback((imageValue: unknown): string | null => {
                   onClear={handleVehicleSearchClear}
                   onFocus={handleVehicleSearchFocus}
                   onBlur={handleVehicleSearchBlur}
+                  onKeyDown={(e) => {
+                    if (e.key !== "Enter") return;
+                    e.preventDefault();
+                    setIsVehicleSearchFocused(false); // hide suggestions
+                    resetVisibleVehicleBatch(); // apply/refresh visible results
+                  }}
                   placeholder={t.searchByBrandModel}
                   icon={Search}
                   autoComplete="off"
@@ -3039,7 +3091,9 @@ const getVehicleImageUrl = useCallback((imageValue: unknown): string | null => {
                         ? searchSuggestionVehicles.map((vehicle) => ({ vehicle, score: null }))
                         : fuzzySuggestions.map((suggestion) => ({ vehicle: suggestion.vehicle, score: suggestion.score }))
                       ).map(({ vehicle, score }, index) => {
-                        const suggestedSearch = `${vehicle.Brand || ""} ${vehicle.Model || ""}`.trim();
+                        const canonicalBrand = displayCanonicalBrand(vehicle.Brand) || "";
+                        const suggestedLabel = `${canonicalBrand} ${vehicle.Model || ""}`.trim();
+                        const fallbackSuggestedText = `${canonicalBrand} ${vehicle.Model || ""}`.trim() || getVehicleSuggestionSearchText(vehicle);
 
                         return (
                           <button
@@ -3056,7 +3110,7 @@ const getVehicleImageUrl = useCallback((imageValue: unknown): string | null => {
                             </span>
                             <span className="min-w-0 flex-1">
                               <span className="block truncate text-sm font-semibold text-slate-800 dark:text-slate-100">
-                                {suggestedSearch || "Vehicle"}
+                                {suggestedLabel || fallbackSuggestedText || "Vehicle"}
                               </span>
                               <span className="mt-0.5 block truncate text-xs text-slate-500 dark:text-slate-400">
                                 {score === null
@@ -3147,100 +3201,6 @@ const getVehicleImageUrl = useCallback((imageValue: unknown): string | null => {
               </div>
 
               <ViewToggle view={viewMode} onChange={handleViewModeChange} t={t} />
-
-              {/* Columns Dropdown */}
-              <div className="relative hidden sm:block" ref={columnMenuRef}>
-                <button
-                  type="button"
-                  ref={columnsButtonRef}
-                  onClick={() => setShowColumnMenu(!showColumnMenu)}
-                  {...(showColumnMenu ? { "aria-expanded": "true" as const } : { "aria-expanded": "false" as const })}
-                  aria-haspopup="dialog"
-                  className={cn(
-                    "flex min-h-10 items-center gap-2 rounded-2xl px-3 py-2 text-sm font-medium sm:px-4 sm:py-2.5",
-                    "bg-gradient-to-br from-[#f8fafc] to-[#f1f5f9] text-slate-600 dark:from-slate-900 dark:to-slate-800 dark:text-slate-200",
-                    "shadow-[4px_4px_8px_#cbd5e1,-4px_-4px_8px_#ffffff]",
-                    "dark:shadow-[0_10px_24px_rgba(2,6,23,0.45)]",
-                    "hover:shadow-[6px_6px_12px_#cbd5e1,-6px_-6px_12px_#ffffff]",
-                    "dark:hover:shadow-[0_14px_30px_rgba(2,6,23,0.58)]",
-                    "active:shadow-[inset_3px_3px_6px_#cbd5e1,inset_-3px_-3px_6px_#ffffff]",
-                    "dark:active:shadow-[inset_3px_3px_8px_rgba(2,6,23,0.7),inset_-3px_-3px_8px_rgba(51,65,85,0.22)]",
-                    "transition-all duration-200"
-                  )}
-                >
-                  <Columns className="w-4 h-4" />
-                  <span className="hidden sm:inline">Columns</span>
-                </button>
-
-                {showColumnMenu && (
-                  <>
-                    <button
-                      type="button"
-                      aria-label="Close columns menu"
-                      className="fixed inset-0 z-[900] bg-slate-950/25 backdrop-blur-[1px] sm:hidden"
-                      onClick={() => setShowColumnMenu(false)}
-                    />
-                    <NeuCard
-                      className="fixed right-4 top-[calc(env(safe-area-inset-top)+6.25rem)] z-[910] flex max-h-[min(60dvh,24rem)] w-[min(calc(100vw-2rem),20rem)] flex-col overflow-hidden rounded-2xl p-3 sm:absolute sm:inset-x-auto sm:bottom-auto sm:right-0 sm:top-full sm:z-50 sm:mt-2 sm:w-72 sm:max-h-[34rem] sm:p-4"
-                      hover={false}
-                      role="dialog"
-                      aria-labelledby="vehicle-columns-menu-title"
-                    >
-                      <div className="flex min-h-0 flex-1 flex-col gap-2 sm:gap-3">
-                        <div className="flex shrink-0 items-center justify-between gap-2 border-b border-slate-200 pb-2 dark:border-slate-700 sm:gap-3 sm:pb-3">
-                          <span id="vehicle-columns-menu-title" className="text-sm font-semibold text-slate-700 dark:text-slate-100 sm:text-base">{t.visibleColumns}</span>
-                          <span className="ml-auto rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-500 dark:bg-slate-800 dark:text-slate-300 sm:py-1 sm:text-xs">
-                            {visibleColumns.filter(key => key !== "actions").length}/{COLUMNS.length - 1}
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => setShowColumnMenu(false)}
-                            aria-label="Close columns menu"
-                            title="Close columns menu"
-                            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700 active:bg-slate-200 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100 dark:active:bg-slate-700 sm:h-10 sm:w-10"
-                          >
-                            <X className="w-4 h-4" />
-                          </button>
-                        </div>
-
-                        <div className="min-h-0 flex-1 space-y-0.5 overflow-y-auto overscroll-contain pr-1 sm:max-h-64 sm:flex-none sm:space-y-1">
-                          {COLUMNS.filter(col => col.key !== "actions").map((col) => (
-                            <label
-                              key={col.key}
-                              className="flex min-h-9 cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 transition-colors hover:bg-slate-50 active:bg-slate-100 dark:hover:bg-slate-800 dark:active:bg-slate-700/70 sm:min-h-11 sm:gap-3 sm:px-2.5 sm:py-2"
-                            >
-                              <input
-                                type="checkbox"
-                                checked={visibleColumns.includes(col.key)}
-                                onChange={() => toggleColumn(col.key)}
-                                className="h-4 w-4 shrink-0 rounded border-slate-300 text-emerald-500 focus:ring-emerald-500 dark:border-slate-600 sm:h-5 sm:w-5"
-                              />
-                              <span className="min-w-0 text-xs font-medium text-slate-600 dark:text-slate-300 sm:text-sm">{col.label}</span>
-                            </label>
-                          ))}
-                        </div>
-
-                        <div className="grid shrink-0 grid-cols-2 gap-2 border-t border-slate-200 pt-2 dark:border-slate-700 sm:pt-3">
-                          <button
-                            type="button"
-                            onClick={() => setVisibleColumns(COLUMNS.map(c => c.key))}
-                            className="min-h-9 rounded-lg bg-emerald-50 px-2 py-1.5 text-xs font-semibold text-emerald-600 transition-colors hover:bg-emerald-100 active:bg-emerald-200 dark:bg-emerald-500/15 dark:text-emerald-300 dark:hover:bg-emerald-500/25 dark:active:bg-emerald-500/35 sm:min-h-0"
-                          >
-                            Select All
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setVisibleColumns(["image", "brand", "model", "actions"])}
-                            className="min-h-9 rounded-lg bg-slate-100 px-2 py-1.5 text-xs font-semibold text-slate-600 transition-colors hover:bg-slate-200 active:bg-slate-300 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700 dark:active:bg-slate-600 sm:min-h-0"
-                          >
-                            Minimal
-                          </button>
-                        </div>
-                      </div>
-                    </NeuCard>
-                  </>
-                )}
-              </div>
             </div>
           </div>
 
@@ -3622,17 +3582,17 @@ const getVehicleImageUrl = useCallback((imageValue: unknown): string | null => {
                       onDelete={handleDelete}
                       getImageUrl={getVehicleImageUrl}
                       priority={index < 2}
+                      language={language}
                     />
                   ))}
                 </div>
 
-                {false && (
                 <div className="hidden overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-[0_4px_20px_rgba(0,0,0,0.08)] dark:border-slate-700/80 dark:bg-slate-900 dark:shadow-[0_18px_40px_rgba(2,6,23,0.5)]">
                   <div className="overflow-x-auto">
                     <table className="w-full">
                       <thead className="sticky top-0 z-10">
                         <tr className="border-b border-slate-200 bg-slate-50/95 backdrop-blur-sm dark:border-slate-700 dark:bg-slate-800/95">
-                          {COLUMNS.filter(col => visibleColumns.includes(col.key)).map((col) => (
+                          {DEFAULT_TABLE_COLUMNS.map((col) => (
                             <th
                               key={col.key}
                               className={cn(
@@ -3660,169 +3620,103 @@ const getVehicleImageUrl = useCallback((imageValue: unknown): string | null => {
                             className="group scroll-mt-24 cursor-pointer transition-all duration-200 hover:bg-slate-50/80 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-emerald-400/40 dark:hover:bg-slate-800/70"
                             style={{ animationDelay: `${index * 50}ms` }}
                           >
-                            {visibleColumns.includes("id") && (
-                              <td className="px-4 py-3.5 text-sm font-medium text-slate-500 dark:text-slate-400">
-                                {vehicle.VehicleId?.startsWith("temp-") ? "Saving..." : `#${formatVehicleId(vehicle.VehicleId)}`}
-                              </td>
-                            )}
-
-                            {visibleColumns.includes("image") && (
-                              <td className="px-4 py-3.5">
-                                {(() => {
-                                  const imageUrl = getVehicleImageUrl(vehicle.Image);
-                                  return imageUrl ? (
-                                    <div className="relative h-12 w-12 overflow-hidden rounded-xl bg-slate-100 shadow-sm ring-2 ring-white dark:bg-slate-800 dark:ring-slate-700">
-                                      <Car className="absolute inset-0 m-auto h-5 w-5 text-slate-300 dark:text-slate-600" aria-hidden="true" />
-                                      <Image
-                                        src={imageUrl}
-                                        alt={vehicle.Model || "Vehicle"}
-                                        fill
-                                        sizes="48px"
-                                        unoptimized={shouldBypassNextImageOptimization(imageUrl)}
-                                        className="object-cover"
-                                        onError={(e) => {
-                                          e.currentTarget.style.display = "none";
-                                        }}
-                                      />
-                                    </div>
-                                  ) : (
-                                    <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-slate-100 dark:bg-slate-800">
-                                      <Car className="h-5 w-5 text-slate-400 dark:text-slate-600" />
-                                    </div>
-                                  );
-                                })()}
-                              </td>
-                            )}
-
-                            {visibleColumns.includes("category") && (
-                              <td className="px-4 py-3.5">
-                                <span className={cn(
-                                  "inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium",
-                                  getCategoryBadgeClass(vehicle.Category)
-                                )}>
-                                  {vehicle.Category}
-                                </span>
-                              </td>
-                            )}
-
-                            {visibleColumns.includes("brand") && (
-                              <td className="px-4 py-3.5 text-sm font-semibold text-slate-800 dark:text-slate-100">{vehicle.Brand}</td>
-                            )}
-
-                            {visibleColumns.includes("model") && (
-                              <td className="px-4 py-3.5 text-sm text-slate-700 dark:text-slate-300">{vehicle.Model}</td>
-                            )}
-
-                            {visibleColumns.includes("year") && (
-                              <td className="px-4 py-3.5 text-sm font-medium text-slate-600 dark:text-slate-300">{vehicle.Year || "-"}</td>
-                            )}
-
-                            {visibleColumns.includes("plate") && (
-                              <td className="px-4 py-3.5">
-                                <span className="inline-flex items-center rounded-lg bg-slate-100 px-2.5 py-1 font-mono text-xs font-medium text-slate-700 ring-1 ring-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:ring-slate-700">
-                                  {vehicle.Plate || "-"}
-                                </span>
-                              </td>
-                            )}
-
-                            {visibleColumns.includes("priceNew") && (
-                              <td className="px-4 py-3.5 text-sm font-bold text-emerald-600">
-                                ${vehicle.PriceNew?.toLocaleString() || "-"}
-                              </td>
-                            )}
-
-                            {visibleColumns.includes("price40") && (
-                              <td className="px-4 py-3.5 text-sm font-medium text-blue-600">
-                                ${vehicle.Price40?.toLocaleString() || "-"}
-                              </td>
-                            )}
-
-                            {visibleColumns.includes("price70") && (
-                              <td className="px-4 py-3.5 text-sm font-medium text-purple-600">
-                                ${vehicle.Price70?.toLocaleString() || "-"}
-                              </td>
-                            )}
-
-                            {visibleColumns.includes("taxType") && (
-                              <td className="px-4 py-3.5">
-                                <span className="inline-flex items-center rounded-lg bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700 ring-1 ring-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:ring-slate-700">
-                                  {vehicle.TaxType || "-"}
-                                </span>
-                              </td>
-                            )}
-
-                            {visibleColumns.includes("bodyType") && (
-                              <td className="px-4 py-3.5 text-sm text-slate-700 dark:text-slate-300">{vehicle.BodyType || "-"}</td>
-                            )}
-
-                            {visibleColumns.includes("color") && (
-                              <td className="px-4 py-3.5">
-                                <div className="flex items-center gap-2">
-                                  {vehicle.Color && (
-                                    <span
-                                      className="h-4 w-4 rounded-full border border-slate-200 shadow-sm dark:border-slate-600"
-                                      style={{ backgroundColor: getVehicleColorHex(vehicle.Color) }}
-                                      title={translateVehicleColor(vehicle.Color, language)}
+                            <td className="px-4 py-3.5">
+                              {(() => {
+                                const imageUrl = getVehicleImageUrl(vehicle.Image);
+                                return imageUrl ? (
+                                  <div className="relative h-12 w-12 overflow-hidden rounded-xl bg-slate-100 shadow-sm ring-2 ring-white dark:bg-slate-800 dark:ring-slate-700">
+                                    <Car className="absolute inset-0 m-auto h-5 w-5 text-slate-300 dark:text-slate-600" aria-hidden="true" />
+                                    <Image
+                                      src={imageUrl}
+                                      alt={vehicle.Model || "Vehicle"}
+                                      fill
+                                      sizes="48px"
+                                      unoptimized={shouldBypassNextImageOptimization(imageUrl)}
+                                      className="object-cover"
+                                      onError={(e) => {
+                                        e.currentTarget.style.display = "none";
+                                      }}
                                     />
-                                  )}
-                                  <span className="text-sm text-slate-700 dark:text-slate-300">
-                                    {translateVehicleColor(vehicle.Color, language)}
-                                  </span>
-                                </div>
-                              </td>
-                            )}
+                                  </div>
+                                ) : (
+                                  <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-slate-100 dark:bg-slate-800">
+                                    <Car className="h-5 w-5 text-slate-400 dark:text-slate-600" />
+                                  </div>
+                                );
+                              })()}
+                            </td>
 
-                            {visibleColumns.includes("condition") && (
-                              <td className="px-4 py-3.5">
+                            <td className="px-4 py-3.5">
+                              <span className={cn(
+                                "inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium",
+                                getCategoryBadgeClass(vehicle.Category)
+                              )}>
+                                {vehicle.Category}
+                              </span>
+                            </td>
+
+                            <td className="px-4 py-3.5 text-sm font-semibold text-slate-800 dark:text-slate-100">{displayCanonicalBrand(vehicle.Brand)}</td>
+
+                            <td className="px-4 py-3.5 text-sm text-slate-700 dark:text-slate-300">{getDisplayModelName(vehicle.Model)}</td>
+
+                            <td className="px-4 py-3.5 text-sm font-medium text-slate-600 dark:text-slate-300">{vehicle.Year || "-"}</td>
+
+                            <td className="px-4 py-3.5">
+                              <span className="inline-flex items-center rounded-lg bg-slate-100 px-2.5 py-1 font-mono text-xs font-medium text-slate-700 ring-1 ring-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:ring-slate-700">
+                                {vehicle.Plate || "-"}
+                              </span>
+                            </td>
+
+                            <td className="px-4 py-3.5 text-sm font-bold text-emerald-600">
+                              ${vehicle.PriceNew?.toLocaleString() || "-"}
+                            </td>
+
+                            <td className="px-4 py-3.5">
+                              <span className={cn(
+                                "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold",
+                                vehicle.Condition?.toLowerCase() === "new"
+                                  ? "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200 dark:bg-emerald-500/15 dark:text-emerald-300 dark:ring-emerald-500/30"
+                                  : "bg-amber-50 text-amber-700 ring-1 ring-amber-200 dark:bg-amber-500/15 dark:text-amber-300 dark:ring-amber-500/30"
+                              )}>
                                 <span className={cn(
-                                  "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold",
-                                  vehicle.Condition?.toLowerCase() === "new"
-                                    ? "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200 dark:bg-emerald-500/15 dark:text-emerald-300 dark:ring-emerald-500/30"
-                                    : "bg-amber-50 text-amber-700 ring-1 ring-amber-200 dark:bg-amber-500/15 dark:text-amber-300 dark:ring-amber-500/30"
-                                )}>
-                                  <span className={cn(
-                                    "w-1.5 h-1.5 rounded-full",
-                                    vehicle.Condition?.toLowerCase() === "new" ? "bg-emerald-500" : "bg-amber-500"
-                                  )} />
-                                  {vehicle.Condition}
-                                </span>
-                              </td>
-                            )}
+                                  "w-1.5 h-1.5 rounded-full",
+                                  vehicle.Condition?.toLowerCase() === "new" ? "bg-emerald-500" : "bg-amber-500"
+                                )} />
+                                {vehicle.Condition}
+                              </span>
+                            </td>
 
-                            {visibleColumns.includes("actions") && (
-                              <td className="px-4 py-3.5">
-                                <div className="flex items-center gap-1.5">
-                                  <ActionButton
-                                    onClick={() => handleView(vehicle.VehicleId)}
-                                    icon={Eye}
-                                    label="View"
-                                  />
-                                  {isAdmin && (
-                                    <>
-                                      <ActionButton
-                                        onClick={() => handleEdit(vehicle.VehicleId)}
-                                        icon={Pen}
-                                        label="Edit"
-                                        variant="edit"
-                                      />
-                                      <ActionButton
-                                        onClick={() => handleDelete(vehicle)}
-                                        icon={Trash2}
-                                        label="Delete"
-                                        variant="delete"
-                                      />
-                                    </>
-                                  )}
-                                </div>
-                              </td>
-                            )}
+                            <td className="px-4 py-3.5">
+                              <div className="flex items-center gap-1.5">
+                                <ActionButton
+                                  onClick={() => handleView(vehicle.VehicleId)}
+                                  icon={Eye}
+                                  label="View"
+                                />
+                                {isAdmin && (
+                                  <>
+                                    <ActionButton
+                                      onClick={() => handleEdit(vehicle.VehicleId)}
+                                      icon={Pen}
+                                      label="Edit"
+                                      variant="edit"
+                                    />
+                                    <ActionButton
+                                      onClick={() => handleDelete(vehicle)}
+                                      icon={Trash2}
+                                      label="Delete"
+                                      variant="delete"
+                                    />
+                                  </>
+                                )}
+                              </div>
+                            </td>
                           </tr>
                         ))}
                       </tbody>
                     </table>
                   </div>
                 </div>
-                )}
               </div>
             ))}
 

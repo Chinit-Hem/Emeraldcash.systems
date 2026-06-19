@@ -517,7 +517,26 @@ const postHandler = withErrorHandling(async (req, { logger, requestId, startTime
   // Build vehicle data with proper null handling
   const createData: Parameters<typeof vehicleService.createVehicle>[0] = {
     category: String(categoryValue),
-    brand: String(brandValue),
+    brand: (() => {
+      const raw = String(brandValue ?? "").trim();
+      if (!raw) return "";
+      if (raw.toLowerCase() === "toyota") return "Toyota";
+      const isAllUpper = raw === raw.toUpperCase();
+      if (isAllUpper && raw.length <= 3) return raw;
+      const titleCaseWord = (w: string) => {
+        const lower = w.toLowerCase();
+        return lower.charAt(0).toUpperCase() + lower.slice(1);
+      };
+      return raw
+        .split(/\s+/g)
+        .map((part) =>
+          part
+            .split(/-/g)
+            .map((sub) => titleCaseWord(sub))
+            .join("-")
+        )
+        .join(" ");
+    })(),
     model: String(modelValue),
     year: year,
     plate: String(plateValue ?? ""),

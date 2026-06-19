@@ -1,9 +1,9 @@
 /**
  * Smart Search Component
- * 
+ *
  * Reusable search component with debouncing (300ms) for filtering vehicles.
  * Searches by name, category, and brand without page refresh.
- * 
+ *
  * @module SmartSearch
  */
 
@@ -12,6 +12,7 @@
 import { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import type { Vehicle } from "@/shared/types/types";
 import { SearchClearButton } from "@/shared/components/ui/SearchClearButton";
+import { getDisplayBrandName, getDisplayModelName } from "@/systems/vms/utils/vehicleBrandMetadata";
 
 // Debounce hook with 300ms delay
 function useDebounce<T>(value: T, delay: number): T {
@@ -37,9 +38,9 @@ type SmartSearchProps = {
   className?: string;
 };
 
-export default function SmartSearch({ 
-  vehicles, 
-  onSelect, 
+export default function SmartSearch({
+  vehicles,
+  onSelect,
   placeholder = "Search vehicles...",
   className = ""
 }: SmartSearchProps) {
@@ -55,16 +56,16 @@ export default function SmartSearch({
   // Filter vehicles based on debounced query
   const filteredVehicles = useMemo(() => {
     if (!debouncedQuery.trim()) return [];
-    
+
     const searchTerm = debouncedQuery.toLowerCase().trim();
-    
+
     return vehicles
       .filter((vehicle) => {
         const brand = (vehicle.Brand || "").toLowerCase();
         const model = (vehicle.Model || "").toLowerCase();
         const category = (vehicle.Category || "").toLowerCase();
         const plate = (vehicle.Plate || "").toLowerCase();
-        
+
         return (
           brand.includes(searchTerm) ||
           model.includes(searchTerm) ||
@@ -103,7 +104,7 @@ export default function SmartSearch({
     switch (e.key) {
       case "ArrowDown":
         e.preventDefault();
-        setHighlightedIndex((prev) => 
+        setHighlightedIndex((prev) =>
           prev < filteredVehicles.length - 1 ? prev + 1 : prev
         );
         break;
@@ -197,7 +198,7 @@ export default function SmartSearch({
                   <div className="flex items-center justify-between">
                     <div>
                       <span className="font-medium">
-                        {vehicle.Brand} {vehicle.Model}
+                        {getDisplayBrandName(vehicle.Brand)} {getDisplayModelName(vehicle.Model)}
                       </span>
                       <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">
                         {vehicle.Category}

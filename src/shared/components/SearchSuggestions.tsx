@@ -13,6 +13,7 @@
 import { Car, ArrowRight, Sparkles } from "lucide-react";
 import { cn } from "@/shared/utils/ui";
 import type { FuzzySuggestion } from "@/systems/vms/utils/fuzzySearch";
+import { getVehicleSuggestionSearchText } from "@/systems/vms/utils/vehicle-helpers";
 
 // ============================================================================
 // Types
@@ -78,6 +79,7 @@ export default function SearchSuggestions({
             <button
               key={`${v.VehicleId}-${index}`}
               type="button"
+              data-search-value={getVehicleSuggestionSearchText(v)}
               onPointerDown={(event) => event.preventDefault()}
               onClick={() => onSelect(suggestion)}
               className={cn(

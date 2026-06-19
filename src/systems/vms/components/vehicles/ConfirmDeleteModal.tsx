@@ -4,6 +4,7 @@ import React, { useEffect, useCallback } from "react";
 import { GlassCard } from "@/shared/components/ui/glass/GlassCard";
 import { GlassButton } from "@/shared/components/ui/glass/GlassButton";
 import { formatCurrency } from "@/shared/utils/format";
+import { getDisplayBrandName, getDisplayModelName } from "@/systems/vms/utils/vehicleBrandMetadata";
 import type { Vehicle } from "@/shared/types/types";
 
 interface ConfirmDeleteModalProps {
@@ -172,13 +173,13 @@ export function ConfirmDeleteModal({
                 <div>
                   <span className="text-gray-500 dark:text-gray-400">Brand:</span>
                   <span className="ml-2 font-medium text-gray-900 dark:text-white">
-                    {vehicle.Brand}
+                    {getDisplayBrandName(vehicle.Brand)}
                   </span>
                 </div>
                 <div>
                   <span className="text-gray-500 dark:text-gray-400">Model:</span>
                   <span className="ml-2 font-medium text-gray-900 dark:text-white">
-                    {vehicle.Model}
+                    {getDisplayModelName(vehicle.Model)}
                   </span>
                 </div>
                 <div>

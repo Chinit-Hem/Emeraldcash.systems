@@ -13,7 +13,7 @@ function log(level: "info" | "warn" | "error", message: string, meta?: Record<st
     service: "cron-sync-vehicles",
     ...meta,
   };
-  
+
   // In production, you might want to send this to a logging service
   if (level === "error") {
     console.error(JSON.stringify(logEntry));
@@ -27,15 +27,15 @@ function log(level: "info" | "warn" | "error", message: string, meta?: Record<st
 // Validation functions
 function isValidVehicle(vehicle: unknown): vehicle is Vehicle {
   if (!vehicle || typeof vehicle !== "object") return false;
-  
+
   const v = vehicle as Record<string, unknown>;
-  
+
   // Required fields
   if (!v.VehicleId || String(v.VehicleId).trim() === "") return false;
   if (!v.Category || String(v.Category).trim() === "") return false;
   if (!v.Brand || String(v.Brand).trim() === "") return false;
   if (!v.Model || String(v.Model).trim() === "") return false;
-  
+
   // Validate data types
   if (v.Year !== undefined && v.Year !== null) {
     const year = Number(v.Year);
@@ -43,14 +43,14 @@ function isValidVehicle(vehicle: unknown): vehicle is Vehicle {
       return false;
     }
   }
-  
+
   if (v.PriceNew !== undefined && v.PriceNew !== null) {
     const price = Number(v.PriceNew);
     if (isNaN(price) || price < 0) {
       return false;
     }
   }
-  
+
   return true;
 }
 
@@ -63,12 +63,42 @@ function sanitizeConfidence(value: unknown): "High" | "Medium" | "Low" | null {
   return null;
 }
 
+function normalizeBrand(input: unknown): string {
+  const raw = input === null || input === undefined ? "" : String(input).trim();
+  if (!raw) return "";
+
+  // Big text -> proper case
+  if (raw.toLowerCase() === "toyota") return "Toyota";
+
+  // Keep acronyms like BMW as-is
+  const isAllUpper = raw === raw.toUpperCase();
+  if (isAllUpper && raw.length <= 3) return raw;
+
+  // Title-case (per word), preserving hyphens/space separation
+  const titleCaseWord = (w: string) => {
+    if (!w) return w;
+    const lower = w.toLowerCase();
+    return lower.charAt(0).toUpperCase() + lower.slice(1);
+  };
+
+  // Split by spaces, but keep hyphenated parts title-cased too
+  return raw
+    .split(/\s+/g)
+    .map((part) =>
+      part
+        .split(/-/g)
+        .map((sub) => titleCaseWord(sub))
+        .join("-")
+    )
+    .join(" ");
+}
+
 function sanitizeVehicle(vehicle: Vehicle): Vehicle {
   return {
     ...vehicle,
     VehicleId: String(vehicle.VehicleId).trim(),
     Category: String(vehicle.Category).trim(),
-    Brand: String(vehicle.Brand).trim(),
+    Brand: normalizeBrand(vehicle.Brand),
     Model: String(vehicle.Model).trim(),
     Year: vehicle.Year ? Number(vehicle.Year) : null,
     Plate: vehicle.Plate ? String(vehicle.Plate).trim() : "",
@@ -96,11 +126,11 @@ function sanitizeVehicle(vehicle: Vehicle): Vehicle {
 // Fetch vehicles from Neon Database
 async function fetchVehiclesFromDB(): Promise<{ vehicles: Vehicle[]; meta: VehicleMeta; duration: number }> {
   const startTime = Date.now();
-  
+
   try {
     // Query all vehicles from the database
     const result = await db.executeUnsafe<Record<string, unknown>>(`
-      SELECT 
+      SELECT
         vehicle_id as "VehicleId",
         category as "Category",
         brand as "Brand",
@@ -126,7 +156,7 @@ async function fetchVehiclesFromDB(): Promise<{ vehicles: Vehicle[]; meta: Vehic
       FROM vehicles
       ORDER BY created_at DESC
     `);
-    
+
     const vehicles = (result || []).map((row) => ({
       VehicleId: String(row["VehicleId"] || ""),
       Category: String(row["Category"] || ""),
@@ -187,7 +217,7 @@ async function fetchVehiclesFromDB(): Promise<{ vehicles: Vehicle[]; meta: Vehic
 export async function GET(req: NextRequest) {
   const startTime = Date.now();
   const cronSecret = process.env.CRON_SECRET;
-  
+
   // Verify cron secret if configured
   if (cronSecret) {
     const authHeader = req.headers.get("authorization");
@@ -204,12 +234,12 @@ export async function GET(req: NextRequest) {
 
     // Fetch and validate data from database
     const { vehicles, meta, duration: fetchDuration } = await fetchVehiclesFromDB();
-    
+
     // Update cache
     setCachedVehicles(vehicles);
-    
+
     const totalDuration = Date.now() - startTime;
-    
+
     // Log success metrics
     log("info", "Vehicle sync completed successfully", {
       vehicleCount: vehicles.length,
@@ -239,11 +269,11 @@ export async function GET(req: NextRequest) {
 
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : "Unknown error";
-    log("error", "Vehicle sync failed", { 
+    log("error", "Vehicle sync failed", {
       error: errorMessage,
       duration: Date.now() - startTime,
     });
-    
+
     return NextResponse.json(
       { ok: false, error: errorMessage },
       { status: 500 }

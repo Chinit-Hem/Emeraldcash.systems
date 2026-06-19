@@ -1,5 +1,5 @@
-﻿"use client";
+import VehiclesPage from "@/systems/vms/views/routes/vehicles/page";
 
-export { default } from "@/systems/vms/views/routes/vehicles/page";
-export * from "@/systems/vms/views/routes/vehicles/page";
-
+export default function Page() {
+  return <VehiclesPage />;
+}

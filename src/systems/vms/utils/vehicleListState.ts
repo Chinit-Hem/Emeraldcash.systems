@@ -1,4 +1,5 @@
 import type { Vehicle } from "@/shared/types/types";
+import { getCanonicalBrandName, getBrandKey } from "@/systems/vms/utils/vehicleBrandMetadata";
 
 export const VEHICLE_GROUP_BY_OPTIONS = ["none", "category", "brand", "year", "condition", "color"] as const;
 export const VEHICLE_LIST_PATH = "/vehicles";
@@ -29,6 +30,9 @@ export type VehicleGroupByOption = (typeof VEHICLE_GROUP_BY_OPTIONS)[number];
 export type VehicleListViewMode = "grid" | "list";
 
 type SearchParamsLike = Pick<URLSearchParams, "get" | "getAll" | "toString">;
+type VehicleListHrefFallbackOptions = {
+  includeStoredFallback?: boolean;
+};
 type VehicleListQueryKey =
   | "category"
   | "search"
@@ -316,19 +320,34 @@ export function getCurrentVehicleListHref(fallback = VEHICLE_LIST_PATH): string 
 
 export function getVehicleGroupValue(vehicle: Vehicle, groupBy: VehicleGroupByOption): string {
   switch (groupBy) {
-    case "category": return normalizeVehicleGroupText(vehicle.Category || "") || "Uncategorized";
-    case "brand": return normalizeVehicleGroupText(vehicle.Brand || "") || "Unknown Brand";
-    case "year": return normalizeVehicleGroupText(vehicle.Year?.toString() || "") || "Unknown Year";
-    case "condition": return normalizeVehicleGroupText(vehicle.Condition || "") || "Unknown Condition";
-    case "color": return normalizeVehicleGroupText(vehicle.Color || "") || "Unknown Color";
-    default: return "All";
+    case "category":
+      return normalizeVehicleGroupText(vehicle.Category || "") || "Uncategorized";
+    case "brand":
+      // Canonical brand casing for the group label.
+      // This prevents e.g. "XIAOMI" and "Xiaomi" from appearing as two different groups.
+      return getCanonicalBrandName(vehicle.Brand) || "Unknown Brand";
+    case "year":
+      return normalizeVehicleGroupText(vehicle.Year?.toString() || "") || "Unknown Year";
+    case "condition":
+      return normalizeVehicleGroupText(vehicle.Condition || "") || "Unknown Condition";
+    case "color":
+      return normalizeVehicleGroupText(vehicle.Color || "") || "Unknown Color";
+    default:
+      return "All";
   }
 }
 
 export function getVehicleGroupKey(vehicle: Vehicle, groupBy: VehicleGroupByOption): string {
+  if (groupBy === "brand") {
+    const canonicalBrand = getCanonicalBrandName(vehicle.Brand) || "";
+    // Use brandKey so grouping is stable regardless of original casing.
+    return getBrandKey(canonicalBrand) || "unknown-brand";
+  }
+
   const normalizedValue = normalizeVehicleGroupText(getVehicleGroupValue(vehicle, groupBy));
   return groupBy === "year" ? normalizedValue : normalizedValue.toLocaleLowerCase("en-US");
 }
+
 
 export function getVehicleListSearchParams(searchParams: SearchParamsLike | null | undefined): URLSearchParams {
   const next = new URLSearchParams();
@@ -414,10 +433,12 @@ function withStoredVehicleListViewParam(params: URLSearchParams): URLSearchParam
 }
 
 export function getVehicleListSearchParamsWithFallback(
-  searchParams: SearchParamsLike | null | undefined
+  searchParams: SearchParamsLike | null | undefined,
+  options: VehicleListHrefFallbackOptions = {}
 ): URLSearchParams {
+  const { includeStoredFallback = true } = options;
   const current = getVehicleListSearchParams(searchParams);
-  const stored = getStoredVehicleListSearchParams();
+  const stored = includeStoredFallback ? getStoredVehicleListSearchParams() : new URLSearchParams();
 
   const nextParams = shouldMergeStoredVehicleListParams(current, stored)
     ? mergeVehicleListSearchParams(stored, current)
@@ -476,7 +497,10 @@ export function getVehicleEditHref(vehicleId: string, returnHref = getCurrentVeh
   );
 }
 
-export function getVehicleListHrefWithFallback(searchParams: SearchParamsLike | null | undefined): string {
+export function getVehicleListHrefWithFallback(
+  searchParams: SearchParamsLike | null | undefined,
+  options: VehicleListHrefFallbackOptions = {}
+): string {
   const returnHref = normalizeVehicleListHref(searchParams?.get(VEHICLE_LIST_RETURN_PARAM));
   if (returnHref) {
     const returnParams = getVehicleListSearchParams(
@@ -495,7 +519,7 @@ export function getVehicleListHrefWithFallback(searchParams: SearchParamsLike | 
     return getVehicleListHrefFromParams(withStoredVehicleListViewParam(returnParams));
   }
 
-  return getVehicleListHrefFromParams(getVehicleListSearchParamsWithFallback(searchParams));
+  return getVehicleListHrefFromParams(getVehicleListSearchParamsWithFallback(searchParams, options));
 }
 
 export function getVehicleListPageFromHref(href: string): number {
@@ -512,5 +536,8 @@ export function getVehicleListBackLabel(_href: string): string {
 }
 
 export function withVehicleListQueryFallback(path: string, searchParams: SearchParamsLike | null | undefined): string {
-  return withVehicleListReturnHref(path, getVehicleListHrefWithFallback(searchParams));
+  return withVehicleListReturnHref(
+    path,
+    getVehicleListHrefWithFallback(searchParams, { includeStoredFallback: false })
+  );
 }
