@@ -224,7 +224,7 @@ const BODY_TYPE_OPTIONS: Omit<BodyTypeOption, "count">[] = [
     aliases: ["sedan", "saloon"],
     icon: Car,
     tone: "text-sky-600",
-    imageSrc: "/assets/body-types/sedan.webp",
+    imageSrc: "/assets/vehicle-body-types/Sedan-Car-PNG.png",
   },
   {
     label: "Hatchback",
@@ -232,7 +232,7 @@ const BODY_TYPE_OPTIONS: Omit<BodyTypeOption, "count">[] = [
     aliases: ["hatchback", "hatch"],
     icon: CarFront,
     tone: "text-blue-600",
-    imageSrc: "/assets/body-types/hatchback.webp",
+    imageSrc: "/assets/vehicle-body-types/Hatchback-Car-PNG.png",
   },
   {
     label: "Pickup",
@@ -240,7 +240,7 @@ const BODY_TYPE_OPTIONS: Omit<BodyTypeOption, "count">[] = [
     aliases: ["pickup", "pick up", "pick-up", "truck"],
     icon: Truck,
     tone: "text-cyan-700",
-    imageSrc: "/assets/body-types/pickup.webp",
+    imageSrc: "/assets/vehicle-body-types/Pickup-Car-PNG.png",
     imageClassName: "w-[44px] sm:w-[82px]",
   },
   {
@@ -249,7 +249,7 @@ const BODY_TYPE_OPTIONS: Omit<BodyTypeOption, "count">[] = [
     aliases: ["suv", "crossover"],
     icon: Car,
     tone: "text-indigo-600",
-    imageSrc: "/assets/body-types/suv.webp",
+    imageSrc: "/assets/vehicle-body-types/SUV-Car-PNG.png",
   },
   {
     label: "Convertible",
@@ -257,7 +257,7 @@ const BODY_TYPE_OPTIONS: Omit<BodyTypeOption, "count">[] = [
     aliases: ["convertible", "cabriolet", "roadster"],
     icon: CarTaxiFront,
     tone: "text-blue-500",
-    imageSrc: "/assets/body-types/convertible.webp",
+    imageSrc: "/assets/vehicle-body-types/Convertible-Car-PNG.png",
   },
   {
     label: "MPV (Minivan)",
@@ -265,7 +265,7 @@ const BODY_TYPE_OPTIONS: Omit<BodyTypeOption, "count">[] = [
     aliases: ["mpv", "minivan", "mini van", "van"],
     icon: Van,
     tone: "text-sky-700",
-    imageSrc: "/assets/body-types/mpv.webp",
+    imageSrc: "/assets/vehicle-body-types/MPV%20%28Minivan%29-Car-PNG.png",
   },
   {
     label: "Sports",
@@ -273,7 +273,7 @@ const BODY_TYPE_OPTIONS: Omit<BodyTypeOption, "count">[] = [
     aliases: ["sports", "sport", "coupe"],
     icon: CarFront,
     tone: "text-blue-700",
-    imageSrc: "/assets/body-types/sports.webp",
+    imageSrc: "/assets/vehicle-body-types/bugatti-Sport-Car-PNG.png",
     imageClassName: "w-[40px] sm:w-[78px]",
   },
   {
@@ -282,7 +282,7 @@ const BODY_TYPE_OPTIONS: Omit<BodyTypeOption, "count">[] = [
     aliases: ["station wagon", "wagon", "estate"],
     icon: BusFront,
     tone: "text-slate-600",
-    imageSrc: "/assets/body-types/station-wagon.webp",
+    imageSrc: "/assets/vehicle-body-types/Station-Wagon-Car-PNG.png",
   },
   {
     label: "Other",
@@ -290,7 +290,7 @@ const BODY_TYPE_OPTIONS: Omit<BodyTypeOption, "count">[] = [
     aliases: ["other", "others"],
     icon: Shapes,
     tone: "text-sky-600",
-    imageSrc: "/assets/body-types/other.webp",
+    // Intentionally omit imageSrc so the UI uses BodyTypeVehicleSvg fallback
   },
 ];
 
