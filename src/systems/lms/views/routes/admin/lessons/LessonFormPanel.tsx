@@ -89,6 +89,7 @@ export function LessonFormPanel({
     description: `${formId}-description`,
     category: `${formId}-category`,
     duration: `${formId}-duration`,
+    durationMinutes: `${formId}-duration-minutes`,
     audience: `${formId}-audience`,
     youtubeUrl: `${formId}-youtube-url`,
     isActive: `${formId}-is-active`,
@@ -102,6 +103,14 @@ export function LessonFormPanel({
     : editingId
       ? tr("Update Lesson")
       : tr("Create Lesson");
+  const hasDurationMinutes =
+    formData.duration_minutes !== null && formData.duration_minutes > 0;
+  const showDurationError = Boolean(
+    formErrors.duration_minutes ||
+      (durationLookup.status === "error" && !hasDurationMinutes)
+  );
+  const showDurationReady =
+    hasDurationMinutes || durationLookup.status === "ready";
 
   return (
     <div className="mb-8 rounded-2xl bg-white p-4 shadow-[8px_8px_24px_#e2e8f0,-8px_-8px_24px_#ffffff] sm:rounded-3xl sm:p-6">
@@ -248,18 +257,18 @@ export function LessonFormPanel({
               aria-live="polite"
               aria-labelledby={fieldIds.duration}
               className={`flex min-h-11 w-full items-center gap-3 rounded-xl border px-4 py-3 text-base sm:text-sm ${
-                formErrors.duration_minutes || durationLookup.status === "error"
+                showDurationError
                   ? "border-red-200 bg-red-50 text-red-700"
-                  : durationLookup.status === "ready"
+                  : showDurationReady
                     ? "border-emerald-200 bg-emerald-50 text-emerald-700"
                     : "border-slate-200 bg-slate-50 text-slate-700"
               }`}
             >
-              {durationLookup.status === "loading" ? (
+              {durationLookup.status === "loading" && !hasDurationMinutes ? (
                 <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
-              ) : formErrors.duration_minutes || durationLookup.status === "error" ? (
+              ) : showDurationError ? (
                 <AlertCircle className="h-4 w-4 shrink-0" />
-              ) : durationLookup.status === "ready" ? (
+              ) : showDurationReady ? (
                 <CheckCircle2 className="h-4 w-4 shrink-0" />
               ) : (
                 <Clock className="h-4 w-4 shrink-0" />
@@ -270,11 +279,41 @@ export function LessonFormPanel({
                   : tr("Auto from video")}
               </span>
             </div>
+            <div className="mt-3">
+              <label htmlFor={fieldIds.durationMinutes} className={labelClass}>
+                {tr("Duration Minutes")} <span className="text-red-500">*</span>
+              </label>
+              <input
+                id={fieldIds.durationMinutes}
+                type="number"
+                min={1}
+                step={1}
+                inputMode="numeric"
+                title={tr("Duration minutes")}
+                value={formData.duration_minutes ?? ""}
+                onChange={(event) => {
+                  const parsedDuration = Number(event.target.value);
+                  onFieldChange(
+                    "duration_minutes",
+                    Number.isFinite(parsedDuration) && parsedDuration >= 1
+                      ? Math.floor(parsedDuration)
+                      : null
+                  );
+                }}
+                placeholder="58"
+                className={`${inputClass} ${formErrors.duration_minutes ? invalidInputClass : ""}`}
+                {...(formErrors.duration_minutes ? { "aria-invalid": "true" as const } : {})}
+              />
+            </div>
             {formErrors.duration_minutes ? (
               <FieldError error={formErrors.duration_minutes} />
             ) : (
               <p className="mt-1 break-words text-xs text-slate-500">
-                {tr(durationLookup.message)}
+                {tr(
+                  hasDurationMinutes && durationLookup.status === "error"
+                    ? "Manual duration entered."
+                    : durationLookup.message
+                )}
               </p>
             )}
           </div>

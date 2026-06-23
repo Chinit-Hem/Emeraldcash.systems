@@ -161,9 +161,12 @@ export function validateLessonFormFields(
     errors.youtube_url = "Please enter a valid YouTube URL";
   }
 
-  if (durationLookupStatus === "loading") {
+  const hasValidDuration =
+    formData.duration_minutes !== null && formData.duration_minutes >= 1;
+
+  if (!hasValidDuration && durationLookupStatus === "loading") {
     errors.duration_minutes = "Please wait for the video duration to load";
-  } else if (!formData.duration_minutes || formData.duration_minutes < 1) {
+  } else if (!hasValidDuration) {
     errors.duration_minutes = "Video duration must load automatically before saving";
   }
 
