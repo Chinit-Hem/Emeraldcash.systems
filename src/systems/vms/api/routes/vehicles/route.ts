@@ -512,7 +512,8 @@ const postHandler = withErrorHandling(async (req, { logger, requestId, startTime
     rawThumbnailUrl
   );
   const normalizedImageId = normalizedImages[0] || null;
-  const normalizedThumbnailUrl = normalizedImageId;
+  // thumbnail_url must be an image identity/URL (not the image_id variable)
+  const normalizedThumbnailUrl = normalizedImages[0] || rawThumbnailUrl;
 
   // Build vehicle data with proper null handling
   const createData: Parameters<typeof vehicleService.createVehicle>[0] = {

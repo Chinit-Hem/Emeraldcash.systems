@@ -1,27 +1,13 @@
 import type { Metadata, Viewport } from "next";
 import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
-import { Inter, Kantumruy_Pro } from "next/font/google";
 import { Suspense } from "react";
 import "../styles/globals.css";
 import { ThemeProvider } from "@/shared/hooks/theme-provider";
 import { LanguageProvider } from "@/shared/hooks/LanguageContext";
 import { NeuDashboardSkeleton } from "@/shared/components/skeletons/NeuDashboardSkeleton";
 import PwaLifecycle from "@/shared/components/PwaLifecycle";
-
-const inter = Inter({
-  subsets: ["latin"],
-  display: "optional",
-  variable: "--font-inter",
-});
-
-const kantumruyPro = Kantumruy_Pro({
-  subsets: ["khmer", "latin"],
-  weight: ["300", "400", "700"],
-  display: "swap",
-  preload: false,
-  variable: "--font-kantumruy-pro",
-});
+import SelectFieldTextOnFocus from "@/shared/components/SelectFieldTextOnFocus";
 
 const appUrl =
   process.env.NEXT_PUBLIC_APP_URL ||
@@ -192,7 +178,6 @@ export default async function RootLayout({
     <html
       lang="en"
       dir="ltr"
-      className={`${inter.variable} ${kantumruyPro.variable}`}
       suppressHydrationWarning
     >
       <head>
@@ -203,6 +188,7 @@ export default async function RootLayout({
       </head>
       <body className="antialiased" suppressHydrationWarning>
         <PwaLifecycle />
+        <SelectFieldTextOnFocus />
         <Analytics />
         <SpeedInsights />
         <ThemeProvider>

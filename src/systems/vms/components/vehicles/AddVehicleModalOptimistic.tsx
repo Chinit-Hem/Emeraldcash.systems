@@ -131,7 +131,7 @@ function getModelOptions(category?: string, brand?: string) {
 function ModalBackdrop({ children, onClose }: { children: React.ReactNode; onClose: () => void }) {
   return (
     <div
-      className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-sm"
+      className="fixed inset-0 z-[300] overflow-y-auto bg-slate-900/60 backdrop-blur-sm"
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
       <div className="min-h-screen px-4 py-8 flex items-center justify-center">

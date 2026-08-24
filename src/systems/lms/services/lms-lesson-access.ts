@@ -27,7 +27,7 @@ export function normalizeLessonAudienceRoles(value: unknown): LmsLessonAudienceR
 }
 
 export function getEffectiveLessonAudienceRoles(role?: Role | null): LmsLessonAudienceRole[] {
-  if (role === "Accounting") {
+  if (role === "Finance") {
     return ["Staff", "Accounting"];
   }
 

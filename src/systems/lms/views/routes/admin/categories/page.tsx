@@ -1,6 +1,7 @@
 "use client";
 
 import { useAuthUser } from "@/shared/hooks/AuthContext";
+import { hasAppPermission } from "@/shared/utils/permissions";
 import type { LmsCategory } from "@/systems/lms/types/lms-types";
 import {
   ArrowLeft,
@@ -90,7 +91,7 @@ function getCategoryColorValueForOrder(orderIndex: number) {
 export default function CategoriesAdminPage() {
   const router = useRouter();
   const user = useAuthUser();
-  const isAdmin = user?.role === "Admin";
+  const canManageLms = hasAppPermission(user?.role, "lms:manage");
   
   const [categories, setCategories] = useState<LmsCategory[]>([]);
   const [loading, setLoading] = useState(true);
@@ -151,12 +152,12 @@ export default function CategoriesAdminPage() {
   }, []);
 
   useEffect(() => {
-    if (!isAdmin) {
+    if (!canManageLms) {
       router.push("/lms", { scroll: false });
       return;
     }
     fetchCategories();
-  }, [isAdmin, router, fetchCategories]);
+  }, [canManageLms, router, fetchCategories]);
 
   const handleSave = async () => {
     if (!formName.trim()) {
@@ -288,7 +289,7 @@ export default function CategoriesAdminPage() {
     setError("");
   };
 
-  if (!isAdmin) return null;
+  if (!canManageLms) return null;
 
   if (loading) {
     return (

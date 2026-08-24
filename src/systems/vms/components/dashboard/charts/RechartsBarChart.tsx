@@ -52,9 +52,9 @@ export default function RechartsBarChart({ data, width = 300, height = 300 }: Re
         />
         <Bar
           dataKey="value"
-          fill="#10b981"
-          stroke="#059669"
-          strokeOpacity={0.5}
+          fill="#16a34a"
+          stroke="#166534"
+          strokeOpacity={0.6}
           strokeWidth={1}
           radius={[8, 8, 0, 0]}
         />

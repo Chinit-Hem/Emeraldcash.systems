@@ -1,5 +1,3 @@
-﻿"use client";
-
-export { default } from "@/systems/vms/views/routes/home/page";
-export * from "@/systems/vms/views/routes/home/page";
+﻿export { default } from "@/app/(dashboard)/home/page";
+export * from "@/app/(dashboard)/home/page";
 

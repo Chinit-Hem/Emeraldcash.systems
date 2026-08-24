@@ -1,8 +1,15 @@
 import type { NextConfig } from 'next';
+import { networkInterfaces } from 'node:os';
 
 const isProduction = process.env.NODE_ENV === "production";
 const isDevelopment = !isProduction;
 const devLanIp = process.env.DEV_LAN_IP?.trim() || "192.168.0.68";
+const localLanIps = Object.values(networkInterfaces())
+  .flat()
+  .filter((networkInterface): networkInterface is NonNullable<typeof networkInterface> =>
+    Boolean(networkInterface && networkInterface.family === "IPv4" && !networkInterface.internal)
+  )
+  .map((networkInterface) => networkInterface.address);
 
 const devConnectSources = isDevelopment
   ? [
@@ -131,7 +138,8 @@ const nextConfig: NextConfig = {
     "192.168.1.100",
     "192.168.195.1",
     "192.168.1.7",
-    devLanIp || ""
+    devLanIp || "",
+    ...localLanIps,
   ].filter(Boolean),
 
   images: {

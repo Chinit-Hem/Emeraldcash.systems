@@ -1,7 +1,7 @@
 "use client";
 
 import type { User } from "@/shared/types/types";
-import { BookOpen, Boxes, Calculator, Menu, Settings } from "lucide-react";
+import { BookOpen, Boxes, Car, Menu, Settings } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { flushSync } from "react-dom";
@@ -75,7 +75,7 @@ export default function MobileBottomNav({
     const navItems: NavLinkItem[] = [];
 
     if (hasAppPermission(user.role, "vehicles:view")) {
-      navItems.push({ id: "vms", label: "VMS", labelKm: "VMS", href: "/", icon: Calculator });
+      navItems.push({ id: "vms", label: "VMS", labelKm: "VMS", href: "/", icon: Car });
     }
 
     if (hasAppPermission(user.role, "lms:view")) {

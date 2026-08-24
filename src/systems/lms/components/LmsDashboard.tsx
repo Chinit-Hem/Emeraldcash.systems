@@ -45,6 +45,7 @@ import {
   InitialLmsData
 } from "@/systems/lms/types/lms-types";
 import { useAuthUser } from "@/shared/hooks/AuthContext";
+import { hasAppPermission } from "@/shared/utils/permissions";
 import { useDebouncedValue } from "@/shared/hooks/useDebouncedValue";
 import { SearchClearButton } from "@/shared/components/ui/SearchClearButton";
 import {
@@ -374,7 +375,7 @@ function LmsDashboard({ initialData }: LmsDashboardProps) {
   const activeTab = _activeTab;
 
   const user = useAuthUser();
-  const isAdmin = user?.role === "Admin";
+  const canManageLms = hasAppPermission(user?.role, "lms:manage");
   const dashboardStats = stats ?? EMPTY_LMS_STATS;
 
   const [searchQuery, setSearchQuery] = useState("");
@@ -594,7 +595,7 @@ function LmsDashboard({ initialData }: LmsDashboardProps) {
           <p className="text-xl text-slate-600 dark:text-slate-400 mb-8 max-w-md mx-auto leading-relaxed">
             The training portal is ready, but no courses have been added.
           </p>
-          {isAdmin ? (
+          {canManageLms ? (
             <div className="space-y-4">
               <a
                 href="/lms/admin/categories"
@@ -603,7 +604,7 @@ function LmsDashboard({ initialData }: LmsDashboardProps) {
                 Open Content Manager
               </a>
               <p className="text-sm text-slate-500 dark:text-slate-400 text-center">
-                Admin: create categories and lessons in Content Manager.
+                You can create categories and lessons in Content Manager.
               </p>
             </div>
           ) : (

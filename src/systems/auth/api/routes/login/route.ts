@@ -234,8 +234,10 @@ export async function POST(req: NextRequest) {
   const forwardedProto = req.headers.get("x-forwarded-proto")?.split(",")[0]?.trim().toLowerCase();
   const isActuallyHttps = forwardedProto === "https" || req.nextUrl.protocol === "https:";
   
-  const allowInsecureCookies = !IS_PRODUCTION && process.env.ALLOW_HTTP_COOKIES === "true";
-  const isSecureEnvironment = (IS_PRODUCTION || isActuallyHttps) && !allowInsecureCookies;
+  // Only mark the session cookie as secure when the incoming request is actually HTTPS.
+  // This is required for LAN HTTP environments (e.g. http://192.168.1.94:3000).
+  const isSecureEnvironment = isActuallyHttps;
+
 
   const res = NextResponse.json({
     ok: true,

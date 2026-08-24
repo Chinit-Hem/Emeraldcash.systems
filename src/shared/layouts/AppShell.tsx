@@ -1,23 +1,22 @@
 "use client";
 
 import type { User } from "@/shared/types/types";
-import Image from "next/image";
-import { Menu } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Suspense, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import MobileBottomNav from "@/shared/components/MobileBottomNav";
 import MobileBackHandler from "@/shared/components/MobileBackHandler";
-import Sidebar from "@/shared/components/Sidebar";
+import { AppSidebar, MobileDrawer } from "@/shared/components/sidebar/index";
+import TopBar from "@/shared/components/TopBar";
 import { AuthUserProvider } from "@/shared/hooks/AuthContext";
 import { UIProvider } from "@/shared/hooks/UIContext";
 import { clearCachedUser, getCachedUser, setCachedUser } from "@/shared/utils/authCache";
-import { useLanguage } from "@/shared/hooks/LanguageContext";
-import { useStandaloneDisplayMode } from "@/shared/hooks/useStandaloneDisplayMode";
 
 type AppShellProps = {
   children: ReactNode;
 };
+
+const LAST_APP_LOCATION_KEY = "emerald-cash.last-app-location";
 
 function useDesktopSidebar() {
   const [isDesktop, setIsDesktop] = useState(false);
@@ -42,45 +41,86 @@ function AppShellContent({ children }: AppShellProps) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const isDesktopSidebar = useDesktopSidebar();
-  const isStandaloneApp = useStandaloneDisplayMode();
-  const { language } = useLanguage();
-  const systemsLabel = language === "km" ? "ប្រព័ន្ធ" : "Systems";
-  const openMenuLabel = language === "km" ? "បើកម៉ឺនុយ" : "Open menu";
 
   // OPTIMIZATION: Show UI immediately with cached user, check auth in background
   const [user, setUser] = useState<User | null>(() => getCachedUser());
   const [loading, setLoading] = useState(false); // Changed: default false for 0ms load feel
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [isSidebarClosing, setIsSidebarClosing] = useState(false);
-  const [hasOpenedSidebar, setHasOpenedSidebar] = useState(false);
+  const [isSidebarCompact, setIsSidebarCompact] = useState(true);
+  const [isSidebarPreferenceLoaded, setIsSidebarPreferenceLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const hasRedirected = useRef(false);
   const authChecked = useRef(false);
-  const closeSidebarTimer = useRef<number | null>(null);
-  const drawerId = "mobile-navigation-drawer";
+  const currentLocationRef = useRef("/");
+  const sidebarPreferenceKey = "emerald-cash.sidebar.collapsed.v2";
   const openSidebar = useCallback(() => {
-    if (closeSidebarTimer.current !== null) {
-      window.clearTimeout(closeSidebarTimer.current);
-      closeSidebarTimer.current = null;
-    }
-    setIsSidebarClosing(false);
-    setHasOpenedSidebar(true);
     setIsSidebarOpen(true);
   }, []);
   const closeSidebar = useCallback(() => {
-    if (!isSidebarOpen) return;
-
-    if (closeSidebarTimer.current !== null) {
-      window.clearTimeout(closeSidebarTimer.current);
-    }
-
     setIsSidebarOpen(false);
-    setIsSidebarClosing(true);
-    closeSidebarTimer.current = window.setTimeout(() => {
-      setIsSidebarClosing(false);
-      closeSidebarTimer.current = null;
-    }, 220);
-  }, [isSidebarOpen]);
+  }, []);
+
+  useEffect(() => {
+    const query = searchParams?.toString?.() || "";
+    const currentLocation = query ? `${pathname}?${query}` : pathname;
+    currentLocationRef.current = currentLocation;
+    try {
+      window.sessionStorage.setItem(LAST_APP_LOCATION_KEY, currentLocation);
+    } catch {
+      // Navigation still works when session storage is unavailable.
+    }
+  }, [pathname, searchParams]);
+
+  const handleLogout = useCallback(() => {
+    if (!window.confirm("Are you sure you want to log out?")) return;
+
+    void (async () => {
+      try {
+        await fetch("/api/auth/logout", { method: "POST" });
+      } finally {
+        clearCachedUser();
+        window.location.assign("/login");
+      }
+    })();
+  }, []);
+
+  useEffect(() => {
+    try {
+      const storedPreference = window.localStorage.getItem(sidebarPreferenceKey);
+      setIsSidebarCompact(storedPreference === null ? true : storedPreference === "true");
+    } catch {
+      // Keep the compact default when storage is unavailable.
+    } finally {
+      setIsSidebarPreferenceLoaded(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!isSidebarPreferenceLoaded) return;
+    try {
+      window.localStorage.setItem(sidebarPreferenceKey, String(isSidebarCompact));
+    } catch {
+      // Storage may be disabled in private browsing; the current session still works.
+    }
+  }, [isSidebarCompact, isSidebarPreferenceLoaded]);
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (!(event.ctrlKey || event.metaKey) || event.key.toLowerCase() !== "b") return;
+      const target = event.target;
+      if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement || target instanceof HTMLSelectElement || (target instanceof HTMLElement && target.isContentEditable)) return;
+
+      event.preventDefault();
+      if (isDesktopSidebar) {
+        setIsSidebarCompact((current) => !current);
+      } else {
+        setIsSidebarOpen((current) => !current);
+      }
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [isDesktopSidebar]);
 
   useEffect(() => {
     let isActive = true;
@@ -119,7 +159,8 @@ function AppShellContent({ children }: AppShellProps) {
           setUser(null);
           if (!hasRedirected.current) {
             hasRedirected.current = true;
-            router.replace("/login");
+            const redirectPath = currentLocationRef.current || "/";
+            router.replace(`/login?redirect=${encodeURIComponent(redirectPath)}`);
           }
           return;
         }
@@ -154,14 +195,6 @@ function AppShellContent({ children }: AppShellProps) {
       controller.abort();
     };
   }, [router]);
-
-  useEffect(() => {
-    return () => {
-      if (closeSidebarTimer.current !== null) {
-        window.clearTimeout(closeSidebarTimer.current);
-      }
-    };
-  }, []);
 
   const mainRef = useRef<HTMLElement | null>(null);
 
@@ -228,10 +261,7 @@ function AppShellContent({ children }: AppShellProps) {
   // Neumorphism loading card
   const loadingCardClass = "neu-card max-w-md w-full";
 
-  // Mobile-first header with Neumorphism
-  const mobileHeaderClass = "xl:hidden fixed top-0 left-0 right-0 z-40 neu-card-sm !rounded-none !rounded-b-neu !p-0 safe-area-top";
-  const bottomPaddingClass = isStandaloneApp ? "pb-safe" : "pb-0";
-  const shouldShowSidebarLayer = isSidebarOpen || isSidebarClosing;
+  const bottomPaddingClass = "pb-0";
 
   // Loading state - Neumorphism
   if (loading) {
@@ -272,99 +302,53 @@ function AppShellContent({ children }: AppShellProps) {
   }
 
   return (
-    <div className={`flex h-dvh min-h-screen overflow-hidden bg-transparent ${bottomPaddingClass} xl:pb-0`}>
+    <div className={`flex min-h-screen h-dvh min-w-0 flex-col overflow-hidden bg-transparent ${bottomPaddingClass} xl:pb-0`}>
       <AuthUserProvider user={user}>
         <MobileBackHandler isMenuOpen={isSidebarOpen} onCloseMenu={closeSidebar} />
 
-        {/* Desktop sidebar */}
-        {isDesktopSidebar && (
-          <div className="hidden xl:block">
-              <Suspense fallback={null}>
-              <Sidebar user={user} mode="desktop" />
-            </Suspense>
-          </div>
-        )}
-
-        {/* Mobile drawer */}
-        <div
-          className={`fixed inset-0 z-[60] xl:hidden ${shouldShowSidebarLayer ? "visible" : "invisible"} ${isSidebarOpen ? "pointer-events-auto" : "pointer-events-none"}`}
-          onKeyDown={(e) => {
-            if (e.key === "Escape") closeSidebar();
-          }}
-          {...(!isSidebarOpen ? { "aria-hidden": "true" as const } : {})}
-        >
-          <div
-            className={`absolute inset-0 bg-slate-900/30 backdrop-blur-sm transition-opacity duration-200 ease-out motion-reduce:transition-none ${isSidebarOpen ? "opacity-100" : "opacity-0"}`}
-            onClick={closeSidebar}
-            aria-hidden="true"
-          />
-          <div
-            id={drawerId}
-            className={`absolute inset-y-0 left-0 h-full w-[280px] max-w-[85vw] overflow-hidden bg-neu-bg shadow-neu-flat-lg transition-[opacity,transform] duration-[220ms] ease-out will-change-[opacity,transform] motion-reduce:transition-none ${isSidebarOpen ? "translate-x-0 opacity-100" : "-translate-x-full opacity-0"}`}
-            role="dialog"
-            {...(isSidebarOpen ? { "aria-modal": "true" as const } : {})}
-            aria-label="Navigation menu"
-          >
+        <div className="flex min-h-0 flex-1 overflow-hidden">
+          {/* Desktop sidebar (render ONLY once) */}
+          {isDesktopSidebar && (
             <Suspense fallback={null}>
-              {hasOpenedSidebar ? (
-                <Sidebar
-                  user={user}
-                  onNavigate={closeSidebar}
-                  isVisible={isSidebarOpen}
-                  mode="drawer"
-                />
-              ) : null}
+              <AppSidebar
+                user={user}
+                mode="desktop"
+                collapsed={isSidebarCompact}
+                onToggleCollapse={() => setIsSidebarCompact((state) => !state)}
+                onLogout={handleLogout}
+              />
             </Suspense>
+          )}
+
+          <div className="flex min-h-0 flex-1 min-w-0 flex-col">
+            <TopBar
+              user={user}
+              showMenuButton={!isDesktopSidebar}
+              onMenuClick={() => {
+                if (isDesktopSidebar) {
+                  setIsSidebarCompact((state) => !state);
+                } else {
+                  openSidebar();
+                }
+              }}
+            />
+
+            {/* Main content */}
+            <main
+              ref={mainRef}
+              data-app-scroll-container="true"
+              className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden pt-0"
+            >
+              {children}
+            </main>
           </div>
         </div>
 
-        <div className="flex min-h-0 flex-1 min-w-0 flex-col pt-14 xl:pt-0">
-          {/* Mobile header - Fixed position with safe area support */}
-          <header
-            className={`${mobileHeaderClass} transition-opacity duration-150 ${shouldShowSidebarLayer ? "pointer-events-none opacity-0" : "opacity-100"}`}
-            {...(shouldShowSidebarLayer ? { "aria-hidden": "true" as const } : {})}
-          >
-            <div className="relative h-14 px-4 flex items-center justify-center max-w-[100vw]">
-              <div className="flex min-w-0 translate-y-1 items-center justify-center gap-3">
-                <div className="relative w-9 h-9 flex items-center justify-center overflow-hidden flex-shrink-0 neu-icon-btn !rounded-full !bg-white dark:!bg-white">
-                  <Image
-                    src="/logo.png"
-                    alt=""
-                    width={28}
-                    height={28}
-                    className="w-7 h-7 object-contain"
-                    aria-hidden="true"
-                  />
-                </div>
-                <div className="flex flex-col min-w-0">
-                  <span className="font-bold text-neu-text text-sm leading-tight truncate">Emerald Cash</span>
-                  <span className="text-sm font-bold leading-tight text-emerald-700 dark:text-emerald-300">{systemsLabel}</span>
-                </div>
-              </div>
-              {!isStandaloneApp ? (
-                <button
-                  type="button"
-                  className="neu-icon-btn absolute left-3 top-1/2 h-10 w-10 -translate-y-1/2 text-neu-text-muted"
-                  onClick={openSidebar}
-                  aria-label={openMenuLabel}
-                  aria-controls={drawerId}
-                  {...{ "aria-expanded": isSidebarOpen ? "true" as const : "false" as const }}
-                >
-                  <Menu className="h-5 w-5" aria-hidden="true" />
-                </button>
-              ) : null}
-            </div>
-          </header>
-
-          {/* Main content - Add padding-top to account for fixed header on mobile */}
-          <main
-            ref={mainRef}
-            data-app-scroll-container="true"
-            className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden pt-0"
-          >
-            {children}
-          </main>
-        </div>
+        <MobileDrawer open={isSidebarOpen} onClose={closeSidebar}>
+          <Suspense fallback={null}>
+            <AppSidebar user={user} onNavigate={closeSidebar} onLogout={handleLogout} mode="drawer" />
+          </Suspense>
+        </MobileDrawer>
 
         <MobileBottomNav user={user} isMenuOpen={isSidebarOpen} onOpenMenu={openSidebar} />
       </AuthUserProvider>

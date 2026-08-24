@@ -10,9 +10,10 @@ import React, { Suspense, useCallback, useEffect, useRef, useState } from "react
 const SHOW_LOGIN_DEBUG = process.env.NODE_ENV !== "production";
 const TURNSTILE_SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY?.trim() || "";
 const TURNSTILE_ENABLED = Boolean(TURNSTILE_SITE_KEY);
+const LAST_APP_LOCATION_KEY = "emerald-cash.last-app-location";
 
 type TurnstileRenderOptions = {
-  sitekey: string;
+  sitekey: string
   theme?: "auto" | "light" | "dark";
   callback?: (token: string) => void;
   "expired-callback"?: () => void;
@@ -139,12 +140,18 @@ function LoginForm() {
   // Development-only session diagnostics, kept free of cookie values.
   const [debugInfo, setDebugInfo] = useState<string | null>(null);
 
+  const submitGuardRef = useRef(false);
+
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
+    if (submitGuardRef.current) return;
+    submitGuardRef.current = true;
+
     setError("");
     setSuccess("");
     setDebugInfo(null);
     setLoading(true);
+
 
     try {
       const trimmedUsername = username.trim();
@@ -232,19 +239,39 @@ function LoginForm() {
       // Redirect to original destination when safe, otherwise app home.
       // Keep legacy /dashboard links working by mapping them to root.
       const requestedRedirect = searchParams.get("redirect");
-      const safeRedirect = requestedRedirect && requestedRedirect.startsWith("/") && !requestedRedirect.startsWith("//")
-        ? requestedRedirect
-        : "/";
-      const redirectTo = safeRedirect === "/dashboard" ? "/" : safeRedirect;
+      let rememberedRedirect: string | null = null;
+      try {
+        rememberedRedirect = window.sessionStorage.getItem(LAST_APP_LOCATION_KEY);
+      } catch {
+        // Continue with the URL redirect or app home when storage is unavailable.
+      }
+      const preferredRedirect = requestedRedirect || rememberedRedirect;
+      const safeRedirect =
+        preferredRedirect &&
+        preferredRedirect.startsWith("/") &&
+        !preferredRedirect.startsWith("//") &&
+        !preferredRedirect.startsWith("/login")
+          ? preferredRedirect
+          : "/";
+
+      // Default post-login destination must be the ERP Home hub.
+      // Keep legacy "/dashboard" working by mapping it to "/".
+      const redirectTo =
+        safeRedirect === "/dashboard" ? "/" : safeRedirect;
+
       router.replace(redirectTo);
     } catch (err) {
+      submitGuardRef.current = false;
       if (TURNSTILE_ENABLED) {
         setTurnstileToken("");
         window.turnstile?.reset(turnstileWidgetIdRef.current ?? undefined);
       }
       setError(err instanceof Error ? err.message : "Login failed");
       setLoading(false);
+      submitGuardRef.current = false;
     }
+  
+
   }
 
 

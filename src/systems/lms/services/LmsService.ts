@@ -596,7 +596,7 @@ export class LmsService extends BaseService<LmsCategoryEntity, LmsCategoryDB> {
     const startTime = Date.now();
 
     try {
-      const validRoles = ["Admin", "Staff", "Accounting"];
+      const validRoles = ["Admin", "Staff", "Loan Operations", "Manager / Approver", "Finance", "Human Resources", "IT Support", "Risk & Compliance", "Marketing", "Intern / Read Only", "Executive Viewer"];
       const role = input.role && validRoles.includes(input.role) ? input.role : "Staff";
 
       const staff = await this.staffRepo.create({

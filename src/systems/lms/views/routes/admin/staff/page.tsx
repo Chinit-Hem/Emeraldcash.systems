@@ -1,6 +1,7 @@
 "use client";
 
 import { useAuthUser } from "@/shared/hooks/AuthContext";
+import { hasAppPermission } from "@/shared/utils/permissions";
 import type { Role } from "@/shared/types/types";
 import {
   ArrowLeft,
@@ -148,7 +149,7 @@ function getTrainingStatus(progress: StaffMember | null) {
 export default function StaffAdminPage() {
   const router = useRouter();
   const user = useAuthUser();
-  const isAdmin = user?.role === "Admin";
+  const canManageLms = hasAppPermission(user?.role, "lms:manage");
   
   const [users, setUsers] = useState<ManagedUser[]>([]);
   const [lmsStaff, setLmsStaff] = useState<StaffMember[]>([]);
@@ -164,7 +165,7 @@ export default function StaffAdminPage() {
 
   // Fetch both Settings users and LMS staff
   const loadData = useCallback(async () => {
-    if (!isAdmin) return;
+    if (!canManageLms) return;
 
     setIsUsersLoading(true);
     setUserActionError("");
@@ -197,15 +198,15 @@ export default function StaffAdminPage() {
     } finally {
       setIsUsersLoading(false);
     }
-  }, [isAdmin]);
+  }, [canManageLms]);
 
   useEffect(() => {
-    if (!isAdmin) {
+    if (!canManageLms) {
       router.push("/lms", { scroll: false });
       return;
     }
     void loadData();
-  }, [isAdmin, router, loadData]);
+  }, [canManageLms, router, loadData]);
 
   // Sync user with LMS staff
   const syncUserWithLMS = async (username: string, fullName: string | null, email: string | null, phone: string | null, role: Role) => {
@@ -249,7 +250,7 @@ export default function StaffAdminPage() {
 
   // Sync all users to LMS
   const syncAllUsersToLMS = async () => {
-    if (!isAdmin) return;
+    if (!canManageLms) return;
     
     setIsSyncingAll(true);
     setUserActionError("");
@@ -399,7 +400,7 @@ export default function StaffAdminPage() {
       });
   }, [roleFilter, searchQuery, sortOption, statusFilter, usersWithProgress]);
 
-  if (!isAdmin) return null;
+  if (!canManageLms) return null;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-slate-100 to-slate-200">

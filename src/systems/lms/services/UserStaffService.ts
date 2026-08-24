@@ -82,7 +82,7 @@ export class UserStaffService {
       const authResult = await createUser({
         username: data.username,
         password: data.password,
-        role: data.role === "Admin" ? "Admin" : "Staff",
+        role: data.role,
         createdBy: "system"
       });
 

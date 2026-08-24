@@ -8,6 +8,8 @@ import { driveThumbnailUrl, extractDriveFileId } from "@/shared/utils/drive";
 import type { Vehicle } from "@/shared/types/types";
 import { TAX_TYPE_METADATA } from "@/shared/types/types";
 import { cn } from "@/shared/utils/ui";
+import { hasAppPermission } from "@/shared/utils/permissions";
+import { Car as CarIcon } from "lucide-react";
 import { withVehicleListQueryFallback } from "@/systems/vms/utils/vehicleListState";
 import { useVehicleListBackLink } from "@/systems/vms/hooks/useVehicleListBackLink";
 import { getCanonicalBrandName, getDisplayBrandName, getDisplayModelName } from "@/systems/vms/utils/vehicleBrandMetadata";
@@ -146,9 +148,8 @@ export function VehicleDetailsCard({
   const [isImageModalOpen, setIsImageModalOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 
-  const isAdmin = userRole === "Admin";
-  const canEdit = isAdmin;  // Only Admin can edit vehicles
-  const canDelete = isAdmin;
+  const canEdit = hasAppPermission(userRole, "vehicles:edit");
+  const canDelete = hasAppPermission(userRole, "vehicles:delete");
 
   const handleEdit = () => {
     if (onEdit) {
@@ -242,8 +243,8 @@ export function VehicleDetailsCard({
   };
 
   return (
-    <>
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 pb-32 md:pb-8">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 pb-32 md:pb-8">
+
         {/* Header Section */}
         <div className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-xl border-b border-slate-200/50 dark:border-slate-700/50 sticky top-0 z-30">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
@@ -465,49 +466,54 @@ export function VehicleDetailsCard({
                   <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-10 -mt-10 blur-2xl" />
                   <div className="relative">
                     <div className="flex items-center gap-2 mb-1 opacity-90">
+                      <CarIcon className="h-4 w-4 text-white/90" />
                       <Icons.Price />
                       <span className="text-xs font-semibold uppercase tracking-wider">Market Price</span>
                     </div>
-                    <p className="text-3xl font-bold">{formatCurrency(vehicle.PriceNew)}</p>
-                    <p className="text-xs opacity-75 mt-1">Full vehicle value</p>
-                  </div>
-                </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  {/* DOC 40% */}
-                  <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-lg shadow-slate-200/50 dark:shadow-slate-900/30 p-5 border border-slate-100 dark:border-slate-700 relative overflow-hidden">
-                    <div className="absolute top-0 right-0 w-20 h-20 bg-rose-100 dark:bg-rose-900/20 rounded-full -mr-10 -mt-10 blur-xl" />
-                    <div className="relative">
-                      <p className="text-xs font-semibold text-rose-600 dark:text-rose-400 uppercase tracking-wider mb-1">DOC 40%</p>
-                      <p className="text-2xl font-bold text-slate-900 dark:text-white">{formatCurrency(vehicle.Price40)}</p>
-                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Down payment</p>
+                    <div className="mt-1">
+                      <p className="text-3xl font-bold">{formatCurrency(vehicle.PriceNew)}</p>
+                      <p className="text-xs opacity-75 mt-1">Full vehicle value</p>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4 mt-4">
+                      {/* DOC 40% */}
+                      <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-lg shadow-slate-200/50 dark:shadow-slate-900/30 p-5 border border-slate-100 dark:border-slate-700 relative overflow-hidden">
+                        <div className="absolute top-0 right-0 w-20 h-20 bg-rose-100 dark:bg-rose-900/20 rounded-full -mr-10 -mt-10 blur-xl" />
+                        <div className="relative">
+                          <p className="text-xs font-semibold text-rose-600 dark:text-rose-400 uppercase tracking-wider mb-1">DOC 40%</p>
+                          <p className="text-2xl font-bold text-slate-900 dark:text-white">{formatCurrency(vehicle.Price40)}</p>
+                          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Down payment</p>
+                        </div>
+                      </div>
+
+                      {/* Vehicles 70% */}
+                      <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-lg shadow-slate-200/50 dark:shadow-slate-900/30 p-5 border border-slate-100 dark:border-slate-700 relative overflow-hidden">
+                        <div className="absolute top-0 right-0 w-20 h-20 bg-blue-100 dark:bg-blue-900/20 rounded-full -mr-10 -mt-10 blur-xl" />
+                        <div className="relative">
+                          <p className="text-xs font-semibold text-blue-600 dark:text-blue-400 uppercase tracking-wider mb-1">Vehicles 70%</p>
+                          <p className="text-2xl font-bold text-slate-900 dark:text-white">{formatCurrency(vehicle.Price70)}</p>
+                          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Installment</p>
+                        </div>
+                      </div>
                     </div>
                   </div>
+                </div>
 
-                  {/* Vehicles 70% */}
-                  <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-lg shadow-slate-200/50 dark:shadow-slate-900/30 p-5 border border-slate-100 dark:border-slate-700 relative overflow-hidden">
-                    <div className="absolute top-0 right-0 w-20 h-20 bg-blue-100 dark:bg-blue-900/20 rounded-full -mr-10 -mt-10 blur-xl" />
-                    <div className="relative">
-                      <p className="text-xs font-semibold text-blue-600 dark:text-blue-400 uppercase tracking-wider mb-1">Vehicles 70%</p>
-                      <p className="text-2xl font-bold text-slate-900 dark:text-white">{formatCurrency(vehicle.Price70)}</p>
-                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Installment</p>
-                    </div>
+                {/* Added Time */}
+                <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-lg shadow-slate-200/50 dark:shadow-slate-900/30 p-5 border border-slate-100 dark:border-slate-700 flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-xl bg-slate-100 dark:bg-slate-700 flex items-center justify-center text-slate-600 dark:text-slate-400">
+                    <Icons.Clock />
                   </div>
-                </div>
-              </div>
-
-              {/* Added Time */}
-              <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-lg shadow-slate-200/50 dark:shadow-slate-900/30 p-5 border border-slate-100 dark:border-slate-700 flex items-center gap-4">
-                <div className="w-12 h-12 rounded-xl bg-slate-100 dark:bg-slate-700 flex items-center justify-center text-slate-600 dark:text-slate-400">
-                  <Icons.Clock />
-                </div>
-                <div>
-                  <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Added Time</p>
-                  <p className="text-sm font-mono font-semibold text-slate-900 dark:text-white">{formatVehicleTime(vehicle.Time)}</p>
+                  <div>
+                    <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Added Time</p>
+                    <p className="text-sm font-mono font-semibold text-slate-900 dark:text-white">{formatVehicleTime(vehicle.Time)}</p>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
+            </div>
+
         </div>
 
         {/* Desktop Action Bar */}
@@ -646,6 +652,5 @@ export function VehicleDetailsCard({
           </div>
         )}
       </div>
-    </>
   );
 }

@@ -1,5 +1,5 @@
 
-export type Role = "Admin" | "Staff" | "Accounting" | string;
+export type Role = "Admin" | "Staff" | "Finance" | string;
 
 // Role definition for custom roles
 export interface RoleDefinition {
@@ -30,6 +30,13 @@ export type Permission =
   | "users:delete"
   | "lms:view"
   | "lms:manage"
+  | "loans:view"
+  | "loans:create"
+  | "loans:edit"
+  | "loans:approve"
+  | "loans:disburse"
+  | "loans:repay"
+  | "loans:delete"
   | "settings:view"
   | "settings:manage"
   | "reports:view"
@@ -43,6 +50,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<string, Permission[]> = {
     "sms:view", "sms:create", "sms:edit", "sms:delete", "sms:transfer",
     "users:view", "users:create", "users:edit", "users:delete",
     "lms:view", "lms:manage",
+    "loans:view", "loans:create", "loans:edit", "loans:approve", "loans:disburse", "loans:repay", "loans:delete",
     "settings:view", "settings:manage",
     "reports:view", "reports:manage",
     "roles:manage"
@@ -54,18 +62,27 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<string, Permission[]> = {
     "sms:create",              // Can upload images / create assets as part of transfer flow
     "users:view",              // Can view users
     "lms:view",                // Can access LMS
+    "loans:view", "loans:create", "loans:edit", // Can prepare and submit loan applications
     "reports:view"             // Can view reports
-    // Note: Staff CANNOT create/edit/delete vehicles or access settings
   ],
-  Accounting: [
+  Finance: [
     "vehicles:view",           // Same app permissions as Staff
     "sms:view",
     "sms:transfer",
     "sms:create",
     "users:view",
     "lms:view",
+    "loans:view", "loans:create", "loans:edit", "loans:approve", "loans:disburse", "loans:repay",
     "reports:view"
-  ]
+  ],
+  "Loan Operations": ["loans:view", "loans:create", "loans:edit", "loans:approve", "reports:view"],
+  "Manager / Approver": ["loans:view", "loans:create", "loans:edit", "loans:approve", "reports:view", "reports:manage"],
+  "Human Resources": ["users:view", "users:create", "users:edit", "lms:view", "settings:view", "reports:view"],
+  "IT Support": ["vehicles:view", "sms:view", "users:view", "lms:view", "loans:view", "settings:view", "reports:view"],
+  "Risk & Compliance": ["loans:view", "reports:view"],
+  Marketing: ["lms:view"],
+  "Intern / Read Only": ["lms:view"],
+  "Executive Viewer": ["loans:view", "loans:approve", "reports:view", "reports:manage"]
 };
 
 // Permission labels for UI
@@ -85,6 +102,13 @@ export const PERMISSION_LABELS: Record<Permission, string> = {
   "users:delete": "Delete Users",
   "lms:view": "View LMS",
   "lms:manage": "Manage LMS",
+  "loans:view": "View Loans",
+  "loans:create": "Create Loan Applications",
+  "loans:edit": "Edit Loan Applications",
+  "loans:approve": "Approve or Reject Loans",
+  "loans:disburse": "Disburse Approved Loans",
+  "loans:repay": "Record Loan Repayments",
+  "loans:delete": "Delete Loan Applications",
   "settings:view": "View Settings",
   "settings:manage": "Manage Settings",
   "reports:view": "View Reports",
@@ -98,6 +122,7 @@ export const PERMISSION_CATEGORIES = {
   "SMS": ["sms:view", "sms:create", "sms:edit", "sms:delete", "sms:transfer"] as Permission[],
   "Users": ["users:view", "users:create", "users:edit", "users:delete"] as Permission[],
   "LMS": ["lms:view", "lms:manage"] as Permission[],
+  "Loans": ["loans:view", "loans:create", "loans:edit", "loans:approve", "loans:disburse", "loans:repay", "loans:delete"] as Permission[],
   "Settings": ["settings:view", "settings:manage"] as Permission[],
   "Reports": ["reports:view", "reports:manage"] as Permission[],
   "System": ["roles:manage"] as Permission[]
@@ -107,6 +132,9 @@ export type User = {
   username: string;
   role: Role;
   full_name?: string;
+  position?: string;
+  department?: string;
+  branch?: string;
   email?: string;
   phone?: string;
   bio?: string;

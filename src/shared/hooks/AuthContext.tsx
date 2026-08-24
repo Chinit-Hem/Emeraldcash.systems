@@ -2,7 +2,7 @@
 
 import type { User } from "@/shared/types/types";
 import type { ReactNode } from "react";
-import { createContext, useContext, useState, useCallback } from "react";
+import { createContext, useContext, useState, useCallback, useEffect } from "react";
 
 interface AuthContextType {
   user: User | null;
@@ -20,6 +20,12 @@ const DEFAULT_USER: User = {
 
 export function AuthUserProvider({ user: initialUser, children }: { user: User; children: ReactNode }) {
   const [user, setUser] = useState<User>(initialUser);
+
+  // AppShell may replace its cached user after the background session check.
+  // Keep page-level permission checks in sync with the refreshed role.
+  useEffect(() => {
+    setUser(initialUser);
+  }, [initialUser]);
 
   const updateProfile = useCallback(async (data: Partial<User>): Promise<{ success: boolean; error?: string }> => {
     try {

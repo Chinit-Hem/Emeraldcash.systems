@@ -3,6 +3,7 @@
 import React, { useCallback, useEffect, useId, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useAuthUser } from "@/shared/hooks/AuthContext";
+import { hasAppPermission } from "@/shared/utils/permissions";
 import { formatVehicleId, formatVehicleTime, formatCurrency } from "@/shared/utils/format";
 import { onVehicleCacheUpdate } from "@/systems/vms/utils/vehicleCache";
 import { derivePrices } from "@/systems/vms/utils/pricing";
@@ -433,10 +434,9 @@ function ViewVehicleInner() {
   const isMounted = useMounted();
   const { success, error: showError } = useToast();
 
-  const isAdmin = user?.role === "Admin";
   const userRole = user?.role || "Viewer";
-  const canEdit = isAdmin;  // Only Admin can edit vehicles
-  const canDelete = isAdmin;
+  const canEdit = hasAppPermission(user?.role, "vehicles:edit");
+  const canDelete = hasAppPermission(user?.role, "vehicles:delete");
 
   const [vehicle, setVehicle] = useState<Vehicle | null>(null);
   const [loading, setLoading] = useState(true);

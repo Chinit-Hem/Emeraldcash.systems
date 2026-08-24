@@ -1,3 +1,4 @@
-﻿export { default } from "@/systems/vms/views/routes/dashboard/page";
-export * from "@/systems/vms/views/routes/dashboard/page";
+﻿export { default } from "@/app/(dashboard)/dashboard/selector/page";
+export * from "@/app/(dashboard)/dashboard/selector/page";
+
 

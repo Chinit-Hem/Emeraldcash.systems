@@ -10,7 +10,7 @@
  * @module DashboardPage
  */
 
-import Dashboard from "@/systems/vms/components/dashboard/Dashboard";
+import EnhancedDashboard from "@/systems/vms/components/dashboard/EnhancedDashboard";
 import { vehicleService } from "@/systems/vms/services/VehicleService";
 import type { Vehicle } from "@/shared/types/types";
 import { headers } from "next/headers";
@@ -133,11 +133,11 @@ export default async function DashboardPage() {
   ].filter(Boolean).join(" | ") || null;
 
   return (
-    <Dashboard
+    <EnhancedDashboard
       initialVehicles={vehicles}
       initialMeta={meta}
       initialError={initialError}
-      useMobileSafeCharts={useMobileSafeCharts}
+      isIOSSafari={useMobileSafeCharts}
     />
   );
 }

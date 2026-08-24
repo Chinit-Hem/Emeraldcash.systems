@@ -383,6 +383,94 @@ textarea::placeholder {
   color: var(--text-secondary);
 }
 
+.loan-primary-fields input:not([type="checkbox"]):not([type="radio"]),
+.loan-primary-fields select,
+.loan-primary-fields textarea {
+  border: 0 !important;
+  border-bottom: 1px solid rgb(203 213 225) !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.loan-primary-fields input:focus,
+.loan-primary-fields select:focus,
+.loan-primary-fields textarea:focus {
+  border-bottom-color: rgb(203 213 225) !important;
+  box-shadow: none !important;
+  outline: none !important;
+}
+
+.dark .loan-primary-fields input:focus,
+.dark .loan-primary-fields select:focus,
+.dark .loan-primary-fields textarea:focus {
+  border-bottom-color: rgb(51 65 85) !important;
+}
+
+/* Loan and pawn forms use the reference system's borderless underline fields. */
+.loan-system-flat-fields input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="file"]):not([type="button"]):not([type="submit"]),
+.loan-system-flat-fields select,
+.loan-system-flat-fields textarea {
+  border: 0 !important;
+  border-bottom: 1px solid rgb(203 213 225) !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  outline: none !important;
+}
+
+.loan-system-flat-fields input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="file"]):not([type="button"]):not([type="submit"]):focus,
+.loan-system-flat-fields select:focus,
+.loan-system-flat-fields textarea:focus {
+  border-bottom-color: rgb(203 213 225) !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  outline: none !important;
+}
+
+.dark .loan-system-flat-fields input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="file"]):not([type="button"]):not([type="submit"]),
+.dark .loan-system-flat-fields select,
+.dark .loan-system-flat-fields textarea,
+.dark .loan-system-flat-fields input:focus,
+.dark .loan-system-flat-fields select:focus,
+.dark .loan-system-flat-fields textarea:focus {
+  border-bottom-color: rgb(51 65 85) !important;
+}
+
+.loan-form-row {
+  display: grid;
+  grid-template-columns: minmax(9rem, 0.65fr) minmax(0, 1fr);
+  align-items: center;
+  column-gap: 1.5rem;
+}
+
+/* Replaced by the reference-style Add/Create Contact workflow. */
+.customer-reference-form > .mt-5.space-y-5 {
+  display: none;
+}
+
+.loan-form-row > span,
+.loan-form-row > label {
+  margin-bottom: 0;
+  font-weight: 700;
+}
+
+.loan-form-row > p {
+  grid-column: 2;
+}
+
+@media (max-width: 639px) {
+  .loan-form-row {
+    display: block;
+  }
+
+  .loan-form-row > span,
+  .loan-form-row > label {
+    display: block;
+    margin-bottom: 0.375rem;
+  }
+}
+
 .neu-card {
   background: var(--bg-elevated);
   border-radius: 16px;
@@ -1705,7 +1793,59 @@ button:not(:disabled):active,
   }
 }
 
-/* ================= KHMER FONT: KANTUMRUY PRO ================= */
+/* ================= SELF-HOSTED FONTS ================= */
+
+/* Inter (variable) – Latin subset */
+@font-face {
+  font-family: "Inter Fallback";
+  src: local("Inter"), local("Segoe UI"), local("system-ui");
+  font-display: optional;
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: "Inter Variable";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: optional;
+  src: url("/fonts/inter-latin.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+/* Kantumruy Pro – Khmer subset (covers weight 300, 400, 700) */
+@font-face {
+  font-family: "Kantumruy Pro Variable";
+  font-style: normal;
+  font-weight: 300 700;
+  font-display: swap;
+  src: url("/fonts/kantumruypro-khmer.woff2") format("woff2");
+  unicode-range: U+1780-17FF, U+19E0-19FF, U+200C-200D, U+25CC;
+}
+
+/* Kantumruy Pro – Latin Extended */
+@font-face {
+  font-family: "Kantumruy Pro Variable";
+  font-style: normal;
+  font-weight: 300 700;
+  font-display: swap;
+  src: url("/fonts/kantumruypro-latin-ext.woff2") format("woff2");
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+/* Kantumruy Pro – Latin */
+@font-face {
+  font-family: "Kantumruy Pro Variable";
+  font-style: normal;
+  font-weight: 300 700;
+  font-display: swap;
+  src: url("/fonts/kantumruypro-latin.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+:root {
+  --font-inter: "Inter Variable", "Inter Fallback", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --font-kantumruy-pro: "Kantumruy Pro Variable", "Inter Variable", "Segoe UI", system-ui, sans-serif;
+}
 
 /* Base Latin stack; Khmer switches on through html[lang="km"] below. */
 body {
@@ -1741,6 +1881,27 @@ html[lang="km"] .text-xl {
 /* All headings get bold weight in Khmer */
 html[lang="km"] :is(h1, h2, h3, h4, h5, h6) {
   font-weight: 700 !important;
+}
+
+/* Hide sidebar scrollbar but keep scrolling (doesn't cut "scroll to bottom" actions) */
+/* Hide scrollbar but keep scrolling on the sidebar menu */
+aside nav[aria-label="Main navigation"] {
+  overflow-y: auto !important;
+  overscroll-behavior: contain;
+  scrollbar-width: none !important; /* Firefox */
+  -ms-overflow-style: none !important; /* IE/Edge */
+}
+aside nav[aria-label="Main navigation"]::-webkit-scrollbar {
+  width: 0 !important;
+  height: 0 !important;
+  display: none !important; /* Chrome/Safari */
+}
+
+/* Fallback in case layout doesn't match the `aside nav` selector */
+nav[aria-label="Main navigation"]::-webkit-scrollbar {
+  width: 0 !important;
+  height: 0 !important;
+  display: none !important;
 }
 
 @media (prefers-reduced-motion: reduce) {

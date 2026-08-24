@@ -1,6 +1,7 @@
 "use client";
 
 import { useAuthUser } from "@/shared/hooks/AuthContext";
+import { hasAppPermission } from "@/shared/utils/permissions";
 import type { Role } from "@/shared/types/types";
 import {
   ArrowLeft,
@@ -60,7 +61,7 @@ interface UnifiedStaffMember {
 export default function UnifiedStaffPage() {
   const router = useRouter();
   const user = useAuthUser();
-  const isAdmin = user?.role === "Admin";
+  const canManageLms = hasAppPermission(user?.role, "lms:manage");
   
   const [unifiedStaff, setUnifiedStaff] = useState<UnifiedStaffMember[]>([]);
   const [loading, setLoading] = useState(true);
@@ -94,12 +95,12 @@ export default function UnifiedStaffPage() {
   }, []);
 
   useEffect(() => {
-    if (!isAdmin) {
+    if (!canManageLms) {
       router.push("/lms", { scroll: false });
       return;
     }
     fetchData();
-  }, [isAdmin, router, fetchData]);
+  }, [canManageLms, router, fetchData]);
 
   // Merge Settings users and LMS staff
   const mergeStaffData = (settings: SettingsUser[], lms: StaffMember[]): UnifiedStaffMember[] => {
@@ -265,7 +266,7 @@ export default function UnifiedStaffPage() {
     unsynced: unifiedStaff.filter((s) => !s.isSynced).length,
   };
 
-  if (!isAdmin) return null;
+  if (!canManageLms) return null;
 
   if (loading) {
     return (

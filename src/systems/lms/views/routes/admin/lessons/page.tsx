@@ -1,6 +1,7 @@
 "use client";
 
 import { useAuthUser } from "@/shared/hooks/AuthContext";
+import { hasAppPermission } from "@/shared/utils/permissions";
 import { useLanguage } from "@/shared/hooks/LanguageContext";
 import { translatePhrase } from "@/shared/utils/i18n";
 import type { LessonWithStatus } from "@/systems/lms/types/lms-types";
@@ -30,7 +31,7 @@ export default function LessonsAdminPage() {
   const user = useAuthUser();
   const { language } = useLanguage();
   const tr = useCallback((text: string) => translatePhrase(text, language), [language]);
-  const isAdmin = user?.role === "Admin";
+  const canManageLms = hasAppPermission(user?.role, "lms:manage");
   const {
     categories,
     lessons,
@@ -55,13 +56,13 @@ export default function LessonsAdminPage() {
   );
 
   useEffect(() => {
-    if (!isAdmin) {
+    if (!canManageLms) {
       router.push("/lms", { scroll: false });
       return;
     }
 
     fetchData();
-  }, [fetchData, isAdmin, router]);
+  }, [fetchData, canManageLms, router]);
 
   useEffect(() => {
     if (categories.length === 0) {
@@ -245,7 +246,7 @@ export default function LessonsAdminPage() {
     [deleteLesson, tr]
   );
 
-  if (!isAdmin) return null;
+  if (!canManageLms) return null;
 
   if (loading) {
     return (

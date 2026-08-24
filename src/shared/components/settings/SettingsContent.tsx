@@ -1,7 +1,7 @@
 "use client";
 
 import {
-  Calculator,
+  Car,
   Boxes,
   Check,
   ChevronRight,
@@ -24,7 +24,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { clearCachedUser } from "@/shared/utils/authCache";
@@ -44,13 +44,19 @@ type ManagedUser = {
   updatedAt: number;
   createdBy: string;
   full_name?: string | null;
+  position?: string | null;
+  department?: string | null;
+  branch?: string | null;
   email?: string | null;
   phone?: string | null;
   profile_picture?: string | null;
 };
 
 type TabType = "profile" | "users" | "system";
-const USER_ROLE_OPTIONS: Role[] = ["Staff", "Accounting", "Admin"];
+const USER_ROLE_OPTIONS: Role[] = ["Staff", "Loan Operations", "Manager / Approver", "Finance", "Human Resources", "IT Support", "Risk & Compliance", "Marketing", "Intern / Read Only", "Executive Viewer", "Admin"];
+const USER_POSITION_OPTIONS = ["General Assistant", "Accounting Intern", "Assistant Accountant", "Accountant", "Loan Specialist", "Collection Officer", "Branch Manager", "Finance Manager", "Credit Manager", "Collateral Checker", "Human Resources Intern", "Human Resources Assistant", "Human Resources Officer", "Human Resources Supervisor", "IT Intern", "IT Executive (Support and Systems)", "Risk Officer", "Risk Manager", "Digital Marketing Officer", "Digital Marketing Supervisor", "Chief Executive Officer"];
+const USER_DEPARTMENT_OPTIONS = ["Branch Operations", "Loan Operations", "Finance & Accounting", "Human Resources", "Information Technology", "Risk & Compliance", "Marketing", "Management"];
+const USER_BRANCH_OPTIONS = ["Head Office", "Boeung Keng Kang"];
 const USER_PASSWORD_MIN_LENGTH = 8;
 
 const UserAvatar = memo(({
@@ -136,6 +142,7 @@ QuickLinkCard.displayName = "QuickLinkCard";
 
 export default function SettingsContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const user = useAuthUser();
   const { updateProfile, refreshUser } = useAuthContext();
   const { language, toggleLanguage } = useLanguage();
@@ -144,8 +151,9 @@ export default function SettingsContent() {
   const isAdmin = user.role === "Admin";
   const formatRoleLabel = useCallback((role: Role) => {
     if (role === "Admin") return t.admin;
-    if (role === "Accounting") return language === "km" ? "គណនេយ្យ" : "Accounting";
-    return t.staff;
+    if (role === "Finance") return language === "km" ? "ហិរញ្ញវត្ថុ" : "Finance";
+    if (role === "Staff") return t.staff;
+    return role;
   }, [language, t.admin, t.staff]);
   
   const [activeTab, setActiveTab] = useState<TabType>("profile");
@@ -155,6 +163,9 @@ export default function SettingsContent() {
   
   const [newUsername, setNewUsername] = useState("");
   const [newFullName, setNewFullName] = useState("");
+  const [newPosition, setNewPosition] = useState("");
+  const [newDepartment, setNewDepartment] = useState("");
+  const [newBranch, setNewBranch] = useState("");
   const [newEmail, setNewEmail] = useState("");
   const [newPhone, setNewPhone] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -163,6 +174,7 @@ export default function SettingsContent() {
 
   const [isProfileEditing, setIsProfileEditing] = useState(false);
   const [profileFullName, setProfileFullName] = useState(user.full_name || "");
+  const [profilePosition, setProfilePosition] = useState(user.position || "");
   const [profileEmail, setProfileEmail] = useState(user.email || "");
   const [profilePhone, setProfilePhone] = useState(user.phone || "");
   const [profilePicture, setProfilePicture] = useState<string | null>(user.profile_picture || null);
@@ -178,6 +190,9 @@ export default function SettingsContent() {
   const [editConfirmPassword, setEditConfirmPassword] = useState("");
   const [editRole, setEditRole] = useState<Role>("Staff");
   const [editFullName, setEditFullName] = useState("");
+  const [editPosition, setEditPosition] = useState("");
+  const [editDepartment, setEditDepartment] = useState("");
+  const [editBranch, setEditBranch] = useState("");
   const [editEmail, setEditEmail] = useState("");
   const [editPhone, setEditPhone] = useState("");
   const [editProfilePicture, setEditProfilePicture] = useState<string | null>(null);
@@ -191,12 +206,34 @@ export default function SettingsContent() {
   const [success, setSuccess] = useState("");
   const [usersError, setUsersError] = useState("");
 
+  const branchOptions = useMemo(
+    () => Array.from(new Set([
+      ...USER_BRANCH_OPTIONS,
+      ...users.map((managedUser) => managedUser.branch?.trim()).filter((branch): branch is string => Boolean(branch)),
+    ])).sort((a, b) => a.localeCompare(b)),
+    [users]
+  );
+  const departmentOptions = useMemo(
+    () => Array.from(new Set([
+      ...USER_DEPARTMENT_OPTIONS,
+      ...users.map((managedUser) => managedUser.department?.trim()).filter((department): department is string => Boolean(department)),
+    ])).sort((a, b) => a.localeCompare(b)),
+    [users]
+  );
+  const positionOptions = useMemo(
+    () => Array.from(new Set([
+      ...USER_POSITION_OPTIONS,
+      ...users.map((managedUser) => managedUser.position?.trim()).filter((position): position is string => Boolean(position)),
+    ])).sort((a, b) => a.localeCompare(b)),
+    [users]
+  );
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const profileFileInputRef = useRef<HTMLInputElement>(null);
 
   const quickLinks = useMemo(() => {
     const links: { href: string; icon: LucideIcon; label: string; color: string }[] = [
-      { href: "/", icon: Calculator, label: "VMS - Vehicle Valuation", color: "from-emerald-500 to-teal-600" },
+      { href: "/", icon: Car, label: "VMS - Vehicle Valuation", color: "from-emerald-500 to-teal-600" },
       { href: "/lms", icon: GraduationCap, label: "LMS - Learning Center", color: "from-violet-500 to-purple-600" },
       { href: "/sms/assets", icon: Boxes, label: "SMS - Asset Inventory", color: "from-blue-500 to-indigo-600" },
     ];
@@ -207,12 +244,17 @@ export default function SettingsContent() {
   }, [isAdmin, language]);
 
   useEffect(() => {
+    if (searchParams.get("tab") === "users" && isAdmin) setActiveTab("users");
+  }, [isAdmin, searchParams]);
+
+  useEffect(() => {
     if (isProfileEditing) return;
     setProfileFullName(user.full_name || "");
+    setProfilePosition(user.position || "");
     setProfileEmail(user.email || "");
     setProfilePhone(user.phone || "");
     setProfilePicture(user.profile_picture || null);
-  }, [isProfileEditing, user.email, user.full_name, user.phone, user.profile_picture]);
+  }, [isProfileEditing, user.email, user.full_name, user.phone, user.position, user.profile_picture]);
 
   const loadUsers = useCallback(async () => {
     if (!isAdmin) return;
@@ -287,6 +329,9 @@ export default function SettingsContent() {
           password: newPassword,
           role: newRole,
           full_name: newFullName.trim() || null,
+          position: newPosition.trim() || null,
+          department: newDepartment.trim() || null,
+          branch: newBranch.trim() || null,
           email: newEmail.trim() || null,
           phone: newPhone.trim() || null,
         }),
@@ -297,6 +342,9 @@ export default function SettingsContent() {
       setSuccess(t.createSuccess);
       setNewUsername("");
       setNewFullName("");
+      setNewPosition("");
+      setNewDepartment("");
+      setNewBranch("");
       setNewEmail("");
       setNewPhone("");
       setNewPassword("");
@@ -308,7 +356,7 @@ export default function SettingsContent() {
     } finally {
       setIsCreating(false);
     }
-  }, [newUsername, newFullName, newEmail, newPhone, newPassword, confirmPassword, newRole, t, loadUsers]);
+  }, [newUsername, newFullName, newPosition, newDepartment, newBranch, newEmail, newPhone, newPassword, confirmPassword, newRole, t, loadUsers]);
 
   const handleProfileAvatarUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -344,6 +392,7 @@ export default function SettingsContent() {
     try {
       const result = await updateProfile({
         full_name: profileFullName.trim(),
+        position: profilePosition.trim(),
         email: profileEmail.trim(),
         phone: profilePhone.trim(),
         profile_picture: profilePicture || "",
@@ -361,7 +410,7 @@ export default function SettingsContent() {
     } finally {
       setIsProfileUpdating(false);
     }
-  }, [profileEmail, profileFullName, profilePhone, profilePicture, refreshUser, t.saveError, t.updateSuccess, updateProfile]);
+  }, [profileEmail, profileFullName, profilePhone, profilePicture, profilePosition, refreshUser, t.saveError, t.updateSuccess, updateProfile]);
 
   const handleDeleteUser = useCallback(async (username: string) => {
     if (!confirm(`${t.confirmDelete} ${username}?`)) return;
@@ -390,6 +439,9 @@ export default function SettingsContent() {
     setEditConfirmPassword("");
     setEditRole(USER_ROLE_OPTIONS.includes(user.role) ? user.role : "Staff");
     setEditFullName(user.full_name || "");
+    setEditPosition(user.position || "");
+    setEditDepartment(user.department || "");
+    setEditBranch(user.branch || "");
     setEditEmail(user.email || "");
     setEditPhone(user.phone || "");
     setEditProfilePicture(user.profile_picture || null);
@@ -404,6 +456,9 @@ export default function SettingsContent() {
     setEditConfirmPassword("");
     setEditRole("Staff");
     setEditFullName("");
+    setEditPosition("");
+    setEditDepartment("");
+    setEditBranch("");
     setEditEmail("");
     setEditPhone("");
     setEditProfilePicture(null);
@@ -463,6 +518,9 @@ export default function SettingsContent() {
           role: editRole,
           ...(editPassword ? { password: editPassword, confirmPassword: editConfirmPassword } : {}),
           full_name: editFullName.trim() || null,
+          position: editPosition.trim() || null,
+          department: editDepartment.trim() || null,
+          branch: editBranch.trim() || null,
           email: editEmail.trim() || null,
           phone: editPhone.trim() || null,
           profile_picture: editProfilePicture,
@@ -483,10 +541,13 @@ export default function SettingsContent() {
     } finally {
       setIsUpdating(false);
     }
-  }, [editingUser, editUsername, editPassword, editConfirmPassword, editRole, editFullName, editEmail, editPhone, editProfilePicture, t, cancelEdit, loadUsers, user.username, user.role, router]);
+  }, [editingUser, editUsername, editPassword, editConfirmPassword, editRole, editFullName, editPosition, editDepartment, editBranch, editEmail, editPhone, editProfilePicture, t, cancelEdit, loadUsers, user.username, user.role, router]);
 
   return (
     <div className="min-h-screen bg-slate-50 pb-20 dark:bg-slate-950 sm:pb-8">
+      <datalist id="user-position-options">{positionOptions.map((position) => <option key={position} value={position} />)}</datalist>
+      <datalist id="user-department-options">{departmentOptions.map((department) => <option key={department} value={department} />)}</datalist>
+      <datalist id="user-branch-options">{branchOptions.map((branch) => <option key={branch} value={branch} />)}</datalist>
       {/* Header */}
       <div className="border-b border-slate-200/80 bg-white/95 dark:border-slate-800 dark:bg-slate-900/95">
         <div className="mx-auto max-w-6xl px-4 py-4 sm:px-6 sm:py-7 lg:px-8">
@@ -686,6 +747,19 @@ export default function SettingsContent() {
                       />
                     </div>
                     <div>
+                      <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">{language === "km" ? "មុខតំណែង" : "Position"}</label>
+                      <input
+                        type="text"
+                        list="user-position-options"
+                        title={language === "km" ? "មុខតំណែង" : "Position"}
+                        value={profilePosition}
+                        onChange={(e) => setProfilePosition(e.target.value)}
+                        disabled={!isProfileEditing || isProfileUpdating}
+                        placeholder={language === "km" ? "ជ្រើសរើស ឬវាយបញ្ចូលមុខតំណែង" : "Select or type a position"}
+                        className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-slate-900 transition-all placeholder:text-slate-400 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 disabled:bg-slate-50 disabled:text-slate-500 dark:border-slate-700 dark:bg-slate-800 dark:text-white dark:disabled:bg-slate-800/50"
+                      />
+                    </div>
+                    <div>
                       <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">{t.phone}</label>
                       <input
                         type="tel"
@@ -696,6 +770,14 @@ export default function SettingsContent() {
                         placeholder={t.enterPhone}
                         className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-slate-900 transition-all placeholder:text-slate-400 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 disabled:bg-slate-50 disabled:text-slate-500 dark:border-slate-700 dark:bg-slate-800 dark:text-white dark:disabled:bg-slate-800/50"
                       />
+                    </div>
+                    <div>
+                      <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">{language === "km" ? "នាយកដ្ឋាន" : "Department"}</label>
+                      <input type="text" value={user.department || ""} disabled placeholder="Not assigned" className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-500 dark:border-slate-700 dark:bg-slate-800/50 dark:text-slate-400" />
+                    </div>
+                    <div>
+                      <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">{language === "km" ? "សាខា" : "Branch"}</label>
+                      <input type="text" value={user.branch || ""} disabled placeholder="Not assigned" className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-500 dark:border-slate-700 dark:bg-slate-800/50 dark:text-slate-400" />
                     </div>
                     <div>
                       <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">{t.role}</label>
@@ -723,6 +805,7 @@ export default function SettingsContent() {
                           onClick={() => {
                             setIsProfileEditing(false);
                             setProfileFullName(user.full_name || "");
+                            setProfilePosition(user.position || "");
                             setProfileEmail(user.email || "");
                             setProfilePhone(user.phone || "");
                             setProfilePicture(user.profile_picture || null);
@@ -831,6 +914,20 @@ export default function SettingsContent() {
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                      {language === "km" ? "មុខតំណែង" : "Position"}
+                    </label>
+                    <input
+                      type="text"
+                      list="user-position-options"
+                      title={language === "km" ? "មុខតំណែង" : "Position"}
+                      value={newPosition}
+                      onChange={(e) => setNewPosition(e.target.value)}
+                      placeholder={language === "km" ? "ជ្រើសរើស ឬវាយបញ្ចូលមុខតំណែង" : "Select or type a position"}
+                      className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 shadow-sm hover:shadow-md dark:shadow-slate-900/20 dark:hover:shadow-slate-900/40 transition-all"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                       {t.email}
                     </label>
                     <input
@@ -841,6 +938,14 @@ export default function SettingsContent() {
                       placeholder={t.enterEmail}
                       className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 shadow-sm hover:shadow-md dark:shadow-slate-900/20 dark:hover:shadow-slate-900/40 transition-all"
                     />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">{language === "km" ? "នាយកដ្ឋាន" : "Department"}</label>
+                    <input type="text" list="user-department-options" value={newDepartment} onChange={(e) => setNewDepartment(e.target.value)} title="Department" placeholder="Select or type a department" className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 shadow-sm transition-all" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">{language === "km" ? "សាខា" : "Branch"}</label>
+                    <input type="text" list="user-branch-options" value={newBranch} onChange={(e) => setNewBranch(e.target.value)} title="Branch" placeholder="Select or type a branch" className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 shadow-sm transition-all" />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
@@ -1027,7 +1132,7 @@ export default function SettingsContent() {
                             <span className={`shrink-0 px-2 py-0.5 rounded-full text-xs font-medium ${
                               managedUser.role === "Admin"
                                 ? "bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300"
-                                : managedUser.role === "Accounting"
+                                : managedUser.role === "Finance"
                                 ? "bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300"
                                 : "bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300"
                             }`}>
@@ -1035,8 +1140,9 @@ export default function SettingsContent() {
                             </span>
                           </div>
                           <p className="text-sm text-slate-500 dark:text-slate-400 truncate" data-no-translate>
-                            {managedUser.email || `@${managedUser.username}`}
+                            {managedUser.position || managedUser.email || `@${managedUser.username}`}
                           </p>
+                          {managedUser.position && managedUser.email ? <p className="truncate text-xs text-slate-400" data-no-translate>{managedUser.email}</p> : null}
                         </div>
 
                         <div className="flex shrink-0 items-center gap-2">
@@ -1332,6 +1438,20 @@ export default function SettingsContent() {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                    {language === "km" ? "មុខតំណែង" : "Position"}
+                  </label>
+                  <input
+                    type="text"
+                    list="user-position-options"
+                    title={language === "km" ? "មុខតំណែង" : "Position"}
+                    value={editPosition}
+                    onChange={(e) => setEditPosition(e.target.value)}
+                    placeholder={language === "km" ? "ជ្រើសរើស ឬវាយបញ្ចូលមុខតំណែង" : "Select or type a position"}
+                    className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                     {t.password}
                   </label>
                   <input
@@ -1347,7 +1467,15 @@ export default function SettingsContent() {
                     {language === "km"
                       ? "ទុកទទេ ប្រសិនបើមិនប្តូរ។ បើប្តូរ ត្រូវមានយ៉ាងតិច 8 តួអក្សរ។"
                       : "Leave blank to keep the current password. Use at least 8 characters when changing it."}
-                  </p>
+                    </p>
+                  </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">{language === "km" ? "នាយកដ្ឋាន" : "Department"}</label>
+                  <input type="text" list="user-department-options" value={editDepartment} onChange={(e) => setEditDepartment(e.target.value)} title="Department" placeholder="Select or type a department" className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">{language === "km" ? "សាខា" : "Branch"}</label>
+                  <input type="text" list="user-branch-options" value={editBranch} onChange={(e) => setEditBranch(e.target.value)} title="Branch" placeholder="Select or type a branch" className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all" />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">

@@ -3,6 +3,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useAuthUser } from "@/shared/hooks/AuthContext";
+import { hasAppPermission } from "@/shared/utils/permissions";
 import { useToast } from "@/shared/components/ui/glass/GlassToast";
 import { GlassCard } from "@/shared/components/ui/glass/GlassCard";
 import { GlassButton } from "@/shared/components/ui/glass/GlassButton";
@@ -51,7 +52,7 @@ function EditVehicleInner() {
   const user = useAuthUser();
   const { success, error: showError } = useToast();
 
-  const isAdmin = user?.role === "Admin";
+  const canEditVehicle = hasAppPermission(user?.role, "vehicles:edit");
   const userRole = user?.role || "Viewer";
 
   const handleBackToList = useCallback(() => {
@@ -265,7 +266,7 @@ function EditVehicleInner() {
   }
 
   // Permission check
-  if (!isAdmin) {
+  if (!canEditVehicle) {
     return (
       <div className="p-4 sm:p-6 lg:p-8">
         <div className="max-w-2xl mx-auto">
@@ -289,7 +290,7 @@ function EditVehicleInner() {
               Access Denied
             </h2>
             <p className="text-gray-600 dark:text-gray-400 mb-6">
-              Only Admin can edit vehicles.
+              You do not have permission to edit vehicles.
             </p>
             <div className="flex gap-3 justify-center">
               <GlassButton onClick={handleBackToList} variant="secondary">

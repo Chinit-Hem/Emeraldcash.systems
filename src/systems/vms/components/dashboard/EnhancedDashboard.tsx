@@ -43,6 +43,7 @@ import {
   TrendingUp
 } from "lucide-react";
 import Link from "next/link";
+import { useAuthUser } from "@/shared/hooks/AuthContext";
 import dynamic from "next/dynamic";
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 
@@ -186,7 +187,7 @@ const VEHICLE_CATEGORIES = {
     bgGradient: "from-amber-50 to-orange-50",
     ringColor: "ring-amber-500/20",
   },
-};
+} as const;
 
 // ============================================================================
 // Utility Components
@@ -196,6 +197,8 @@ const VEHICLE_CATEGORIES = {
  * Professional Chart Skeleton with pulse animation
  */
 function ChartSkeleton({ height = 320, title = "Loading..." }: { height?: number; title?: string }) {
+  const user = useAuthUser();
+
   return (
     <div
       className="w-full flex flex-col items-center justify-center rounded-3xl bg-gradient-to-br from-[#e8ecf1] to-[#dce2e8] shadow-sm"
@@ -419,6 +422,8 @@ export default function EnhancedDashboard({
     logLabel: "EnhancedDashboard",
   });
 
+  const user = useAuthUser();
+
   useEffect(() => {
     setVehicles(initialVehicles);
     setMeta(initialMeta);
@@ -590,48 +595,6 @@ export default function EnhancedDashboard({
 
   return (
     <div className="ec-dark-scope min-h-screen w-full overflow-x-hidden bg-gradient-to-br from-slate-50 via-slate-100 to-slate-200 dark:from-slate-950 dark:via-slate-950 dark:to-slate-900">
-      {/* Top Navigation Bar */}
-      <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-xl border-b border-slate-200/50 dark:border-slate-800 dark:bg-slate-950/85">
-        <div className="mx-auto flex h-16 max-w-[1600px] min-w-0 items-center justify-between gap-3 px-4 sm:px-6 lg:px-8">
-          <div className="flex min-w-0 items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-600 shadow-lg shadow-emerald-500/30 flex items-center justify-center">
-              <Car className="w-5 h-5 text-white" />
-            </div>
-            <div className="min-w-0">
-              <h1 className="truncate text-xl font-bold text-slate-800 dark:text-slate-100">{t.dashboard}</h1>
-              <p className="truncate text-xs text-slate-500 dark:text-slate-400">{language === 'km' ? 'វិភាគទិន្នន័យយានយន្តជាពេលវេលាពិត' : 'Real-time inventory analytics'}</p>
-            </div>
-          </div>
-
-          <div className="flex flex-shrink-0 items-center gap-2 sm:gap-3">
-            <button
-              onClick={handleRefresh}
-              disabled={isRefreshing}
-              className="p-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 transition-all active:scale-95 disabled:opacity-50 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
-              title={t.refresh}
-            >
-              <RefreshCw className={`w-5 h-5 ${isRefreshing ? 'animate-spin' : ''}`} />
-            </button>
-
-            <button className="hidden sm:flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 font-medium transition-all active:scale-95 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800">
-              <Download className="w-4 h-4" />
-              {language === 'km' ? 'នាំចេញ' : 'Export'}
-            </button>
-
-            <button
-              type="button"
-              onClick={toggleLanguage}
-              className="flex items-center gap-2 rounded-xl bg-slate-100 px-3 py-2.5 font-medium text-slate-600 transition-all hover:bg-slate-200 active:scale-95 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 sm:px-4"
-              aria-label={language === 'km' ? 'Switch to English' : 'ប្ដូរទៅខ្មែរ'}
-              title={language === 'km' ? 'Switch to English' : 'ប្ដូរទៅខ្មែរ'}
-            >
-              <Languages className="w-4 h-4" />
-              <span className="hidden sm:inline">{language === 'km' ? 'English' : 'ខ្មែរ'}</span>
-            </button>
-
-          </div>
-        </div>
-      </header>
 
       <div className="mx-auto w-full max-w-[1600px] min-w-0 px-3 py-8 sm:px-6 lg:px-8">
         <div className="space-y-8 animate-fade-in">

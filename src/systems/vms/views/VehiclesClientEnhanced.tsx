@@ -3,6 +3,7 @@
 import { useLanguage } from "@/shared/hooks/LanguageContext";
 import { useTranslation, type Language, type Translations } from "@/shared/utils/i18n";
 import { useAuthUser } from "@/shared/hooks/AuthContext";
+import { hasAppPermission } from "@/shared/utils/permissions";
 
 import { ConfirmDeleteModal } from "@/systems/vms/components/vehicles/ConfirmDeleteModal";
 
@@ -1649,7 +1650,9 @@ export default function VehiclesClientEnhanced() {
   );
   const user = useAuthUser();
   const { success, error: showError } = useToast();
-  const isAdmin = user?.role === "Admin";
+  const canCreateVehicle = hasAppPermission(user?.role, "vehicles:create");
+  const canEditVehicle = hasAppPermission(user?.role, "vehicles:edit");
+  const canDeleteVehicle = hasAppPermission(user?.role, "vehicles:delete");
   const [isMobileSafeMode, setIsMobileSafeMode] = useState(detectMobileSafariLike);
   const [isMobileVehicleViewport, setIsMobileVehicleViewport] = useState(detectMobileVehicleViewport);
   const activeListHrefRef = useRef<string | null>(null);
@@ -1740,6 +1743,17 @@ export default function VehiclesClientEnhanced() {
   // Add Vehicle Modal state
   const [showAddModal, setShowAddModal] = useState(false);
   const [isVehicleSearchFocused, setIsVehicleSearchFocused] = useState(false);
+  const shouldOpenAddVehicleModal = searchParams.get("action") === "new";
+
+  useEffect(() => {
+    if (!shouldOpenAddVehicleModal || !canCreateVehicle) return;
+
+    setShowAddModal(true);
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete("action");
+    const nextQuery = params.toString();
+    router.replace(nextQuery ? `/vehicles?${nextQuery}` : "/vehicles", { scroll: false });
+  }, [canCreateVehicle, router, searchParams, shouldOpenAddVehicleModal]);
 
   // Delete Vehicle Modal state
   const [vehicleToDelete, setVehicleToDelete] = useState<Vehicle | null>(null);
@@ -3010,8 +3024,8 @@ const getVehicleImageUrl = useCallback((imageValue: unknown): string | null => {
               Refresh
             </NeuButton>
 
-            {/* Add Vehicle - Admin only */}
-            {isAdmin && (
+            {/* Add Vehicle - permission controlled */}
+            {canCreateVehicle && (
               <NeuButton
                 variant="primary"
                 size="sm"
@@ -3576,7 +3590,7 @@ const getVehicleImageUrl = useCallback((imageValue: unknown): string | null => {
                     <MobileVehicleListCard
                       key={vehicle.VehicleId}
                       vehicle={vehicle}
-                      isAdmin={isAdmin}
+                      isAdmin={canEditVehicle || canDeleteVehicle}
                       onView={handleView}
                       onEdit={handleEdit}
                       onDelete={handleDelete}
@@ -3693,20 +3707,24 @@ const getVehicleImageUrl = useCallback((imageValue: unknown): string | null => {
                                   icon={Eye}
                                   label="View"
                                 />
-                                {isAdmin && (
+                                {(canEditVehicle || canDeleteVehicle) && (
                                   <>
-                                    <ActionButton
-                                      onClick={() => handleEdit(vehicle.VehicleId)}
-                                      icon={Pen}
-                                      label="Edit"
-                                      variant="edit"
-                                    />
-                                    <ActionButton
-                                      onClick={() => handleDelete(vehicle)}
-                                      icon={Trash2}
-                                      label="Delete"
-                                      variant="delete"
-                                    />
+                                    {canEditVehicle && (
+                                      <ActionButton
+                                        onClick={() => handleEdit(vehicle.VehicleId)}
+                                        icon={Pen}
+                                        label="Edit"
+                                        variant="edit"
+                                      />
+                                    )}
+                                    {canDeleteVehicle && (
+                                      <ActionButton
+                                        onClick={() => handleDelete(vehicle)}
+                                        icon={Trash2}
+                                        label="Delete"
+                                        variant="delete"
+                                      />
+                                    )}
                                   </>
                                 )}
                               </div>

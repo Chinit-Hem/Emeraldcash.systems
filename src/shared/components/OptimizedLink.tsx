@@ -11,6 +11,8 @@ interface OptimizedLinkProps {
   prefetch?: boolean;
   priority?: "high" | "normal" | "low";
   onClick?: (event: React.MouseEvent<HTMLAnchorElement>) => void;
+  onMouseEnter?: (event: React.MouseEvent<HTMLAnchorElement>) => void;
+  onMouseLeave?: (event: React.MouseEvent<HTMLAnchorElement>) => void;
   onPointerDown?: () => void;
   deferNavigation?: boolean;
 }
@@ -31,6 +33,8 @@ export function OptimizedLink({
   prefetch = true,
   priority = "normal",
   onClick,
+  onMouseEnter,
+  onMouseLeave,
   onPointerDown,
   deferNavigation = false,
 }: OptimizedLinkProps) {
@@ -41,7 +45,8 @@ export function OptimizedLink({
   const hasPrefetched = useRef(false);
 
   // Immediate prefetch on hover for instant navigation
-  const handleMouseEnter = useCallback(() => {
+  const handleMouseEnter = useCallback((event: React.MouseEvent<HTMLAnchorElement>) => {
+    onMouseEnter?.(event);
     if (!prefetch || hasPrefetched.current) return;
     if (href === pathname || href === "#") return;
 
@@ -56,14 +61,15 @@ export function OptimizedLink({
         hasPrefetched.current = true;
       }
     }, delay);
-  }, [href, pathname, prefetch, priority, router]);
+  }, [href, onMouseEnter, pathname, prefetch, priority, router]);
 
-  const handleMouseLeave = useCallback(() => {
+  const handleMouseLeave = useCallback((event: React.MouseEvent<HTMLAnchorElement>) => {
+    onMouseLeave?.(event);
     if (prefetchTimeoutRef.current) {
       clearTimeout(prefetchTimeoutRef.current);
       prefetchTimeoutRef.current = null;
     }
-  }, []);
+  }, [onMouseLeave]);
 
 // Preload high priority routes on mount with iOS safe fallback
   useEffect(() => {

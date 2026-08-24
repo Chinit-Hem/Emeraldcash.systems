@@ -970,6 +970,27 @@ conditions.push(`(NULLIF(TRIM(COALESCE(image_id, '')), '') IS NULL AND NULLIF(TR
     }
   }
 
+  /** Mark one or all stock notifications read for their intended recipient. */
+  public async markStockNotificationsRead(
+    recipientId: string,
+    notificationId?: number
+  ): Promise<ServiceResult<boolean>> {
+    const startTime = Date.now();
+    try {
+      const sql = dbManager.getClient();
+      await sql`
+        UPDATE stock_notifications
+        SET is_read = true
+        WHERE recipient_id = ${recipientId}
+          AND (${notificationId || null}::integer IS NULL OR id = ${notificationId || null}::integer)
+      `;
+      return { success: true, data: true, meta: { durationMs: Date.now() - startTime, queryCount: 1 } };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Failed to mark stock notifications read";
+      return { success: false, error: errorMessage, meta: { durationMs: Date.now() - startTime, queryCount: 1 } };
+    }
+  }
+
   /**
    * Seed stock from existing vehicles
    */
@@ -1488,9 +1509,9 @@ conditions.push(`(NULLIF(TRIM(COALESCE(image_id, '')), '') IS NULL AND NULLIF(TR
       // This fixes the dashboard "missing images" count mismatch.
       // 🚀 OPTIMIZED: Replace slow LIKE '%car%' with CASE WHEN + ILIKE ANY (10x faster)
       // RECOMMEND: CREATE INDEX CONCURRENTLY idx_vehicles_category_lower ON vehicles (LOWER(category));
-      const query = `
+const query = `
         SELECT
-          COUNT(*) as total,
+          COUNT(id) as total,
         COUNT(*) FILTER (WHERE category ILIKE ANY(ARRAY['%car%','car','cars'])) as cars_count,
 COUNT(*) FILTER (WHERE category ILIKE ANY(ARRAY['%motor%','motorcycle%','bike%'])) as motorcycles_count,
 COUNT(*) FILTER (WHERE category ILIKE ANY(ARRAY['%tuk%','tuktuk','tuk tuk'])) as tuktuks_count,

@@ -17,8 +17,8 @@ import { NextRequest, NextResponse } from "next/server";
 
 // Validation constants
 const USERNAME_REGEX = /^[a-z0-9._-]{3,32}$/;
-type SystemRole = "Admin" | "Staff" | "Accounting";
-const VALID_ROLES: SystemRole[] = ["Admin", "Staff", "Accounting"];
+type SystemRole = "Admin" | "Staff" | "Loan Operations" | "Manager / Approver" | "Finance" | "Human Resources" | "IT Support" | "Risk & Compliance" | "Marketing" | "Intern / Read Only" | "Executive Viewer";
+const VALID_ROLES: SystemRole[] = ["Admin", "Staff", "Loan Operations", "Manager / Approver", "Finance", "Human Resources", "IT Support", "Risk & Compliance", "Marketing", "Intern / Read Only", "Executive Viewer"];
 
 // Security headers for all responses
 const securityHeaders = {
@@ -219,6 +219,9 @@ export async function POST(req: NextRequest) {
       });
       return createErrorResponse(roleValidation.error, "invalid_role", 400);
     }
+    if (!hasAppPermission(session.role, "roles:manage") && roleValidation.value !== "Staff") {
+      return createErrorResponse("Only security administrators can assign privileged roles", "forbidden", 403);
+    }
 
     log("DEBUG", "POST /api/auth/users - All inputs validated, creating user", { 
       requestId,
@@ -234,8 +237,12 @@ export async function POST(req: NextRequest) {
       role: roleValidation.value,
       createdBy: session.username,
       full_name: typeof body.full_name === "string" ? body.full_name.trim() || null : null,
+      position: typeof body.position === "string" ? body.position.trim() || null : null,
+      department: typeof body.department === "string" ? body.department.trim() || null : null,
+      branch: typeof body.branch === "string" ? body.branch.trim() || null : null,
       email: typeof body.email === "string" ? body.email.trim() || null : null,
       phone: typeof body.phone === "string" ? body.phone.trim() || null : null,
+      mobile: typeof body.mobile === "string" ? body.mobile.trim() || null : null,
     });
 
     if (result.ok === false) {
@@ -371,6 +378,7 @@ export async function PUT(req: NextRequest) {
       nextRole = roleValidation.value;
     }
 
+    const hasOrgAssignmentUpdate = body.department !== undefined || body.branch !== undefined;
     const hasAccountUpdate = nextUsername !== targetUsername || hasPasswordUpdate || hasRoleUpdate;
     
     // Users can only update their own profile unless their role can edit users.
@@ -393,7 +401,7 @@ export async function PUT(req: NextRequest) {
       return createErrorResponse("Can only update your own profile", "forbidden", 403);
     }
 
-    if (hasRoleUpdate && !hasAppPermission(session.role, "users:edit")) {
+    if (hasRoleUpdate && !hasAppPermission(session.role, "roles:manage")) {
       log("WARN", "PUT /api/auth/users - Forbidden: role update requires users:edit", {
         requestId,
         username: session.username,
@@ -408,7 +416,11 @@ export async function PUT(req: NextRequest) {
         status: "denied",
         severity: "warning",
       }));
-      return createErrorResponse("Only admins can update roles", "forbidden", 403);
+      return createErrorResponse("Only security administrators can update roles", "forbidden", 403);
+    }
+
+    if (hasOrgAssignmentUpdate && !hasAppPermission(session.role, "users:edit")) {
+      return createErrorResponse("Department and branch assignments require user management permission", "forbidden", 403);
     }
 
     if (hasAccountUpdate && !hasAppPermission(session.role, "users:edit")) {
@@ -456,8 +468,12 @@ export async function PUT(req: NextRequest) {
       passwordHash,
       role: nextRole,
       full_name: body.full_name as string | undefined,
+      position: body.position as string | undefined,
+      department: body.department as string | undefined,
+      branch: body.branch as string | undefined,
       email: body.email as string | undefined,
       phone: body.phone as string | undefined,
+      mobile: body.mobile as string | undefined,
       bio: body.bio as string | undefined,
       profile_picture: body.profile_picture as string | undefined,
     });
@@ -488,8 +504,12 @@ export async function PUT(req: NextRequest) {
         username: updatedUser.username,
         role: updatedUser.role,
         full_name: updatedUser.full_name,
+        position: updatedUser.position,
+        department: updatedUser.department,
+        branch: updatedUser.branch,
         email: updatedUser.email,
         phone: updatedUser.phone,
+        mobile: updatedUser.mobile,
         bio: updatedUser.bio,
         profile_picture: updatedUser.profile_picture,
       }

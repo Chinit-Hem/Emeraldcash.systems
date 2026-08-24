@@ -12,7 +12,7 @@ import {
 } from "@/lib/errors";
 import { log } from "@/lib/logger";
 
-export type Role = "Admin" | "Staff" | "Accounting";
+export type Role = "Admin" | "Staff" | "Loan Operations" | "Manager / Approver" | "Finance" | "Human Resources" | "IT Support" | "Risk & Compliance" | "Marketing" | "Intern / Read Only" | "Executive Viewer";
 
 export interface UserDB {
   username: string;
@@ -22,8 +22,12 @@ export interface UserDB {
   updated_at: string;
   created_by: string;
   full_name?: string;
+  position?: string;
+  department?: string;
+  branch?: string;
   email?: string;
   phone?: string;
+  mobile?: string;
   bio?: string;
   profile_picture?: string;
 }
@@ -31,7 +35,7 @@ export interface UserDB {
 // Validation constants
 const USERNAME_REGEX = /^[a-z0-9._-]{3,32}$/;
 const MAX_PASSWORD_HASH_LENGTH = 255;
-const VALID_ROLES: Role[] = ["Admin", "Staff", "Accounting"];
+const VALID_ROLES: Role[] = ["Admin", "Staff", "Loan Operations", "Manager / Approver", "Finance", "Human Resources", "IT Support", "Risk & Compliance", "Marketing", "Intern / Read Only", "Executive Viewer"];
 
 // Input validation functions
 function validateUsername(username: string): void {
@@ -109,11 +113,14 @@ export async function ensureUsersTable(): Promise<void> {
       async () => sql`
         CREATE TABLE IF NOT EXISTS users (
           username VARCHAR(32) PRIMARY KEY,
-          role VARCHAR(20) NOT NULL CHECK (role IN ('Admin', 'Staff', 'Accounting')),
+          role VARCHAR(40) NOT NULL CHECK (role IN ('Admin', 'Staff', 'Loan Operations', 'Manager / Approver', 'Finance', 'Human Resources', 'IT Support', 'Risk & Compliance', 'Marketing', 'Intern / Read Only', 'Executive Viewer')),
           password_hash VARCHAR(255) NOT NULL,
           created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
           updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-          created_by VARCHAR(32) NOT NULL
+          created_by VARCHAR(32) NOT NULL,
+          position VARCHAR(100),
+          department VARCHAR(100),
+          branch VARCHAR(100)
         )
       `,
       "ensureUsersTable"
@@ -122,11 +129,7 @@ export async function ensureUsersTable(): Promise<void> {
       async () => sql`
         DO $$
         BEGIN
-          ALTER TABLE users ALTER COLUMN role TYPE VARCHAR(20);
-
-          UPDATE users
-          SET role = 'Staff'
-          WHERE role = 'Transfer';
+          ALTER TABLE users ALTER COLUMN role TYPE VARCHAR(40);
 
           IF EXISTS (
             SELECT 1
@@ -137,9 +140,19 @@ export async function ensureUsersTable(): Promise<void> {
             ALTER TABLE users DROP CONSTRAINT users_role_check;
           END IF;
 
+          UPDATE users SET role = 'Staff' WHERE role = 'Transfer';
+          UPDATE users SET role = 'Loan Operations' WHERE role IN ('Loan Officer', 'Loan Specialist', 'Collateral Checker');
+          UPDATE users SET role = 'Manager / Approver' WHERE role IN ('Branch Manager', 'BM', 'Credit Manager');
+          UPDATE users SET role = 'Finance' WHERE role IN ('Accounting', 'Finance Manager');
+          UPDATE users SET role = 'IT Support' WHERE role = 'IT Executive (Support and Systems)';
+          UPDATE users SET role = 'Executive Viewer' WHERE role = 'CEO';
+          UPDATE users SET role = 'Risk & Compliance' WHERE role IN ('Risk', 'Risk Officer', 'Compliance Officer');
+          UPDATE users SET role = 'Marketing' WHERE role IN ('Digital Marketing', 'Digital Marketing Supervisor');
+          UPDATE users SET role = 'Intern / Read Only' WHERE role IN ('Intern', 'HR Intern', 'IT Intern', 'Accounting Intern');
+
           ALTER TABLE users
           ADD CONSTRAINT users_role_check
-          CHECK (role IN ('Admin', 'Staff', 'Accounting'));
+          CHECK (role IN ('Admin', 'Staff', 'Loan Operations', 'Manager / Approver', 'Finance', 'Human Resources', 'IT Support', 'Risk & Compliance', 'Marketing', 'Intern / Read Only', 'Executive Viewer'));
         END $$;
       `,
       "ensureUsersTable-role-constraint"
@@ -160,8 +173,12 @@ export async function createUserInDB(params: {
   role: Role;
   createdBy: string;
   full_name?: string | null;
+  position?: string | null;
+  department?: string | null;
+  branch?: string | null;
   email?: string | null;
   phone?: string | null;
+  mobile?: string | null;
 }): Promise<UserDB> {
   log("INFO", "Attempting to INSERT user", { username: params.username });
 
@@ -184,15 +201,19 @@ export async function createUserInDB(params: {
   try {
     // Rely on unique constraint for username to prevent duplicates
     const result = await queryWithRetry(async () => sql`
-      INSERT INTO users (username, role, password_hash, created_by, full_name, email, phone)
+      INSERT INTO users (username, role, password_hash, created_by, full_name, position, department, branch, email, phone, mobile)
       VALUES (
         ${normalizedUsername},
         ${params.role},
         ${params.passwordHash},
         ${params.createdBy.trim()},
         ${params.full_name || null},
+        ${params.position || null},
+        ${params.department || null},
+        ${params.branch || null},
         ${params.email || null},
-        ${params.phone || null}
+        ${params.phone || null},
+        ${params.mobile || null}
       )
       RETURNING *
     `, "createUserInDB-insert");
@@ -677,8 +698,12 @@ export async function updateUserAccountInDB(params: {
   passwordHash?: string;
   role?: Role;
   full_name?: string | null;
+  position?: string | null;
+  department?: string | null;
+  branch?: string | null;
   email?: string | null;
   phone?: string | null;
+  mobile?: string | null;
   bio?: string | null;
   profile_picture?: string | null;
 }): Promise<UserDB> {
@@ -725,8 +750,12 @@ export async function updateUserAccountInDB(params: {
     }
 
     const full_name = params.full_name !== undefined ? params.full_name : currentUser.full_name;
+    const position = params.position !== undefined ? params.position : currentUser.position;
+    const department = params.department !== undefined ? params.department : currentUser.department;
+    const branch = params.branch !== undefined ? params.branch : currentUser.branch;
     const email = params.email !== undefined ? params.email : currentUser.email;
     const phone = params.phone !== undefined ? params.phone : currentUser.phone;
+    const mobile = params.mobile !== undefined ? params.mobile : currentUser.mobile;
     const bio = params.bio !== undefined ? params.bio : currentUser.bio;
     const profile_picture = params.profile_picture !== undefined ? params.profile_picture : currentUser.profile_picture;
     const password_hash = params.passwordHash ?? currentUser.password_hash;
@@ -747,8 +776,12 @@ export async function updateUserAccountInDB(params: {
           role = ${role},
           password_hash = ${password_hash},
           full_name = ${full_name || null},
+          position = ${position || null},
+          department = ${department || null},
+          branch = ${branch || null},
           email = ${email || null},
           phone = ${phone || null},
+          mobile = ${mobile || null},
           bio = ${bio || null},
           profile_picture = ${profile_picture || null},
           updated_at = CURRENT_TIMESTAMP
@@ -917,12 +950,28 @@ export async function migrateUsersTable(): Promise<void> {
             ALTER TABLE users ADD COLUMN full_name VARCHAR(100);
           END IF;
 
+          IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'users' AND column_name = 'position') THEN
+            ALTER TABLE users ADD COLUMN position VARCHAR(100);
+          END IF;
+
+          IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'users' AND column_name = 'department') THEN
+            ALTER TABLE users ADD COLUMN department VARCHAR(100);
+          END IF;
+
+          IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'users' AND column_name = 'branch') THEN
+            ALTER TABLE users ADD COLUMN branch VARCHAR(100);
+          END IF;
+
           IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'users' AND column_name = 'email') THEN
             ALTER TABLE users ADD COLUMN email VARCHAR(255);
           END IF;
 
           IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'users' AND column_name = 'phone') THEN
             ALTER TABLE users ADD COLUMN phone VARCHAR(20);
+          END IF;
+
+          IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'users' AND column_name = 'mobile') THEN
+            ALTER TABLE users ADD COLUMN mobile VARCHAR(20);
           END IF;
 
           IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'users' AND column_name = 'bio') THEN
@@ -950,8 +999,12 @@ export async function migrateUsersTable(): Promise<void> {
 export async function updateUserProfileInDB(params: {
   username: string;
   full_name?: string;
+  position?: string;
+  department?: string;
+  branch?: string;
   email?: string;
   phone?: string;
+  mobile?: string;
   bio?: string;
   profile_picture?: string;
 }): Promise<UserDB> {
@@ -979,8 +1032,12 @@ export async function updateUserProfileInDB(params: {
 
     // Build update with merged values
     const full_name = params.full_name !== undefined ? params.full_name : currentUser.full_name;
+    const position = params.position !== undefined ? params.position : currentUser.position;
+    const department = params.department !== undefined ? params.department : currentUser.department;
+    const branch = params.branch !== undefined ? params.branch : currentUser.branch;
     const email = params.email !== undefined ? params.email : currentUser.email;
     const phone = params.phone !== undefined ? params.phone : currentUser.phone;
+    const mobile = params.mobile !== undefined ? params.mobile : currentUser.mobile;
     const bio = params.bio !== undefined ? params.bio : currentUser.bio;
     const profile_picture = params.profile_picture !== undefined ? params.profile_picture : currentUser.profile_picture;
 
@@ -989,8 +1046,12 @@ export async function updateUserProfileInDB(params: {
         UPDATE users
         SET
           full_name = ${full_name || null},
+          position = ${position || null},
+          department = ${department || null},
+          branch = ${branch || null},
           email = ${email || null},
           phone = ${phone || null},
+          mobile = ${mobile || null},
           bio = ${bio || null},
           profile_picture = ${profile_picture || null},
           updated_at = CURRENT_TIMESTAMP

@@ -59,7 +59,7 @@ const RATE_LIMIT_RULES: RateLimitRule[] = [
   {
     name: "uploads",
     methods: ["POST"],
-    paths: ["/api/auth/upload-avatar", "/api/cloudinary-signature", "/api/upload"],
+    paths: ["/api/auth/upload-avatar", "/api/cloudinary-signature", "/api/upload", "/api/loan/contact-image", "/api/loan/operation-report-image"],
     prefixes: ["/api/sms/assets/upload"],
     limit: 30,
     windowMs: 60 * 1000,

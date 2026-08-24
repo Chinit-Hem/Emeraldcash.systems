@@ -40,7 +40,7 @@ export default function manifest(): MetadataRoute.Manifest {
       },
     ],
     shortcuts: [
-      { name: 'VMS - Vehicle Valuation', short_name: 'VMS', url: '/vehicles?category=all', icons: [{ src: '/icon-192.png', sizes: '192x192' }] },
+      { name: 'VMS - Vehicle Valuation', short_name: 'VMS', url: '/vms', icons: [{ src: '/vms-icon.svg', sizes: 'any', type: 'image/svg+xml' }] },
       { name: 'LMS - Learning Center', short_name: 'LMS', url: '/lms', icons: [{ src: '/icon-192.png', sizes: '192x192' }] },
       { name: 'SMS - Asset Inventory', short_name: 'SMS', url: '/sms/assets', icons: [{ src: '/icon-192.png', sizes: '192x192' }] },
     ]

@@ -5,6 +5,7 @@ import { GlassCard } from "@/shared/components/ui/glass/GlassCard";
 import { GlassButton } from "@/shared/components/ui/glass/GlassButton";
 import { formatCurrency } from "@/shared/utils/format";
 import { getDisplayBrandName, getDisplayModelName } from "@/systems/vms/utils/vehicleBrandMetadata";
+import { hasAppPermission } from "@/shared/utils/permissions";
 import type { Vehicle } from "@/shared/types/types";
 
 interface ConfirmDeleteModalProps {
@@ -32,8 +33,7 @@ export function ConfirmDeleteModal({
   onConfirm,
   onCancel,
 }: ConfirmDeleteModalProps) {
-  const isAdmin = userRole === "Admin";
-  const canDelete = isAdmin;
+  const canDelete = hasAppPermission(userRole, "vehicles:delete");
 
   // Handle keyboard shortcuts
   const handleKeyDown = useCallback(
@@ -67,7 +67,7 @@ export function ConfirmDeleteModal({
   if (!canDelete) {
     return (
       <div
-        className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+        className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
         onClick={onCancel}
         role="dialog"
         aria-modal="true"
@@ -119,7 +119,7 @@ export function ConfirmDeleteModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+      className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
       onClick={onCancel}
       role="dialog"
       aria-modal="true"

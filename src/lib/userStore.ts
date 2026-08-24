@@ -31,8 +31,12 @@ export type StoredUser = {
 
 export type PublicUser = Omit<StoredUser, "passwordHash"> & {
   full_name?: string | null;
+  position?: string | null;
+  department?: string | null;
+  branch?: string | null;
   email?: string | null;
   phone?: string | null;
+  mobile?: string | null;
   bio?: string | null;
   profile_picture?: string | null;
 };
@@ -76,9 +80,7 @@ function normalizeUsername(username: string): string {
 }
 
 function sanitizeRole(role: unknown): DBRole | null {
-  if (role === "Admin" || role === "Staff" || role === "Accounting") {
-    return role;
-  }
+  if (["Admin", "Staff", "Loan Operations", "Manager / Approver", "Finance", "Human Resources", "IT Support", "Risk & Compliance", "Marketing", "Intern / Read Only", "Executive Viewer"].includes(String(role))) return role as DBRole;
 
   return null;
 }
@@ -91,8 +93,12 @@ function publicUserFromDB(user: UserDB): PublicUser {
     updatedAt: new Date(user.updated_at).getTime(),
     createdBy: user.created_by,
     full_name: user.full_name,
+    position: user.position,
+    department: user.department,
+    branch: user.branch,
     email: user.email,
     phone: user.phone,
+    mobile: user.mobile,
     bio: user.bio,
     profile_picture: user.profile_picture,
   };
@@ -284,8 +290,12 @@ export async function createUser(params: {
   role: Role;
   createdBy: string;
   full_name?: string | null;
+  position?: string | null;
+  department?: string | null;
+  branch?: string | null;
   email?: string | null;
   phone?: string | null;
+  mobile?: string | null;
 }): Promise<CreateUserResult> {
   log("INFO", "createUser() called", { username: params.username });
 
@@ -354,8 +364,12 @@ export async function createUser(params: {
       role,
       createdBy,
       full_name: params.full_name,
+      position: params.position,
+      department: params.department,
+      branch: params.branch,
       email: params.email,
       phone: params.phone,
+      mobile: params.mobile,
     });
 
     log("INFO", "createUser() - SUCCESS", { username });
