@@ -4700,7 +4700,7 @@ function AccountReportView() {
               <div className="flex items-center justify-center p-4"><EmeraldCashLogo className="h-auto w-44 object-contain" /></div>
               <div className="font-khmer-muol-light flex items-center justify-center px-5 text-center text-3xl text-red-700">ក្រុមហ៊ុន អេមើរ៉ល ឃែស ឯ.ក</div>
             </div>
-            <div className="border-b border-slate-300 py-3 text-center text-2xl font-black text-emerald-700 dark:border-slate-700">របាយការណ៍គណនេយ្យ សាខា បឹងកេងកង</div>
+            <div className="font-khmer-muol-light border-b border-slate-300 py-3 text-center text-2xl text-emerald-700 dark:border-slate-700">របាយការណ៍គណនេយ្យ សាខា បឹងកេងកង</div>
             <div className="grid grid-cols-[1fr_180px_1.4fr_1fr] border-b border-slate-300 dark:border-slate-700">
               <div className="border-r border-slate-300 dark:border-slate-700" />
               <div className="space-y-0 text-right font-semibold">
@@ -4830,13 +4830,15 @@ type OperationReportRecord = {
 
 const OPERATION_COLLECTION_REASONS = ["យឺត ៣ថ្ងៃ", "យឺត ៤ថ្ងៃ", "យឺត ៧ថ្ងៃ", "យឺត ៨ថ្ងៃ", "យឺត ១៥ថ្ងៃ", "ប្រភពចំណូលមិនច្បាស់លាស់", "កូនមិនទទួលជួយបង់ជំនួស", "បញ្ហាសុខភាពឈឺចូលពេទ្យ"];
 const OPERATION_RESOLUTION_OPTIONS = ["បានបង់ផ្តាច់", "បង់តែការប្រាក់", "សុំពន្យារពេល", "សន្យាបង់", "ត្រូវតាមដានបន្ត"];
+const OPERATION_REJECTION_REASONS = ["ឯកសារមិនគ្រប់គ្រាន់", "ចំណូលមិនគ្រប់គ្រាន់", "ប្រវត្តិឥណទានមិនល្អ", "ទ្រព្យធានាមិនគ្រប់គ្រាន់", "មិនបំពេញតាមលក្ខខណ្ឌឥណទាន"];
+const OPERATION_REPORT_DEFAULT_ROWS = 5;
 
 function createOperationCollectionRows() {
-  return Array.from({ length: 10 }, (_, index) => ({ id: index + 1, customer: "", amount: "", reason: "" }));
+  return Array.from({ length: OPERATION_REPORT_DEFAULT_ROWS }, (_, index) => ({ id: index + 1, customer: "", amount: "", reason: "" }));
 }
 
 function createOperationResolutionRows() {
-  return Array.from({ length: 10 }, (_, index) => ({ id: index + 1, customer: "", assetType: "", interest: "", penalty: "", principal: "", solution: "" }));
+  return Array.from({ length: OPERATION_REPORT_DEFAULT_ROWS }, (_, index) => ({ id: index + 1, customer: "", assetType: "", interest: "", penalty: "", principal: "", solution: "" }));
 }
 
 function operationNumber(value: string) {
@@ -4984,7 +4986,7 @@ function OperationReportView({ loans, loading, canViewLoanData, onRefresh, onOpe
     const reportTime = new Date(`${reportDate}T00:00:00`).getTime();
     const rowsFor = (items: LoanEntity[]) => {
       const rows = items.map((loan, index): OperationReportResolutionRow => ({ id: index + 1, customer: loan.borrower.fullName, assetType: loan.loanType, interest: "", penalty: "", principal: String(loan.outstandingBalance), solution: "" }));
-      return rows.length >= 10 ? rows : [...rows, ...createOperationResolutionRows().slice(0, 10 - rows.length).map((row, index) => ({ ...row, id: rows.length + index + 1 }))];
+      return rows.length >= OPERATION_REPORT_DEFAULT_ROWS ? rows : [...rows, ...createOperationResolutionRows().slice(0, OPERATION_REPORT_DEFAULT_ROWS - rows.length).map((row, index) => ({ ...row, id: rows.length + index + 1 }))];
     };
     const dueToday: LoanEntity[] = [];
     const followUp: LoanEntity[] = [];
@@ -5001,7 +5003,7 @@ function OperationReportView({ loans, loading, canViewLoanData, onRefresh, onOpe
       const overdueDays = Math.max(0, Math.round((reportTime - dueTime) / 86_400_000));
       return { id: index + 1, customer: loan.borrower.fullName, amount: String(loan.paymentAmount), reason: overdueDays ? opText(`ហួសកំណត់ ${overdueDays} ថ្ងៃ`, `${overdueDays} day(s) overdue`) : opText("ដល់ថ្ងៃបង់", "Due today") };
     });
-    setCollectionDueRows(dueRows.length >= 10 ? dueRows : [...dueRows, ...createOperationCollectionRows().slice(0, 10 - dueRows.length).map((row, index) => ({ ...row, id: dueRows.length + index + 1 }))]);
+    setCollectionDueRows(dueRows.length >= OPERATION_REPORT_DEFAULT_ROWS ? dueRows : [...dueRows, ...createOperationCollectionRows().slice(0, OPERATION_REPORT_DEFAULT_ROWS - dueRows.length).map((row, index) => ({ ...row, id: dueRows.length + index + 1 }))]);
     setDueNoticeRows(rowsFor(dueToday));
     setFollowUpRows(rowsFor(followUp));
     setFormalNoticeRows(rowsFor(formal));
@@ -5163,38 +5165,54 @@ function OperationReportView({ loans, loading, canViewLoanData, onRefresh, onOpe
 
   const datalist = <datalist id="operation-report-customers">{suggestedCustomers.map((customer) => <option key={customer} value={customer} />)}</datalist>;
   const loanTypeDatalist = <datalist id="operation-report-loan-types">{suggestedLoanTypes.map((type) => <option key={type} value={type} />)}</datalist>;
+  const reportFieldClass = "block w-full border-0 bg-transparent px-3 py-2 text-slate-950 outline-none focus:bg-emerald-50 disabled:opacity-100 dark:text-slate-100 dark:focus:bg-emerald-950/30";
+  const reportSheetHeader = (
+    <>
+      <div className="grid min-h-36 grid-cols-[220px_1fr] border-b border-slate-300 bg-white dark:border-slate-700 dark:bg-slate-950">
+        <div className="flex items-center justify-center p-4"><EmeraldCashLogo className="h-auto w-44 object-contain" /></div>
+        <div className="font-khmer-muol-light flex items-center justify-center px-5 text-center text-3xl text-red-700">ក្រុមហ៊ុន អេមើរ៉ល ឃែស ឯ.ក</div>
+      </div>
+      <div className="font-khmer-muol-light flex items-center justify-center border-b border-slate-300 py-3 text-center text-2xl text-emerald-700 dark:border-slate-700">របាយការណ៍លទ្ធផលប្រចាំថ្ងៃ សាខា បឹងកេងកង</div>
+      <div className="grid grid-cols-[1fr_180px_1.4fr_1fr] border-b border-slate-300 dark:border-slate-700">
+        <div className="border-r border-slate-300 dark:border-slate-700" />
+        <div className="text-right font-semibold">
+          <div className="border-b border-slate-300 px-3 py-2 dark:border-slate-700">កាលបរិច្ឆេទ៖</div>
+          <div className="border-b border-slate-300 px-3 py-2 dark:border-slate-700">ឈ្មោះ៖</div>
+          <div className="border-b border-slate-300 px-3 py-2 dark:border-slate-700">តួនាទី៖</div>
+          <div className="px-3 py-2">នាយកដ្ឋាន៖</div>
+        </div>
+        <div>
+          <input type="date" disabled={reviewingAnotherSpecialist || reportLocked} value={reportDate} onChange={(event) => changeReportDate(event.target.value)} className={`${reportFieldClass} border-b border-slate-300 dark:border-slate-700`} />
+          <input disabled={reviewingAnotherSpecialist || reportLocked} value={reporterName} onChange={(event) => setReporterName(event.target.value)} className={`${reportFieldClass} border-b border-slate-300 dark:border-slate-700`} />
+          <input disabled={reviewingAnotherSpecialist || reportLocked} value={reporterRole} onChange={(event) => setReporterRole(event.target.value)} className={`${reportFieldClass} border-b border-slate-300 dark:border-slate-700`} />
+          <input disabled={reviewingAnotherSpecialist || reportLocked} value={department} onChange={(event) => setDepartment(event.target.value)} className={reportFieldClass} />
+        </div>
+        <div aria-hidden="true" />
+      </div>
+      <div className="h-10 border-b border-slate-300 dark:border-slate-700" />
+    </>
+  );
 
   return (
-    <div className="space-y-6 pb-10">
+    <div className="space-y-4 pb-10">
       {datalist}
       {loanTypeDatalist}
       <datalist id="operation-report-reasons">{OPERATION_COLLECTION_REASONS.map((reason) => <option key={reason} value={reason} />)}</datalist>
       <datalist id="operation-report-solutions">{OPERATION_RESOLUTION_OPTIONS.map((solution) => <option key={solution} value={solution} />)}</datalist>
+      <datalist id="operation-report-rejection-reasons">{OPERATION_REJECTION_REASONS.map((reason) => <option key={reason} value={reason} />)}</datalist>
 
-      <section className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
-        <div className="flex flex-col gap-4 px-5 py-5 sm:px-7 lg:flex-row lg:items-start lg:justify-between">
-          <div className="flex items-center gap-4">
-            <img src="/logo-horizontal.png" alt="Emerald Cash" className="h-auto w-36 object-contain sm:w-44" />
-            <div><p className="font-semibold text-red-700">{opText("ក្រុមហ៊ុន អេមើរ៉ល ឃែស ឯ.ក", "Emerald Cash Co., Ltd.")}</p><h1 className="mt-1 text-2xl font-bold text-slate-900 dark:text-white">{opText("របាយការណ៍ប្រតិបត្តិការ", "Operation Report")}</h1><p className="mt-1 font-semibold text-emerald-700">{opText("របាយការណ៍លទ្ធផលប្រចាំថ្ងៃ", "Daily Performance Report")}</p></div>
-          </div>
-          <div className="flex flex-wrap gap-2">
+      <section className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-sm dark:border-slate-800 dark:bg-slate-900 print:hidden">
+          <div className="flex flex-wrap items-center gap-2">
             <span className={`inline-flex items-center rounded-lg px-3 py-2 text-sm font-semibold ${operationReportStatusClass(loadedReportStatus)}`}>{operationReportStatusLabel(loadedReportStatus, language)}</span>
             {reviewingAnotherSpecialist ? <button type="button" onClick={openMyReport} className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300"><FilePlus2 className="h-4 w-4" />{opText("របាយការណ៍ខ្ញុំ", "My Report")}</button> : null}
+          </div>
+          <div className="flex flex-wrap gap-2">
             <button type="button" disabled={Boolean(savingReport) || reviewingAnotherSpecialist || reportLocked} onClick={() => void saveOperationReport("draft")} className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300">{savingReport === "draft" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}{opText("រក្សាទុកព្រាង", "Save Draft")}</button>
             <button type="button" disabled={Boolean(savingReport) || reviewingAnotherSpecialist || reportLocked} onClick={() => void saveOperationReport("submitted")} className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50">{savingReport === "submitted" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}{opText("ដាក់ស្នើ", "Submit")}</button>
             {canViewLoanData ? <button type="button" onClick={onRefresh} className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300"><RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />{opText("ផ្ទុកឥណទានឡើងវិញ", "Refresh Loans")}</button> : null}
             <button type="button" disabled={exporting} onClick={() => void exportOperationReport()} className="inline-flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-700 hover:bg-emerald-100 disabled:cursor-wait disabled:opacity-60 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-300">{exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}{exporting ? opText("កំពុងបង្កើត Excel…", "Creating Excel…") : opText("នាំចេញ Excel", "Export Excel")}</button>
             <button type="button" onClick={() => window.print()} className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-700"><Printer className="h-4 w-4" />{opText("បោះពុម្ព", "Print")}</button>
           </div>
-        </div>
-
-        <div className={`grid gap-4 border-t border-slate-200 bg-slate-50/70 px-5 py-5 dark:border-slate-800 dark:bg-slate-950/50 sm:grid-cols-2 ${activeForm === "decisions" ? "xl:grid-cols-4" : "xl:grid-cols-5"}`}>
-          {activeForm !== "decisions" ? <Field label={opText("កាលបរិច្ឆេទ", "Date")}><input type="date" value={reportDate} onChange={(event) => changeReportDate(event.target.value)} className={inputClass} /></Field> : null}
-          <Field label={opText("សាខា", "Branch")}><input disabled={reviewingAnotherSpecialist || reportLocked} value={branch} onChange={(event) => setBranch(event.target.value)} className={inputClass} /></Field>
-          <Field label={opText("ឈ្មោះ", "Name")}><input disabled={reviewingAnotherSpecialist || reportLocked} value={reporterName} onChange={(event) => setReporterName(event.target.value)} className={inputClass} /></Field>
-          <Field label={opText("មុខតំណែង", "Position")}><input disabled={reviewingAnotherSpecialist || reportLocked} value={reporterRole} onChange={(event) => setReporterRole(event.target.value)} className={inputClass} /></Field>
-          <Field label={opText("នាយកដ្ឋាន", "Department")}><input disabled={reviewingAnotherSpecialist || reportLocked} value={department} onChange={(event) => setDepartment(event.target.value)} className={inputClass} /></Field>
-        </div>
       </section>
 
       {reviewingAnotherSpecialist ? <section className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-4 text-sm text-amber-950 dark:border-amber-800 dark:bg-amber-950/25 dark:text-amber-100">
@@ -5205,50 +5223,31 @@ function OperationReportView({ loans, loading, canViewLoanData, onRefresh, onOpe
 
       {validationErrors.length ? <section role="alert" className="rounded-lg border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-900 dark:border-red-800 dark:bg-red-950/25 dark:text-red-200"><p className="font-bold">{opText("សូមបំពេញតម្រូវការទាំងនេះមុនពេលដាក់ស្នើ៖", "Complete these requirements before submitting:")}</p><ul className="mt-2 list-disc space-y-1 pl-5">{validationErrors.map((error) => <li key={error}>{error}</li>)}</ul></section> : null}
 
-      <div role="tablist" aria-label="Operation Report forms" className="sticky top-0 z-30 overflow-x-auto rounded-lg border border-slate-200 bg-white p-1 shadow-md dark:border-slate-800 dark:bg-slate-900 print:hidden">
-        <div className="grid min-w-[760px] grid-cols-3 gap-1">
+      <div role="tablist" aria-label="Operation Report forms" className="font-khmer-battambang sticky top-0 z-30 overflow-x-auto border-b border-slate-300 bg-slate-100 px-1 pt-1 shadow-sm dark:border-slate-700 dark:bg-slate-900 print:hidden">
+        <div className="flex min-w-max items-end">
           {([
             ["summary", opText("របាយការណ៍សង្ខេប", "Summary")],
             ["collection", opText("អតិថិជនប្រមូល និងដោះស្រាយ", "Collection & Resolution")],
             ["decisions", opText("ឥណទានស្នើសុំ អនុម័ត និងបដិសេធ", "Loan Decisions")],
-          ] as const).map(([value, label]) => <button key={value} type="button" role="tab" aria-selected={activeForm === value} onClick={() => setActiveForm(value)} className={`min-h-14 border-b-2 px-4 py-2 text-center font-semibold transition ${activeForm === value ? "border-emerald-700 bg-emerald-50 text-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-300" : "border-transparent text-slate-500 hover:bg-slate-50 hover:text-slate-800 dark:hover:bg-slate-800 dark:hover:text-slate-200"}`}>{label}</button>)}
+          ] as const).map(([value, label]) => <button key={value} type="button" role="tab" aria-selected={activeForm === value} onClick={() => setActiveForm(value)} className={`min-h-11 min-w-72 shrink-0 border-x border-t px-5 py-2 text-center text-lg transition ${activeForm === value ? "border-slate-300 border-t-2 border-t-emerald-700 bg-white text-emerald-700 dark:border-slate-700 dark:bg-slate-950 dark:text-emerald-300" : "border-transparent text-slate-500 hover:bg-white/70 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200"}`}>{label}</button>)}
         </div>
       </div>
 
-      {activeForm === "summary" ? <>
-        <OperationMyWorkToday loans={myDueLoans} report={myReportForDate} reportDate={reportDate} canPrepare={!reviewingAnotherSpecialist && !reportLocked && canViewLoanData} onPrepare={prepareDailyWork} onOpenLoan={onOpenLoan} />
-        <OperationReportRecordsDashboard records={savedReports} loading={reportsLoading} currentUsername={user.username} canManageReports={canManageReports} deletingReportId={deletingReportId} onEdit={editSavedReport} onDelete={deleteSavedReport} />
-        <PaymentDateAlerts loans={loans} canViewLoanData={canViewLoanData} onOpenLoan={onOpenLoan} />
-        <OperationSummaryTable
-          dueCount={dueCustomerCount}
-          paidCount={paidCustomerCount}
-          collectionRate={collectionRate}
-          dueNoticeRows={dueNoticeRows}
-          followUpRows={followUpRows}
-          formalNoticeRows={formalNoticeRows}
-          requestedRows={requestedRows}
-          approvedRows={approvedRows}
-          rejectedRows={rejectedRows}
-        />
-      </> : null}
+      <Card className="overflow-hidden rounded-xl border border-slate-300 bg-white p-0 shadow-sm dark:border-slate-700 dark:bg-slate-950">
+        <div className="overflow-x-auto">
+          <div className="font-khmer-battambang min-w-[1180px] text-slate-950 dark:text-slate-100">
+            {reportSheetHeader}
+            {activeForm === "summary" ? <OperationSummaryTable dueCount={dueCustomerCount} paidCount={paidCustomerCount} collectionRate={collectionRate} dueNoticeRows={dueNoticeRows} followUpRows={followUpRows} formalNoticeRows={formalNoticeRows} /> : null}
+            {activeForm === "collection" ? <>
+              <div className="grid grid-cols-2"><CollectionReportTable title={opText("អតិថិជនដែលត្រូវប្រមូលសរុប", "Total Customers Due")} rows={collectionDueRows} onChange={setCollectionDueRows} /><CollectionReportTable title={opText("អតិថិជនដែលប្រមូលបានសរុប", "Total Customers Collected")} rows={collectionPaidRows} onChange={setCollectionPaidRows} accent="red" /></div>
+              <div className="space-y-8 border-t-4 border-double border-slate-900 pt-6"><ResolutionTable title={opText("ជូនដំណឹងទៅអតិថិជន ដល់ថ្ងៃកំណត់ត្រូវបង់", "Notify Customers Due Today")} rows={dueNoticeRows} onChange={setDueNoticeRows} /><ResolutionTable title={opText("បានបន្តទាក់ទងអតិថិជនដែលយ៉ឺតចាប់ពី ១ថ្ងៃ ដល់ ៣ថ្ងៃ", "Follow Up Customers 1–3 Days Overdue")} rows={followUpRows} onChange={setFollowUpRows} /><ResolutionTable title={opText("ផ្ញើលិខិតជូនដំណឹងផ្លូវការសម្រាប់អតិថិជនយ៉ឺតចាប់ពី ៤ថ្ងៃ", "Send Formal Notice for Customers 4+ Days Overdue")} rows={formalNoticeRows} onChange={setFormalNoticeRows} /></div>
+            </> : null}
+            {activeForm === "decisions" ? <div className="space-y-8 pb-4"><DecisionTable title={opText("អតិថិជនដែលស្នើឥណទាន", "Loan Requests")} rows={requestedRows} total={sumRows(requestedRows, "amount")} onChange={setRequestedRows} loans={loans} statusGroup="requested" /><DecisionTable title={opText("អតិថិជនដែលបានអនុម័ត", "Approved Loans")} rows={approvedRows} total={sumRows(approvedRows, "amount")} onChange={setApprovedRows} loans={loans} statusGroup="approved" /><DecisionTable title={opText("អតិថិជនដែលបានបដិសេធ", "Rejected Loans")} rows={rejectedRows} total={sumRows(rejectedRows, "amount")} onChange={setRejectedRows} loans={loans} statusGroup="rejected" showReason /></div> : null}
+          </div>
+        </div>
+      </Card>
 
-      {activeForm === "collection" ? <><section className="space-y-4"><div><h2 className="text-xl font-bold text-emerald-800 dark:text-emerald-300">{opText("ការប្រមូល", "Collection")}</h2><p className="text-sm text-slate-500">{opText("បញ្ជីអតិថិជនត្រូវបង់ និងអតិថិជនដែលបានបង់", "Customers due and customers who have paid")}</p></div><div className="grid gap-5 2xl:grid-cols-2">
-        <CollectionReportTable title={opText("អតិថិជនដែលត្រូវប្រមូលសរុប", "Total Customers Due")} rows={collectionDueRows} onChange={setCollectionDueRows} />
-        <CollectionReportTable title={opText("អតិថិជនដែលប្រមូលបានសរុប", "Total Customers Collected")} rows={collectionPaidRows} onChange={setCollectionPaidRows} accent="red" />
-      </div></section>
-
-      <section className="space-y-4"><div><h2 className="text-xl font-bold text-emerald-800 dark:text-emerald-300">{opText("ការដោះស្រាយ", "Resolution")}</h2><p className="text-sm text-slate-500">{opText("អតិថិជនដែលដោះស្រាយសរុប", "Total resolved customers")}</p></div>
-        <ResolutionTable title={opText("ជូនដំណឹងទៅអតិថិជន ដល់ថ្ងៃកំណត់ត្រូវបង់", "Notify Customers Due Today")} rows={dueNoticeRows} onChange={setDueNoticeRows} />
-        <ResolutionTable title={opText("បានបន្តទាក់ទងអតិថិជនដែលយ៉ឺតចាប់ពី ១ថ្ងៃ ដល់ ៣ថ្ងៃ", "Follow Up Customers 1–3 Days Overdue")} rows={followUpRows} onChange={setFollowUpRows} />
-        <ResolutionTable title={opText("ផ្ញើលិខិតជូនដំណឹងផ្លូវការសម្រាប់អតិថិជនយ៉ឺតចាប់ពី ៤ថ្ងៃ", "Send Formal Notice for Customers 4+ Days Overdue")} rows={formalNoticeRows} onChange={setFormalNoticeRows} />
-      </section></> : null}
-
-      {activeForm === "decisions" ? <section className="space-y-4">
-        <div><h2 className="text-xl font-bold text-emerald-800 dark:text-emerald-300">{opText("ឥណទានស្នើសុំ អនុម័ត និងបដិសេធ", "Loan Requests, Approvals, and Rejections")}</h2></div>
-        <DecisionTable title={opText("អតិថិជនដែលស្នើឥណទាន", "Loan Requests")} rows={requestedRows} total={sumRows(requestedRows, "amount")} onChange={setRequestedRows} loans={loans} statusGroup="requested" />
-        <DecisionTable title={opText("អតិថិជនដែលបានអនុម័ត", "Approved Loans")} rows={approvedRows} total={sumRows(approvedRows, "amount")} onChange={setApprovedRows} loans={loans} statusGroup="approved" />
-        <DecisionTable title={opText("អតិថិជនដែលបានបដិសេធ", "Rejected Loans")} rows={rejectedRows} total={sumRows(rejectedRows, "amount")} onChange={setRejectedRows} loans={loans} statusGroup="rejected" showReason />
-      </section> : null}
+      {activeForm === "summary" ? <div className="space-y-6 print:hidden"><OperationMyWorkToday loans={myDueLoans} report={myReportForDate} reportDate={reportDate} canPrepare={!reviewingAnotherSpecialist && !reportLocked && canViewLoanData} onPrepare={prepareDailyWork} onOpenLoan={onOpenLoan} /><OperationReportRecordsDashboard records={savedReports} loading={reportsLoading} currentUsername={user.username} canManageReports={canManageReports} deletingReportId={deletingReportId} onEdit={editSavedReport} onDelete={deleteSavedReport} /><PaymentDateAlerts loans={loans} canViewLoanData={canViewLoanData} onOpenLoan={onOpenLoan} /></div> : null}
     </div>
   );
 }
@@ -5381,60 +5380,45 @@ function PaymentDateAlerts({ loans, canViewLoanData, onOpenLoan }: { loans: Loan
   );
 }
 
-function OperationSummaryTable({ dueCount, paidCount, collectionRate, dueNoticeRows, followUpRows, formalNoticeRows, requestedRows, approvedRows, rejectedRows }: { dueCount: number; paidCount: number; collectionRate: number; dueNoticeRows: OperationReportResolutionRow[]; followUpRows: OperationReportResolutionRow[]; formalNoticeRows: OperationReportResolutionRow[]; requestedRows: OperationReportLoanDecisionRow[]; approvedRows: OperationReportLoanDecisionRow[]; rejectedRows: OperationReportLoanDecisionRow[] }) {
+function OperationSummaryTable({ dueCount, paidCount, collectionRate, dueNoticeRows, followUpRows, formalNoticeRows }: { dueCount: number; paidCount: number; collectionRate: number; dueNoticeRows: OperationReportResolutionRow[]; followUpRows: OperationReportResolutionRow[]; formalNoticeRows: OperationReportResolutionRow[] }) {
   const { language } = useLanguage();
   const text = (km: string, en: string) => language === "km" ? km : en;
-  const resolutionCustomers = Array.from(new Set(dueNoticeRows.map((row) => row.customer.trim().toLowerCase()).filter(Boolean))).length;
-  const resolvedCustomers = Array.from(new Set([...followUpRows, ...formalNoticeRows].filter((row) => row.solution.trim()).map((row) => row.customer.trim().toLowerCase()).filter(Boolean))).length;
-  const resolutionRate = resolutionCustomers ? Math.min(100, Math.round((resolvedCustomers / resolutionCustomers) * 100)) : 0;
-  const decisionCount = (rows: OperationReportLoanDecisionRow[]) => rows.filter((row) => row.customer.trim()).length;
-  const decisionAmount = (rows: OperationReportLoanDecisionRow[]) => rows.reduce((sum, row) => sum + operationNumber(row.amount), 0);
-  const requestedAmount = decisionAmount(requestedRows);
-  const approvedAmount = decisionAmount(approvedRows);
-  const rejectedAmount = decisionAmount(rejectedRows);
+  const resolutionCount = (rows: OperationReportResolutionRow[]) => rows.filter((row) => row.customer.trim()).length;
+  const interestTotal = (rows: OperationReportResolutionRow[]) => rows.reduce((sum, row) => sum + operationNumber(row.interest), 0);
+  const rows = [
+    [text("អតិថិជនត្រូវបង់សរុប", "Total Customers Due"), dueCount, ""],
+    [text("អតិថិជនដែលបានបង់សរុប", "Total Customers Collected"), paidCount, ""],
+    [text("អត្រាប្រមូលចូលគិតជាភាគរយ", "Collection Rate"), `${collectionRate}%`, ""],
+    [text("ជូនដំណឹងទៅអតិថិជន ដល់ថ្ងៃកំណត់ត្រូវបង់", "Notify Customers Due Today"), resolutionCount(dueNoticeRows), operationCurrency(interestTotal(dueNoticeRows))],
+    [text("បានបន្តទាក់ទងអតិថិជនដែលយ៉ឺតចាប់ពី ១ថ្ងៃ ដល់ ៣ថ្ងៃ", "Follow Up Customers 1-3 Days Overdue"), resolutionCount(followUpRows), operationCurrency(interestTotal(followUpRows))],
+    [text("ផ្ញើលិខិតជូនដំណឹងផ្លូវការសម្រាប់អតិថិជនយ៉ឺតចាប់ពី ៤ថ្ងៃ", "Formal Notice for Customers 4+ Days Overdue"), resolutionCount(formalNoticeRows), operationCurrency(interestTotal(formalNoticeRows))],
+  ];
 
   return (
-    <section aria-label="Operation Report dashboard" className="overflow-hidden rounded-lg border border-slate-300 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
-      <div className="border-b border-slate-200 px-5 py-4 dark:border-slate-800">
-        <p className="text-sm font-semibold text-emerald-700">{text("ផ្ទាំងគ្រប់គ្រង", "Dashboard")}</p>
-        <h2 className="mt-1 text-xl font-bold text-slate-900 dark:text-white">{text("សង្ខេបលទ្ធផលប្រចាំថ្ងៃ", "Daily Performance Summary")}</h2>
-      </div>
-      <div className="overflow-x-auto">
-        <table className="min-w-full text-sm">
-          <thead className="bg-emerald-800 text-white"><tr><th className="min-w-80 px-4 py-3 text-left">{text("ការប្រមូល និងដោះស្រាយ", "Collection and Resolution")}</th><th className="min-w-44 px-4 py-3 text-center">{text("ចំនួនប្រមូល (នាក់)", "Collected Customers")}</th><th className="min-w-44 px-4 py-3 text-center">{text("ចំនួនដោះស្រាយ (នាក់)", "Resolved Customers")}</th></tr></thead>
-          <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
-            <tr><td className="px-4 py-3 font-semibold">{text("អតិថិជនប្រមូល និងដោះស្រាយសរុប", "Total Customers for Collection and Resolution")}</td><td className="px-4 py-3 text-center text-base font-bold">{dueCount}</td><td className="px-4 py-3 text-center text-base font-bold">{resolutionCustomers}</td></tr>
-            <tr><td className="px-4 py-3 font-semibold">{text("ចំនួនអតិថិជនដែលប្រមូល និងដោះស្រាយបាន", "Customers Collected and Resolved")}</td><td className="px-4 py-3 text-center text-base font-bold">{paidCount}</td><td className="px-4 py-3 text-center text-base font-bold">{resolvedCustomers}</td></tr>
-            <tr><td className="px-4 py-3 font-semibold">{text("អត្រាប្រមូល និងដោះស្រាយជាភាគរយ", "Collection and Resolution Rate")}</td><td className="px-4 py-3 text-center text-base font-bold text-emerald-700 dark:text-emerald-300">{collectionRate}%</td><td className="px-4 py-3 text-center text-base font-bold text-emerald-700 dark:text-emerald-300">{resolutionRate}%</td></tr>
-          </tbody>
-        </table>
-      </div>
-      <div className="overflow-x-auto border-t-4 border-slate-100 dark:border-slate-800">
-        <table className="min-w-full text-sm">
-          <thead className="bg-emerald-800 text-white"><tr><th className="min-w-80 px-4 py-3 text-left">{text("ការស្នើឥណទាន", "Loan Decisions")}</th><th className="min-w-44 px-4 py-3 text-center">{text("ចំនួន (នាក់)", "Customers")}</th><th className="min-w-52 px-4 py-3 text-right">{text("ទឹកប្រាក់ ($)", "Amount ($)")}</th></tr></thead>
-          <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
-            <tr><td className="px-4 py-3 font-semibold">{text("ចំនួនឥណទានស្នើសុំ", "Loan Requests")}</td><td className="px-4 py-3 text-center font-bold">{decisionCount(requestedRows)}</td><td className="px-4 py-3 text-right font-semibold">{operationCurrency(requestedAmount)}</td></tr>
-            <tr><td className="px-4 py-3 font-semibold">{text("ចំនួនឥណទានបានអនុម័ត", "Approved Loans")}</td><td className="px-4 py-3 text-center font-bold">{decisionCount(approvedRows)}</td><td className="px-4 py-3 text-right font-semibold">{operationCurrency(approvedAmount)}</td></tr>
-            <tr><td className="px-4 py-3 font-semibold">{text("ចំនួនឥណទានបដិសេធ", "Rejected Loans")}</td><td className="px-4 py-3 text-center font-bold">{decisionCount(rejectedRows)}</td><td className="px-4 py-3 text-right font-semibold">{operationCurrency(rejectedAmount)}</td></tr>
-          </tbody>
-          <tfoot className="border-t-2 border-slate-900 bg-slate-100 font-bold text-red-700 dark:border-slate-500 dark:bg-slate-800"><tr><td colSpan={2} className="px-4 py-3 text-center text-base">{text("សរុប", "Total")}</td><td className="px-4 py-3 text-right text-lg">{operationCurrency(requestedAmount + approvedAmount + rejectedAmount)}</td></tr></tfoot>
-        </table>
-      </div>
+    <section aria-label="Operation Report summary">
+      <table className="w-full table-fixed border-collapse text-sm [&_td]:border [&_td]:border-slate-300 [&_th]:border [&_th]:border-slate-300 dark:[&_td]:border-slate-700 dark:[&_th]:border-slate-700">
+        <thead className="bg-[#087323] text-white"><tr><th className="px-3 py-3 text-left">{text("ការប្រមូល", "Collection")}</th><th className="w-48 px-3 py-3 text-center">{text("ចំនួនអតិថិជន (នាក់)", "Customers")}</th><th className="w-64 px-3 py-3 text-right">{text("ចំនួនទឹកប្រាក់", "Amount")}</th></tr></thead>
+        <tbody>{rows.slice(0, 3).map(([label, count, amount]) => <tr key={String(label)}><td className="px-3 py-3 font-semibold">{label}</td><td className="px-3 py-3 text-center font-bold">{count}</td><td className="px-3 py-3 text-right font-semibold tabular-nums">{amount}</td></tr>)}</tbody>
+        <thead className="bg-[#087323] text-white"><tr><th className="px-3 py-3 text-left">{text("ការដោះស្រាយ", "Resolution")}</th><th className="w-48 px-3 py-3 text-center">{text("ចំនួន (នាក់)", "Customers")}</th><th className="w-64 px-3 py-3 text-right">{text("ជាសាច់ប្រាក់ (សរុបគិតជាដុល្លារ)", "Amount ($)")}</th></tr></thead>
+        <tbody>{rows.slice(3).map(([label, count, amount]) => <tr key={String(label)}><td className="px-3 py-3 font-semibold">{label}</td><td className="px-3 py-3 text-center font-bold">{count}</td><td className="px-3 py-3 text-right font-semibold tabular-nums">{amount}</td></tr>)}</tbody>
+      </table>
     </section>
   );
 }
 
-function ReportTable({ title, count, total, children }: { title: string; count: number; total: number; children: ReactNode }) {
-  const { language } = useLanguage();
+function ReportTable({ title, count, total, children, titleTone = "green" }: { title: string; count: number; total: number; children: ReactNode; titleTone?: "green" | "red" }) {
+  void count;
+  void total;
+  const titleColor = titleTone === "red" ? "text-red-700 dark:text-red-300" : "text-emerald-800 dark:text-emerald-300";
   return (
-    <Card className="overflow-hidden p-0">
-      <div className="border-b border-slate-200 px-5 py-4 dark:border-slate-800"><h2 className="text-lg font-bold text-red-700 dark:text-red-400">{title}</h2><p className="mt-1 text-sm text-slate-500">{count} {language === "km" ? "នាក់" : count === 1 ? "customer" : "customers"} · {operationCurrency(total)}</p></div>
-      <div className="overflow-x-auto"><table className="min-w-full text-left text-sm">{children}</table></div>
-    </Card>
+    <section>
+      <h2 className={`border-b border-slate-300 px-3 py-2 text-sm font-bold dark:border-slate-700 ${titleColor}`}>{title}</h2>
+      <table className="w-full table-fixed border-collapse text-left text-sm [&_td]:border [&_td]:border-slate-300 [&_th]:border [&_th]:border-slate-300 dark:[&_td]:border-slate-700 dark:[&_th]:border-slate-700">{children}</table>
+    </section>
   );
 }
 
-function OperationReportImageCell({ images, imageUrl, imageName, onChange }: OperationReportAttachment & { onChange: (attachment: OperationReportAttachment) => void }) {
+function OperationReportImageCell({ images, imageUrl, imageName, onChange, compact = false }: OperationReportAttachment & { onChange: (attachment: OperationReportAttachment) => void; compact?: boolean }) {
   const { error: toastError, success: toastSuccess } = useToast();
   const { language } = useLanguage();
   const text = (km: string, en: string) => language === "km" ? km : en;
@@ -5479,7 +5463,7 @@ function OperationReportImageCell({ images, imageUrl, imageName, onChange }: Ope
   const viewedImage = viewerIndex === null ? null : attachments[viewerIndex];
 
   return (
-    <div className="flex min-w-40 flex-wrap items-center gap-2">
+    <div className={`flex flex-wrap items-center gap-2 ${compact ? "shrink-0" : "min-w-40"}`}>
       {attachments.map((image, index) => <span key={`${image.imageUrl}-${index}`} className="group relative shrink-0">
         <button type="button" onClick={() => openViewer(index)} title={text("បើកកម្មវិធីមើលរូបភាព", "Open photo viewer")}><img src={image.imageUrl} alt={image.imageName || text("ឯកសារភ្ជាប់ជួរ", "Row attachment")} className="h-12 w-12 rounded-md border border-slate-200 object-cover transition hover:border-emerald-400 dark:border-slate-700" /></button>
         <button type="button" onClick={() => removeImage(index)} title={text("លុបរូបភាព", "Remove photo")} aria-label={text("លុបរូបភាព", "Remove photo")} className="absolute -right-1.5 -top-1.5 inline-flex h-5 w-5 items-center justify-center rounded-full bg-red-600 text-white shadow hover:bg-red-700"><X className="h-3 w-3" /></button>
@@ -5527,7 +5511,13 @@ function CollectionReportTable({ title, rows, onChange, accent = "green" }: { ti
     (id) => ({ id, customer: "", amount: "", reason: "" }),
     field
   );
-  return <ReportTable title={title} count={rows.filter((row) => row.customer.trim()).length} total={total}><thead className={`${header} text-white`}><tr><th className="w-14 px-3 py-3">{text("ល.រ", "No.")}</th><th className="min-w-44 px-3 py-3">{text("ឈ្មោះអតិថិជន", "Customer Name")}</th><th className="min-w-28 px-3 py-3 text-right">{text("ជាសាច់ប្រាក់ ($)", "Amount ($)")}</th><th className="min-w-44 px-3 py-3">{text("មូលហេតុ", "Reason")}</th><th className="min-w-48 px-3 py-3">{text("រូបភាព", "Photos")}</th></tr></thead><tbody>{rows.map((row, index) => <tr key={row.id} className="border-t border-slate-200 dark:border-slate-800"><td className="px-3 py-2 text-slate-500">{index + 1}</td><td className="px-3 py-2"><input data-operation-row={index} data-operation-field="customer" list="operation-report-customers" value={row.customer} onKeyDown={(event) => onEnter(event, index, "customer")} onChange={(event) => onChange(rows.map((item) => item.id === row.id ? { ...item, customer: event.target.value } : item))} className={inputClass} placeholder={text("ឈ្មោះអតិថិជន", "Customer name")} /></td><td className="px-3 py-2"><input data-operation-row={index} data-operation-field="amount" type="number" min="0" value={row.amount} onKeyDown={(event) => onEnter(event, index, "amount")} onChange={(event) => onChange(rows.map((item) => item.id === row.id ? { ...item, amount: event.target.value } : item))} className={`${inputClass} text-right`} placeholder="0.00" /></td><td className="px-3 py-2"><input data-operation-row={index} data-operation-field="reason" list="operation-report-reasons" value={row.reason} onKeyDown={(event) => onEnter(event, index, "reason")} onChange={(event) => onChange(rows.map((item) => item.id === row.id ? { ...item, reason: event.target.value } : item))} className={inputClass} placeholder={text("មូលហេតុ", "Reason")} /></td><td className="px-3 py-2"><OperationReportImageCell images={row.images} imageUrl={row.imageUrl} imageName={row.imageName} onChange={(attachment) => onChange(rows.map((item) => item.id === row.id ? { ...item, ...attachment } : item))} /></td></tr>)}</tbody><tfoot className="border-t-2 border-slate-900 bg-slate-100 font-bold text-red-700 dark:bg-slate-800"><tr><td colSpan={2} className="px-3 py-3 text-center">{text("សរុប", "Total")}</td><td className="px-3 py-3 text-right">{operationCurrency(total)}</td><td colSpan={2} /></tr></tfoot></ReportTable>;
+  return (
+    <ReportTable title={title} count={rows.filter((row) => row.customer.trim()).length} total={total} titleTone={accent}>
+      <thead className={`${header} text-white`}><tr><th className="w-14 px-3 py-3">{text("ល.រ", "No.")}</th><th className="px-3 py-3">{text("ឈ្មោះអតិថិជន", "Customer Name")}</th><th className="w-40 px-3 py-3 text-right">{text("ជាសាច់ប្រាក់ ($)", "Amount ($)")}</th><th className="px-3 py-3">{text("មូលហេតុ", "Reason")}</th></tr></thead>
+      <tbody>{rows.map((row, index) => <tr key={row.id}><td className="px-3 py-2 text-center text-slate-500">{index + 1}</td><td className="px-2 py-1"><input data-operation-row={index} data-operation-field="customer" list="operation-report-customers" value={row.customer} onKeyDown={(event) => onEnter(event, index, "customer")} onChange={(event) => onChange(rows.map((item) => item.id === row.id ? { ...item, customer: event.target.value } : item))} className={inputClass} placeholder={text("ឈ្មោះអតិថិជន", "Customer name")} /></td><td className="px-2 py-1"><input data-operation-row={index} data-operation-field="amount" type="number" min="0" value={row.amount} onKeyDown={(event) => onEnter(event, index, "amount")} onChange={(event) => onChange(rows.map((item) => item.id === row.id ? { ...item, amount: event.target.value } : item))} className={`${inputClass} text-right`} placeholder="0.00" /></td><td className="px-2 py-1"><div className="flex items-center gap-2"><input data-operation-row={index} data-operation-field="reason" list="operation-report-reasons" value={row.reason} onKeyDown={(event) => onEnter(event, index, "reason")} onChange={(event) => onChange(rows.map((item) => item.id === row.id ? { ...item, reason: event.target.value } : item))} className={inputClass} placeholder={text("មូលហេតុ", "Reason")} /><OperationReportImageCell compact images={row.images} imageUrl={row.imageUrl} imageName={row.imageName} onChange={(attachment) => onChange(rows.map((item) => item.id === row.id ? { ...item, ...attachment } : item))} /></div></td></tr>)}</tbody>
+      <tfoot className="border-t-2 border-slate-900 bg-slate-100 font-bold text-red-700 dark:bg-slate-800"><tr><td colSpan={2} className="px-3 py-3 text-center">{text("សរុប", "Total")}</td><td className="px-3 py-3 text-right">{operationCurrency(total)}</td><td /></tr></tfoot>
+    </ReportTable>
+  );
 }
 
 function ResolutionTable({ title, rows, onChange }: { title: string; rows: OperationReportResolutionRow[]; onChange: (rows: OperationReportResolutionRow[]) => void }) {
@@ -5546,9 +5536,9 @@ function ResolutionTable({ title, rows, onChange }: { title: string; rows: Opera
   );
   return (
     <ReportTable title={title} count={rows.filter((row) => row.customer.trim()).length} total={interestTotal}>
-      <thead className="bg-emerald-800 text-white"><tr><th className="w-14 px-3 py-3">{text("ល.រ", "No.")}</th><th className="min-w-44 px-3 py-3">{text("ឈ្មោះអតិថិជន", "Customer Name")}</th><th className="min-w-36 px-3 py-3">{text("ប្រភេទទ្រព្យ", "Asset Type")}</th><th className="min-w-28 px-3 py-3 text-right">{text("ការប្រាក់ ($)", "Interest ($)")}</th><th className="min-w-28 px-3 py-3 text-right">{text("ពិន័យ ($)", "Penalty ($)")}</th><th className="min-w-28 px-3 py-3 text-right">{text("ប្រាក់ដើម ($)", "Principal ($)")}</th><th className="min-w-48 px-3 py-3">{text("មូលហេតុ ឬដំណោះស្រាយ", "Reason or Solution")}</th><th className="min-w-48 px-3 py-3">{text("រូបភាព", "Photos")}</th></tr></thead>
-      <tbody>{rows.map((row, index) => <tr key={row.id} className="border-t border-slate-200 dark:border-slate-800"><td className="px-3 py-2 text-slate-500">{index + 1}</td><td className="px-3 py-2"><input data-operation-row={index} data-operation-field="customer" list="operation-report-customers" value={row.customer} onKeyDown={(event) => onEnter(event, index, "customer")} onChange={(event) => onChange(rows.map((item) => item.id === row.id ? { ...item, customer: event.target.value } : item))} className={inputClass} placeholder={text("ឈ្មោះអតិថិជន", "Customer name")} /></td><td className="px-3 py-2"><input data-operation-row={index} data-operation-field="assetType" value={row.assetType} onKeyDown={(event) => onEnter(event, index, "assetType")} onChange={(event) => onChange(rows.map((item) => item.id === row.id ? { ...item, assetType: event.target.value } : item))} className={inputClass} placeholder={text("ប្រភេទទ្រព្យ", "Asset type")} /></td><td className="px-3 py-2"><input data-operation-row={index} data-operation-field="interest" type="number" min="0" value={row.interest} onKeyDown={(event) => onEnter(event, index, "interest")} onChange={(event) => onChange(rows.map((item) => item.id === row.id ? { ...item, interest: event.target.value } : item))} className={`${inputClass} text-right`} placeholder="0.00" /></td><td className="px-3 py-2"><input data-operation-row={index} data-operation-field="penalty" type="number" min="0" value={row.penalty} onKeyDown={(event) => onEnter(event, index, "penalty")} onChange={(event) => onChange(rows.map((item) => item.id === row.id ? { ...item, penalty: event.target.value } : item))} className={`${inputClass} text-right`} placeholder="0.00" /></td><td className="px-3 py-2"><input data-operation-row={index} data-operation-field="principal" type="number" min="0" value={row.principal} onKeyDown={(event) => onEnter(event, index, "principal")} onChange={(event) => onChange(rows.map((item) => item.id === row.id ? { ...item, principal: event.target.value } : item))} className={`${inputClass} text-right`} placeholder="0.00" /></td><td className="px-3 py-2"><input data-operation-row={index} data-operation-field="solution" list="operation-report-solutions" value={row.solution} onKeyDown={(event) => onEnter(event, index, "solution")} onChange={(event) => onChange(rows.map((item) => item.id === row.id ? { ...item, solution: event.target.value } : item))} className={inputClass} placeholder={text("ដំណោះស្រាយ", "Solution")} /></td><td className="px-3 py-2"><OperationReportImageCell images={row.images} imageUrl={row.imageUrl} imageName={row.imageName} onChange={(attachment) => onChange(rows.map((item) => item.id === row.id ? { ...item, ...attachment } : item))} /></td></tr>)}</tbody>
-      <tfoot className="border-t-2 border-slate-900 bg-slate-100 font-bold text-red-700 dark:bg-slate-800"><tr><td colSpan={3} className="px-3 py-3 text-center">{text("សរុប", "Total")}</td><td className="px-3 py-3 text-right">{operationCurrency(interestTotal)}</td><td className="px-3 py-3 text-right">{operationCurrency(penaltyTotal)}</td><td className="px-3 py-3 text-right">{operationCurrency(principalTotal)}</td><td colSpan={2} /></tr></tfoot>
+      <thead className="bg-emerald-800 text-white"><tr><th className="w-14 px-3 py-3">{text("ល.រ", "No.")}</th><th className="px-3 py-3">{text("ឈ្មោះអតិថិជន", "Customer Name")}</th><th className="px-3 py-3">{text("ប្រភេទទ្រព្យ", "Asset Type")}</th><th className="w-36 px-3 py-3 text-right">{text("ការប្រាក់ ($)", "Interest ($)")}</th><th className="w-32 px-3 py-3 text-right">{text("ពិន័យ ($)", "Penalty ($)")}</th><th className="w-40 px-3 py-3 text-right">{text("ប្រាក់ដើម ($)", "Principal ($)")}</th><th className="px-3 py-3">{text("ដំណោះស្រាយ", "Solution")}</th></tr></thead>
+      <tbody>{rows.map((row, index) => <tr key={row.id}><td className="px-3 py-2 text-center text-slate-500">{index + 1}</td><td className="px-2 py-1"><input data-operation-row={index} data-operation-field="customer" list="operation-report-customers" value={row.customer} onKeyDown={(event) => onEnter(event, index, "customer")} onChange={(event) => onChange(rows.map((item) => item.id === row.id ? { ...item, customer: event.target.value } : item))} className={inputClass} placeholder={text("ឈ្មោះអតិថិជន", "Customer name")} /></td><td className="px-2 py-1"><input data-operation-row={index} data-operation-field="assetType" value={row.assetType} onKeyDown={(event) => onEnter(event, index, "assetType")} onChange={(event) => onChange(rows.map((item) => item.id === row.id ? { ...item, assetType: event.target.value } : item))} className={inputClass} placeholder={text("ប្រភេទទ្រព្យ", "Asset type")} /></td><td className="px-2 py-1"><input data-operation-row={index} data-operation-field="interest" type="number" min="0" value={row.interest} onKeyDown={(event) => onEnter(event, index, "interest")} onChange={(event) => onChange(rows.map((item) => item.id === row.id ? { ...item, interest: event.target.value } : item))} className={`${inputClass} text-right`} placeholder="0.00" /></td><td className="px-2 py-1"><input data-operation-row={index} data-operation-field="penalty" type="number" min="0" value={row.penalty} onKeyDown={(event) => onEnter(event, index, "penalty")} onChange={(event) => onChange(rows.map((item) => item.id === row.id ? { ...item, penalty: event.target.value } : item))} className={`${inputClass} text-right`} placeholder="0.00" /></td><td className="px-2 py-1"><input data-operation-row={index} data-operation-field="principal" type="number" min="0" value={row.principal} onKeyDown={(event) => onEnter(event, index, "principal")} onChange={(event) => onChange(rows.map((item) => item.id === row.id ? { ...item, principal: event.target.value } : item))} className={`${inputClass} text-right`} placeholder="0.00" /></td><td className="px-2 py-1"><div className="flex items-center gap-2"><input data-operation-row={index} data-operation-field="solution" list="operation-report-solutions" value={row.solution} onKeyDown={(event) => onEnter(event, index, "solution")} onChange={(event) => onChange(rows.map((item) => item.id === row.id ? { ...item, solution: event.target.value } : item))} className={inputClass} placeholder={text("ដំណោះស្រាយ", "Solution")} /><OperationReportImageCell compact images={row.images} imageUrl={row.imageUrl} imageName={row.imageName} onChange={(attachment) => onChange(rows.map((item) => item.id === row.id ? { ...item, ...attachment } : item))} /></div></td></tr>)}</tbody>
+      <tfoot className="border-t-2 border-slate-900 bg-slate-100 font-bold text-red-700 dark:bg-slate-800"><tr><td colSpan={3} className="px-3 py-3 text-center">{text("សរុប", "Total")}</td><td className="px-3 py-3 text-right">{operationCurrency(interestTotal)}</td><td className="px-3 py-3 text-right">{operationCurrency(penaltyTotal)}</td><td className="px-3 py-3 text-right">{operationCurrency(principalTotal)}</td><td /></tr></tfoot>
     </ReportTable>
   );
 }
@@ -5591,7 +5581,8 @@ function DecisionTable({ title, rows, total, onChange, loans, statusGroup, showR
   return (
     <ReportTable title={title} count={rows.filter((row) => row.customer.trim()).length} total={total}>
       <thead className="bg-emerald-800 text-white"><tr><th className="w-14 px-3 py-3">{text("ល.រ", "No.")}</th><th className="min-w-44 px-3 py-3">{text("ឈ្មោះអតិថិជន", "Customer")}</th><th className="min-w-36 px-3 py-3">{text("ប្រភេទ", "Type")}</th><th className="min-w-28 px-3 py-3 text-right">{text("សាច់ប្រាក់", "Amount")}</th>{showReason ? <th className="min-w-44 px-3 py-3">{text("មូលហេតុ", "Reason")}</th> : null}<th className="min-w-48 px-3 py-3">{text("រូបភាព", "Photos")}</th></tr></thead>
-      <tbody>{rows.map((row, index) => <tr key={row.id} className="border-t border-slate-200 dark:border-slate-800"><td className="px-3 py-2 text-slate-500">{index + 1}</td><td className="px-3 py-2"><input data-operation-row={index} data-operation-field="customer" list="operation-report-customers" value={row.customer} onKeyDown={(event) => onEnter(event, index, "customer")} onChange={(event) => changeCustomer(row, event.target.value)} className={inputClass} placeholder={text("ឈ្មោះអតិថិជន", "Customer name")} /></td><td className="px-3 py-2"><input data-operation-row={index} data-operation-field="type" list="operation-report-loan-types" value={row.type} onKeyDown={(event) => onEnter(event, index, "type")} onChange={(event) => onChange(rows.map((item) => item.id === row.id ? { ...item, type: event.target.value } : item))} className={inputClass} placeholder={text("ប្រភេទឥណទាន", "Loan type")} /></td><td className="px-3 py-2"><input data-operation-row={index} data-operation-field="amount" type="number" min="0" value={row.amount} onKeyDown={(event) => onEnter(event, index, "amount")} onChange={(event) => onChange(rows.map((item) => item.id === row.id ? { ...item, amount: event.target.value } : item))} className={`${inputClass} text-right`} placeholder="0.00" /></td>{showReason ? <td className="px-3 py-2"><input data-operation-row={index} data-operation-field="reason" value={row.reason} onKeyDown={(event) => onEnter(event, index, "reason")} onChange={(event) => onChange(rows.map((item) => item.id === row.id ? { ...item, reason: event.target.value } : item))} className={inputClass} placeholder={text("មូលហេតុ", "Reason")} /></td> : null}<td className="px-3 py-2"><OperationReportImageCell images={row.images} imageUrl={row.imageUrl} imageName={row.imageName} onChange={(attachment) => onChange(rows.map((item) => item.id === row.id ? { ...item, ...attachment } : item))} /></td></tr>)}</tbody>
+      <tbody>{rows.map((row, index) => <tr key={row.id} className="border-t border-slate-200 dark:border-slate-800"><td className="px-3 py-2 text-slate-500">{index + 1}</td><td className="px-3 py-2"><input data-operation-row={index} data-operation-field="customer" list="operation-report-customers" value={row.customer} onKeyDown={(event) => onEnter(event, index, "customer")} onChange={(event) => changeCustomer(row, event.target.value)} className={inputClass} placeholder={text("ឈ្មោះអតិថិជន", "Customer name")} /></td><td className="px-3 py-2"><input data-operation-row={index} data-operation-field="type" list="operation-report-loan-types" value={row.type} onKeyDown={(event) => onEnter(event, index, "type")} onChange={(event) => onChange(rows.map((item) => item.id === row.id ? { ...item, type: event.target.value } : item))} className={inputClass} placeholder={text("ប្រភេទឥណទាន", "Loan type")} /></td><td className="px-3 py-2"><input data-operation-row={index} data-operation-field="amount" type="number" min="0" value={row.amount} onKeyDown={(event) => onEnter(event, index, "amount")} onChange={(event) => onChange(rows.map((item) => item.id === row.id ? { ...item, amount: event.target.value } : item))} className={`${inputClass} text-right`} placeholder="0.00" /></td>{showReason ? <td className="px-3 py-2"><input data-operation-row={index} data-operation-field="reason" list="operation-report-rejection-reasons" value={row.reason} onKeyDown={(event) => onEnter(event, index, "reason")} onChange={(event) => onChange(rows.map((item) => item.id === row.id ? { ...item, reason: event.target.value } : item))} className={inputClass} placeholder={text("ជ្រើសរើស ឬបញ្ចូលមូលហេតុ", "Select or enter a reason")} /></td> : null}<td className="px-3 py-2"><OperationReportImageCell images={row.images} imageUrl={row.imageUrl} imageName={row.imageName} onChange={(attachment) => onChange(rows.map((item) => item.id === row.id ? { ...item, ...attachment } : item))} /></td></tr>)}</tbody>
+      <tfoot className="border-t-2 border-slate-900 bg-slate-100 font-bold text-red-700 dark:bg-slate-800"><tr><td colSpan={3} className="px-3 py-3 text-center">{text("សរុប", "Total")}</td><td className="px-3 py-3 text-right tabular-nums">{operationCurrency(total)}</td><td colSpan={showReason ? 2 : 1} /></tr></tfoot>
     </ReportTable>
   );
 }

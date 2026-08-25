@@ -35,6 +35,13 @@ function nonEmpty<T extends { customer: string }>(rows: T[]) {
   return rows.filter((row) => row.customer.trim());
 }
 
+function excelReportDate(value: string) {
+  const [year, month, day] = value.split("-").map(Number);
+  if (!year || !month || !day) return null;
+  const date = new Date(Date.UTC(year, month - 1, day));
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
 function styleCells(sheet: ExcelJS.Worksheet, fromRow: number, toRow: number, fromColumn: number, toColumn: number) {
   for (let row = fromRow; row <= toRow; row += 1) {
     for (let column = fromColumn; column <= toColumn; column += 1) {
@@ -53,21 +60,18 @@ function styleCells(sheet: ExcelJS.Worksheet, fromRow: number, toRow: number, fr
 
 async function addBrandHeader(workbook: ExcelJS.Workbook, sheet: ExcelJS.Worksheet, data: OperationReportExcelData, lastColumn: number) {
   const lastColumnLetter = sheet.getColumn(lastColumn).letter;
-  const compactHeader = lastColumn === 3;
-  const titleCellAddress = compactHeader ? "B1" : "C1";
-  const subtitleCellAddress = compactHeader ? "B3" : "C3";
-  sheet.mergeCells(compactHeader ? "A1:A3" : "A1:B3");
-  sheet.mergeCells(compactHeader ? "B1:C2" : `C1:${lastColumnLetter}2`);
-  sheet.mergeCells(compactHeader ? "B3:C3" : `C3:${lastColumnLetter}3`);
-  sheet.getCell(titleCellAddress).value = "ក្រុមហ៊ុន អេមើរ៉ល ឃែស ឯ.ក";
-  sheet.getCell(titleCellAddress).font = { name: "Khmer OS Muol Light", size: compactHeader ? 17 : 20, color: { argb: RED } };
-  sheet.getCell(titleCellAddress).alignment = { horizontal: "center", vertical: "middle", wrapText: false, shrinkToFit: true };
-  sheet.getCell(subtitleCellAddress).value = "របាយការណ៍លទ្ធផលប្រចាំថ្ងៃ";
-  sheet.getCell(subtitleCellAddress).font = { name: "Khmer OS Muol Light", size: compactHeader ? 12 : 14, color: { argb: GREEN } };
-  sheet.getCell(subtitleCellAddress).alignment = { horizontal: "center", vertical: "middle", wrapText: false, shrinkToFit: true };
-  sheet.getRow(1).height = 38;
+  sheet.mergeCells("A1:B3");
+  sheet.mergeCells(`C1:${lastColumnLetter}2`);
+  sheet.mergeCells(`C3:${lastColumnLetter}3`);
+  sheet.getCell("C1").value = "ក្រុមហ៊ុន អេមើរ៉ល ឃែស ឯ.ក";
+  sheet.getCell("C1").font = { name: "Khmer OS Muol Light", size: 20, color: { argb: RED } };
+  sheet.getCell("C1").alignment = { horizontal: "center", vertical: "middle", wrapText: false, shrinkToFit: true };
+  sheet.getCell("C3").value = "របាយការណ៍លទ្ធផលប្រចាំថ្ងៃ សាខា បឹងកេងកង";
+  sheet.getCell("C3").font = { name: "Khmer OS Muol Light", size: 14, color: { argb: GREEN } };
+  sheet.getCell("C3").alignment = { horizontal: "center", vertical: "middle", wrapText: false, shrinkToFit: true };
+  sheet.getRow(1).height = 36;
   sheet.getRow(2).height = 32;
-  sheet.getRow(3).height = 32;
+  sheet.getRow(3).height = 30;
 
   try {
     const logoResponse = await fetch("/logo-horizontal.png");
@@ -76,35 +80,33 @@ async function addBrandHeader(workbook: ExcelJS.Workbook, sheet: ExcelJS.Workshe
       let binary = "";
       bytes.forEach((byte) => { binary += String.fromCharCode(byte); });
       const imageId = workbook.addImage({ base64: `data:image/png;base64,${btoa(binary)}`, extension: "png" });
-      sheet.addImage(imageId, { tl: { col: compactHeader ? 0.18 : 0.2, row: 0.55 }, ext: { width: compactHeader ? 180 : 170, height: compactHeader ? 75 : 71 } });
+      sheet.addImage(imageId, { tl: { col: 0.2, row: 0.55 }, ext: { width: 160, height: 67 } });
     }
   } catch {
     sheet.getCell("A1").value = "Emerald Cash";
     sheet.getCell("A1").font = { bold: true, color: { argb: GREEN } };
   }
 
-  const identityRows: Array<[string, string]> = [
-    ["កាលបរិច្ឆេទ / Date", data.reportDate],
-    ["ឈ្មោះ / Name", data.reporterName],
-    ["តួនាទី / Position", data.reporterRole],
-    ["នាយកដ្ឋាន / Department", data.department],
-    ["សាខា / Branch", data.branch],
+  const identityRows: Array<[string, string | Date | null]> = [
+    ["កាលបរិច្ឆេទ៖", excelReportDate(data.reportDate)],
+    ["ឈ្មោះ៖", data.reporterName],
+    ["តួនាទី៖", data.reporterRole],
+    ["នាយកដ្ឋាន៖", data.department],
   ];
   identityRows.forEach(([label, value], index) => {
-    const row = 4 + index;
-    if (compactHeader) {
-      sheet.mergeCells(row, 2, row, 3);
-    } else {
-      sheet.mergeCells(row, 1, row, 2);
-      sheet.mergeCells(row, 3, row, lastColumn);
-    }
+    const row = 5 + index;
+    sheet.mergeCells(row, 1, row, 3);
+    sheet.mergeCells(row, 4, row, Math.min(lastColumn, 6));
     sheet.getCell(row, 1).value = label;
     sheet.getCell(row, 1).font = { name: KHMER_FONT, bold: true };
     sheet.getCell(row, 1).alignment = { horizontal: "right", vertical: "middle" };
-    sheet.getCell(row, compactHeader ? 2 : 3).value = value;
+    const valueCell = sheet.getCell(row, 4);
+    valueCell.value = value || "";
+    if (value instanceof Date) valueCell.numFmt = "[$-en-US]dddd, dd mmmm yyyy";
+    valueCell.alignment = { horizontal: "left", vertical: "middle" };
     sheet.getRow(row).height = 24;
   });
-  styleCells(sheet, 1, 8, 1, lastColumn);
+  styleCells(sheet, 1, 9, 1, lastColumn);
 }
 
 function addSectionTitle(sheet: ExcelJS.Worksheet, row: number, title: string, lastColumn: number, color = GREEN) {
@@ -177,7 +179,7 @@ function photoLink(row: Attachment) {
 
 function configureSheet(sheet: ExcelJS.Worksheet, widths: number[], landscape = true) {
   widths.forEach((width, index) => { sheet.getColumn(index + 1).width = width; });
-  sheet.views = [{ state: "frozen", ySplit: 9 }];
+  sheet.views = [{ state: "frozen", ySplit: 10 }];
   sheet.pageSetup = { orientation: landscape ? "landscape" : "portrait", fitToPage: true, fitToWidth: 1, fitToHeight: 0, paperSize: 9, margins: { left: 0.25, right: 0.25, top: 0.35, bottom: 0.35, header: 0.15, footer: 0.15 } };
   sheet.headerFooter.oddFooter = "Page &P of &N";
 }
@@ -188,8 +190,8 @@ export async function exportOperationReportExcel(data: OperationReportExcelData)
   workbook.created = new Date();
 
   const summary = workbook.addWorksheet("របាយការណ៍សង្ខេប");
-  configureSheet(summary, [43, 18, 22]);
-  await addBrandHeader(workbook, summary, data, 3);
+  configureSheet(summary, [7, 20, 20, 16, 16, 16, 16, 32]);
+  await addBrandHeader(workbook, summary, data, 8);
   const dueCount = nonEmpty(data.collectionDueRows).length;
   const paidCount = nonEmpty(data.collectionPaidRows).length;
   const summaryRows: Array<Array<string | number>> = [
@@ -200,16 +202,38 @@ export async function exportOperationReportExcel(data: OperationReportExcelData)
     ["បានបន្តទាក់ទងអតិថិជនដែលយ៉ឺតចាប់ពី ១ថ្ងៃ ដល់ ៣ថ្ងៃ", nonEmpty(data.followUpRows).length, data.followUpRows.reduce((sum, row) => sum + numberValue(row.interest), 0)],
     ["ផ្ញើលិខិតជូនដំណឹងផ្លូវការសម្រាប់អតិថិជនយ៉ឺតចាប់ពី ៤ថ្ងៃ", nonEmpty(data.formalNoticeRows).length, data.formalNoticeRows.reduce((sum, row) => sum + numberValue(row.interest), 0)],
   ];
-  summaryRows.forEach((values, index) => values.forEach((value, column) => { summary.getCell(10 + index, column + 1).value = value; }));
-  ["ការប្រមូល និង ដោះស្រាយ", "ចំនួន (នាក់)", "ជាសាច់ប្រាក់ ($)"].forEach((value, index) => { const cell = summary.getCell(9, index + 1); cell.value = value; cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: GREEN } }; cell.font = { name: KHMER_FONT, bold: true, color: { argb: "FFFFFF" } }; });
-  summary.getCell("B12").numFmt = "0%";
-  [13, 14, 15].forEach((row) => { summary.getCell(row, 3).numFmt = "$#,##0.00"; });
-  styleCells(summary, 9, 15, 1, 3);
+  const addSummaryBand = (headerRow: number, headers: string[], values: Array<Array<string | number>>) => {
+    summary.mergeCells(headerRow, 1, headerRow, 2);
+    summary.mergeCells(headerRow, 3, headerRow, 4);
+    summary.mergeCells(headerRow, 5, headerRow, 8);
+    [1, 3, 5].forEach((column, index) => {
+      const cell = summary.getCell(headerRow, column);
+      cell.value = headers[index];
+      cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: GREEN } };
+      cell.font = { name: KHMER_FONT, bold: true, color: { argb: "FFFFFF" } };
+      cell.alignment = { horizontal: "center", vertical: "middle", wrapText: true };
+    });
+    values.forEach(([label, count, amount], index) => {
+      const row = headerRow + index + 1;
+      summary.mergeCells(row, 1, row, 2);
+      summary.mergeCells(row, 3, row, 4);
+      summary.mergeCells(row, 5, row, 8);
+      summary.getCell(row, 1).value = label;
+      summary.getCell(row, 3).value = count;
+      summary.getCell(row, 3).alignment = { horizontal: "center", vertical: "middle" };
+      summary.getCell(row, 5).value = amount;
+    });
+  };
+  addSummaryBand(11, ["ការប្រមូល", "ចំនួនអតិថិជន (នាក់)", "ចំនួនទឹកប្រាក់"], summaryRows.slice(0, 3));
+  addSummaryBand(15, ["ការដោះស្រាយ", "ចំនួន (នាក់)", "ជាសាច់ប្រាក់ (សរុបគិតជាដុល្លារ)"], summaryRows.slice(3));
+  summary.getCell("C14").numFmt = "0%";
+  [16, 17, 18].forEach((row) => { summary.getCell(row, 5).numFmt = "$#,##0.00"; });
+  styleCells(summary, 11, 18, 1, 8);
 
   const collection = workbook.addWorksheet("អតិថិជនប្រមូល&ដោះស្រាយ");
   configureSheet(collection, [7, 26, 20, 16, 16, 18, 30, 18]);
   await addBrandHeader(workbook, collection, data, 8);
-  let row = 10;
+  let row = 11;
   row = addTable(collection, row, "អតិថិជនដែលត្រូវប្រមូលសរុប", ["ល.រ", "ឈ្មោះអតិថិជន", "ជាសាច់ប្រាក់ ($)", "មូលហេតុ", "រូបភាព"], nonEmpty(data.collectionDueRows).map((item, index) => [index + 1, item.customer, numberValue(item.amount), item.reason, photoLink(item)]), [3], [3]);
   row = addTable(collection, row, "អតិថិជនដែលប្រមូលបានសរុប", ["ល.រ", "ឈ្មោះអតិថិជន", "ជាសាច់ប្រាក់ ($)", "មូលហេតុ", "រូបភាព"], nonEmpty(data.collectionPaidRows).map((item, index) => [index + 1, item.customer, numberValue(item.amount), item.reason, photoLink(item)]), [3], [3], RED);
   const addResolution = (title: string, rows: ResolutionRow[]) => addTable(collection, row, title, ["ល.រ", "ឈ្មោះអតិថិជន", "ប្រភេទទ្រព្យ", "ការប្រាក់ ($)", "ពិន័យ ($)", "ប្រាក់ដើម ($)", "មូលហេតុ / ដំណោះស្រាយ", "រូបភាព"], nonEmpty(rows).map((item, index) => [index + 1, item.customer, item.assetType, numberValue(item.interest), numberValue(item.penalty), numberValue(item.principal), item.solution, photoLink(item)]), [4, 5, 6], [4, 5, 6]);
@@ -220,7 +244,7 @@ export async function exportOperationReportExcel(data: OperationReportExcelData)
   const decisions = workbook.addWorksheet("ឥណទានស្នើសុំ-អនុម័ត-បដិសេធ");
   configureSheet(decisions, [7, 30, 22, 18, 34, 18]);
   await addBrandHeader(workbook, decisions, data, 6);
-  let decisionRow = 10;
+  let decisionRow = 11;
   const addDecision = (title: string, rows: DecisionRow[], color = GREEN) => addTable(decisions, decisionRow, title, ["ល.រ", "ឈ្មោះអតិថិជន", "ប្រភេទឥណទាន", "សាច់ប្រាក់ ($)", "មូលហេតុ", "រូបភាព"], nonEmpty(rows).map((item, index) => [index + 1, item.customer, item.type, numberValue(item.amount), item.reason, photoLink(item)]), [4], [4], color);
   decisionRow = addDecision("អតិថិជនដែលស្នើឥណទាន", data.requestedRows);
   decisionRow = addDecision("អតិថិជនដែលបានអនុម័ត", data.approvedRows);

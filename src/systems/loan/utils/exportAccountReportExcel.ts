@@ -27,6 +27,13 @@ function numberValue(value: string) {
   return Number(value.replace(/[^\d.-]/g, "")) || 0;
 }
 
+function excelReportDate(value: string) {
+  const [year, month, day] = value.split("-").map(Number);
+  if (!year || !month || !day) return null;
+  const date = new Date(Date.UTC(year, month - 1, day));
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
 function filledCollectionRows(rows: AccountReportCollectionRow[]) {
   return rows.filter((row) => row.customer.trim() || row.amount.trim() || row.reason.trim());
 }
@@ -187,8 +194,8 @@ async function addReportHeader(workbook: ExcelJS.Workbook, sheet: ExcelJS.Worksh
   sheet.getRow(3).height = 30;
   await addLogo(workbook, sheet);
 
-  const identityRows: Array<[string, string]> = [
-    ["កាលបរិច្ឆេទ៖", data.reportDateDisplay],
+  const identityRows: Array<[string, string | Date | null]> = [
+    ["កាលបរិច្ឆេទ៖", excelReportDate(data.reportDate)],
     ["ឈ្មោះ៖", data.reporterName],
     ["តួនាទី៖", data.reporterRole],
     ["នាយកដ្ឋាន៖", data.department],
@@ -199,7 +206,10 @@ async function addReportHeader(workbook: ExcelJS.Workbook, sheet: ExcelJS.Worksh
     sheet.getCell(row, 3).value = label;
     sheet.getCell(row, 3).alignment = { horizontal: "right", vertical: "middle" };
     sheet.mergeCells(row, 4, row, 6);
-    sheet.getCell(row, 4).value = value;
+    const valueCell = sheet.getCell(row, 4);
+    valueCell.value = value || "";
+    if (value instanceof Date) valueCell.numFmt = "[$-en-US]dddd, dd mmmm yyyy";
+    valueCell.alignment = { horizontal: "left", vertical: "middle" };
     sheet.getRow(row).height = 24;
   });
   styleRange(sheet, 1, 9, 1, 8);

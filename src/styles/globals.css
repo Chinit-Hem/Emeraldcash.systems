@@ -1909,6 +1909,13 @@ html[lang="km"] :is(h1, h2, h3, h4, h5, h6) {
   font-weight: 700 !important;
 }
 
+/* Preserve display headings that explicitly use the Emerald Cash report font. */
+html[lang="km"] .font-khmer-muol-light {
+  font-family: "Khmer OS Muol Light", serif !important;
+  font-style: normal !important;
+  font-weight: 400 !important;
+}
+
 /* Hide sidebar scrollbar but keep scrolling (doesn't cut "scroll to bottom" actions) */
 /* Hide scrollbar but keep scrolling on the sidebar menu */
 aside nav[aria-label="Main navigation"] {
