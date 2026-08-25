@@ -4565,6 +4565,24 @@ function accountReportDisplayDate(value: string) {
   return date.toLocaleDateString("en-US", { weekday: "long", day: "2-digit", month: "long", year: "numeric" });
 }
 
+function appendAccountRowOnEnter<T extends { id: number }>(
+  event: ReactKeyboardEvent<HTMLInputElement>,
+  rowIndex: number,
+  rows: T[],
+  onChange: (rows: T[]) => void,
+  createRow: (id: number) => T,
+  field: string
+) {
+  if (event.key !== "Enter" || event.nativeEvent.isComposing || rowIndex !== rows.length - 1) return;
+  event.preventDefault();
+  const table = event.currentTarget.closest("table");
+  const nextId = Math.max(0, ...rows.map((row) => row.id)) + 1;
+  onChange([...rows, createRow(nextId)]);
+  requestAnimationFrame(() => {
+    table?.querySelector<HTMLInputElement>(`[data-account-row="${rowIndex + 1}"][data-account-field="${field}"]`)?.focus();
+  });
+}
+
 function AccountReportView() {
   const user = useAuthUser();
   const { success: toastSuccess, error: toastError } = useToast();
@@ -4630,19 +4648,23 @@ function AccountReportView() {
 
   const renderCollectionTable = (title: string, rows: AccountCollectionRow[], setter: (rows: AccountCollectionRow[]) => void, headerClass = khmerHeader) => {
     const total = rows.reduce((sum, row) => sum + accountNumber(row.amount), 0);
-    return <section className="min-w-0"><h3 className={`border border-slate-300 px-3 py-2 text-sm font-bold ${headerClass}`}>{title}</h3><table className="w-full table-fixed border-collapse text-sm"><thead className={headerClass}><tr><th className="w-14 border border-slate-300 px-2 py-2">ល.រ</th><th className="border border-slate-300 px-2 py-2">ឈ្មោះអតិថិជន</th><th className="w-36 border border-slate-300 px-2 py-2">ជាសាច់ប្រាក់ ($)</th><th className="border border-slate-300 px-2 py-2">មូលហេតុ</th></tr></thead><tbody>{rows.map((row, index) => <tr key={row.id}><td className="border border-slate-300 px-2 py-2 text-center">{index + 1}</td><td className="border border-slate-300"><input value={row.customer} onChange={(event) => updateCollection(rows, row.id, "customer", event.target.value, setter)} className={cellInput} /></td><td className="border border-slate-300"><input value={row.amount} onChange={(event) => updateCollection(rows, row.id, "amount", event.target.value, setter)} className={`${cellInput} text-right tabular-nums`} /></td><td className="border border-slate-300"><input value={row.reason} onChange={(event) => updateCollection(rows, row.id, "reason", event.target.value, setter)} className={cellInput} list="account-report-reasons" /></td></tr>)}</tbody><tfoot><tr className="border-t-2 border-slate-900 bg-slate-100 font-bold text-red-600 dark:bg-slate-800"><td colSpan={2} className="border border-slate-300 px-2 py-2 text-center">សរុប</td><td className="border border-slate-300 px-2 py-2 text-right tabular-nums">{formatCurrency(total)}</td><td className="border border-slate-300" /></tr></tfoot></table></section>;
+    const onEnter = (event: ReactKeyboardEvent<HTMLInputElement>, index: number, field: keyof Omit<AccountCollectionRow, "id">) => appendAccountRowOnEnter(event, index, rows, setter, (id) => ({ id, customer: "", amount: "", reason: "" }), field);
+    return <section className="min-w-0"><h3 className={`border border-slate-300 px-3 py-2 text-sm font-bold ${headerClass}`}>{title}</h3><table className="w-full table-fixed border-collapse text-sm"><thead className={headerClass}><tr><th className="w-14 border border-slate-300 px-2 py-2">ល.រ</th><th className="border border-slate-300 px-2 py-2">ឈ្មោះអតិថិជន</th><th className="w-36 border border-slate-300 px-2 py-2">ជាសាច់ប្រាក់ ($)</th><th className="border border-slate-300 px-2 py-2">មូលហេតុ</th></tr></thead><tbody>{rows.map((row, index) => <tr key={row.id}><td className="border border-slate-300 px-2 py-2 text-center">{index + 1}</td><td className="border border-slate-300"><input data-account-row={index} data-account-field="customer" value={row.customer} onKeyDown={(event) => onEnter(event, index, "customer")} onChange={(event) => updateCollection(rows, row.id, "customer", event.target.value, setter)} className={cellInput} /></td><td className="border border-slate-300"><input data-account-row={index} data-account-field="amount" value={row.amount} onKeyDown={(event) => onEnter(event, index, "amount")} onChange={(event) => updateCollection(rows, row.id, "amount", event.target.value, setter)} className={`${cellInput} text-right tabular-nums`} /></td><td className="border border-slate-300"><input data-account-row={index} data-account-field="reason" value={row.reason} onKeyDown={(event) => onEnter(event, index, "reason")} onChange={(event) => updateCollection(rows, row.id, "reason", event.target.value, setter)} className={cellInput} list="account-report-reasons" /></td></tr>)}</tbody><tfoot><tr className="border-t-2 border-slate-900 bg-slate-100 font-bold text-red-600 dark:bg-slate-800"><td colSpan={2} className="border border-slate-300 px-2 py-2 text-center">សរុប</td><td className="border border-slate-300 px-2 py-2 text-right tabular-nums">{formatCurrency(total)}</td><td className="border border-slate-300" /></tr></tfoot></table></section>;
   };
 
-  const renderResolutionTable = (title: string, rows: AccountResolutionRow[], setter: (rows: AccountResolutionRow[]) => void, totals: { interest: number; penalty: number; principal: number }) => (
+  const renderResolutionTable = (title: string, rows: AccountResolutionRow[], setter: (rows: AccountResolutionRow[]) => void, totals: { interest: number; penalty: number; principal: number }) => {
+    const onEnter = (event: ReactKeyboardEvent<HTMLInputElement>, index: number, field: keyof Omit<AccountResolutionRow, "id">) => appendAccountRowOnEnter(event, index, rows, setter, (id) => ({ id, customer: "", assetType: "", interest: "", penalty: "", principal: "", note: "" }), field);
+    return (
     <section>
       <h3 className="border border-slate-300 px-3 py-2 text-sm font-bold text-red-600">{title}</h3>
       <table className="w-full table-fixed border-collapse text-sm">
         <thead className={khmerHeader}><tr><th className="w-14 border border-slate-300 px-2 py-2">ល.រ</th><th className="border border-slate-300 px-2 py-2">ឈ្មោះអតិថិជន</th><th className="border border-slate-300 px-2 py-2">ប្រភេទទ្រព្យ</th><th className="w-32 border border-slate-300 px-2 py-2">ការប្រាក់ ($)</th><th className="w-32 border border-slate-300 px-2 py-2">ពិន័យ ($)</th><th className="w-36 border border-slate-300 px-2 py-2">ប្រាក់ដើម ($)</th><th className="border border-slate-300 px-2 py-2">មូលហេតុ</th></tr></thead>
-        <tbody>{rows.map((row, index) => <tr key={row.id}><td className="border border-slate-300 px-2 py-2 text-center">{index + 1}</td><td className="border border-slate-300"><input value={row.customer} onChange={(event) => updateResolution(rows, row.id, "customer", event.target.value, setter)} className={cellInput} /></td><td className="border border-slate-300"><input value={row.assetType} onChange={(event) => updateResolution(rows, row.id, "assetType", event.target.value, setter)} className={cellInput} /></td><td className="border border-slate-300"><input value={row.interest} onChange={(event) => updateResolution(rows, row.id, "interest", event.target.value, setter)} className={`${cellInput} text-right tabular-nums`} /></td><td className="border border-slate-300"><input value={row.penalty} onChange={(event) => updateResolution(rows, row.id, "penalty", event.target.value, setter)} className={`${cellInput} text-right tabular-nums`} /></td><td className="border border-slate-300"><input value={row.principal} onChange={(event) => updateResolution(rows, row.id, "principal", event.target.value, setter)} className={`${cellInput} text-right tabular-nums`} /></td><td className="border border-slate-300"><input value={row.note} onChange={(event) => updateResolution(rows, row.id, "note", event.target.value, setter)} className={cellInput} /></td></tr>)}</tbody>
+        <tbody>{rows.map((row, index) => <tr key={row.id}><td className="border border-slate-300 px-2 py-2 text-center">{index + 1}</td><td className="border border-slate-300"><input data-account-row={index} data-account-field="customer" value={row.customer} onKeyDown={(event) => onEnter(event, index, "customer")} onChange={(event) => updateResolution(rows, row.id, "customer", event.target.value, setter)} className={cellInput} /></td><td className="border border-slate-300"><input data-account-row={index} data-account-field="assetType" value={row.assetType} onKeyDown={(event) => onEnter(event, index, "assetType")} onChange={(event) => updateResolution(rows, row.id, "assetType", event.target.value, setter)} className={cellInput} /></td><td className="border border-slate-300"><input data-account-row={index} data-account-field="interest" value={row.interest} onKeyDown={(event) => onEnter(event, index, "interest")} onChange={(event) => updateResolution(rows, row.id, "interest", event.target.value, setter)} className={`${cellInput} text-right tabular-nums`} /></td><td className="border border-slate-300"><input data-account-row={index} data-account-field="penalty" value={row.penalty} onKeyDown={(event) => onEnter(event, index, "penalty")} onChange={(event) => updateResolution(rows, row.id, "penalty", event.target.value, setter)} className={`${cellInput} text-right tabular-nums`} /></td><td className="border border-slate-300"><input data-account-row={index} data-account-field="principal" value={row.principal} onKeyDown={(event) => onEnter(event, index, "principal")} onChange={(event) => updateResolution(rows, row.id, "principal", event.target.value, setter)} className={`${cellInput} text-right tabular-nums`} /></td><td className="border border-slate-300"><input data-account-row={index} data-account-field="note" value={row.note} onKeyDown={(event) => onEnter(event, index, "note")} onChange={(event) => updateResolution(rows, row.id, "note", event.target.value, setter)} className={cellInput} /></td></tr>)}</tbody>
         <tfoot><tr className="border-t-2 border-slate-900 bg-slate-100 font-bold text-red-600 dark:bg-slate-800"><td colSpan={3} className="border border-slate-300 px-2 py-2 text-center">សរុប</td><td className="border border-slate-300 px-2 py-2 text-right tabular-nums">{formatCurrency(totals.interest)}</td><td className="border border-slate-300 px-2 py-2 text-right tabular-nums">{totals.penalty ? formatCurrency(totals.penalty) : "-"}</td><td className="border border-slate-300 px-2 py-2 text-right tabular-nums">{formatCurrency(totals.principal)}</td><td className="border border-slate-300" /></tr></tfoot>
       </table>
     </section>
-  );
+    );
+  };
 
   return (
     <div className="space-y-4">
@@ -4651,7 +4673,7 @@ function AccountReportView() {
         <button type="button" onClick={exportAccountReport} className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300"><Download className="h-4 w-4" />Export</button>
         <button type="button" onClick={() => window.print()} className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-700"><Printer className="h-4 w-4" />Print</button>
       </div>
-      <div role="tablist" aria-label="Account report sheets" className="font-khmer-battambang flex min-h-12 items-end overflow-x-auto border-b border-slate-300 bg-slate-100 px-1 pt-1 print:hidden dark:border-slate-700 dark:bg-slate-900">
+      <div role="tablist" aria-label="Account report sheets" className="font-khmer-battambang sticky top-0 z-30 flex min-h-12 items-end overflow-x-auto border-b border-slate-300 bg-slate-100 px-1 pt-1 shadow-sm print:hidden dark:border-slate-700 dark:bg-slate-900">
         <button
           type="button"
           role="tab"
@@ -4740,7 +4762,7 @@ function AccountingDirectory({ onOpenJournalItems }: { onOpenJournalItems: (acco
   const money = (account: LoanBankingAccount, amount: number) => new Intl.NumberFormat("en-US", { style: "currency", currency: account.currency || "USD", maximumFractionDigits: 2 }).format(amount);
 
   return (
-    <Card className="overflow-hidden p-0">
+    <Card className={mode === "accountReport" ? "overflow-visible p-0" : "overflow-hidden p-0"}>
       <div className="border-b border-slate-200 px-5 py-5 dark:border-slate-800 sm:px-7">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
