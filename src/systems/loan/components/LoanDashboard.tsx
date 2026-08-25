@@ -4703,14 +4703,15 @@ function AccountReportView() {
             <div className="font-khmer-muol-light border-b border-slate-300 py-3 text-center text-2xl text-emerald-700 dark:border-slate-700">របាយការណ៍គណនេយ្យ សាខា បឹងកេងកង</div>
             <div className="grid grid-cols-[1fr_180px_1.4fr_1fr] border-b border-slate-300 dark:border-slate-700">
               <div className="border-r border-slate-300 dark:border-slate-700" />
-              <div className="space-y-0 text-right font-semibold">
-                <div className="border-b border-slate-300 px-3 py-2 dark:border-slate-700">កាលបរិច្ឆេទ៖</div><div className="border-b border-slate-300 px-3 py-2 dark:border-slate-700">ឈ្មោះ៖</div><div className="border-b border-slate-300 px-3 py-2 dark:border-slate-700">តួនាទី៖</div><div className="px-3 py-2">នាយកដ្ឋាន៖</div>
-              </div>
-              <div className="space-y-0">
-                <input type="date" value={reportDate} onChange={(event) => setReportDate(event.target.value)} className="block w-full border-0 border-b border-slate-300 px-3 py-2 outline-none focus:bg-emerald-50 dark:border-slate-700 dark:bg-transparent dark:focus:bg-emerald-950/30" />
-                <input value={reporterName} onChange={(event) => setReporterName(event.target.value)} className="block w-full border-0 border-b border-slate-300 px-3 py-2 outline-none focus:bg-emerald-50 dark:border-slate-700 dark:bg-transparent dark:focus:bg-emerald-950/30" />
-                <input value={reporterRole} onChange={(event) => setReporterRole(event.target.value)} className="block w-full border-0 border-b border-slate-300 px-3 py-2 outline-none focus:bg-emerald-50 dark:border-slate-700 dark:bg-transparent dark:focus:bg-emerald-950/30" />
-                <input value={department} onChange={(event) => setDepartment(event.target.value)} className="block w-full border-0 px-3 py-2 outline-none focus:bg-emerald-50 dark:bg-transparent dark:focus:bg-emerald-950/30" />
+              <div className="col-span-2 grid grid-cols-[180px_minmax(0,1fr)]">
+                <div className="flex min-h-12 items-center justify-end whitespace-nowrap border-b border-slate-300 px-3 py-2 text-right font-semibold dark:border-slate-700">កាលបរិច្ឆេទ៖</div>
+                <input type="date" value={reportDate} onChange={(event) => setReportDate(event.target.value)} className="block min-h-12 w-full border-0 border-b border-slate-300 px-3 py-2 outline-none focus:bg-emerald-50 dark:border-slate-700 dark:bg-transparent dark:focus:bg-emerald-950/30" />
+                <div className="flex min-h-12 items-center justify-end whitespace-nowrap border-b border-slate-300 px-3 py-2 text-right font-semibold dark:border-slate-700">ឈ្មោះ៖</div>
+                <input value={reporterName} onChange={(event) => setReporterName(event.target.value)} className="block min-h-12 w-full border-0 border-b border-slate-300 px-3 py-2 outline-none focus:bg-emerald-50 dark:border-slate-700 dark:bg-transparent dark:focus:bg-emerald-950/30" />
+                <div className="flex min-h-12 items-center justify-end whitespace-nowrap border-b border-slate-300 px-3 py-2 text-right font-semibold dark:border-slate-700">តួនាទី៖</div>
+                <input value={reporterRole} onChange={(event) => setReporterRole(event.target.value)} className="block min-h-12 w-full border-0 border-b border-slate-300 px-3 py-2 outline-none focus:bg-emerald-50 dark:border-slate-700 dark:bg-transparent dark:focus:bg-emerald-950/30" />
+                <div className="flex min-h-12 items-center justify-end whitespace-nowrap px-3 py-2 text-right font-semibold">នាយកដ្ឋាន៖</div>
+                <input value={department} onChange={(event) => setDepartment(event.target.value)} className="block min-h-12 w-full border-0 px-3 py-2 outline-none focus:bg-emerald-50 dark:bg-transparent dark:focus:bg-emerald-950/30" />
               </div>
               <div className="border-l border-slate-300 p-3 text-sm text-slate-500 dark:border-slate-700">{accountReportDisplayDate(reportDate)}</div>
             </div>
@@ -5175,19 +5176,17 @@ function OperationReportView({ loans, loading, canViewLoanData, onRefresh, onOpe
       <div className="font-khmer-muol-light flex items-center justify-center border-b border-slate-300 py-3 text-center text-2xl text-emerald-700 dark:border-slate-700">របាយការណ៍លទ្ធផលប្រចាំថ្ងៃ សាខា បឹងកេងកង</div>
       <div className="grid grid-cols-[1fr_180px_1.4fr_1fr] border-b border-slate-300 dark:border-slate-700">
         <div className="border-r border-slate-300 dark:border-slate-700" />
-        <div className="text-right font-semibold">
-          <div className="border-b border-slate-300 px-3 py-2 dark:border-slate-700">កាលបរិច្ឆេទ៖</div>
-          <div className="border-b border-slate-300 px-3 py-2 dark:border-slate-700">ឈ្មោះ៖</div>
-          <div className="border-b border-slate-300 px-3 py-2 dark:border-slate-700">តួនាទី៖</div>
-          <div className="px-3 py-2">នាយកដ្ឋាន៖</div>
+        <div className="col-span-2 grid grid-cols-[180px_minmax(0,1fr)]">
+          <div className="flex min-h-12 items-center justify-end whitespace-nowrap border-b border-slate-300 px-3 py-2 text-right font-semibold dark:border-slate-700">កាលបរិច្ឆេទ៖</div>
+          <input type="date" disabled={reviewingAnotherSpecialist || reportLocked} value={reportDate} onChange={(event) => changeReportDate(event.target.value)} className={`${reportFieldClass} min-h-12 border-b border-slate-300 dark:border-slate-700`} />
+          <div className="flex min-h-12 items-center justify-end whitespace-nowrap border-b border-slate-300 px-3 py-2 text-right font-semibold dark:border-slate-700">ឈ្មោះ៖</div>
+          <input disabled={reviewingAnotherSpecialist || reportLocked} value={reporterName} onChange={(event) => setReporterName(event.target.value)} className={`${reportFieldClass} min-h-12 border-b border-slate-300 dark:border-slate-700`} />
+          <div className="flex min-h-12 items-center justify-end whitespace-nowrap border-b border-slate-300 px-3 py-2 text-right font-semibold dark:border-slate-700">តួនាទី៖</div>
+          <input disabled={reviewingAnotherSpecialist || reportLocked} value={reporterRole} onChange={(event) => setReporterRole(event.target.value)} className={`${reportFieldClass} min-h-12 border-b border-slate-300 dark:border-slate-700`} />
+          <div className="flex min-h-12 items-center justify-end whitespace-nowrap px-3 py-2 text-right font-semibold">នាយកដ្ឋាន៖</div>
+          <input disabled={reviewingAnotherSpecialist || reportLocked} value={department} onChange={(event) => setDepartment(event.target.value)} className={`${reportFieldClass} min-h-12`} />
         </div>
-        <div>
-          <input type="date" disabled={reviewingAnotherSpecialist || reportLocked} value={reportDate} onChange={(event) => changeReportDate(event.target.value)} className={`${reportFieldClass} border-b border-slate-300 dark:border-slate-700`} />
-          <input disabled={reviewingAnotherSpecialist || reportLocked} value={reporterName} onChange={(event) => setReporterName(event.target.value)} className={`${reportFieldClass} border-b border-slate-300 dark:border-slate-700`} />
-          <input disabled={reviewingAnotherSpecialist || reportLocked} value={reporterRole} onChange={(event) => setReporterRole(event.target.value)} className={`${reportFieldClass} border-b border-slate-300 dark:border-slate-700`} />
-          <input disabled={reviewingAnotherSpecialist || reportLocked} value={department} onChange={(event) => setDepartment(event.target.value)} className={reportFieldClass} />
-        </div>
-        <div aria-hidden="true" />
+        <div aria-hidden="true" className="border-l border-slate-300 dark:border-slate-700" />
       </div>
       <div className="h-10 border-b border-slate-300 dark:border-slate-700" />
     </>
