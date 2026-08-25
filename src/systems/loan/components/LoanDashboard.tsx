@@ -52,6 +52,7 @@ import { useAuthUser } from "@/shared/hooks/AuthContext";
 import { useLanguage } from "@/shared/hooks/LanguageContext";
 import { hasAppPermission } from "@/shared/utils/permissions";
 import type { Language } from "@/shared/utils/i18n";
+import EmeraldCashLogo from "@/shared/components/EmeraldCashLogo";
 import dynamic from "next/dynamic";
 
 const LoanRevenueChart = dynamic(() => import("./charts/LoanRevenueChart").then((m) => m.default), { ssr: false });
@@ -4536,11 +4537,190 @@ function ContactDirectory({ canCreate, canEdit }: { canCreate: boolean; canEdit:
   );
 }
 
+type AccountReportMode = "banking" | "accountReport";
+type AccountReportSheet = "summary" | "collection";
+type AccountCollectionRow = { id: number; customer: string; amount: string; reason: string };
+type AccountResolutionRow = { id: number; customer: string; assetType: string; interest: string; penalty: string; principal: string; note: string };
+
+const ACCOUNT_REPORT_COLLECTION_REASONS = ["យឺត ៣ថ្ងៃ", "យឺត ៧ថ្ងៃ", "យឺត ១៥ថ្ងៃ", "ប្រភពចំណូលមិនច្បាស់លាស់", "កូនមិនទទួលជួយបង់ជំនួស", "បញ្ហាសុខភាពឈឺចូលពេទ្យ"];
+
+function createAccountCollectionRows(customers: string[] = []): AccountCollectionRow[] {
+  return Array.from({ length: 10 }, (_, index) => ({ id: index + 1, customer: customers[index] || "", amount: "", reason: "" }));
+}
+
+function createAccountResolutionRows(customers: string[] = [], count = 0): AccountResolutionRow[] {
+  return Array.from({ length: 10 }, (_, index) => ({ id: index + 1, customer: index < count ? customers[index] || "" : "", assetType: "", interest: "", penalty: "", principal: "", note: "" }));
+}
+
+function accountNumber(value: string) {
+  return Number(value.replace(/[^\d.-]/g, "")) || 0;
+}
+
+function accountReportDateInputValue() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function accountReportDisplayDate(value: string) {
+  const date = value ? new Date(`${value}T00:00:00`) : new Date();
+  return date.toLocaleDateString("en-US", { weekday: "long", day: "2-digit", month: "long", year: "numeric" });
+}
+
+function AccountReportView() {
+  const user = useAuthUser();
+  const { success: toastSuccess, error: toastError } = useToast();
+  const [reportDate, setReportDate] = useState(accountReportDateInputValue());
+  const [reporterName, setReporterName] = useState(user.full_name || user.username || "Pha Sreymom");
+  const [reporterRole, setReporterRole] = useState(user.position || "Assistant Accountant");
+  const [department, setDepartment] = useState(user.department || "Accountant");
+  const [dueRows, setDueRows] = useState<AccountCollectionRow[]>(createAccountCollectionRows);
+  const [paidRows, setPaidRows] = useState<AccountCollectionRow[]>(createAccountCollectionRows);
+  const [dueNoticeRows, setDueNoticeRows] = useState<AccountResolutionRow[]>(createAccountResolutionRows);
+  const [promiseRows, setPromiseRows] = useState<AccountResolutionRow[]>(createAccountResolutionRows);
+  const [closedRows, setClosedRows] = useState<AccountResolutionRow[]>(createAccountResolutionRows);
+  const [loadingLoans, setLoadingLoans] = useState(false);
+  const [activeSheet, setActiveSheet] = useState<AccountReportSheet>("summary");
+
+  const dueCount = dueRows.filter((row) => row.customer.trim()).length;
+  const paidCount = paidRows.filter((row) => row.customer.trim()).length;
+  const collectionRate = dueCount ? Math.round((paidCount / dueCount) * 100) : 0;
+  const resolutionTotal = (rows: AccountResolutionRow[], key: keyof Pick<AccountResolutionRow, "interest" | "penalty" | "principal">) => rows.reduce((total, row) => total + accountNumber(row[key]), 0);
+  const promiseInterestTotal = resolutionTotal(promiseRows, "interest");
+  const promisePenaltyTotal = resolutionTotal(promiseRows, "penalty");
+  const promisePrincipalTotal = resolutionTotal(promiseRows, "principal");
+  const closedInterestTotal = resolutionTotal(closedRows, "interest");
+  const closedPenaltyTotal = resolutionTotal(closedRows, "penalty");
+  const closedPrincipalTotal = resolutionTotal(closedRows, "principal");
+
+  const prepareFromLoans = async () => {
+    setLoadingLoans(true);
+    try {
+      const loans = await api<LoanEntity[]>("/api/loan/loans?limit=200");
+      const activeLoans = loans.filter((loan) => !["Closed", "Rejected", "Draft"].includes(loan.repaymentStatus)).slice(0, 10);
+      const names = activeLoans.map((loan) => loan.borrower.fullName);
+      const collection = activeLoans.map((loan, index) => ({ id: index + 1, customer: loan.borrower.fullName, amount: String(loan.paymentAmount || ""), reason: loan.nextPaymentDate && loan.nextPaymentDate.slice(0, 10) < reportDate ? "យឺត" : "ដល់ថ្ងៃបង់" }));
+      const paddedCollection = [...collection, ...createAccountCollectionRows([]).slice(0, Math.max(0, 10 - collection.length)).map((row, index) => ({ ...row, id: collection.length + index + 1 }))];
+      const resolution = activeLoans.map((loan, index) => ({ id: index + 1, customer: loan.borrower.fullName, assetType: loan.loanType, interest: String(loan.paymentAmount || ""), penalty: "", principal: String(loan.outstandingBalance || loan.principal || ""), note: "" }));
+      const paddedResolution = [...resolution, ...createAccountResolutionRows([], 0).slice(0, Math.max(0, 10 - resolution.length)).map((row, index) => ({ ...row, id: resolution.length + index + 1 }))];
+      setDueRows(paddedCollection);
+      setPaidRows(createAccountCollectionRows(names.slice(0, Math.min(3, names.length))));
+      setDueNoticeRows(paddedResolution);
+      toastSuccess("Account report prepared from active loans.");
+    } catch (caught) {
+      toastError(caught instanceof Error ? caught.message : "Could not prepare report from loans");
+    } finally {
+      setLoadingLoans(false);
+    }
+  };
+
+  const exportAccountReport = async () => {
+    try {
+      const { exportAccountReportExcel } = await import("@/systems/loan/utils/exportAccountReportExcel");
+      await exportAccountReportExcel({ reportDate, reportDateDisplay: accountReportDisplayDate(reportDate), reporterName, reporterRole, department, dueRows, paidRows, dueNoticeRows, promiseRows, closedRows });
+      toastSuccess("Account report exported to Excel.");
+    } catch (caught) {
+      toastError(caught instanceof Error ? caught.message : "Could not export account report");
+    }
+  };
+
+  const updateCollection = (rows: AccountCollectionRow[], rowId: number, key: keyof Omit<AccountCollectionRow, "id">, value: string, setter: (rows: AccountCollectionRow[]) => void) => setter(rows.map((row) => row.id === rowId ? { ...row, [key]: value } : row));
+  const updateResolution = (rows: AccountResolutionRow[], rowId: number, key: keyof Omit<AccountResolutionRow, "id">, value: string, setter: (rows: AccountResolutionRow[]) => void) => setter(rows.map((row) => row.id === rowId ? { ...row, [key]: value } : row));
+  const cellInput = "w-full min-w-0 border-0 bg-transparent px-2 py-1.5 text-sm text-slate-900 outline-none focus:bg-emerald-50 focus:ring-1 focus:ring-emerald-500 dark:text-white dark:focus:bg-emerald-950/30";
+  const khmerHeader = "bg-[#087323] text-white";
+  const redHeader = "bg-[#c90000] text-white";
+
+  const renderCollectionTable = (title: string, rows: AccountCollectionRow[], setter: (rows: AccountCollectionRow[]) => void, headerClass = khmerHeader) => {
+    const total = rows.reduce((sum, row) => sum + accountNumber(row.amount), 0);
+    return <section className="min-w-0"><h3 className={`border border-slate-300 px-3 py-2 text-sm font-bold ${headerClass}`}>{title}</h3><table className="w-full table-fixed border-collapse text-sm"><thead className={headerClass}><tr><th className="w-14 border border-slate-300 px-2 py-2">ល.រ</th><th className="border border-slate-300 px-2 py-2">ឈ្មោះអតិថិជន</th><th className="w-36 border border-slate-300 px-2 py-2">ជាសាច់ប្រាក់ ($)</th><th className="border border-slate-300 px-2 py-2">មូលហេតុ</th></tr></thead><tbody>{rows.map((row, index) => <tr key={row.id}><td className="border border-slate-300 px-2 py-2 text-center">{index + 1}</td><td className="border border-slate-300"><input value={row.customer} onChange={(event) => updateCollection(rows, row.id, "customer", event.target.value, setter)} className={cellInput} /></td><td className="border border-slate-300"><input value={row.amount} onChange={(event) => updateCollection(rows, row.id, "amount", event.target.value, setter)} className={`${cellInput} text-right tabular-nums`} /></td><td className="border border-slate-300"><input value={row.reason} onChange={(event) => updateCollection(rows, row.id, "reason", event.target.value, setter)} className={cellInput} list="account-report-reasons" /></td></tr>)}</tbody><tfoot><tr className="border-t-2 border-slate-900 bg-slate-100 font-bold text-red-600 dark:bg-slate-800"><td colSpan={2} className="border border-slate-300 px-2 py-2 text-center">សរុប</td><td className="border border-slate-300 px-2 py-2 text-right tabular-nums">{formatCurrency(total)}</td><td className="border border-slate-300" /></tr></tfoot></table></section>;
+  };
+
+  const renderResolutionTable = (title: string, rows: AccountResolutionRow[], setter: (rows: AccountResolutionRow[]) => void, totals: { interest: number; penalty: number; principal: number }) => (
+    <section>
+      <h3 className="border border-slate-300 px-3 py-2 text-sm font-bold text-red-600">{title}</h3>
+      <table className="w-full table-fixed border-collapse text-sm">
+        <thead className={khmerHeader}><tr><th className="w-14 border border-slate-300 px-2 py-2">ល.រ</th><th className="border border-slate-300 px-2 py-2">ឈ្មោះអតិថិជន</th><th className="border border-slate-300 px-2 py-2">ប្រភេទទ្រព្យ</th><th className="w-32 border border-slate-300 px-2 py-2">ការប្រាក់ ($)</th><th className="w-32 border border-slate-300 px-2 py-2">ពិន័យ ($)</th><th className="w-36 border border-slate-300 px-2 py-2">ប្រាក់ដើម ($)</th><th className="border border-slate-300 px-2 py-2">មូលហេតុ</th></tr></thead>
+        <tbody>{rows.map((row, index) => <tr key={row.id}><td className="border border-slate-300 px-2 py-2 text-center">{index + 1}</td><td className="border border-slate-300"><input value={row.customer} onChange={(event) => updateResolution(rows, row.id, "customer", event.target.value, setter)} className={cellInput} /></td><td className="border border-slate-300"><input value={row.assetType} onChange={(event) => updateResolution(rows, row.id, "assetType", event.target.value, setter)} className={cellInput} /></td><td className="border border-slate-300"><input value={row.interest} onChange={(event) => updateResolution(rows, row.id, "interest", event.target.value, setter)} className={`${cellInput} text-right tabular-nums`} /></td><td className="border border-slate-300"><input value={row.penalty} onChange={(event) => updateResolution(rows, row.id, "penalty", event.target.value, setter)} className={`${cellInput} text-right tabular-nums`} /></td><td className="border border-slate-300"><input value={row.principal} onChange={(event) => updateResolution(rows, row.id, "principal", event.target.value, setter)} className={`${cellInput} text-right tabular-nums`} /></td><td className="border border-slate-300"><input value={row.note} onChange={(event) => updateResolution(rows, row.id, "note", event.target.value, setter)} className={cellInput} /></td></tr>)}</tbody>
+        <tfoot><tr className="border-t-2 border-slate-900 bg-slate-100 font-bold text-red-600 dark:bg-slate-800"><td colSpan={3} className="border border-slate-300 px-2 py-2 text-center">សរុប</td><td className="border border-slate-300 px-2 py-2 text-right tabular-nums">{formatCurrency(totals.interest)}</td><td className="border border-slate-300 px-2 py-2 text-right tabular-nums">{totals.penalty ? formatCurrency(totals.penalty) : "-"}</td><td className="border border-slate-300 px-2 py-2 text-right tabular-nums">{formatCurrency(totals.principal)}</td><td className="border border-slate-300" /></tr></tfoot>
+      </table>
+    </section>
+  );
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap justify-end gap-2 print:hidden">
+        <button type="button" disabled={loadingLoans} onClick={() => void prepareFromLoans()} className="inline-flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-700 hover:bg-emerald-100 disabled:opacity-50 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-300"><RefreshCw className={`h-4 w-4 ${loadingLoans ? "animate-spin" : ""}`} />Prepare from loans</button>
+        <button type="button" onClick={exportAccountReport} className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300"><Download className="h-4 w-4" />Export</button>
+        <button type="button" onClick={() => window.print()} className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-700"><Printer className="h-4 w-4" />Print</button>
+      </div>
+      <div role="tablist" aria-label="Account report sheets" className="font-khmer-battambang flex min-h-12 items-end overflow-x-auto border-b border-slate-300 bg-slate-100 px-1 pt-1 print:hidden dark:border-slate-700 dark:bg-slate-900">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeSheet === "summary"}
+          onClick={() => setActiveSheet("summary")}
+          className={`min-h-11 min-w-64 shrink-0 border-x border-t px-5 py-2 text-center text-lg transition ${activeSheet === "summary" ? "border-slate-300 border-t-2 border-t-emerald-700 bg-white text-emerald-700 dark:border-slate-700 dark:bg-slate-950 dark:text-emerald-300" : "border-transparent text-slate-500 hover:bg-white/70 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200"}`}
+        >
+          របាយការណ៍សង្ខេប
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeSheet === "collection"}
+          onClick={() => setActiveSheet("collection")}
+          className={`min-h-11 min-w-80 shrink-0 border-x border-t px-5 py-2 text-center text-lg transition ${activeSheet === "collection" ? "border-slate-300 border-t-2 border-t-emerald-700 bg-white text-emerald-700 dark:border-slate-700 dark:bg-slate-950 dark:text-emerald-300" : "border-transparent text-slate-500 hover:bg-white/70 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200"}`}
+        >
+          អតិថិជនប្រមូល&amp;ដោះស្រាយ
+        </button>
+      </div>
+      <Card className="overflow-hidden rounded-xl border border-slate-300 bg-white p-0 shadow-sm dark:border-slate-700 dark:bg-slate-950">
+        <div className="overflow-x-auto">
+          <div className="min-w-[1180px] p-0 text-slate-950 dark:text-slate-100">
+            <div className="grid min-h-36 grid-cols-[220px_1fr] border-b border-slate-300 bg-white dark:border-slate-700 dark:bg-slate-950">
+              <div className="flex items-center justify-center p-4"><EmeraldCashLogo className="h-auto w-44 object-contain" /></div>
+              <div className="font-khmer-muol-light flex items-center justify-center px-5 text-center text-3xl text-red-700">ក្រុមហ៊ុន អេមើរ៉ល ឃែស ឯ.ក</div>
+            </div>
+            <div className="border-b border-slate-300 py-3 text-center text-2xl font-black text-emerald-700 dark:border-slate-700">របាយការណ៍គណនេយ្យ សាខា បឹងកេងកង</div>
+            <div className="grid grid-cols-[1fr_180px_1.4fr_1fr] border-b border-slate-300 dark:border-slate-700">
+              <div className="border-r border-slate-300 dark:border-slate-700" />
+              <div className="space-y-0 text-right font-semibold">
+                <div className="border-b border-slate-300 px-3 py-2 dark:border-slate-700">កាលបរិច្ឆេទ៖</div><div className="border-b border-slate-300 px-3 py-2 dark:border-slate-700">ឈ្មោះ៖</div><div className="border-b border-slate-300 px-3 py-2 dark:border-slate-700">តួនាទី៖</div><div className="px-3 py-2">នាយកដ្ឋាន៖</div>
+              </div>
+              <div className="space-y-0">
+                <input type="date" value={reportDate} onChange={(event) => setReportDate(event.target.value)} className="block w-full border-0 border-b border-slate-300 px-3 py-2 outline-none focus:bg-emerald-50 dark:border-slate-700 dark:bg-transparent dark:focus:bg-emerald-950/30" />
+                <input value={reporterName} onChange={(event) => setReporterName(event.target.value)} className="block w-full border-0 border-b border-slate-300 px-3 py-2 outline-none focus:bg-emerald-50 dark:border-slate-700 dark:bg-transparent dark:focus:bg-emerald-950/30" />
+                <input value={reporterRole} onChange={(event) => setReporterRole(event.target.value)} className="block w-full border-0 border-b border-slate-300 px-3 py-2 outline-none focus:bg-emerald-50 dark:border-slate-700 dark:bg-transparent dark:focus:bg-emerald-950/30" />
+                <input value={department} onChange={(event) => setDepartment(event.target.value)} className="block w-full border-0 px-3 py-2 outline-none focus:bg-emerald-50 dark:bg-transparent dark:focus:bg-emerald-950/30" />
+              </div>
+              <div className="border-l border-slate-300 p-3 text-sm text-slate-500 dark:border-slate-700">{accountReportDisplayDate(reportDate)}</div>
+            </div>
+            <div className="h-10 border-b border-slate-300 dark:border-slate-700" />
+            {activeSheet === "summary" ? (
+              <table className="w-full table-fixed border-collapse text-sm">
+                <thead className={khmerHeader}><tr><th className="border border-slate-300 px-3 py-3">ការប្រមូល</th><th className="border border-slate-300 px-3 py-3">ចំនួនអតិថិជន (នាក់)</th><th className="border border-slate-300 px-3 py-3">ចំនួនទឹកប្រាក់</th></tr></thead>
+                <tbody><tr><td className="border border-slate-300 px-3 py-2">អតិថិជនត្រូវបង់សរុប</td><td className="border border-slate-300 px-3 py-2 text-center">{dueCount}</td><td className="border border-slate-300" /></tr><tr><td className="border border-slate-300 px-3 py-2">ចំនួនអតិថិជនដែលបានបង់សរុប</td><td className="border border-slate-300 px-3 py-2 text-center">{paidCount}</td><td className="border border-slate-300" /></tr><tr><td className="border border-slate-300 px-3 py-2">អត្រាប្រមូលប្រាក់គិតជាភាគរយ</td><td className="border border-slate-300 px-3 py-2 text-center">{collectionRate}%</td><td className="border border-slate-300" /></tr></tbody>
+                <thead className={khmerHeader}><tr><th className="border border-slate-300 px-3 py-3">ការដោះស្រាយ</th><th className="border border-slate-300 px-3 py-3">ចំនួន (នាក់)</th><th className="border border-slate-300 px-3 py-3">ជាសាច់ប្រាក់ (សរុបគិតជាដុល្លារ)</th></tr></thead>
+                <tbody><tr><td className="border border-slate-300 px-3 py-2">អ្នកជំពាក់អតិថិជន ដល់ថ្ងៃកំណត់ត្រូវបង់</td><td className="border border-slate-300 px-3 py-2 text-center">{dueNoticeRows.filter((row) => row.customer.trim()).length}</td><td className="border border-slate-300" /></tr><tr><td className="border border-slate-300 px-3 py-2">បានបង់តាមកំណត់និងលើកលែងជាថ្មី</td><td className="border border-slate-300 px-3 py-2 text-center">{promiseRows.filter((row) => row.customer.trim()).length}</td><td className="border border-slate-300 px-3 py-2 text-right">{formatCurrency(promiseInterestTotal)}</td></tr><tr><td className="border border-slate-300 px-3 py-2">ធ្វើវិធីសាស្រ្តដោះស្រាយបន្ថែម</td><td className="border border-slate-300 px-3 py-2 text-center">{closedRows.filter((row) => row.customer.trim()).length}</td><td className="border border-slate-300 px-3 py-2 text-right">{formatCurrency(closedInterestTotal)}</td></tr></tbody>
+                <tfoot><tr className="border-t-2 border-slate-900 bg-slate-100 font-bold text-red-600 dark:bg-slate-800"><td colSpan={2} className="border border-slate-300 px-3 py-3 text-center">សរុប</td><td className="border border-slate-300 px-3 py-3 text-right text-lg">{formatCurrency(promiseInterestTotal + closedInterestTotal)}</td></tr></tfoot>
+              </table>
+            ) : (
+              <>
+                <div className="grid grid-cols-2 gap-0">{renderCollectionTable("អតិថិជនត្រូវបង់សរុប", dueRows, setDueRows)}{renderCollectionTable("អតិថិជនដែលបានបង់សរុប", paidRows, setPaidRows, redHeader)}</div>
+                <div className="space-y-8 border-t-4 border-double border-slate-900 pt-6">{renderResolutionTable("អតិថិជនដែលត្រូវដោះស្រាយសរុប", dueNoticeRows, setDueNoticeRows, { interest: resolutionTotal(dueNoticeRows, "interest"), penalty: resolutionTotal(dueNoticeRows, "penalty"), principal: resolutionTotal(dueNoticeRows, "principal") })}{renderResolutionTable("បានបង់តាមកំណត់និងលើកលែងជាថ្មី", promiseRows, setPromiseRows, { interest: promiseInterestTotal, penalty: promisePenaltyTotal, principal: promisePrincipalTotal })}{renderResolutionTable("ធ្វើវិធីសាស្រ្តដោះស្រាយបន្ថែម", closedRows, setClosedRows, { interest: closedInterestTotal, penalty: closedPenaltyTotal, principal: closedPrincipalTotal })}</div>
+              </>
+            )}
+          </div>
+        </div>
+      </Card>
+      <datalist id="account-report-reasons">{ACCOUNT_REPORT_COLLECTION_REASONS.map((reason) => <option key={reason} value={reason} />)}</datalist>
+    </div>
+  );
+}
+
 function AccountingDirectory({ onOpenJournalItems }: { onOpenJournalItems: (account: JournalViewAccount) => void }) {
   const { error: toastError, info: toastInfo } = useToast();
   const [accounts, setAccounts] = useState<LoanBankingAccount[]>([]);
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
+  const [mode, setMode] = useState<AccountReportMode>("banking");
 
   useEffect(() => {
     let active = true;
@@ -4563,21 +4743,37 @@ function AccountingDirectory({ onOpenJournalItems }: { onOpenJournalItems: (acco
     <Card className="overflow-hidden p-0">
       <div className="border-b border-slate-200 px-5 py-5 dark:border-slate-800 sm:px-7">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Banking</h1>
-          <div className="flex w-full items-center gap-3 lg:max-w-3xl"><button type="button" onClick={() => toastInfo("Banking bookmarks are ready for saved filters.")} className="inline-flex shrink-0 items-center gap-2 rounded-full bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700"><CalendarDays className="h-4 w-4" /> Bookmarks <ChevronDown className="h-4 w-4" /></button><div className="relative min-w-0 flex-1 rounded-full border border-slate-300 bg-white transition focus-within:border-emerald-500 focus-within:ring-2 focus-within:ring-emerald-500/20 dark:border-slate-700 dark:bg-slate-900"><Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><input aria-label="Search banking accounts" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Type to search" className="w-full rounded-full border-0 bg-transparent py-2.5 pl-11 pr-4 text-sm text-slate-900 !outline-none focus-visible:!outline-none dark:text-white" /></div></div>
+          <div>
+            <p className="text-sm font-semibold text-emerald-700 dark:text-emerald-300">Loan management / Accounting</p>
+            <h1 className="mt-1 text-2xl font-bold text-slate-900 dark:text-white">{mode === "banking" ? "Banking" : "Account Report"}</h1>
+          </div>
+          {mode === "banking" ? <div className="flex w-full items-center gap-3 lg:max-w-3xl"><button type="button" onClick={() => toastInfo("Banking bookmarks are ready for saved filters.")} className="inline-flex shrink-0 items-center gap-2 rounded-full bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700"><CalendarDays className="h-4 w-4" /> Bookmarks <ChevronDown className="h-4 w-4" /></button><div className="relative min-w-0 flex-1 rounded-full border border-slate-300 bg-white transition focus-within:border-emerald-500 focus-within:ring-2 focus-within:ring-emerald-500/20 dark:border-slate-700 dark:bg-slate-900"><Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><input aria-label="Search banking accounts" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Type to search" className="w-full rounded-full border-0 bg-transparent py-2.5 pl-11 pr-4 text-sm text-slate-900 !outline-none focus-visible:!outline-none dark:text-white" /></div></div> : null}
         </div>
-        <div className="mt-4 flex flex-wrap items-center justify-end gap-3"><span className="text-sm font-semibold text-slate-600 dark:text-slate-300">{visibleAccounts.length ? `1-${visibleAccounts.length}` : "0-0"}</span><span className="text-slate-300">|</span><span className="text-sm font-semibold text-slate-600 dark:text-slate-300">{accounts.length}</span><button type="button" disabled className="rounded-full bg-slate-100 p-2.5 text-slate-400 disabled:opacity-60 dark:bg-slate-800"><ChevronDown className="h-4 w-4 rotate-90" /></button><button type="button" disabled className="rounded-full bg-slate-100 p-2.5 text-slate-400 disabled:opacity-60 dark:bg-slate-800"><ChevronDown className="h-4 w-4 -rotate-90" /></button><span className="flex-1" /><button type="button" onClick={() => toastInfo("Use the search field to filter banking accounts.")} className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-4 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300"><Search className="h-4 w-4" /> Filters <ChevronDown className="h-4 w-4" /></button><button type="button" onClick={() => toastInfo("Accounts are grouped as Bank and Cash.")} className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-4 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300"><List className="h-4 w-4" /> Group By <ChevronDown className="h-4 w-4" /></button></div>
+        <div className="mt-4 flex flex-wrap items-center gap-3">
+          <div className="inline-flex rounded-xl border border-slate-200 bg-slate-50 p-1 dark:border-slate-700 dark:bg-slate-900">
+            <button type="button" onClick={() => setMode("banking")} className={`rounded-lg px-3 py-2 text-sm font-semibold ${mode === "banking" ? "bg-emerald-600 text-white" : "text-slate-600 hover:bg-white dark:text-slate-300 dark:hover:bg-slate-800"}`}>Banking</button>
+            <button type="button" onClick={() => setMode("accountReport")} className={`rounded-lg px-3 py-2 text-sm font-semibold ${mode === "accountReport" ? "bg-emerald-600 text-white" : "text-slate-600 hover:bg-white dark:text-slate-300 dark:hover:bg-slate-800"}`}>Account Report</button>
+          </div>
+          {mode === "banking" ? <><span className="ml-auto text-sm font-semibold text-slate-600 dark:text-slate-300">{visibleAccounts.length ? `1-${visibleAccounts.length}` : "0-0"}</span><span className="text-slate-300">|</span><span className="text-sm font-semibold text-slate-600 dark:text-slate-300">{accounts.length}</span><button type="button" disabled className="rounded-full bg-slate-100 p-2.5 text-slate-400 disabled:opacity-60 dark:bg-slate-800"><ChevronDown className="h-4 w-4 rotate-90" /></button><button type="button" disabled className="rounded-full bg-slate-100 p-2.5 text-slate-400 disabled:opacity-60 dark:bg-slate-800"><ChevronDown className="h-4 w-4 -rotate-90" /></button><span className="flex-1" /><button type="button" onClick={() => toastInfo("Use the search field to filter banking accounts.")} className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-4 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300"><Search className="h-4 w-4" /> Filters <ChevronDown className="h-4 w-4" /></button><button type="button" onClick={() => toastInfo("Accounts are grouped as Bank and Cash.")} className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-4 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300"><List className="h-4 w-4" /> Group By <ChevronDown className="h-4 w-4" /></button></> : null}
+        </div>
       </div>
       <div className="bg-slate-50/70 p-5 dark:bg-slate-950 sm:p-6">
-        {loading ? <div className="flex min-h-52 items-center justify-center text-sm text-slate-500"><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading banking…</div> : null}
-        {!loading && visibleAccounts.length ? <div className="grid gap-5 xl:grid-cols-2">{visibleAccounts.map((account) => <div key={account.id} className="min-h-80 rounded-xl border border-slate-200 bg-white p-7 shadow-sm dark:border-slate-700 dark:bg-slate-900"><h2 className="text-xl font-bold text-slate-900 dark:text-white">{account.name}</h2><div className="mt-8 grid grid-cols-2 gap-x-8 gap-y-7"><button type="button" onClick={() => onOpenJournalItems(account)} className="text-left"><span className="block text-sm font-medium text-slate-500">Balance</span><span className="mt-1 flex items-center gap-2 text-base font-semibold text-slate-700 dark:text-slate-200">{money(account, account.balance)} <ArrowRight className="h-4 w-4 text-emerald-600" /></span></button><button type="button" onClick={() => onOpenJournalItems(account)} className="text-left"><span className="block text-sm font-medium text-slate-500">Reconciled</span><span className="mt-1 flex items-center gap-2 text-base font-semibold text-slate-700 dark:text-slate-200">{money(account, account.reconciled)} <ArrowRight className="h-4 w-4 text-emerald-600" /></span></button><button type="button" onClick={() => toastInfo("Record a repayment from the active loan to receive money.")} className="inline-flex items-center gap-2 text-sm font-bold text-emerald-700 hover:text-emerald-800 dark:text-emerald-300 dark:hover:text-emerald-200"><HandCoins className="h-5 w-5" /> Receive Money</button><button type="button" onClick={() => toastInfo("Approve and disburse a loan to send money.")} className="inline-flex items-center gap-2 text-sm font-bold text-emerald-700 hover:text-emerald-800 dark:text-emerald-300 dark:hover:text-emerald-200"><CreditCard className="h-5 w-5" /> Send Money</button><button type="button" onClick={() => toastInfo("Statement import will be connected to bank reconciliation.")} className="col-span-2 inline-flex items-center gap-2 text-sm font-semibold text-emerald-700 hover:text-emerald-800 dark:text-emerald-300 dark:hover:text-emerald-200"><Upload className="h-5 w-5" /> Import Statement</button></div></div>)}</div> : null}
-        {!loading && visibleAccounts.length === 0 ? <div className="py-16 text-center"><CreditCard className="mx-auto h-10 w-10 text-slate-300" /><p className="mt-3 font-semibold text-slate-700 dark:text-slate-200">No banking accounts found</p><p className="mt-1 text-sm text-slate-500">Clear the search or configure a Bank and Cash account.</p></div> : null}
+        {mode === "accountReport" ? <AccountReportView /> : null}
+        {mode === "banking" && loading ? <div className="flex min-h-52 items-center justify-center text-sm text-slate-500"><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading banking…</div> : null}
+        {mode === "banking" && !loading && visibleAccounts.length ? <div className="grid gap-5 xl:grid-cols-2">{visibleAccounts.map((account) => <div key={account.id} className="min-h-80 rounded-xl border border-slate-200 bg-white p-7 shadow-sm dark:border-slate-700 dark:bg-slate-900"><h2 className="text-xl font-bold text-slate-900 dark:text-white">{account.name}</h2><div className="mt-8 grid grid-cols-2 gap-x-8 gap-y-7"><button type="button" onClick={() => onOpenJournalItems(account)} className="text-left"><span className="block text-sm font-medium text-slate-500">Balance</span><span className="mt-1 flex items-center gap-2 text-base font-semibold text-slate-700 dark:text-slate-200">{money(account, account.balance)} <ArrowRight className="h-4 w-4 text-emerald-600" /></span></button><button type="button" onClick={() => onOpenJournalItems(account)} className="text-left"><span className="block text-sm font-medium text-slate-500">Reconciled</span><span className="mt-1 flex items-center gap-2 text-base font-semibold text-slate-700 dark:text-slate-200">{money(account, account.reconciled)} <ArrowRight className="h-4 w-4 text-emerald-600" /></span></button><button type="button" onClick={() => toastInfo("Record a repayment from the active loan to receive money.")} className="inline-flex items-center gap-2 text-sm font-bold text-emerald-700 hover:text-emerald-800 dark:text-emerald-300 dark:hover:text-emerald-200"><HandCoins className="h-5 w-5" /> Receive Money</button><button type="button" onClick={() => toastInfo("Approve and disburse a loan to send money.")} className="inline-flex items-center gap-2 text-sm font-bold text-emerald-700 hover:text-emerald-800 dark:text-emerald-300 dark:hover:text-emerald-200"><CreditCard className="h-5 w-5" /> Send Money</button><button type="button" onClick={() => toastInfo("Statement import will be connected to bank reconciliation.")} className="col-span-2 inline-flex items-center gap-2 text-sm font-semibold text-emerald-700 hover:text-emerald-800 dark:text-emerald-300 dark:hover:text-emerald-200"><Upload className="h-5 w-5" /> Import Statement</button></div></div>)}</div> : null}
+        {mode === "banking" && !loading && visibleAccounts.length === 0 ? <div className="py-16 text-center"><CreditCard className="mx-auto h-10 w-10 text-slate-300" /><p className="mt-3 font-semibold text-slate-700 dark:text-slate-200">No banking accounts found</p><p className="mt-1 text-sm text-slate-500">Clear the search or configure a Bank and Cash account.</p></div> : null}
       </div>
     </Card>
   );
 }
 
-type OperationReportAttachment = { imageUrl?: string; imageName?: string };
+type OperationReportImage = { imageUrl: string; imageName?: string };
+type OperationReportAttachment = {
+  images?: OperationReportImage[];
+  // Keep legacy fields so previously saved reports continue to display their photo.
+  imageUrl?: string;
+  imageName?: string;
+};
 type OperationReportCollectionRow = OperationReportAttachment & { id: number; customer: string; amount: string; reason: string };
 type OperationReportResolutionRow = OperationReportAttachment & { id: number; customer: string; assetType: string; interest: string; penalty: string; principal: string; solution: string };
 type OperationReportLoanDecisionRow = OperationReportAttachment & { id: number; customer: string; type: string; amount: string; reason: string };
@@ -4700,11 +4896,13 @@ function OperationReportView({ loans, loading, canViewLoanData, onRefresh, onOpe
   const [loadedReportStatus, setLoadedReportStatus] = useState<OperationReportStatus>("draft");
   const [reviewComment, setReviewComment] = useState("");
   const [reviewingAction, setReviewingAction] = useState<"reviewed" | "approved" | "returned" | null>(null);
+  const [deletingReportId, setDeletingReportId] = useState<string | null>(null);
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
 
   const suggestedCustomers = useMemo(() => Array.from(new Set(loans.map((loan) => loan.borrower.fullName).filter(Boolean))).slice(0, 40), [loans]);
   const suggestedLoanTypes = useMemo(() => Array.from(new Set(loans.map((loan) => loan.loanType).filter(Boolean))).sort(), [loans]);
-  const canManageReports = hasAppPermission(user.role, "reports:manage");
+  const normalizedUserRole = user.role.trim().toLocaleLowerCase();
+  const canManageReports = ["admin", "manager / approver", "branch manager", "bm", "credit manager"].includes(normalizedUserRole);
   const assignedNames = useMemo(() => new Set([user.username, user.full_name || ""].map((value) => value.trim().toLocaleLowerCase()).filter(Boolean)), [user.full_name, user.username]);
   const myDueLoans = useMemo(() => loans.filter((loan) => {
     if (!loan.nextPaymentDate || loan.nextPaymentDate.slice(0, 10) > reportDate || ["Closed", "Rejected"].includes(loan.repaymentStatus)) return false;
@@ -4872,6 +5070,30 @@ function OperationReportView({ loans, loading, canViewLoanData, onRefresh, onOpe
     toastSuccess(record.reporterUsername === user.username ? opText("បានផ្ទុករបាយការណ៍របស់អ្នក", "Your saved report was loaded.") : opText(`កំពុងពិនិត្យរបាយការណ៍របស់ ${record.reporterName}`, `Reviewing ${record.reporterName}'s report.`));
   };
 
+  const editSavedReport = (record: OperationReportRecord) => {
+    openSavedReport(record);
+    setActiveForm("collection");
+  };
+
+  const deleteSavedReport = async (record: OperationReportRecord) => {
+    const confirmed = window.confirm(opText(
+      `លុបរបាយការណ៍របស់ ${record.reporterName || record.reporterUsername} សម្រាប់ថ្ងៃ ${record.reportDate} មែនទេ?`,
+      `Delete ${record.reporterName || record.reporterUsername}'s report for ${record.reportDate}? This cannot be undone.`
+    ));
+    if (!confirmed) return;
+    setDeletingReportId(record.id);
+    try {
+      await api<{ id: string }>(`/api/loan/operation-reports?id=${encodeURIComponent(record.id)}`, { method: "DELETE" });
+      if (loadedReportRecord?.id === record.id) startOwnReport(reportDate);
+      toastSuccess(opText("បានលុបរបាយការណ៍", "Report deleted."));
+      await loadSavedReports();
+    } catch (caught) {
+      toastError(caught instanceof Error ? caught.message : opText("មិនអាចលុបរបាយការណ៍", "Could not delete report"));
+    } finally {
+      setDeletingReportId(null);
+    }
+  };
+
   const startOwnReport = (date = operationDateInputValue()) => {
     setReportDate(date);
     setBranch(user.branch || "Boeung Keng Kang");
@@ -4930,7 +5152,7 @@ function OperationReportView({ loans, loading, canViewLoanData, onRefresh, onOpe
       <section className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
         <div className="flex flex-col gap-4 px-5 py-5 sm:px-7 lg:flex-row lg:items-start lg:justify-between">
           <div className="flex items-center gap-4">
-            <img src="/assets/logo.png" alt="Emerald Cash" className="h-16 w-16 object-contain sm:h-20 sm:w-20" />
+            <img src="/logo-horizontal.png" alt="Emerald Cash" className="h-auto w-36 object-contain sm:w-44" />
             <div><p className="font-semibold text-red-700">{opText("ក្រុមហ៊ុន អេមើរ៉ល ឃែស ឯ.ក", "Emerald Cash Co., Ltd.")}</p><h1 className="mt-1 text-2xl font-bold text-slate-900 dark:text-white">{opText("របាយការណ៍ប្រតិបត្តិការ", "Operation Report")}</h1><p className="mt-1 font-semibold text-emerald-700">{opText("របាយការណ៍លទ្ធផលប្រចាំថ្ងៃ", "Daily Performance Report")}</p></div>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -4944,8 +5166,8 @@ function OperationReportView({ loans, loading, canViewLoanData, onRefresh, onOpe
           </div>
         </div>
 
-        <div className="grid gap-4 border-t border-slate-200 bg-slate-50/70 px-5 py-5 dark:border-slate-800 dark:bg-slate-950/50 sm:grid-cols-2 xl:grid-cols-5">
-          <Field label={opText("កាលបរិច្ឆេទ", "Date")}><input type="date" value={reportDate} onChange={(event) => changeReportDate(event.target.value)} className={inputClass} /></Field>
+        <div className={`grid gap-4 border-t border-slate-200 bg-slate-50/70 px-5 py-5 dark:border-slate-800 dark:bg-slate-950/50 sm:grid-cols-2 ${activeForm === "decisions" ? "xl:grid-cols-4" : "xl:grid-cols-5"}`}>
+          {activeForm !== "decisions" ? <Field label={opText("កាលបរិច្ឆេទ", "Date")}><input type="date" value={reportDate} onChange={(event) => changeReportDate(event.target.value)} className={inputClass} /></Field> : null}
           <Field label={opText("សាខា", "Branch")}><input disabled={reviewingAnotherSpecialist || reportLocked} value={branch} onChange={(event) => setBranch(event.target.value)} className={inputClass} /></Field>
           <Field label={opText("ឈ្មោះ", "Name")}><input disabled={reviewingAnotherSpecialist || reportLocked} value={reporterName} onChange={(event) => setReporterName(event.target.value)} className={inputClass} /></Field>
           <Field label={opText("មុខតំណែង", "Position")}><input disabled={reviewingAnotherSpecialist || reportLocked} value={reporterRole} onChange={(event) => setReporterRole(event.target.value)} className={inputClass} /></Field>
@@ -4973,7 +5195,7 @@ function OperationReportView({ loans, loading, canViewLoanData, onRefresh, onOpe
 
       {activeForm === "summary" ? <>
         <OperationMyWorkToday loans={myDueLoans} report={myReportForDate} reportDate={reportDate} canPrepare={!reviewingAnotherSpecialist && !reportLocked && canViewLoanData} onPrepare={prepareDailyWork} onOpenLoan={onOpenLoan} />
-        <OperationReportRecordsDashboard records={savedReports} loading={reportsLoading} onOpen={openSavedReport} />
+        <OperationReportRecordsDashboard records={savedReports} loading={reportsLoading} currentUsername={user.username} canManageReports={canManageReports} deletingReportId={deletingReportId} onEdit={editSavedReport} onDelete={deleteSavedReport} />
         <PaymentDateAlerts loans={loans} canViewLoanData={canViewLoanData} onOpenLoan={onOpenLoan} />
         <OperationSummaryTable
           dueCount={dueCustomerCount}
@@ -5001,9 +5223,9 @@ function OperationReportView({ loans, loading, canViewLoanData, onRefresh, onOpe
 
       {activeForm === "decisions" ? <section className="space-y-4">
         <div><h2 className="text-xl font-bold text-emerald-800 dark:text-emerald-300">{opText("ឥណទានស្នើសុំ អនុម័ត និងបដិសេធ", "Loan Requests, Approvals, and Rejections")}</h2></div>
-        <DecisionTable title={opText("អតិថិជនដែលស្នើឥណទាន", "Loan Requests")} rows={requestedRows} total={sumRows(requestedRows, "amount")} onChange={setRequestedRows} loans={loans} statusGroup="requested" onOpenLoan={onOpenLoan} />
-        <DecisionTable title={opText("អតិថិជនដែលបានអនុម័ត", "Approved Loans")} rows={approvedRows} total={sumRows(approvedRows, "amount")} onChange={setApprovedRows} loans={loans} statusGroup="approved" onOpenLoan={onOpenLoan} />
-        <DecisionTable title={opText("អតិថិជនដែលបានបដិសេធ", "Rejected Loans")} rows={rejectedRows} total={sumRows(rejectedRows, "amount")} onChange={setRejectedRows} loans={loans} statusGroup="rejected" onOpenLoan={onOpenLoan} showReason />
+        <DecisionTable title={opText("អតិថិជនដែលស្នើឥណទាន", "Loan Requests")} rows={requestedRows} total={sumRows(requestedRows, "amount")} onChange={setRequestedRows} loans={loans} statusGroup="requested" />
+        <DecisionTable title={opText("អតិថិជនដែលបានអនុម័ត", "Approved Loans")} rows={approvedRows} total={sumRows(approvedRows, "amount")} onChange={setApprovedRows} loans={loans} statusGroup="approved" />
+        <DecisionTable title={opText("អតិថិជនដែលបានបដិសេធ", "Rejected Loans")} rows={rejectedRows} total={sumRows(rejectedRows, "amount")} onChange={setRejectedRows} loans={loans} statusGroup="rejected" showReason />
       </section> : null}
     </div>
   );
@@ -5029,7 +5251,7 @@ function OperationMyWorkToday({ loans, report, reportDate, canPrepare, onPrepare
   );
 }
 
-function OperationReportRecordsDashboard({ records, loading, onOpen }: { records: OperationReportRecord[]; loading: boolean; onOpen: (record: OperationReportRecord) => void }) {
+function OperationReportRecordsDashboard({ records, loading, currentUsername, canManageReports, deletingReportId, onEdit, onDelete }: { records: OperationReportRecord[]; loading: boolean; currentUsername: string; canManageReports: boolean; deletingReportId: string | null; onEdit: (record: OperationReportRecord) => void; onDelete: (record: OperationReportRecord) => void }) {
   const { language } = useLanguage();
   const text = (km: string, en: string) => language === "km" ? km : en;
   const [query, setQuery] = useState("");
@@ -5099,8 +5321,15 @@ function OperationReportRecordsDashboard({ records, loading, onOpen }: { records
       </div>
       <div className="max-h-96 overflow-auto">
         <table className="min-w-[920px] w-full text-left text-sm">
-          <thead className="sticky top-0 z-10 bg-slate-100 text-slate-600 dark:bg-slate-950 dark:text-slate-300"><tr><th className="px-4 py-3">{text("ថ្ងៃ", "Date")}</th><th className="px-4 py-3">{text("អ្នកឯកទេសឥណទាន", "Loan Specialist")}</th><th className="px-4 py-3">{text("សាខា", "Branch")}</th><th className="px-4 py-3 text-center">{text("ត្រូវបង់", "Due")}</th><th className="px-4 py-3 text-center">{text("បានបង់", "Paid")}</th><th className="px-4 py-3 text-center">{text("សំណើ", "Requests")}</th><th className="px-4 py-3">{text("ស្ថានភាព", "Status")}</th><th className="w-24 px-4 py-3 text-center">{text("លម្អិត", "Details")}</th></tr></thead>
-          <tbody>{loading ? <tr><td colSpan={8} className="px-4 py-10 text-center text-slate-500"><Loader2 className="mr-2 inline h-4 w-4 animate-spin" />{text("កំពុងផ្ទុកកំណត់ត្រា...", "Loading records...")}</td></tr> : filtered.length ? filtered.map((record) => <tr key={record.id} className="border-t border-slate-200 dark:border-slate-800"><td className="whitespace-nowrap px-4 py-3 font-semibold">{record.reportDate}</td><td className="px-4 py-3"><p className="font-semibold text-slate-900 dark:text-white">{record.reporterName || record.reporterUsername}</p><p className="text-xs text-slate-500">{record.reporterPosition}</p></td><td className="px-4 py-3 text-slate-600 dark:text-slate-300">{record.branch || "-"}</td><td className="px-4 py-3 text-center font-semibold">{rowCount(record, "collectionDueRows")}</td><td className="px-4 py-3 text-center font-semibold">{rowCount(record, "collectionPaidRows")}</td><td className="px-4 py-3 text-center font-semibold">{rowCount(record, "requestedRows")}</td><td className="px-4 py-3"><span className={`inline-flex rounded-md px-2 py-1 text-xs font-semibold ${operationReportStatusClass(record.status)}`}>{operationReportStatusLabel(record.status, language)}</span></td><td className="px-4 py-3 text-center"><button type="button" onClick={() => onOpen(record)} title={`${text("មើលរបាយការណ៍", "View report")}: ${record.reporterName || record.reporterUsername}`} aria-label={`${text("មើលរបាយការណ៍", "View report")}: ${record.reporterName || record.reporterUsername}`} className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-emerald-700 hover:bg-emerald-50 dark:text-emerald-300 dark:hover:bg-emerald-950/30"><Eye className="h-4 w-4" /></button></td></tr>) : <tr><td colSpan={8} className="px-4 py-10 text-center text-slate-500">{text("រកមិនឃើញរបាយការណ៍ដែលបានរក្សាទុក", "No saved reports found.")}</td></tr>}</tbody>
+          <thead className="sticky top-0 z-10 bg-slate-100 text-slate-600 dark:bg-slate-950 dark:text-slate-300"><tr><th className="px-4 py-3">{text("ថ្ងៃ", "Date")}</th><th className="px-4 py-3">{text("អ្នកឯកទេសឥណទាន", "Loan Specialist")}</th><th className="px-4 py-3">{text("សាខា", "Branch")}</th><th className="px-4 py-3 text-center">{text("ត្រូវបង់", "Due")}</th><th className="px-4 py-3 text-center">{text("បានបង់", "Paid")}</th><th className="px-4 py-3 text-center">{text("សំណើ", "Requests")}</th><th className="px-4 py-3">{text("ស្ថានភាព", "Status")}</th><th className="min-w-56 px-4 py-3 text-right">{text("សកម្មភាព", "Actions")}</th></tr></thead>
+          <tbody>{loading ? <tr><td colSpan={8} className="px-4 py-10 text-center text-slate-500"><Loader2 className="mr-2 inline h-4 w-4 animate-spin" />{text("កំពុងផ្ទុកកំណត់ត្រា...", "Loading records...")}</td></tr> : filtered.length ? filtered.map((record) => {
+            const ownsRecord = record.reporterUsername.trim().toLocaleLowerCase() === currentUsername.trim().toLocaleLowerCase();
+            const canEdit = ownsRecord && ["draft", "returned"].includes(record.status);
+            const canDelete = canManageReports || ownsRecord;
+            const canOpen = canEdit || canManageReports;
+            const reviewing = canManageReports && !ownsRecord;
+            return <tr key={record.id} className="border-t border-slate-200 dark:border-slate-800"><td className="whitespace-nowrap px-4 py-3 font-semibold">{record.reportDate}</td><td className="px-4 py-3"><p className="font-semibold text-slate-900 dark:text-white">{record.reporterName || record.reporterUsername}</p><p className="text-xs text-slate-500">{record.reporterPosition}</p></td><td className="px-4 py-3 text-slate-600 dark:text-slate-300">{record.branch || "-"}</td><td className="px-4 py-3 text-center font-semibold">{rowCount(record, "collectionDueRows")}</td><td className="px-4 py-3 text-center font-semibold">{rowCount(record, "collectionPaidRows")}</td><td className="px-4 py-3 text-center font-semibold">{rowCount(record, "requestedRows")}</td><td className="px-4 py-3"><span className={`inline-flex rounded-md px-2 py-1 text-xs font-semibold ${operationReportStatusClass(record.status)}`}>{operationReportStatusLabel(record.status, language)}</span></td><td className="px-4 py-3"><div className="flex justify-end gap-2"><button type="button" disabled={!canOpen} onClick={() => onEdit(record)} title={canEdit ? text("កែសម្រួល និងធ្វើបច្ចុប្បន្នភាព", "Edit and update report") : reviewing ? text("ពិនិត្យ និងធ្វើបច្ចុប្បន្នភាពស្ថានភាព", "Review and update status") : text("អាចកែបានតែរបាយការណ៍ព្រាង ឬបានបញ្ជូនត្រឡប់របស់អ្នក", "Only your Draft or Returned reports can be edited")} className="inline-flex min-h-9 items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-50 disabled:text-slate-400 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-300 dark:disabled:border-slate-800 dark:disabled:bg-slate-900 dark:disabled:text-slate-600"><Pencil className="h-3.5 w-3.5" />{reviewing ? text("ពិនិត្យ/ធ្វើបច្ចុប្បន្នភាព", "Review / Update") : text("កែ/ធ្វើបច្ចុប្បន្នភាព", "Edit / Update")}</button><button type="button" disabled={!canDelete || deletingReportId === record.id} onClick={() => onDelete(record)} title={text("លុបរបាយការណ៍", "Delete report")} className="inline-flex min-h-9 items-center gap-2 rounded-lg border border-red-200 bg-white px-3 py-2 text-xs font-semibold text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400 dark:border-red-900 dark:bg-slate-950 dark:text-red-300 dark:disabled:border-slate-800 dark:disabled:text-slate-600">{deletingReportId === record.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}{text("លុប", "Delete")}</button></div></td></tr>;
+          }) : <tr><td colSpan={8} className="px-4 py-10 text-center text-slate-500">{text("រកមិនឃើញរបាយការណ៍ដែលបានរក្សាទុក", "No saved reports found.")}</td></tr>}</tbody>
         </table>
       </div>
     </section>
@@ -5183,27 +5412,31 @@ function ReportTable({ title, count, total, children }: { title: string; count: 
   );
 }
 
-function OperationReportImageCell({ imageUrl, imageName, onChange }: { imageUrl?: string; imageName?: string; onChange: (attachment: OperationReportAttachment) => void }) {
+function OperationReportImageCell({ images, imageUrl, imageName, onChange }: OperationReportAttachment & { onChange: (attachment: OperationReportAttachment) => void }) {
   const { error: toastError, success: toastSuccess } = useToast();
   const { language } = useLanguage();
   const text = (km: string, en: string) => language === "km" ? km : en;
   const [uploading, setUploading] = useState(false);
-  const [viewerOpen, setViewerOpen] = useState(false);
+  const [viewerIndex, setViewerIndex] = useState<number | null>(null);
   const [zoom, setZoom] = useState(100);
+  const attachments = images?.length ? images : imageUrl ? [{ imageUrl, imageName }] : [];
 
   const upload = async (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
+    const files = Array.from(event.target.files || []);
     event.target.value = "";
-    if (!file) return;
+    if (!files.length) return;
     setUploading(true);
     try {
-      const data = new FormData();
-      data.append("file", file);
-      const response = await fetch("/api/loan/operation-report-image", { method: "POST", credentials: "include", body: data });
-      const payload = await response.json().catch(() => null) as ApiResponse<{ name: string; url: string }> | null;
-      if (!response.ok || !payload?.success || !payload.data) throw new Error(payload?.error || text("មិនអាចបង្ហោះរូបភាព", "Could not upload image"));
-      onChange({ imageUrl: payload.data.url, imageName: payload.data.name });
-      toastSuccess(text("បានបង្ហោះរូបភាព", "Photo uploaded."));
+      const uploaded = await Promise.all(files.map(async (file): Promise<OperationReportImage> => {
+        const data = new FormData();
+        data.append("file", file);
+        const response = await fetch("/api/loan/operation-report-image", { method: "POST", credentials: "include", body: data });
+        const payload = await response.json().catch(() => null) as ApiResponse<{ name: string; url: string }> | null;
+        if (!response.ok || !payload?.success || !payload.data) throw new Error(payload?.error || text("មិនអាចបង្ហោះរូបភាព", "Could not upload image"));
+        return { imageUrl: payload.data.url, imageName: payload.data.name };
+      }));
+      onChange({ images: [...attachments, ...uploaded], imageUrl: undefined, imageName: undefined });
+      toastSuccess(text(`បានបង្ហោះរូបភាព ${uploaded.length}`, `${uploaded.length} photo${uploaded.length === 1 ? "" : "s"} uploaded.`));
     } catch (caught) {
       toastError(caught instanceof Error ? caught.message : text("មិនអាចបង្ហោះរូបភាព", "Could not upload image"));
     } finally {
@@ -5211,35 +5444,45 @@ function OperationReportImageCell({ imageUrl, imageName, onChange }: { imageUrl?
     }
   };
 
-  const openViewer = () => {
+  const openViewer = (index: number) => {
     setZoom(100);
-    setViewerOpen(true);
+    setViewerIndex(index);
   };
 
+  const removeImage = (index: number) => {
+    onChange({ images: attachments.filter((_, imageIndex) => imageIndex !== index), imageUrl: undefined, imageName: undefined });
+    setViewerIndex(null);
+  };
   const zoomBy = (amount: number) => setZoom((current) => Math.min(400, Math.max(50, current + amount)));
+  const viewedImage = viewerIndex === null ? null : attachments[viewerIndex];
 
   return (
-    <div className="flex min-w-28 items-center gap-2">
-      {imageUrl ? <button type="button" onClick={openViewer} title={text("បើកកម្មវិធីមើលរូបភាព", "Open photo viewer")} className="shrink-0"><img src={imageUrl} alt={imageName || text("ឯកសារភ្ជាប់ជួរ", "Row attachment")} className="h-12 w-12 rounded-md border border-slate-200 object-cover transition hover:border-emerald-400 dark:border-slate-700" /></button> : null}
-      <label title={imageUrl ? text("ជំនួសរូបភាព", "Replace photo") : text("បង្ហោះរូបភាព", "Upload photo")} className="inline-flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-lg border border-slate-300 bg-white text-slate-600 hover:border-emerald-400 hover:text-emerald-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
+    <div className="flex min-w-40 flex-wrap items-center gap-2">
+      {attachments.map((image, index) => <span key={`${image.imageUrl}-${index}`} className="group relative shrink-0">
+        <button type="button" onClick={() => openViewer(index)} title={text("បើកកម្មវិធីមើលរូបភាព", "Open photo viewer")}><img src={image.imageUrl} alt={image.imageName || text("ឯកសារភ្ជាប់ជួរ", "Row attachment")} className="h-12 w-12 rounded-md border border-slate-200 object-cover transition hover:border-emerald-400 dark:border-slate-700" /></button>
+        <button type="button" onClick={() => removeImage(index)} title={text("លុបរូបភាព", "Remove photo")} aria-label={text("លុបរូបភាព", "Remove photo")} className="absolute -right-1.5 -top-1.5 inline-flex h-5 w-5 items-center justify-center rounded-full bg-red-600 text-white shadow hover:bg-red-700"><X className="h-3 w-3" /></button>
+      </span>)}
+      <label title={text("បន្ថែមរូបភាព", "Add photos")} className="inline-flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-lg border border-slate-300 bg-white text-slate-600 hover:border-emerald-400 hover:text-emerald-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
         {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />}
-        <input type="file" accept="image/jpeg,image/png,image/webp,image/gif" onChange={(event) => void upload(event)} disabled={uploading} className="sr-only" />
+        <input type="file" multiple accept="image/jpeg,image/png,image/webp,image/gif" onChange={(event) => void upload(event)} disabled={uploading} className="sr-only" />
       </label>
-      {imageUrl ? <button type="button" onClick={() => onChange({ imageUrl: undefined, imageName: undefined })} title={text("លុបរូបភាព", "Remove photo")} aria-label={text("លុបរូបភាព", "Remove photo")} className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-slate-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/30"><X className="h-4 w-4" /></button> : null}
-      {viewerOpen && imageUrl ? createPortal(
-        <div role="dialog" aria-modal="true" aria-label={text("កម្មវិធីមើលរូបភាព", "Photo viewer")} onClick={() => setViewerOpen(false)} className="fixed inset-0 z-[100] flex flex-col bg-slate-950/95 p-3 sm:p-5">
+      {viewedImage ? createPortal(
+        <div role="dialog" aria-modal="true" aria-label={text("កម្មវិធីមើលរូបភាព", "Photo viewer")} onClick={() => setViewerIndex(null)} className="fixed inset-0 z-[100] flex flex-col bg-slate-950/95 p-3 sm:p-5">
           <div onClick={(event) => event.stopPropagation()} className="mb-3 flex shrink-0 items-center justify-between gap-3 rounded-lg bg-slate-900 px-3 py-2 text-white shadow-lg">
-            <p className="min-w-0 truncate text-sm font-semibold">{imageName || text("រូបភាពរបាយការណ៍ប្រតិបត្តិការ", "Operation Report photo")}</p>
+            <p className="min-w-0 truncate text-sm font-semibold">{viewedImage.imageName || text("រូបភាពរបាយការណ៍ប្រតិបត្តិការ", "Operation Report photo")} <span className="ml-2 text-slate-400">{viewerIndex! + 1}/{attachments.length}</span></p>
             <div className="flex shrink-0 items-center gap-1">
+              {attachments.length > 1 ? <button type="button" onClick={() => { setZoom(100); setViewerIndex((viewerIndex! - 1 + attachments.length) % attachments.length); }} title={text("រូបភាពមុន", "Previous photo")} aria-label={text("រូបភាពមុន", "Previous photo")} className="inline-flex h-9 w-9 items-center justify-center rounded-md hover:bg-white/10"><ChevronDown className="h-5 w-5 rotate-90" /></button> : null}
+              {attachments.length > 1 ? <button type="button" onClick={() => { setZoom(100); setViewerIndex((viewerIndex! + 1) % attachments.length); }} title={text("រូបភាពបន្ទាប់", "Next photo")} aria-label={text("រូបភាពបន្ទាប់", "Next photo")} className="inline-flex h-9 w-9 items-center justify-center rounded-md hover:bg-white/10"><ChevronDown className="h-5 w-5 -rotate-90" /></button> : null}
               <button type="button" onClick={() => zoomBy(-25)} disabled={zoom <= 50} title={text("បង្រួម", "Zoom out")} aria-label={text("បង្រួម", "Zoom out")} className="inline-flex h-9 w-9 items-center justify-center rounded-md hover:bg-white/10 disabled:opacity-40"><ZoomOut className="h-5 w-5" /></button>
               <button type="button" onClick={() => setZoom(100)} title={text("កំណត់ទំហំឡើងវិញ", "Reset zoom")} className="h-9 min-w-14 rounded-md px-2 text-sm font-semibold hover:bg-white/10">{zoom}%</button>
               <button type="button" onClick={() => zoomBy(25)} disabled={zoom >= 400} title={text("ពង្រីក", "Zoom in")} aria-label={text("ពង្រីក", "Zoom in")} className="inline-flex h-9 w-9 items-center justify-center rounded-md hover:bg-white/10 disabled:opacity-40"><ZoomIn className="h-5 w-5" /></button>
-              <button type="button" onClick={() => setViewerOpen(false)} title={text("បិទ", "Close viewer")} aria-label={text("បិទ", "Close viewer")} className="ml-1 inline-flex h-9 w-9 items-center justify-center rounded-md hover:bg-white/10"><X className="h-5 w-5" /></button>
+              <button type="button" onClick={() => removeImage(viewerIndex!)} title={text("លុបរូបភាព", "Remove photo")} aria-label={text("លុបរូបភាព", "Remove photo")} className="ml-1 inline-flex h-9 w-9 items-center justify-center rounded-md text-red-300 hover:bg-red-500/20"><Trash2 className="h-5 w-5" /></button>
+              <button type="button" onClick={() => setViewerIndex(null)} title={text("បិទ", "Close viewer")} aria-label={text("បិទ", "Close viewer")} className="inline-flex h-9 w-9 items-center justify-center rounded-md hover:bg-white/10"><X className="h-5 w-5" /></button>
             </div>
           </div>
           <div onClick={(event) => event.stopPropagation()} className="min-h-0 flex-1 overflow-auto rounded-lg bg-black/30">
             <div className="flex min-h-full min-w-full items-center justify-center p-4">
-              <img src={imageUrl} alt={imageName || text("ឯកសារភ្ជាប់របាយការណ៍ប្រតិបត្តិការ", "Operation Report attachment")} style={{ width: `${zoom}%`, maxWidth: "none" }} className="h-auto object-contain shadow-2xl" />
+              <img src={viewedImage.imageUrl} alt={viewedImage.imageName || text("ឯកសារភ្ជាប់របាយការណ៍ប្រតិបត្តិការ", "Operation Report attachment")} style={{ width: `${zoom}%`, maxWidth: "none" }} className="h-auto object-contain shadow-2xl" />
             </div>
           </div>
         </div>,
@@ -5262,7 +5505,7 @@ function CollectionReportTable({ title, rows, onChange, accent = "green" }: { ti
     (id) => ({ id, customer: "", amount: "", reason: "" }),
     field
   );
-  return <ReportTable title={title} count={rows.filter((row) => row.customer.trim()).length} total={total}><thead className={`${header} text-white`}><tr><th className="w-14 px-3 py-3">{text("ល.រ", "No.")}</th><th className="min-w-44 px-3 py-3">{text("ឈ្មោះអតិថិជន", "Customer Name")}</th><th className="min-w-28 px-3 py-3 text-right">{text("ជាសាច់ប្រាក់ ($)", "Amount ($)")}</th><th className="min-w-44 px-3 py-3">{text("មូលហេតុ", "Reason")}</th><th className="min-w-36 px-3 py-3">{text("រូបភាព", "Photo")}</th></tr></thead><tbody>{rows.map((row, index) => <tr key={row.id} className="border-t border-slate-200 dark:border-slate-800"><td className="px-3 py-2 text-slate-500">{index + 1}</td><td className="px-3 py-2"><input data-operation-row={index} data-operation-field="customer" list="operation-report-customers" value={row.customer} onKeyDown={(event) => onEnter(event, index, "customer")} onChange={(event) => onChange(rows.map((item) => item.id === row.id ? { ...item, customer: event.target.value } : item))} className={inputClass} placeholder={text("ឈ្មោះអតិថិជន", "Customer name")} /></td><td className="px-3 py-2"><input data-operation-row={index} data-operation-field="amount" type="number" min="0" value={row.amount} onKeyDown={(event) => onEnter(event, index, "amount")} onChange={(event) => onChange(rows.map((item) => item.id === row.id ? { ...item, amount: event.target.value } : item))} className={`${inputClass} text-right`} placeholder="0.00" /></td><td className="px-3 py-2"><input data-operation-row={index} data-operation-field="reason" list="operation-report-reasons" value={row.reason} onKeyDown={(event) => onEnter(event, index, "reason")} onChange={(event) => onChange(rows.map((item) => item.id === row.id ? { ...item, reason: event.target.value } : item))} className={inputClass} placeholder={text("មូលហេតុ", "Reason")} /></td><td className="px-3 py-2"><OperationReportImageCell imageUrl={row.imageUrl} imageName={row.imageName} onChange={(attachment) => onChange(rows.map((item) => item.id === row.id ? { ...item, ...attachment } : item))} /></td></tr>)}</tbody><tfoot className="border-t-2 border-slate-900 bg-slate-100 font-bold text-red-700 dark:bg-slate-800"><tr><td colSpan={2} className="px-3 py-3 text-center">{text("សរុប", "Total")}</td><td className="px-3 py-3 text-right">{operationCurrency(total)}</td><td colSpan={2} /></tr></tfoot></ReportTable>;
+  return <ReportTable title={title} count={rows.filter((row) => row.customer.trim()).length} total={total}><thead className={`${header} text-white`}><tr><th className="w-14 px-3 py-3">{text("ល.រ", "No.")}</th><th className="min-w-44 px-3 py-3">{text("ឈ្មោះអតិថិជន", "Customer Name")}</th><th className="min-w-28 px-3 py-3 text-right">{text("ជាសាច់ប្រាក់ ($)", "Amount ($)")}</th><th className="min-w-44 px-3 py-3">{text("មូលហេតុ", "Reason")}</th><th className="min-w-48 px-3 py-3">{text("រូបភាព", "Photos")}</th></tr></thead><tbody>{rows.map((row, index) => <tr key={row.id} className="border-t border-slate-200 dark:border-slate-800"><td className="px-3 py-2 text-slate-500">{index + 1}</td><td className="px-3 py-2"><input data-operation-row={index} data-operation-field="customer" list="operation-report-customers" value={row.customer} onKeyDown={(event) => onEnter(event, index, "customer")} onChange={(event) => onChange(rows.map((item) => item.id === row.id ? { ...item, customer: event.target.value } : item))} className={inputClass} placeholder={text("ឈ្មោះអតិថិជន", "Customer name")} /></td><td className="px-3 py-2"><input data-operation-row={index} data-operation-field="amount" type="number" min="0" value={row.amount} onKeyDown={(event) => onEnter(event, index, "amount")} onChange={(event) => onChange(rows.map((item) => item.id === row.id ? { ...item, amount: event.target.value } : item))} className={`${inputClass} text-right`} placeholder="0.00" /></td><td className="px-3 py-2"><input data-operation-row={index} data-operation-field="reason" list="operation-report-reasons" value={row.reason} onKeyDown={(event) => onEnter(event, index, "reason")} onChange={(event) => onChange(rows.map((item) => item.id === row.id ? { ...item, reason: event.target.value } : item))} className={inputClass} placeholder={text("មូលហេតុ", "Reason")} /></td><td className="px-3 py-2"><OperationReportImageCell images={row.images} imageUrl={row.imageUrl} imageName={row.imageName} onChange={(attachment) => onChange(rows.map((item) => item.id === row.id ? { ...item, ...attachment } : item))} /></td></tr>)}</tbody><tfoot className="border-t-2 border-slate-900 bg-slate-100 font-bold text-red-700 dark:bg-slate-800"><tr><td colSpan={2} className="px-3 py-3 text-center">{text("សរុប", "Total")}</td><td className="px-3 py-3 text-right">{operationCurrency(total)}</td><td colSpan={2} /></tr></tfoot></ReportTable>;
 }
 
 function ResolutionTable({ title, rows, onChange }: { title: string; rows: OperationReportResolutionRow[]; onChange: (rows: OperationReportResolutionRow[]) => void }) {
@@ -5281,14 +5524,14 @@ function ResolutionTable({ title, rows, onChange }: { title: string; rows: Opera
   );
   return (
     <ReportTable title={title} count={rows.filter((row) => row.customer.trim()).length} total={interestTotal}>
-      <thead className="bg-emerald-800 text-white"><tr><th className="w-14 px-3 py-3">{text("ល.រ", "No.")}</th><th className="min-w-44 px-3 py-3">{text("ឈ្មោះអតិថិជន", "Customer Name")}</th><th className="min-w-36 px-3 py-3">{text("ប្រភេទទ្រព្យ", "Asset Type")}</th><th className="min-w-28 px-3 py-3 text-right">{text("ការប្រាក់ ($)", "Interest ($)")}</th><th className="min-w-28 px-3 py-3 text-right">{text("ពិន័យ ($)", "Penalty ($)")}</th><th className="min-w-28 px-3 py-3 text-right">{text("ប្រាក់ដើម ($)", "Principal ($)")}</th><th className="min-w-48 px-3 py-3">{text("មូលហេតុ ឬដំណោះស្រាយ", "Reason or Solution")}</th><th className="min-w-36 px-3 py-3">{text("រូបភាព", "Photo")}</th></tr></thead>
-      <tbody>{rows.map((row, index) => <tr key={row.id} className="border-t border-slate-200 dark:border-slate-800"><td className="px-3 py-2 text-slate-500">{index + 1}</td><td className="px-3 py-2"><input data-operation-row={index} data-operation-field="customer" list="operation-report-customers" value={row.customer} onKeyDown={(event) => onEnter(event, index, "customer")} onChange={(event) => onChange(rows.map((item) => item.id === row.id ? { ...item, customer: event.target.value } : item))} className={inputClass} placeholder={text("ឈ្មោះអតិថិជន", "Customer name")} /></td><td className="px-3 py-2"><input data-operation-row={index} data-operation-field="assetType" value={row.assetType} onKeyDown={(event) => onEnter(event, index, "assetType")} onChange={(event) => onChange(rows.map((item) => item.id === row.id ? { ...item, assetType: event.target.value } : item))} className={inputClass} placeholder={text("ប្រភេទទ្រព្យ", "Asset type")} /></td><td className="px-3 py-2"><input data-operation-row={index} data-operation-field="interest" type="number" min="0" value={row.interest} onKeyDown={(event) => onEnter(event, index, "interest")} onChange={(event) => onChange(rows.map((item) => item.id === row.id ? { ...item, interest: event.target.value } : item))} className={`${inputClass} text-right`} placeholder="0.00" /></td><td className="px-3 py-2"><input data-operation-row={index} data-operation-field="penalty" type="number" min="0" value={row.penalty} onKeyDown={(event) => onEnter(event, index, "penalty")} onChange={(event) => onChange(rows.map((item) => item.id === row.id ? { ...item, penalty: event.target.value } : item))} className={`${inputClass} text-right`} placeholder="0.00" /></td><td className="px-3 py-2"><input data-operation-row={index} data-operation-field="principal" type="number" min="0" value={row.principal} onKeyDown={(event) => onEnter(event, index, "principal")} onChange={(event) => onChange(rows.map((item) => item.id === row.id ? { ...item, principal: event.target.value } : item))} className={`${inputClass} text-right`} placeholder="0.00" /></td><td className="px-3 py-2"><input data-operation-row={index} data-operation-field="solution" list="operation-report-solutions" value={row.solution} onKeyDown={(event) => onEnter(event, index, "solution")} onChange={(event) => onChange(rows.map((item) => item.id === row.id ? { ...item, solution: event.target.value } : item))} className={inputClass} placeholder={text("ដំណោះស្រាយ", "Solution")} /></td><td className="px-3 py-2"><OperationReportImageCell imageUrl={row.imageUrl} imageName={row.imageName} onChange={(attachment) => onChange(rows.map((item) => item.id === row.id ? { ...item, ...attachment } : item))} /></td></tr>)}</tbody>
+      <thead className="bg-emerald-800 text-white"><tr><th className="w-14 px-3 py-3">{text("ល.រ", "No.")}</th><th className="min-w-44 px-3 py-3">{text("ឈ្មោះអតិថិជន", "Customer Name")}</th><th className="min-w-36 px-3 py-3">{text("ប្រភេទទ្រព្យ", "Asset Type")}</th><th className="min-w-28 px-3 py-3 text-right">{text("ការប្រាក់ ($)", "Interest ($)")}</th><th className="min-w-28 px-3 py-3 text-right">{text("ពិន័យ ($)", "Penalty ($)")}</th><th className="min-w-28 px-3 py-3 text-right">{text("ប្រាក់ដើម ($)", "Principal ($)")}</th><th className="min-w-48 px-3 py-3">{text("មូលហេតុ ឬដំណោះស្រាយ", "Reason or Solution")}</th><th className="min-w-48 px-3 py-3">{text("រូបភាព", "Photos")}</th></tr></thead>
+      <tbody>{rows.map((row, index) => <tr key={row.id} className="border-t border-slate-200 dark:border-slate-800"><td className="px-3 py-2 text-slate-500">{index + 1}</td><td className="px-3 py-2"><input data-operation-row={index} data-operation-field="customer" list="operation-report-customers" value={row.customer} onKeyDown={(event) => onEnter(event, index, "customer")} onChange={(event) => onChange(rows.map((item) => item.id === row.id ? { ...item, customer: event.target.value } : item))} className={inputClass} placeholder={text("ឈ្មោះអតិថិជន", "Customer name")} /></td><td className="px-3 py-2"><input data-operation-row={index} data-operation-field="assetType" value={row.assetType} onKeyDown={(event) => onEnter(event, index, "assetType")} onChange={(event) => onChange(rows.map((item) => item.id === row.id ? { ...item, assetType: event.target.value } : item))} className={inputClass} placeholder={text("ប្រភេទទ្រព្យ", "Asset type")} /></td><td className="px-3 py-2"><input data-operation-row={index} data-operation-field="interest" type="number" min="0" value={row.interest} onKeyDown={(event) => onEnter(event, index, "interest")} onChange={(event) => onChange(rows.map((item) => item.id === row.id ? { ...item, interest: event.target.value } : item))} className={`${inputClass} text-right`} placeholder="0.00" /></td><td className="px-3 py-2"><input data-operation-row={index} data-operation-field="penalty" type="number" min="0" value={row.penalty} onKeyDown={(event) => onEnter(event, index, "penalty")} onChange={(event) => onChange(rows.map((item) => item.id === row.id ? { ...item, penalty: event.target.value } : item))} className={`${inputClass} text-right`} placeholder="0.00" /></td><td className="px-3 py-2"><input data-operation-row={index} data-operation-field="principal" type="number" min="0" value={row.principal} onKeyDown={(event) => onEnter(event, index, "principal")} onChange={(event) => onChange(rows.map((item) => item.id === row.id ? { ...item, principal: event.target.value } : item))} className={`${inputClass} text-right`} placeholder="0.00" /></td><td className="px-3 py-2"><input data-operation-row={index} data-operation-field="solution" list="operation-report-solutions" value={row.solution} onKeyDown={(event) => onEnter(event, index, "solution")} onChange={(event) => onChange(rows.map((item) => item.id === row.id ? { ...item, solution: event.target.value } : item))} className={inputClass} placeholder={text("ដំណោះស្រាយ", "Solution")} /></td><td className="px-3 py-2"><OperationReportImageCell images={row.images} imageUrl={row.imageUrl} imageName={row.imageName} onChange={(attachment) => onChange(rows.map((item) => item.id === row.id ? { ...item, ...attachment } : item))} /></td></tr>)}</tbody>
       <tfoot className="border-t-2 border-slate-900 bg-slate-100 font-bold text-red-700 dark:bg-slate-800"><tr><td colSpan={3} className="px-3 py-3 text-center">{text("សរុប", "Total")}</td><td className="px-3 py-3 text-right">{operationCurrency(interestTotal)}</td><td className="px-3 py-3 text-right">{operationCurrency(penaltyTotal)}</td><td className="px-3 py-3 text-right">{operationCurrency(principalTotal)}</td><td colSpan={2} /></tr></tfoot>
     </ReportTable>
   );
 }
 
-function DecisionTable({ title, rows, total, onChange, loans, statusGroup, onOpenLoan, showReason = false }: { title: string; rows: OperationReportLoanDecisionRow[]; total: number; onChange: (rows: OperationReportLoanDecisionRow[]) => void; loans: LoanEntity[]; statusGroup: "requested" | "approved" | "rejected"; onOpenLoan: (loan: LoanEntity) => void; showReason?: boolean }) {
+function DecisionTable({ title, rows, total, onChange, loans, statusGroup, showReason = false }: { title: string; rows: OperationReportLoanDecisionRow[]; total: number; onChange: (rows: OperationReportLoanDecisionRow[]) => void; loans: LoanEntity[]; statusGroup: "requested" | "approved" | "rejected"; showReason?: boolean }) {
   const { language } = useLanguage();
   const text = (km: string, en: string) => language === "km" ? km : en;
   const loansForGroup = useMemo(() => {
@@ -5325,11 +5568,8 @@ function DecisionTable({ title, rows, total, onChange, loans, statusGroup, onOpe
   );
   return (
     <ReportTable title={title} count={rows.filter((row) => row.customer.trim()).length} total={total}>
-      <thead className="bg-emerald-800 text-white"><tr><th className="w-14 px-3 py-3">{text("ល.រ", "No.")}</th><th className="min-w-44 px-3 py-3">{text("ឈ្មោះអតិថិជន", "Customer")}</th><th className="min-w-36 px-3 py-3">{text("ប្រភេទ", "Type")}</th><th className="min-w-28 px-3 py-3 text-right">{text("សាច់ប្រាក់", "Amount")}</th>{showReason ? <th className="min-w-44 px-3 py-3">{text("មូលហេតុ", "Reason")}</th> : null}<th className="min-w-36 px-3 py-3">{text("រូបភាព", "Photo")}</th><th className="w-20 px-3 py-3 text-center">{text("ព័ត៌មាន", "Details")}</th></tr></thead>
-      <tbody>{rows.map((row, index) => {
-        const linkedLoan = findLoan(row.customer);
-        return <tr key={row.id} className="border-t border-slate-200 dark:border-slate-800"><td className="px-3 py-2 text-slate-500">{index + 1}</td><td className="px-3 py-2"><input data-operation-row={index} data-operation-field="customer" list="operation-report-customers" value={row.customer} onKeyDown={(event) => onEnter(event, index, "customer")} onChange={(event) => changeCustomer(row, event.target.value)} className={inputClass} placeholder={text("ឈ្មោះអតិថិជន", "Customer name")} /></td><td className="px-3 py-2"><input data-operation-row={index} data-operation-field="type" list="operation-report-loan-types" value={row.type} onKeyDown={(event) => onEnter(event, index, "type")} onChange={(event) => onChange(rows.map((item) => item.id === row.id ? { ...item, type: event.target.value } : item))} className={inputClass} placeholder={text("ប្រភេទឥណទាន", "Loan type")} /></td><td className="px-3 py-2"><input data-operation-row={index} data-operation-field="amount" type="number" min="0" value={row.amount} onKeyDown={(event) => onEnter(event, index, "amount")} onChange={(event) => onChange(rows.map((item) => item.id === row.id ? { ...item, amount: event.target.value } : item))} className={`${inputClass} text-right`} placeholder="0.00" /></td>{showReason ? <td className="px-3 py-2"><input data-operation-row={index} data-operation-field="reason" value={row.reason} onKeyDown={(event) => onEnter(event, index, "reason")} onChange={(event) => onChange(rows.map((item) => item.id === row.id ? { ...item, reason: event.target.value } : item))} className={inputClass} placeholder={text("មូលហេតុ", "Reason")} /></td> : null}<td className="px-3 py-2"><OperationReportImageCell imageUrl={row.imageUrl} imageName={row.imageName} onChange={(attachment) => onChange(rows.map((item) => item.id === row.id ? { ...item, ...attachment } : item))} /></td><td className="px-3 py-2 text-center"><button type="button" disabled={!linkedLoan} onClick={() => linkedLoan && onOpenLoan(linkedLoan)} title={linkedLoan ? `${text("មើលព័ត៌មានលម្អិតរបស់", "View details for")} ${linkedLoan.borrower.fullName}` : text("ជ្រើសរើសអតិថិជនដែលមានកំណត់ត្រាឥណទាន", "Select a customer with a loan record")} aria-label={linkedLoan ? `${text("មើលព័ត៌មានលម្អិតរបស់", "View details for")} ${linkedLoan.borrower.fullName}` : text("គ្មានកំណត់ត្រាឥណទានភ្ជាប់", "No linked loan record")} className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-emerald-700 hover:bg-emerald-50 disabled:cursor-not-allowed disabled:text-slate-300 dark:text-emerald-300 dark:hover:bg-emerald-950/30 dark:disabled:text-slate-700"><Eye className="h-4 w-4" /></button></td></tr>;
-      })}</tbody>
+      <thead className="bg-emerald-800 text-white"><tr><th className="w-14 px-3 py-3">{text("ល.រ", "No.")}</th><th className="min-w-44 px-3 py-3">{text("ឈ្មោះអតិថិជន", "Customer")}</th><th className="min-w-36 px-3 py-3">{text("ប្រភេទ", "Type")}</th><th className="min-w-28 px-3 py-3 text-right">{text("សាច់ប្រាក់", "Amount")}</th>{showReason ? <th className="min-w-44 px-3 py-3">{text("មូលហេតុ", "Reason")}</th> : null}<th className="min-w-48 px-3 py-3">{text("រូបភាព", "Photos")}</th></tr></thead>
+      <tbody>{rows.map((row, index) => <tr key={row.id} className="border-t border-slate-200 dark:border-slate-800"><td className="px-3 py-2 text-slate-500">{index + 1}</td><td className="px-3 py-2"><input data-operation-row={index} data-operation-field="customer" list="operation-report-customers" value={row.customer} onKeyDown={(event) => onEnter(event, index, "customer")} onChange={(event) => changeCustomer(row, event.target.value)} className={inputClass} placeholder={text("ឈ្មោះអតិថិជន", "Customer name")} /></td><td className="px-3 py-2"><input data-operation-row={index} data-operation-field="type" list="operation-report-loan-types" value={row.type} onKeyDown={(event) => onEnter(event, index, "type")} onChange={(event) => onChange(rows.map((item) => item.id === row.id ? { ...item, type: event.target.value } : item))} className={inputClass} placeholder={text("ប្រភេទឥណទាន", "Loan type")} /></td><td className="px-3 py-2"><input data-operation-row={index} data-operation-field="amount" type="number" min="0" value={row.amount} onKeyDown={(event) => onEnter(event, index, "amount")} onChange={(event) => onChange(rows.map((item) => item.id === row.id ? { ...item, amount: event.target.value } : item))} className={`${inputClass} text-right`} placeholder="0.00" /></td>{showReason ? <td className="px-3 py-2"><input data-operation-row={index} data-operation-field="reason" value={row.reason} onKeyDown={(event) => onEnter(event, index, "reason")} onChange={(event) => onChange(rows.map((item) => item.id === row.id ? { ...item, reason: event.target.value } : item))} className={inputClass} placeholder={text("មូលហេតុ", "Reason")} /></td> : null}<td className="px-3 py-2"><OperationReportImageCell images={row.images} imageUrl={row.imageUrl} imageName={row.imageName} onChange={(attachment) => onChange(rows.map((item) => item.id === row.id ? { ...item, ...attachment } : item))} /></td></tr>)}</tbody>
     </ReportTable>
   );
 }

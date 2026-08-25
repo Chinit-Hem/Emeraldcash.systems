@@ -290,22 +290,22 @@ function LoginForm() {
             
             {/* Logo */}
             <div className="absolute -bottom-8 left-1/2 -translate-x-1/2">
-              <div className="w-16 h-16 rounded-2xl bg-white shadow-lg shadow-emerald-500/25 flex items-center justify-center p-2 ring-4 ring-white/60 dark:bg-white dark:ring-slate-800/80">
+              <div className="flex h-20 w-40 items-center justify-center rounded-2xl bg-white p-3 shadow-lg shadow-emerald-500/25 ring-4 ring-white/60 dark:bg-white dark:ring-slate-800/80">
                 <Image
-                  src="/logo.png"
+                  src="/logo-horizontal.png"
                   alt={brandName}
-                  width={64}
-                  height={64}
+                  width={144}
+                  height={60}
                   priority
-                  sizes="64px"
-                  className="w-full h-full object-contain"
+                  sizes="144px"
+                  className="h-auto w-full object-contain"
                 />
               </div>
             </div>
           </div>
 
           {/* Content */}
-          <div className="pt-10 pb-6 px-6">
+          <div className="px-6 pb-6 pt-14">
             <div className="text-center mb-6">
               <h1 className="text-xl font-bold text-slate-950 dark:text-white">
                 {brandName}

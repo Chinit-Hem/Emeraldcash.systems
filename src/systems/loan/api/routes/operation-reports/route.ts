@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { auditEventFromRequest, recordAuditEvent } from "@/lib/audit-log";
-import { getSession, hasAppPermission } from "@/lib/auth-helpers";
+import { getSession } from "@/lib/auth-helpers";
 import { queryWithRetry, sql } from "@/lib/db-singleton";
 
 export const runtime = "nodejs";
@@ -83,6 +83,11 @@ function timestampValue(value: string | Date) {
   return value instanceof Date ? value.toISOString() : String(value);
 }
 
+function canManageOperationReports(role: string) {
+  const normalized = role.trim().toLocaleLowerCase();
+  return ["admin", "manager / approver", "branch manager", "bm", "credit manager"].includes(normalized);
+}
+
 function mapReport(row: ReportRow) {
   let data = row.report_data;
   if (typeof data === "string") {
@@ -115,7 +120,8 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const from = searchParams.get("from") || "1900-01-01";
     const to = searchParams.get("to") || "2999-12-31";
-    const reporter = searchParams.get("reporter")?.trim() || "";
+    const requestedReporter = searchParams.get("reporter")?.trim() || "";
+    const reporter = canManageOperationReports(session.role) ? requestedReporter : session.username;
     const branch = searchParams.get("branch")?.trim() || "";
     const requestedLimit = Number.parseInt(searchParams.get("limit") || "200", 10);
     const limit = Math.min(500, Math.max(1, Number.isFinite(requestedLimit) ? requestedLimit : 200));
@@ -194,7 +200,7 @@ export async function POST(request: NextRequest) {
 export async function PATCH(request: NextRequest) {
   const session = getSession(request);
   if (!session) return NextResponse.json({ success: false, error: "Unauthorized - Please log in" }, { status: 401 });
-  if (!hasAppPermission(session.role, "reports:manage")) return NextResponse.json({ success: false, error: "Only report managers can review Operation Reports" }, { status: 403 });
+  if (!canManageOperationReports(session.role)) return NextResponse.json({ success: false, error: "Only Admin or Manager / Approver can review Operation Reports" }, { status: 403 });
 
   try {
     await ensureOperationReportsTable();
@@ -237,5 +243,43 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ success: true, data: report });
   } catch (error) {
     return NextResponse.json({ success: false, error: error instanceof Error ? error.message : "Could not review operation report" }, { status: 500 });
+  }
+}
+
+export async function DELETE(request: NextRequest) {
+  const session = getSession(request);
+  if (!session) return NextResponse.json({ success: false, error: "Unauthorized - Please log in" }, { status: 401 });
+
+  try {
+    await ensureOperationReportsTable();
+    const { searchParams } = new URL(request.url);
+    const id = searchParams.get("id") || "";
+    if (!/^[0-9a-f-]{36}$/i.test(id)) return NextResponse.json({ success: false, error: "Invalid report" }, { status: 400 });
+
+    const current = await queryWithRetry(async () => sql<Pick<ReportRow, "status" | "reporter_username" | "report_date">>`
+      SELECT status, reporter_username, report_date FROM operation_reports WHERE id = ${id}::uuid LIMIT 1
+    `, "findOperationReportForDelete");
+    if (!current[0]) return NextResponse.json({ success: false, error: "Report not found" }, { status: 404 });
+
+    const ownsReport = current[0].reporter_username === session.username;
+    if (!ownsReport && !canManageOperationReports(session.role)) {
+      return NextResponse.json({ success: false, error: "You can only delete your own report" }, { status: 403 });
+    }
+
+    await queryWithRetry(async () => sql`
+      DELETE FROM operation_reports WHERE id = ${id}::uuid
+    `, "deleteOperationReport");
+    await recordAuditEvent(auditEventFromRequest(request, {
+      action: "operation_report.delete",
+      actorUsername: session.username,
+      actorRole: session.role,
+      resourceType: "operation_report",
+      resourceId: id,
+      status: "success",
+      metadata: { reporterUsername: current[0].reporter_username, reportDate: dateValue(current[0].report_date) },
+    }));
+    return NextResponse.json({ success: true, data: { id } });
+  } catch (error) {
+    return NextResponse.json({ success: false, error: error instanceof Error ? error.message : "Could not delete operation report" }, { status: 500 });
   }
 }

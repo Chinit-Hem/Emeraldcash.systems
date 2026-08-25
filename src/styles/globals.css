@@ -1,6 +1,32 @@
 @import "tailwindcss";
 @config "../../tailwind.config.ts";
 
+@font-face {
+  font-family: "Khmer OS Muol Light";
+  src: url("/fonts/khmer-os-muol-light.ttf") format("truetype");
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Khmer OS Battambang";
+  src: url("/fonts/khmer-os-battambang.ttf") format("truetype");
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+
+.font-khmer-muol-light {
+  font-family: "Khmer OS Muol Light", serif;
+  font-style: normal;
+  font-weight: 400;
+}
+
+.font-khmer-battambang {
+  font-family: "Khmer OS Battambang", sans-serif;
+}
+
 @custom-variant dark (&:where(.dark, .dark *, [data-theme="dark"], [data-theme="dark"] *));
 
 :root {

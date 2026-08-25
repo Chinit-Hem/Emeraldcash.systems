@@ -53,27 +53,30 @@ function styleCells(sheet: ExcelJS.Worksheet, fromRow: number, toRow: number, fr
 
 async function addBrandHeader(workbook: ExcelJS.Workbook, sheet: ExcelJS.Worksheet, data: OperationReportExcelData, lastColumn: number) {
   const lastColumnLetter = sheet.getColumn(lastColumn).letter;
-  sheet.mergeCells(`A1:B3`);
-  sheet.mergeCells(`C1:${lastColumnLetter}2`);
-  sheet.mergeCells(`C3:${lastColumnLetter}3`);
-  sheet.getCell("C1").value = "ក្រុមហ៊ុន អេមើរ៉ល ឃែស ឯ.ក";
-  sheet.getCell("C1").font = { name: "Khmer OS Muol Light", size: 20, bold: true, color: { argb: RED } };
-  sheet.getCell("C1").alignment = { horizontal: "center", vertical: "middle" };
-  sheet.getCell("C3").value = "របាយការណ៍លទ្ធផលប្រចាំថ្ងៃ";
-  sheet.getCell("C3").font = { name: "Khmer OS Muol Light", size: 14, bold: true, color: { argb: GREEN } };
-  sheet.getCell("C3").alignment = { horizontal: "center", vertical: "middle" };
-  sheet.getRow(1).height = 34;
-  sheet.getRow(2).height = 28;
-  sheet.getRow(3).height = 30;
+  const compactHeader = lastColumn === 3;
+  const titleCellAddress = compactHeader ? "B1" : "C1";
+  const subtitleCellAddress = compactHeader ? "B3" : "C3";
+  sheet.mergeCells(compactHeader ? "A1:A3" : "A1:B3");
+  sheet.mergeCells(compactHeader ? "B1:C2" : `C1:${lastColumnLetter}2`);
+  sheet.mergeCells(compactHeader ? "B3:C3" : `C3:${lastColumnLetter}3`);
+  sheet.getCell(titleCellAddress).value = "ក្រុមហ៊ុន អេមើរ៉ល ឃែស ឯ.ក";
+  sheet.getCell(titleCellAddress).font = { name: "Khmer OS Muol Light", size: compactHeader ? 17 : 20, color: { argb: RED } };
+  sheet.getCell(titleCellAddress).alignment = { horizontal: "center", vertical: "middle", wrapText: false, shrinkToFit: true };
+  sheet.getCell(subtitleCellAddress).value = "របាយការណ៍លទ្ធផលប្រចាំថ្ងៃ";
+  sheet.getCell(subtitleCellAddress).font = { name: "Khmer OS Muol Light", size: compactHeader ? 12 : 14, color: { argb: GREEN } };
+  sheet.getCell(subtitleCellAddress).alignment = { horizontal: "center", vertical: "middle", wrapText: false, shrinkToFit: true };
+  sheet.getRow(1).height = 38;
+  sheet.getRow(2).height = 32;
+  sheet.getRow(3).height = 32;
 
   try {
-    const logoResponse = await fetch("/assets/logo.png");
+    const logoResponse = await fetch("/logo-horizontal.png");
     if (logoResponse.ok) {
       const bytes = new Uint8Array(await logoResponse.arrayBuffer());
       let binary = "";
       bytes.forEach((byte) => { binary += String.fromCharCode(byte); });
       const imageId = workbook.addImage({ base64: `data:image/png;base64,${btoa(binary)}`, extension: "png" });
-      sheet.addImage(imageId, { tl: { col: 0.15, row: 0.1 }, ext: { width: 125, height: 88 } });
+      sheet.addImage(imageId, { tl: { col: compactHeader ? 0.18 : 0.2, row: 0.55 }, ext: { width: compactHeader ? 180 : 170, height: compactHeader ? 75 : 71 } });
     }
   } catch {
     sheet.getCell("A1").value = "Emerald Cash";
@@ -89,12 +92,16 @@ async function addBrandHeader(workbook: ExcelJS.Workbook, sheet: ExcelJS.Workshe
   ];
   identityRows.forEach(([label, value], index) => {
     const row = 4 + index;
-    sheet.mergeCells(row, 1, row, 2);
-    sheet.mergeCells(row, 3, row, lastColumn);
+    if (compactHeader) {
+      sheet.mergeCells(row, 2, row, 3);
+    } else {
+      sheet.mergeCells(row, 1, row, 2);
+      sheet.mergeCells(row, 3, row, lastColumn);
+    }
     sheet.getCell(row, 1).value = label;
     sheet.getCell(row, 1).font = { name: KHMER_FONT, bold: true };
     sheet.getCell(row, 1).alignment = { horizontal: "right", vertical: "middle" };
-    sheet.getCell(row, 3).value = value;
+    sheet.getCell(row, compactHeader ? 2 : 3).value = value;
     sheet.getRow(row).height = 24;
   });
   styleCells(sheet, 1, 8, 1, lastColumn);

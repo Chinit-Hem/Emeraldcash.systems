@@ -419,8 +419,8 @@ export function AppSidebar({ user, collapsed = false, onToggleCollapse, onNaviga
                 )}
                 aria-hidden={isCollapsedHeaderMenuVisible}
               >
-                <span className="flex h-11 w-11 items-center justify-center overflow-hidden rounded-xl border border-emerald-100 bg-white shadow-sm dark:border-emerald-500/20">
-                  <Image src="/logo.png" alt="Emerald Cash logo" width={42} height={42} className="h-10 w-10 object-contain" priority />
+                <span className="flex h-11 w-11 items-center justify-center overflow-hidden rounded-xl border border-emerald-100 bg-white p-1 shadow-sm dark:border-emerald-500/20">
+                  <Image src="/logo.png" alt="Emerald Cash logo" width={40} height={40} className="h-10 w-10 object-contain" priority />
                 </span>
               </span>
               <span
@@ -439,8 +439,8 @@ export function AppSidebar({ user, collapsed = false, onToggleCollapse, onNaviga
               aria-label="System Hub"
               className="flex min-w-0 flex-1 items-center gap-3"
             >
-              <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-emerald-100 bg-white shadow-sm dark:border-emerald-500/20">
-                <Image src="/logo.png" alt="Emerald Cash logo" width={42} height={42} className="h-10 w-10 object-contain" priority />
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-emerald-100 bg-white p-1 shadow-sm dark:border-emerald-500/20">
+                <Image src="/logo.png" alt="Emerald Cash logo" width={40} height={40} className="h-10 w-10 object-contain" priority />
               </div>
               <div className="min-w-0">
                 <p id="mobile-navigation-title" className="truncate text-sm font-bold text-slate-950 dark:text-white">Emerald Cash</p>

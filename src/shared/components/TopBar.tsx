@@ -395,13 +395,13 @@ export default function TopBar({
             ) : null}
 
             <div className="flex min-w-0 items-center gap-3 xl:hidden">
-              <div className="relative flex h-9 w-9 items-center justify-center overflow-hidden rounded-lg border border-slate-200 bg-white text-slate-900 shadow-sm dark:border-slate-800 dark:bg-white dark:text-white">
+              <div className="relative flex h-9 w-24 items-center justify-center overflow-hidden rounded-lg border border-slate-200 bg-white px-2 text-slate-900 shadow-sm dark:border-slate-800 dark:bg-white dark:text-white">
                 <Image
-                  src="/logo.png"
+                  src="/logo-horizontal.png"
                   alt="Emerald Cash logo"
-                  width={32}
-                  height={32}
-                  className="h-8 w-8 object-contain"
+                  width={86}
+                  height={36}
+                  className="h-auto w-full object-contain"
                   priority
                 />
               </div>
@@ -574,11 +574,11 @@ export default function TopBar({
                 >
                   <div className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-full bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200">
                     <Image
-                      src={user.profile_picture || "/logo.png"}
+                      src={user.profile_picture || "/logo-horizontal.png"}
                       alt={user.full_name || user.username}
                       width={32}
                       height={32}
-                      className="h-8 w-8 object-cover"
+                      className={`h-8 w-8 ${user.profile_picture ? "object-cover" : "bg-white object-contain p-1"}`}
                       priority
                     />
                   </div>
@@ -605,11 +605,11 @@ export default function TopBar({
                     <div className="relative flex items-center gap-4 border-b border-slate-100 p-5 dark:border-slate-800">
                       <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-full bg-emerald-50 ring-4 ring-emerald-50/80 dark:bg-emerald-500/15 dark:ring-emerald-500/10">
                         <Image
-                          src={user.profile_picture || "/logo.png"}
+                          src={user.profile_picture || "/logo-horizontal.png"}
                           alt={user.full_name || user.username}
                           width={64}
                           height={64}
-                          className="h-16 w-16 object-cover"
+                          className={`h-16 w-16 ${user.profile_picture ? "object-cover" : "bg-white object-contain p-2"}`}
                         />
                       </div>
                       <div className="min-w-0">

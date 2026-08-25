@@ -135,9 +135,9 @@ export const metadata: Metadata = {
       "Vehicle inventory, stock management, and staff training tools for Emerald Cash operations.",
     images: [
       {
-        url: "/logo.png",
-        width: 512,
-        height: 512,
+        url: "/logo-horizontal.png",
+        width: 1200,
+        height: 500,
         alt: "Emerald Cash logo",
       },
     ],
@@ -147,7 +147,7 @@ export const metadata: Metadata = {
     title: "Emerald Cash Systems",
     description:
       "Vehicle inventory, stock management, and staff training tools for Emerald Cash operations.",
-    images: ["/logo.png"],
+    images: ["/logo-horizontal.png"],
   },
   robots: {
     index: true,

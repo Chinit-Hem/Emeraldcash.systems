@@ -1,10 +1,11 @@
-const CACHE_NAME = "emerald-cash-offline-v2";
+const CACHE_NAME = "emerald-cash-offline-v3";
 const OFFLINE_URL = "/offline.html";
 const STATIC_ASSETS = [
   OFFLINE_URL,
   "/icon-192.png",
   "/icon-512.png",
   "/apple-touch-icon.png",
+  "/logo-horizontal.png",
 ];
 
 self.addEventListener("install", (event) => {

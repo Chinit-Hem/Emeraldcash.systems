@@ -30,16 +30,11 @@
         padding: 2rem;
       }
 
-      .icon {
-        width: 3.5rem;
-        height: 3.5rem;
-        display: grid;
-        place-items: center;
-        border-radius: 1.25rem;
-        background: #d1fae5;
-        color: #047857;
-        font-size: 1.75rem;
-        font-weight: 800;
+      .logo {
+        display: block;
+        width: min(100%, 11rem);
+        height: auto;
+        object-fit: contain;
       }
 
       h1 {
@@ -69,7 +64,7 @@
   </head>
   <body>
     <main>
-      <div class="icon">EC</div>
+      <img class="logo" src="/logo-horizontal.png" alt="Emerald Cash" />
       <h1>You are offline</h1>
       <p>Emerald Cash Systems needs a network connection for live vehicle, learning, and asset data. Reconnect, then try again.</p>
       <button type="button" onclick="window.location.reload()">Retry</button>
