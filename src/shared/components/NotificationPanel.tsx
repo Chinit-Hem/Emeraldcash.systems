@@ -38,6 +38,7 @@ function relativeTime(value: string, language: string) {
 
 export function NotificationPanel({
   notifications,
+  unreadCount,
   loading,
   onClose,
   onMarkAllRead,
@@ -45,6 +46,7 @@ export function NotificationPanel({
   onOpen,
 }: {
   notifications: AppNotification[];
+  unreadCount?: number;
   loading: boolean;
   onClose: () => void;
   onMarkAllRead: () => void;
@@ -52,13 +54,13 @@ export function NotificationPanel({
   onOpen: (notification: AppNotification) => void;
 }) {
   const { language } = useLanguage();
-  const unreadCount = notifications.filter((notification) => !notification.readAt).length;
+  const unreadTotal = unreadCount ?? notifications.filter((notification) => !notification.readAt).length;
 
   return (
     <div className="flex max-h-[70vh] w-80 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl dark:border-slate-700 dark:bg-slate-900 sm:w-96">
       <header className="flex items-center justify-between gap-3 border-b border-slate-200 p-4 dark:border-slate-700">
-        <div><h3 className="font-semibold text-slate-800 dark:text-slate-100">{language === "km" ? "ការជូនដំណឹង" : "Notifications"}</h3>{unreadCount ? <p className="mt-0.5 text-xs text-emerald-700 dark:text-emerald-300">{unreadCount} {language === "km" ? "មិនទាន់អាន" : "unread"}</p> : null}</div>
-        <div className="flex items-center gap-1"><button type="button" onClick={onMarkAllRead} disabled={!unreadCount} className="rounded-lg px-2 py-1 text-xs font-semibold text-emerald-700 hover:bg-emerald-50 disabled:opacity-40 dark:text-emerald-300 dark:hover:bg-emerald-950/30">{language === "km" ? "អានទាំងអស់" : "Mark all read"}</button><button type="button" onClick={onClose} className="rounded-full p-1 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800" aria-label={language === "km" ? "បិទ" : "Close"}><X className="h-5 w-5" /></button></div>
+        <div><h3 className="font-semibold text-slate-800 dark:text-slate-100">{language === "km" ? "ការជូនដំណឹង" : "Notifications"}</h3>{unreadTotal ? <p className="mt-0.5 text-xs text-emerald-700 dark:text-emerald-300">{unreadTotal} {language === "km" ? "មិនទាន់អាន" : "unread"}</p> : null}</div>
+        <div className="flex items-center gap-1"><button type="button" onClick={onMarkAllRead} disabled={!unreadTotal} className="rounded-lg px-2 py-1 text-xs font-semibold text-emerald-700 hover:bg-emerald-50 disabled:opacity-40 dark:text-emerald-300 dark:hover:bg-emerald-950/30">{language === "km" ? "អានទាំងអស់" : "Mark all read"}</button><button type="button" onClick={onClose} className="rounded-full p-1 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800" aria-label={language === "km" ? "បិទ" : "Close"}><X className="h-5 w-5" /></button></div>
       </header>
       <div className="flex-1 overflow-y-auto">
         {loading ? <div className="p-8 text-center text-sm text-slate-500">{language === "km" ? "កំពុងផ្ទុក..." : "Loading notifications…"}</div> : null}

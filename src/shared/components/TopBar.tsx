@@ -55,13 +55,13 @@ export default function TopBar({
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [chatUnreadCount, setChatUnreadCount] = useState(0);
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
+  const [notificationUnreadCount, setNotificationUnreadCount] = useState(0);
   const [notificationsLoading, setNotificationsLoading] = useState(false);
   const [isSystemsMenuOpen, setIsSystemsMenuOpen] = useState(false);
   const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false);
   const [isDateMenuOpen, setIsDateMenuOpen] = useState(false);
   const [workingDate, setWorkingDate] = useState("");
   const canReadNotifications = Boolean(user?.username);
-  const hasUnread = notifications.some((notification) => !notification.readAt);
   const displayDate = useMemo(() => workingDate ? new Intl.DateTimeFormat(language === "km" ? "km-KH" : "en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "Asia/Phnom_Penh" }).format(new Date(`${workingDate}T12:00:00+07:00`)) : "—", [language, workingDate]);
 
   const bellButtonRef = useRef<HTMLButtonElement | null>(null);
@@ -83,6 +83,7 @@ export default function TopBar({
   const loadNotifications = useCallback((force = false): Promise<void> => {
     if (!canReadNotifications) {
       setNotifications([]);
+      setNotificationUnreadCount(0);
       notificationsLoadedRef.current = false;
       return Promise.resolve();
     }
@@ -93,9 +94,10 @@ export default function TopBar({
     const request = (async () => {
       try {
         const response = await fetch("/api/notifications?limit=20", { credentials: "include", cache: "no-store" });
-        const payload = await response.json().catch(() => null) as { success?: boolean; data?: { notifications?: AppNotification[] } } | null;
+        const payload = await response.json().catch(() => null) as { success?: boolean; data?: { notifications?: AppNotification[]; unreadCount?: number } } | null;
         if (response.ok && payload?.success) {
           setNotifications(payload.data?.notifications ?? []);
+          setNotificationUnreadCount(Number(payload.data?.unreadCount ?? 0));
           notificationsLoadedRef.current = true;
           notificationsLoadedAtRef.current = Date.now();
         }
@@ -113,6 +115,7 @@ export default function TopBar({
     if (!canReadNotifications) return;
     const readAt = new Date().toISOString();
     setNotifications((current) => current.map((item) => !notification || (item.source === notification.source && item.id === notification.id) ? { ...item, readAt: item.readAt || readAt } : item));
+    setNotificationUnreadCount((current) => notification ? Math.max(0, current - (notification.readAt ? 0 : 1)) : 0);
     const response = await fetch("/api/notifications", { method: "PATCH", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify(notification ? { notifications: [{ source: notification.source, id: notification.id }] } : {}) });
     if (!response.ok) await loadNotifications(true);
   }, [canReadNotifications, loadNotifications]);
@@ -564,19 +567,17 @@ export default function TopBar({
               ref={bellButtonRef}
               onClick={() => { setIsNotificationsOpen((value) => !value); void loadNotifications(); }}
               className="relative inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition hover:border-slate-300 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
-              aria-label={language === "km" ? "ការជូនដំណឹង" : "Notifications"}
+              aria-label={`${language === "km" ? "ការជូនដំណឹង" : "Notifications"}${notificationUnreadCount ? ` (${notificationUnreadCount})` : ""}`}
               aria-expanded={isNotificationsOpen}
             >
               <Bell className="h-4 w-4" />
 
-              {hasUnread && (
-                <div className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full border-2 border-white bg-red-500 dark:border-slate-900" />
-              )}
+              {notificationUnreadCount > 0 ? <span className="absolute -right-1.5 -top-1.5 min-w-4 rounded-full bg-red-500 px-1 text-center text-[10px] font-bold leading-4 text-white ring-2 ring-white dark:ring-slate-900">{notificationUnreadCount > 99 ? "99+" : notificationUnreadCount}</span> : null}
             </button>
 
             {isNotificationsOpen && (
               <div ref={dropdownRef} style={dropdownStyle}>
-                <NotificationPanel notifications={notifications} loading={notificationsLoading} onClose={() => setIsNotificationsOpen(false)} onMarkAllRead={() => void markNotificationsRead()} onViewAll={() => { setIsNotificationsOpen(false); router.push("/alerts"); }} onOpen={(notification) => { if (!notification.readAt) void markNotificationsRead(notification); setIsNotificationsOpen(false); router.push(notification.href); }} />
+                <NotificationPanel notifications={notifications} unreadCount={notificationUnreadCount} loading={notificationsLoading} onClose={() => setIsNotificationsOpen(false)} onMarkAllRead={() => void markNotificationsRead()} onViewAll={() => { setIsNotificationsOpen(false); router.push("/alerts"); }} onOpen={(notification) => { if (!notification.readAt) void markNotificationsRead(notification); setIsNotificationsOpen(false); router.push(notification.href); }} />
               </div>
             )}
 
