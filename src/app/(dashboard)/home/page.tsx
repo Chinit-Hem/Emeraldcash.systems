@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { getNavigationItems } from "@/shared/components/sidebar/AppSidebar";
 import type { SidebarNavigationItem } from "@/shared/components/sidebar/types";
 import { TukTukIcon } from "@/shared/components/icons/TukTukIcon";
@@ -135,9 +135,14 @@ const systemThemes: Record<string, { shortName: string; icon: string; selected: 
 function SystemHub({ systems, language }: { systems: SidebarNavigationItem[]; language: string }) {
   const isKhmer = language === "km";
   const [selectedSystemId, setSelectedSystemId] = useState<string | null>(null);
+  const selectedSystemSectionRef = useRef<HTMLElement>(null);
   const selectedSystem = systems.find((system) => system.id === selectedSystemId) ?? systems[0];
   const selectedItems = selectedSystem ? getUniqueMenuItems(selectedSystem) : [];
   const SelectedSystemIcon = selectedSystem?.icon;
+  const selectSystem = (systemId: string) => {
+    setSelectedSystemId(systemId);
+    requestAnimationFrame(() => selectedSystemSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }));
+  };
 
   return (
     <>
@@ -167,7 +172,7 @@ function SystemHub({ systems, language }: { systems: SidebarNavigationItem[]; la
               <button
                 key={system.id}
                 type="button"
-                onClick={() => setSelectedSystemId(system.id)}
+                onClick={() => selectSystem(system.id)}
                 aria-pressed={isSelected}
                 className={cn("group flex min-h-[320px] flex-col rounded-2xl border bg-white p-5 text-left shadow-[0_8px_24px_rgba(15,23,42,0.05)] transition-all hover:-translate-y-1 hover:shadow-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/70 dark:bg-slate-950", isSelected ? theme.selected : theme.hover)}
               >
@@ -197,7 +202,7 @@ function SystemHub({ systems, language }: { systems: SidebarNavigationItem[]; la
       </section>
 
       {selectedSystem ? (
-        <section className="rounded-[24px] bg-white p-5 shadow-sm ring-1 ring-slate-200/70 dark:bg-slate-900 dark:ring-slate-800 sm:p-6" aria-labelledby="system-functions-heading">
+        <section ref={selectedSystemSectionRef} className="scroll-mt-24 rounded-[24px] bg-white p-5 shadow-sm ring-1 ring-slate-200/70 dark:bg-slate-900 dark:ring-slate-800 sm:p-6" aria-labelledby="system-functions-heading">
           <div className="flex items-center gap-3 border-b border-slate-100 pb-4 dark:border-slate-800">
             <span className={cn("flex h-10 w-10 items-center justify-center rounded-xl ring-1", (systemThemes[selectedSystem.id] ?? systemThemes["vehicle-management"]).icon)}>
               {SelectedSystemIcon ? <SelectedSystemIcon className="h-5 w-5" aria-hidden="true" /> : null}
