@@ -215,9 +215,10 @@ export async function POST(request: NextRequest) {
           AND report_date = ${reportDate}::date
           AND LOWER(BTRIM(branch)) = LOWER(BTRIM(${branch}))
       `, "validateBranchManagerReportSources");
-      const eligibleById = new Map(eligibleSources.map((source) => [source.id, source.status]));
-      if (sourceReportIds.some((id) => !["reviewed", "approved"].includes(eligibleById.get(id) || ""))) {
-        return NextResponse.json({ success: false, error: "Every linked LS report must match this branch/date and be reviewed before BM submission" }, { status: 409 });
+      const eligibleSourceIds = eligibleSources.filter((source) => ["reviewed", "approved"].includes(source.status)).map((source) => source.id);
+      const hasEveryEligibleSource = eligibleSourceIds.length === sourceReportIds.length && eligibleSourceIds.every((id) => sourceReportIds.includes(id));
+      if (eligibleSources.some((source) => !["reviewed", "approved"].includes(source.status)) || !hasEveryEligibleSource) {
+        return NextResponse.json({ success: false, error: "Every LS report for this branch/date must be reviewed and linked before BM submission" }, { status: 409 });
       }
       const sourceAccountReportIds = Array.isArray(reportData.sourceAccountReportIds) ? reportData.sourceAccountReportIds.map(String).filter((id) => /^[0-9a-f-]{36}$/i.test(id)) : [];
       if (!sourceAccountReportIds.length) return NextResponse.json({ success: false, error: "A BM Report must include a reviewed Account Report" }, { status: 400 });
@@ -227,9 +228,10 @@ export async function POST(request: NextRequest) {
         WHERE report_date = ${reportDate}::date
           AND LOWER(BTRIM(branch)) = LOWER(BTRIM(${branch}))
       `, "validateBranchManagerAccountReportSources");
-      const eligibleAccountById = new Map(eligibleAccountSources.map((source) => [source.id, source.status]));
-      if (sourceAccountReportIds.some((id) => !["reviewed", "approved"].includes(eligibleAccountById.get(id) || ""))) {
-        return NextResponse.json({ success: false, error: "Every linked Account Report must match this branch/date and be reviewed before BM submission" }, { status: 409 });
+      const eligibleAccountSourceIds = eligibleAccountSources.filter((source) => ["reviewed", "approved"].includes(source.status)).map((source) => source.id);
+      const hasEveryEligibleAccountSource = eligibleAccountSourceIds.length === sourceAccountReportIds.length && eligibleAccountSourceIds.every((id) => sourceAccountReportIds.includes(id));
+      if (eligibleAccountSources.some((source) => !["reviewed", "approved"].includes(source.status)) || !hasEveryEligibleAccountSource) {
+        return NextResponse.json({ success: false, error: "Every Account Report for this branch/date must be reviewed and linked before BM submission" }, { status: 409 });
       }
     }
     const existing = await queryWithRetry(async () => sql<Pick<ReportRow, "status">>`
