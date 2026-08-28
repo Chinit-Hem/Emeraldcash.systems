@@ -524,8 +524,8 @@ export async function exportOperationReportExcel(data: OperationReportExcelData)
     ["អតិថិជនដែលបានបង់សរុប", paidCount, ""],
     ["អត្រាប្រមូលចូលគិតជាភាគរយ", dueCount ? paidCount / dueCount : 0, ""],
     ["ជូនដំណឹងទៅអតិថិជន ដល់ថ្ងៃកំណត់ត្រូវបង់", nonEmpty(data.dueNoticeRows).length, data.dueNoticeRows.reduce((sum, row) => sum + numberValue(row.interest), 0)],
-    ["បានបន្តទាក់ទងអតិថិជនដែលយ៉ឺតចាប់ពី ១ថ្ងៃ ដល់ ៣ថ្ងៃ", nonEmpty(data.followUpRows).length, data.followUpRows.reduce((sum, row) => sum + numberValue(row.interest), 0)],
-    ["ផ្ញើលិខិតជូនដំណឹងផ្លូវការសម្រាប់អតិថិជនយ៉ឺតចាប់ពី ៤ថ្ងៃ", nonEmpty(data.formalNoticeRows).length, data.formalNoticeRows.reduce((sum, row) => sum + numberValue(row.interest), 0)],
+    ["បានបន្តទាក់ទងអតិថិជនដែលយឺតចាប់ពី ១ថ្ងៃ ដល់ ៣ថ្ងៃ", nonEmpty(data.followUpRows).length, data.followUpRows.reduce((sum, row) => sum + numberValue(row.interest), 0)],
+    ["ផ្ញើលិខិតជូនដំណឹងផ្លូវការសម្រាប់អតិថិជនយឺតចាប់ពី ៤ថ្ងៃ", nonEmpty(data.formalNoticeRows).length, data.formalNoticeRows.reduce((sum, row) => sum + numberValue(row.interest), 0)],
   ];
   const addSummaryBand = (headerRow: number, headers: string[], values: Array<Array<string | number>>) => {
     summary.mergeCells(headerRow, 1, headerRow, 2);
@@ -562,9 +562,8 @@ export async function exportOperationReportExcel(data: OperationReportExcelData)
   row = addTable(collection, row, "អតិថិជនដែលត្រូវប្រមូលសរុប", ["ល.រ", "ឈ្មោះអតិថិជន", "ជាសាច់ប្រាក់ ($)", "មូលហេតុ", "រូបភាព"], nonEmpty(data.collectionDueRows).map((item, index) => [index + 1, item.customer, numberValue(item.amount), item.reason, photoLink(item)]), [3], [3]);
   row = addTable(collection, row, "អតិថិជនដែលប្រមូលបានសរុប", ["ល.រ", "ឈ្មោះអតិថិជន", "ជាសាច់ប្រាក់ ($)", "មូលហេតុ", "រូបភាព"], nonEmpty(data.collectionPaidRows).map((item, index) => [index + 1, item.customer, numberValue(item.amount), item.reason, photoLink(item)]), [3], [3], RED);
   const addResolution = (title: string, rows: ResolutionRow[]) => addTable(collection, row, title, ["ល.រ", "ឈ្មោះអតិថិជន", "ប្រភេទទ្រព្យ", "ការប្រាក់ ($)", "ពិន័យ ($)", "ប្រាក់ដើម ($)", "មូលហេតុ / ដំណោះស្រាយ", "រូបភាព"], nonEmpty(rows).map((item, index) => [index + 1, item.customer, item.assetType, numberValue(item.interest), numberValue(item.penalty), numberValue(item.principal), item.solution, photoLink(item)]), [4, 5, 6], [4, 5, 6]);
-  row = addResolution("ជូនដំណឹងទៅអតិថិជន ដល់ថ្ងៃកំណត់ត្រូវបង់", data.dueNoticeRows);
-  row = addResolution("បានបន្តទាក់ទងអតិថិជនដែលយ៉ឺតចាប់ពី ១ថ្ងៃ ដល់ ៣ថ្ងៃ", data.followUpRows);
-  addResolution("ផ្ញើលិខិតជូនដំណឹងផ្លូវការសម្រាប់អតិថិជនយ៉ឺតចាប់ពី ៤ថ្ងៃ", data.formalNoticeRows);
+  row = addResolution("អតិថិជនដែលដោះស្រាយសរុប", data.followUpRows);
+  addResolution("អតិថិជនដែលដោះស្រាយបានសរុប", data.formalNoticeRows);
 
   const decisions = workbook.addWorksheet("ឥណទានស្នើសុំ-អនុម័ត-បដិសេធ");
   configureSheet(decisions, [7, 30, 22, 18, 34, 18]);
