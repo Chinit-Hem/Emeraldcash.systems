@@ -4541,6 +4541,8 @@ type AccountReportMode = "banking" | "accountReport";
 type AccountReportSheet = "summary" | "collection";
 type AccountCollectionRow = { id: number; customer: string; amount: string; reason: string };
 type AccountResolutionRow = { id: number; customer: string; assetType: string; interest: string; penalty: string; principal: string; note: string };
+type AccountReportSavedData = { dueRows: AccountCollectionRow[]; paidRows: AccountCollectionRow[]; dueNoticeRows: AccountResolutionRow[]; promiseRows: AccountResolutionRow[]; closedRows: AccountResolutionRow[] };
+type AccountReportRecord = { id: string; reportDate: string; reporterUsername: string; reporterName: string; reporterPosition: string; department: string; branch: string; status: OperationReportStatus; data: Partial<AccountReportSavedData>; reviewedBy: string | null; reviewedAt: string | null; reviewComment: string; createdAt: string; updatedAt: string };
 
 const ACCOUNT_REPORT_COLLECTION_REASONS = ["យឺត ៣ថ្ងៃ", "យឺត ៧ថ្ងៃ", "យឺត ១៥ថ្ងៃ", "ប្រភពចំណូលមិនច្បាស់លាស់", "កូនមិនទទួលជួយបង់ជំនួស", "បញ្ហាសុខភាពឈឺចូលពេទ្យ"];
 
@@ -4590,6 +4592,7 @@ function AccountReportView() {
   const [reporterName, setReporterName] = useState(user.full_name || user.username || "Pha Sreymom");
   const [reporterRole, setReporterRole] = useState(user.position || "Assistant Accountant");
   const [department, setDepartment] = useState(user.department || "Accountant");
+  const [branch, setBranch] = useState(user.branch || "Boeung Keng Kang");
   const [dueRows, setDueRows] = useState<AccountCollectionRow[]>(createAccountCollectionRows);
   const [paidRows, setPaidRows] = useState<AccountCollectionRow[]>(createAccountCollectionRows);
   const [dueNoticeRows, setDueNoticeRows] = useState<AccountResolutionRow[]>(createAccountResolutionRows);
@@ -4597,6 +4600,10 @@ function AccountReportView() {
   const [closedRows, setClosedRows] = useState<AccountResolutionRow[]>(createAccountResolutionRows);
   const [loadingLoans, setLoadingLoans] = useState(false);
   const [activeSheet, setActiveSheet] = useState<AccountReportSheet>("summary");
+  const [savedReports, setSavedReports] = useState<AccountReportRecord[]>([]);
+  const [loadedStatus, setLoadedStatus] = useState<OperationReportStatus>("draft");
+  const [savingReport, setSavingReport] = useState<"draft" | "submitted" | null>(null);
+  const reportLocked = !["draft", "returned"].includes(loadedStatus);
 
   const dueCount = dueRows.filter((row) => row.customer.trim()).length;
   const paidCount = paidRows.filter((row) => row.customer.trim()).length;
@@ -4608,6 +4615,65 @@ function AccountReportView() {
   const closedInterestTotal = resolutionTotal(closedRows, "interest");
   const closedPenaltyTotal = resolutionTotal(closedRows, "penalty");
   const closedPrincipalTotal = resolutionTotal(closedRows, "principal");
+
+  const applySavedReport = useCallback((record: AccountReportRecord) => {
+    setReportDate(record.reportDate);
+    setReporterName(record.reporterName);
+    setReporterRole(record.reporterPosition);
+    setDepartment(record.department);
+    setBranch(record.branch);
+    setDueRows(record.data.dueRows?.length ? record.data.dueRows : createAccountCollectionRows());
+    setPaidRows(record.data.paidRows?.length ? record.data.paidRows : createAccountCollectionRows());
+    setDueNoticeRows(record.data.dueNoticeRows?.length ? record.data.dueNoticeRows : createAccountResolutionRows());
+    setPromiseRows(record.data.promiseRows?.length ? record.data.promiseRows : createAccountResolutionRows());
+    setClosedRows(record.data.closedRows?.length ? record.data.closedRows : createAccountResolutionRows());
+    setLoadedStatus(record.status);
+  }, []);
+
+  const loadAccountReports = useCallback(async () => {
+    try {
+      const records = await api<AccountReportRecord[]>("/api/loan/account-reports?limit=500");
+      setSavedReports(records);
+      const current = records.find((record) => record.reporterUsername === user.username && record.reportDate === reportDate);
+      if (current) applySavedReport(current);
+    } catch (caught) {
+      toastError(caught instanceof Error ? caught.message : "Could not load Account Reports");
+    }
+  }, [applySavedReport, reportDate, toastError, user.username]);
+
+  useEffect(() => { void loadAccountReports(); }, [loadAccountReports]);
+
+  const changeAccountReportDate = (date: string) => {
+    const saved = savedReports.find((record) => record.reporterUsername === user.username && record.reportDate === date);
+    if (saved) applySavedReport(saved);
+    else {
+      setReportDate(date);
+      setReporterName(user.full_name || user.username);
+      setReporterRole(user.position || user.role);
+      setDepartment(user.department || "Accountant");
+      setBranch(user.branch || "Boeung Keng Kang");
+      setDueRows(createAccountCollectionRows());
+      setPaidRows(createAccountCollectionRows());
+      setDueNoticeRows(createAccountResolutionRows());
+      setPromiseRows(createAccountResolutionRows());
+      setClosedRows(createAccountResolutionRows());
+      setLoadedStatus("draft");
+    }
+  };
+
+  const saveAccountReport = async (status: "draft" | "submitted") => {
+    setSavingReport(status);
+    try {
+      const saved = await api<AccountReportRecord>("/api/loan/account-reports", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ reportDate, reporterName, reporterPosition: reporterRole, department, branch, status, data: { dueRows, paidRows, dueNoticeRows, promiseRows, closedRows } }) });
+      setLoadedStatus(saved.status);
+      toastSuccess(status === "submitted" ? "Account Report submitted to BM. A notification was sent." : "Account Report saved as draft.");
+      await loadAccountReports();
+    } catch (caught) {
+      toastError(caught instanceof Error ? caught.message : "Could not save Account Report");
+    } finally {
+      setSavingReport(null);
+    }
+  };
 
   const prepareFromLoans = async () => {
     setLoadingLoans(true);
@@ -4669,6 +4735,9 @@ function AccountReportView() {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap justify-end gap-2 print:hidden">
+        <span className={`inline-flex items-center rounded-lg px-3 py-2 text-sm font-semibold ${operationReportStatusClass(loadedStatus)}`}>{operationReportStatusLabel(loadedStatus, "en")}</span>
+        <button type="button" disabled={Boolean(savingReport) || reportLocked} onClick={() => void saveAccountReport("draft")} className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300">{savingReport === "draft" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}Save Draft</button>
+        <button type="button" disabled={Boolean(savingReport) || reportLocked} onClick={() => void saveAccountReport("submitted")} className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50">{savingReport === "submitted" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}Submit to BM</button>
         <button type="button" disabled={loadingLoans} onClick={() => void prepareFromLoans()} className="inline-flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-700 hover:bg-emerald-100 disabled:opacity-50 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-300"><RefreshCw className={`h-4 w-4 ${loadingLoans ? "animate-spin" : ""}`} />Prepare from loans</button>
         <button type="button" onClick={exportAccountReport} className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300"><Download className="h-4 w-4" />Export</button>
         <button type="button" onClick={() => window.print()} className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-700"><Printer className="h-4 w-4" />Print</button>
@@ -4700,18 +4769,18 @@ function AccountReportView() {
               <div className="flex items-center justify-center p-4"><EmeraldCashLogo className="h-auto w-44 object-contain" /></div>
               <div className="font-khmer-muol-light flex items-center justify-center px-5 text-center text-3xl text-red-700">ក្រុមហ៊ុន អេមើរ៉ល ឃែស ឯ.ក</div>
             </div>
-            <div className="font-khmer-muol-light border-b border-slate-300 py-3 text-center text-2xl text-emerald-700 dark:border-slate-700">របាយការណ៍គណនេយ្យ សាខា បឹងកេងកង</div>
+            <div className="font-khmer-muol-light border-b border-slate-300 py-3 text-center text-2xl text-emerald-700 dark:border-slate-700">របាយការណ៍គណនេយ្យ សាខា {branch}</div>
             <div className="grid grid-cols-[1fr_180px_1.4fr_1fr] border-b border-slate-300 dark:border-slate-700">
               <div className="border-r border-slate-300 dark:border-slate-700" />
               <div className="col-span-2 grid grid-cols-[180px_minmax(0,1fr)]">
                 <div className="flex min-h-12 items-center justify-end whitespace-nowrap border-b border-slate-300 px-3 py-2 text-right font-semibold dark:border-slate-700">កាលបរិច្ឆេទ៖</div>
-                <input type="date" value={reportDate} onChange={(event) => setReportDate(event.target.value)} className="block min-h-12 w-full border-0 border-b border-slate-300 px-3 py-2 outline-none focus:bg-emerald-50 dark:border-slate-700 dark:bg-transparent dark:focus:bg-emerald-950/30" />
+                <input type="date" disabled={reportLocked} value={reportDate} onChange={(event) => changeAccountReportDate(event.target.value)} className="block min-h-12 w-full border-0 border-b border-slate-300 px-3 py-2 outline-none focus:bg-emerald-50 disabled:opacity-70 dark:border-slate-700 dark:bg-transparent dark:focus:bg-emerald-950/30" />
                 <div className="flex min-h-12 items-center justify-end whitespace-nowrap border-b border-slate-300 px-3 py-2 text-right font-semibold dark:border-slate-700">ឈ្មោះ៖</div>
-                <input value={reporterName} onChange={(event) => setReporterName(event.target.value)} className="block min-h-12 w-full border-0 border-b border-slate-300 px-3 py-2 outline-none focus:bg-emerald-50 dark:border-slate-700 dark:bg-transparent dark:focus:bg-emerald-950/30" />
+                <input disabled={reportLocked} value={reporterName} onChange={(event) => setReporterName(event.target.value)} className="block min-h-12 w-full border-0 border-b border-slate-300 px-3 py-2 outline-none focus:bg-emerald-50 disabled:opacity-70 dark:border-slate-700 dark:bg-transparent dark:focus:bg-emerald-950/30" />
                 <div className="flex min-h-12 items-center justify-end whitespace-nowrap border-b border-slate-300 px-3 py-2 text-right font-semibold dark:border-slate-700">តួនាទី៖</div>
-                <input value={reporterRole} onChange={(event) => setReporterRole(event.target.value)} className="block min-h-12 w-full border-0 border-b border-slate-300 px-3 py-2 outline-none focus:bg-emerald-50 dark:border-slate-700 dark:bg-transparent dark:focus:bg-emerald-950/30" />
+                <input disabled={reportLocked} value={reporterRole} onChange={(event) => setReporterRole(event.target.value)} className="block min-h-12 w-full border-0 border-b border-slate-300 px-3 py-2 outline-none focus:bg-emerald-50 disabled:opacity-70 dark:border-slate-700 dark:bg-transparent dark:focus:bg-emerald-950/30" />
                 <div className="flex min-h-12 items-center justify-end whitespace-nowrap px-3 py-2 text-right font-semibold">នាយកដ្ឋាន៖</div>
-                <input value={department} onChange={(event) => setDepartment(event.target.value)} className="block min-h-12 w-full border-0 px-3 py-2 outline-none focus:bg-emerald-50 dark:bg-transparent dark:focus:bg-emerald-950/30" />
+                <input disabled={reportLocked} value={department} onChange={(event) => setDepartment(event.target.value)} className="block min-h-12 w-full border-0 px-3 py-2 outline-none focus:bg-emerald-50 disabled:opacity-70 dark:bg-transparent dark:focus:bg-emerald-950/30" />
               </div>
               <div className="border-l border-slate-300 p-3 text-sm text-slate-500 dark:border-slate-700">{accountReportDisplayDate(reportDate)}</div>
             </div>
@@ -4740,10 +4809,15 @@ function AccountReportView() {
 
 function AccountingDirectory({ onOpenJournalItems }: { onOpenJournalItems: (account: JournalViewAccount) => void }) {
   const { error: toastError, info: toastInfo } = useToast();
+  const searchParams = useSearchParams();
   const [accounts, setAccounts] = useState<LoanBankingAccount[]>([]);
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
-  const [mode, setMode] = useState<AccountReportMode>("banking");
+  const [mode, setMode] = useState<AccountReportMode>(searchParams.get("accountMode") === "accountReport" ? "accountReport" : "banking");
+
+  useEffect(() => {
+    if (searchParams.get("accountMode") === "accountReport") setMode("accountReport");
+  }, [searchParams]);
 
   useEffect(() => {
     let active = true;
@@ -4811,11 +4885,14 @@ type OperationReportSavedData = {
   requestedRows: OperationReportLoanDecisionRow[];
   approvedRows: OperationReportLoanDecisionRow[];
   rejectedRows: OperationReportLoanDecisionRow[];
+  sourceReportIds?: string[];
+  sourceAccountReportIds?: string[];
 };
 type OperationReportRecord = {
   id: string;
   reportDate: string;
   reporterUsername: string;
+  reportType: "ls" | "bm";
   reporterName: string;
   reporterPosition: string;
   department: string;
@@ -4915,49 +4992,120 @@ function OperationReportView({ loans, loading, canViewLoanData, onRefresh, onOpe
     { id: 1, customer: "", type: "", amount: "", reason: "" },
   ]);
   const [savedReports, setSavedReports] = useState<OperationReportRecord[]>([]);
+  const [branchManagerReports, setBranchManagerReports] = useState<OperationReportRecord[]>([]);
+  const [accountReports, setAccountReports] = useState<AccountReportRecord[]>([]);
   const [reportsLoading, setReportsLoading] = useState(true);
   const [savingReport, setSavingReport] = useState<"draft" | "submitted" | null>(null);
+  const [savingBranchManagerReport, setSavingBranchManagerReport] = useState<"draft" | "submitted" | null>(null);
   const [loadedReporterUsername, setLoadedReporterUsername] = useState(user.username);
   const [loadedReportStatus, setLoadedReportStatus] = useState<OperationReportStatus>("draft");
   const [reviewComment, setReviewComment] = useState("");
+  const [reviewCommentError, setReviewCommentError] = useState(false);
   const [reviewingAction, setReviewingAction] = useState<"reviewed" | "approved" | "returned" | null>(null);
   const [deletingReportId, setDeletingReportId] = useState<string | null>(null);
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
+  const [rememberedAssetTypes, setRememberedAssetTypes] = useState<string[]>([]);
 
-  const suggestedCustomers = useMemo(() => Array.from(new Set(loans.map((loan) => loan.borrower.fullName).filter(Boolean))).slice(0, 40), [loans]);
-  const suggestedLoanTypes = useMemo(() => Array.from(new Set(loans.map((loan) => loan.loanType).filter(Boolean))).sort(), [loans]);
+  useEffect(() => {
+    if (reviewComment.trim()) setReviewCommentError(false);
+  }, [reviewComment]);
+
   const normalizedUserRole = user.role.trim().toLocaleLowerCase();
   const canManageReports = ["admin", "manager / approver", "branch manager", "bm", "credit manager"].includes(normalizedUserRole);
+  const roleDefaultsToBranchManagerReport = ["manager / approver", "branch manager", "bm", "credit manager"].includes(normalizedUserRole);
+  const [reportMode, setReportMode] = useState<"operation" | "branchManager">(roleDefaultsToBranchManagerReport ? "branchManager" : "operation");
+  const isBranchManagerReport = reportMode === "branchManager";
+  const selectReportMode = (mode: "operation" | "branchManager") => {
+    setReportMode(mode);
+    if (mode === "branchManager") {
+      if (activeForm === "decisions") setActiveForm("summary");
+      setLoadedReporterUsername(user.username);
+      setReporterName(user.full_name || user.username);
+      setReporterRole(user.position || user.role);
+      setDepartment(user.department || "Loan Operations");
+      setBranch(user.branch || branch);
+      setReviewComment("");
+    }
+  };
   const assignedNames = useMemo(() => new Set([user.username, user.full_name || ""].map((value) => value.trim().toLocaleLowerCase()).filter(Boolean)), [user.full_name, user.username]);
-  const myDueLoans = useMemo(() => loans.filter((loan) => {
-    if (!loan.nextPaymentDate || loan.nextPaymentDate.slice(0, 10) > reportDate || ["Closed", "Rejected"].includes(loan.repaymentStatus)) return false;
+  const visibleLoans = useMemo(() => canManageReports ? loans : loans.filter((loan) => {
     const assigned = (loan.loanContacts.loanSpecialist || loan.loanOfficer || "").trim().toLocaleLowerCase();
     return assignedNames.has(assigned);
-  }).sort((a, b) => String(a.nextPaymentDate).localeCompare(String(b.nextPaymentDate))), [assignedNames, loans, reportDate]);
-  const myReportForDate = savedReports.find((record) => record.reporterUsername === user.username && record.reportDate === reportDate);
-  const loadedReportRecord = savedReports.find((record) => record.reporterUsername === loadedReporterUsername && record.reportDate === reportDate);
+  }), [assignedNames, canManageReports, loans]);
+  const visibleSavedReports = useMemo(() => canManageReports ? savedReports : savedReports.filter((record) => record.reporterUsername.trim().toLocaleLowerCase() === user.username.trim().toLocaleLowerCase()), [canManageReports, savedReports, user.username]);
+  const suggestedCustomers = useMemo(() => Array.from(new Set(visibleLoans.map((loan) => loan.borrower.fullName).filter(Boolean))).slice(0, 40), [visibleLoans]);
+  const suggestedLoanTypes = useMemo(() => Array.from(new Set(visibleLoans.map((loan) => loan.loanType).filter(Boolean))).sort(), [visibleLoans]);
+  const assetTypeStorageKey = `emeraldcash.operation-report.asset-types.${user.username}`;
+  const selectableAssetTypes = useMemo(() => Array.from(new Set([...suggestedLoanTypes, ...rememberedAssetTypes].map((value) => value.trim()).filter(Boolean))).sort((left, right) => left.localeCompare(right)), [rememberedAssetTypes, suggestedLoanTypes]);
+  const myDueLoans = useMemo(() => visibleLoans.filter((loan) => {
+    if (!loan.nextPaymentDate || loan.nextPaymentDate.slice(0, 10) > reportDate || ["Closed", "Rejected"].includes(loan.repaymentStatus)) return false;
+    return true;
+  }).sort((a, b) => String(a.nextPaymentDate).localeCompare(String(b.nextPaymentDate))), [reportDate, visibleLoans]);
+  const myReportForDate = visibleSavedReports.find((record) => record.reporterUsername === user.username && record.reportDate === reportDate);
+  const loadedReportRecord = visibleSavedReports.find((record) => record.reporterUsername === loadedReporterUsername && record.reportDate === reportDate);
 
   const countRows = (rows: Array<{ customer: string }>) => rows.filter((row) => row.customer.trim()).length;
   const sumRows = <T extends { amount?: string; interest?: string; penalty?: string; principal?: string }>(rows: T[], key: keyof T) => rows.reduce((total, row) => total + operationNumber(String(row[key] || "")), 0);
   const dueCustomerCount = countRows(collectionDueRows);
   const paidCustomerCount = countRows(collectionPaidRows);
   const collectionRate = dueCustomerCount ? Math.round((paidCustomerCount / dueCustomerCount) * 100) : 0;
+  const branchManagerRecords = useMemo(() => visibleSavedReports.filter((record) => record.reportDate === reportDate && (!branch.trim() || record.branch.trim().toLocaleLowerCase() === branch.trim().toLocaleLowerCase()) && ["submitted", "reviewed", "approved"].includes(record.status)), [branch, reportDate, visibleSavedReports]);
+  const branchManagerMonthRecords = useMemo(() => visibleSavedReports.filter((record) => record.reportDate.startsWith(reportDate.slice(0, 7)) && (!branch.trim() || record.branch.trim().toLocaleLowerCase() === branch.trim().toLocaleLowerCase()) && ["submitted", "reviewed", "approved"].includes(record.status)), [branch, reportDate, visibleSavedReports]);
+  const branchAccountRecords = useMemo(() => accountReports.filter((record) => record.reportDate === reportDate && (!branch.trim() || record.branch.trim().toLocaleLowerCase() === branch.trim().toLocaleLowerCase()) && ["submitted", "reviewed", "approved"].includes(record.status)), [accountReports, branch, reportDate]);
+  const branchAccountMonthRecords = useMemo(() => accountReports.filter((record) => record.reportDate.startsWith(reportDate.slice(0, 7)) && (!branch.trim() || record.branch.trim().toLocaleLowerCase() === branch.trim().toLocaleLowerCase()) && ["submitted", "reviewed", "approved"].includes(record.status)), [accountReports, branch, reportDate]);
+  const branchLoanSpecialistRecords = useMemo(() => visibleSavedReports.filter((record) => !branch.trim() || record.branch.trim().toLocaleLowerCase() === branch.trim().toLocaleLowerCase()), [branch, visibleSavedReports]);
+  const ownBranchManagerReport = branchManagerReports.find((record) => record.reporterUsername === user.username && record.reportDate === reportDate && record.branch.trim().toLocaleLowerCase() === branch.trim().toLocaleLowerCase());
+  const branchManagerReportStatus: OperationReportStatus = ownBranchManagerReport?.status || "draft";
+  const branchManagerReportLocked = ["submitted", "reviewed", "approved"].includes(branchManagerReportStatus);
+  const branchManagerLoans = useMemo(() => loans.filter((loan) => {
+    const matchesBranch = !branch.trim() || String(loan.branchLocation || "").trim().toLocaleLowerCase() === branch.trim().toLocaleLowerCase();
+    return matchesBranch && !["Closed", "Rejected"].includes(loan.repaymentStatus);
+  }), [branch, loans]);
   const reviewingAnotherSpecialist = loadedReporterUsername !== user.username;
   const reportLocked = !["draft", "returned"].includes(loadedReportStatus);
+
+  useEffect(() => {
+    if (isBranchManagerReport && activeForm !== "summary") setActiveForm("summary");
+  }, [activeForm, isBranchManagerReport]);
 
   const loadSavedReports = useCallback(async () => {
     setReportsLoading(true);
     try {
-      const records = await api<OperationReportRecord[]>("/api/loan/operation-reports?limit=500");
+      const [records, bmRecords, accountingRecords] = await Promise.all([
+        api<OperationReportRecord[]>("/api/loan/operation-reports?limit=500"),
+        canManageReports ? api<OperationReportRecord[]>("/api/loan/operation-reports?reportType=bm&limit=500") : Promise.resolve([]),
+        canManageReports ? api<AccountReportRecord[]>("/api/loan/account-reports?limit=500") : Promise.resolve([]),
+      ]);
       setSavedReports(records);
+      setBranchManagerReports(bmRecords);
+      setAccountReports(accountingRecords);
     } catch (caught) {
       toastError(caught instanceof Error ? caught.message : opText("មិនអាចផ្ទុករបាយការណ៍ដែលបានរក្សាទុក", "Could not load saved reports"));
     } finally {
       setReportsLoading(false);
     }
-  }, [toastError]);
+  }, [canManageReports, toastError]);
 
   useEffect(() => { void loadSavedReports(); }, [loadSavedReports]);
+
+  useEffect(() => {
+    try {
+      const stored = JSON.parse(window.localStorage.getItem(assetTypeStorageKey) || "[]") as unknown;
+      setRememberedAssetTypes(Array.isArray(stored) ? stored.map(String).map((value) => value.trim()).filter(Boolean).slice(0, 100) : []);
+    } catch {
+      setRememberedAssetTypes([]);
+    }
+  }, [assetTypeStorageKey]);
+
+  const rememberAssetType = (value: string) => {
+    const normalized = value.trim();
+    if (!normalized) return;
+    setRememberedAssetTypes((current) => {
+      const next = Array.from(new Set([...current, normalized])).sort((left, right) => left.localeCompare(right)).slice(0, 100);
+      try { window.localStorage.setItem(assetTypeStorageKey, JSON.stringify(next)); } catch { /* Browser storage may be unavailable. */ }
+      return next;
+    });
+  };
 
   const currentReportData = (): OperationReportSavedData => ({ collectionDueRows, collectionPaidRows, dueNoticeRows, followUpRows, formalNoticeRows, requestedRows, approvedRows, rejectedRows });
 
@@ -5051,9 +5199,11 @@ function OperationReportView({ loans, loading, canViewLoanData, onRefresh, onOpe
     const record = savedReports.find((item) => item.reporterUsername === loadedReporterUsername && item.reportDate === reportDate);
     if (!record || !reviewingAnotherSpecialist || !canManageReports) return;
     if (action === "returned" && !reviewComment.trim()) {
+      setReviewCommentError(true);
       toastError(opText("សូមបញ្ចូលមតិកែតម្រូវមុនពេលបញ្ជូនរបាយការណ៍ត្រឡប់", "Add a correction comment before returning this report."));
       return;
     }
+    setReviewCommentError(false);
     setReviewingAction(action);
     try {
       const updated = await api<OperationReportRecord>("/api/loan/operation-reports", {
@@ -5063,10 +5213,46 @@ function OperationReportView({ loans, loading, canViewLoanData, onRefresh, onOpe
       });
       setLoadedReportStatus(updated.status);
       setReviewComment(updated.reviewComment);
+      setReviewCommentError(false);
       toastSuccess(action === "returned" ? opText("បានបញ្ជូនរបាយការណ៍ត្រឡប់ឱ្យកែតម្រូវ", "Report returned for correction.") : opText(`បានកែស្ថានភាពរបាយការណ៍ជា ${operationReportStatusLabel(action, language)}`, `Report marked ${operationReportStatusLabel(action, language).toLocaleLowerCase()}.`));
       await loadSavedReports();
     } catch (caught) {
       toastError(caught instanceof Error ? caught.message : opText("មិនអាចធ្វើបច្ចុប្បន្នភាពការពិនិត្យ", "Could not update report review"));
+    } finally {
+      setReviewingAction(null);
+    }
+  };
+
+  const reviewBranchManagerSubmission = async (record: OperationReportRecord, action: "reviewed" | "approved" | "returned") => {
+    if (!canManageReports || record.reporterUsername === user.username) return;
+    const comment = action === "returned" ? window.prompt(opText("បញ្ចូលមូលហេតុដែលត្រូវកែតម្រូវ", "Enter the correction required"), "")?.trim() || "" : "";
+    if (action === "returned" && !comment) return;
+    setReviewingAction(action);
+    try {
+      await api<OperationReportRecord>("/api/loan/operation-reports", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: record.id, action, comment }),
+      });
+      toastSuccess(action === "approved" ? opText("បានអនុម័តរបាយការណ៍ BM", "BM Report approved.") : action === "reviewed" ? opText("បានពិនិត្យរបាយការណ៍ BM", "BM Report marked reviewed.") : opText("បានបញ្ជូនរបាយការណ៍ BM ត្រឡប់ឱ្យកែតម្រូវ", "BM Report returned for correction."));
+      await loadSavedReports();
+    } catch (caught) {
+      toastError(caught instanceof Error ? caught.message : opText("មិនអាចធ្វើបច្ចុប្បន្នភាពរបាយការណ៍ BM", "Could not update BM Report"));
+    } finally {
+      setReviewingAction(null);
+    }
+  };
+
+  const reviewAccountReport = async (record: AccountReportRecord, action: "reviewed" | "approved" | "returned") => {
+    const comment = action === "returned" ? window.prompt(opText("បញ្ចូលមូលហេតុដែលត្រូវកែតម្រូវ", "Enter the correction required"), "")?.trim() || "" : "";
+    if (action === "returned" && !comment) return;
+    setReviewingAction(action);
+    try {
+      await api<AccountReportRecord>("/api/loan/account-reports", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: record.id, action, comment }) });
+      toastSuccess(action === "reviewed" ? opText("បានពិនិត្យរបាយការណ៍គណនេយ្យ", "Account Report marked reviewed.") : action === "approved" ? opText("បានអនុម័តរបាយការណ៍គណនេយ្យ", "Account Report approved.") : opText("បានបញ្ជូនរបាយការណ៍គណនេយ្យត្រឡប់", "Account Report returned for correction."));
+      await loadSavedReports();
+    } catch (caught) {
+      toastError(caught instanceof Error ? caught.message : opText("មិនអាចធ្វើបច្ចុប្បន្នភាពរបាយការណ៍គណនេយ្យ", "Could not update Account Report"));
     } finally {
       setReviewingAction(null);
     }
@@ -5151,11 +5337,57 @@ function OperationReportView({ loans, loading, canViewLoanData, onRefresh, onOpe
     else startOwnReport(reportDate);
   };
 
+  const saveBranchManagerReport = async (status: "draft" | "submitted") => {
+    if (!canManageReports) return;
+    if (!branchManagerRecords.length) {
+      toastError(opText("មិនទាន់មានរបាយការណ៍ LS ដែលបានដាក់ស្នើសម្រាប់សាខា និងកាលបរិច្ឆេទនេះ", "No submitted LS reports are available for this branch and date."));
+      return;
+    }
+    if (!branchAccountRecords.length) {
+      toastError(opText("មិនទាន់មានរបាយការណ៍គណនេយ្យដែលបានដាក់ស្នើសម្រាប់សាខា និងកាលបរិច្ឆេទនេះ", "No submitted Account Report is available for this branch and date."));
+      return;
+    }
+    const reportsAwaitingReview = branchManagerRecords.filter((record) => record.status === "submitted");
+    const accountReportsAwaitingReview = branchAccountRecords.filter((record) => record.status === "submitted");
+    if (status === "submitted" && (reportsAwaitingReview.length || accountReportsAwaitingReview.length)) {
+      toastError(opText(`សូមពិនិត្យរបាយការណ៍ LS ចំនួន ${reportsAwaitingReview.length} និងរបាយការណ៍គណនេយ្យ ${accountReportsAwaitingReview.length} មុនពេលដាក់ស្នើរបាយការណ៍ BM`, `Review ${reportsAwaitingReview.length} LS report(s) and ${accountReportsAwaitingReview.length} Account Report(s) before submitting the BM report.`));
+      return;
+    }
+    setSavingBranchManagerReport(status);
+    try {
+      await api<OperationReportRecord>("/api/loan/operation-reports", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          reportType: "bm",
+          reportDate,
+          reporterName: user.full_name || user.username,
+          reporterPosition: user.position || user.role,
+          department: user.department || department,
+          branch,
+          status,
+          data: { sourceReportIds: branchManagerRecords.map((record) => record.id), sourceAccountReportIds: branchAccountRecords.map((record) => record.id) },
+        }),
+      });
+      toastSuccess(status === "submitted" ? opText("បានដាក់ស្នើរបាយការណ៍ BM ទៅថ្នាក់លើ", "BM Report submitted to upper management.") : opText("បានរក្សាទុករបាយការណ៍ BM ជាព្រាង", "BM Report saved as draft."));
+      await loadSavedReports();
+    } catch (caught) {
+      toastError(caught instanceof Error ? caught.message : opText("មិនអាចរក្សាទុករបាយការណ៍ BM", "Could not save BM Report"));
+    } finally {
+      setSavingBranchManagerReport(null);
+    }
+  };
+
   async function exportOperationReport() {
     setExporting(true);
     try {
-      const { exportOperationReportExcel } = await import("@/systems/loan/utils/exportOperationReportExcel");
-      await exportOperationReportExcel({ reportDate, branch, reporterName, reporterRole, department, collectionDueRows, collectionPaidRows, dueNoticeRows, followUpRows, formalNoticeRows, requestedRows, approvedRows, rejectedRows });
+      const { exportBranchManagerOperationReportExcel, exportOperationReportExcel } = await import("@/systems/loan/utils/exportOperationReportExcel");
+      const exportData = { reportDate, branch, reporterName, reporterRole, department, collectionDueRows, collectionPaidRows, dueNoticeRows, followUpRows, formalNoticeRows, requestedRows, approvedRows, rejectedRows };
+      if (isBranchManagerReport) {
+        await exportBranchManagerOperationReportExcel({ ...exportData, savedReports: branchManagerRecords, monthReports: branchManagerMonthRecords, accountReports: branchAccountRecords, monthAccountReports: branchAccountMonthRecords, loans: branchManagerLoans });
+      } else {
+        await exportOperationReportExcel(exportData);
+      }
       toastSuccess(opText("បាននាំចេញឯកសារ Excel", "Excel workbook exported."));
     } catch (caught) {
       toastError(caught instanceof Error ? caught.message : opText("មិនអាចនាំចេញឯកសារ Excel", "Could not export Excel workbook"));
@@ -5166,8 +5398,9 @@ function OperationReportView({ loans, loading, canViewLoanData, onRefresh, onOpe
 
   const datalist = <datalist id="operation-report-customers">{suggestedCustomers.map((customer) => <option key={customer} value={customer} />)}</datalist>;
   const loanTypeDatalist = <datalist id="operation-report-loan-types">{suggestedLoanTypes.map((type) => <option key={type} value={type} />)}</datalist>;
+  const assetTypeDatalist = <datalist id="operation-report-asset-types">{selectableAssetTypes.map((type) => <option key={type} value={type} />)}</datalist>;
   const reportFieldClass = "block w-full border-0 bg-transparent px-3 py-2 text-slate-950 outline-none focus:bg-emerald-50 disabled:opacity-100 dark:text-slate-100 dark:focus:bg-emerald-950/30";
-  const reportSheetHeader = (
+  const standardReportSheetHeader = (
     <>
       <div className="grid min-h-36 grid-cols-[220px_1fr] border-b border-slate-300 bg-white dark:border-slate-700 dark:bg-slate-950">
         <div className="flex items-center justify-center p-4"><EmeraldCashLogo className="h-auto w-44 object-contain" /></div>
@@ -5191,23 +5424,55 @@ function OperationReportView({ loans, loading, canViewLoanData, onRefresh, onOpe
       <div className="h-10 border-b border-slate-300 dark:border-slate-700" />
     </>
   );
+  const branchManagerBrandHeader = (
+    <div className="grid min-h-28 grid-cols-[220px_1fr] border-b border-slate-300 bg-white dark:border-slate-700 dark:bg-slate-950">
+      <div className="flex items-center justify-center p-4"><EmeraldCashLogo className="h-auto w-44 object-contain" /></div>
+      <div className="font-khmer-muol-light flex items-center justify-center px-5 text-center text-3xl text-emerald-800 dark:text-emerald-300">ក្រុមហ៊ុន អេមើរ៉ល ឃែស ឯ.ក</div>
+    </div>
+  );
+  const branchManagerReportSheetHeader = activeForm === "collection" ? (
+    <>
+      {branchManagerBrandHeader}
+      <div className="font-khmer-muol-light flex min-h-14 items-center justify-center border-b border-slate-300 px-5 text-center text-2xl text-emerald-800 dark:border-slate-700 dark:text-emerald-300">ទិន្នន័យប្រកាសសរុបពីមន្ត្រីឥណទានទាំងអស់ប្រចាំថ្ងៃ</div>
+    </>
+  ) : (
+    <>
+      {branchManagerBrandHeader}
+      <div className="font-khmer-muol-light flex items-center justify-center border-b border-slate-300 py-3 text-center text-2xl text-emerald-800 dark:border-slate-700 dark:text-emerald-300">របាយការណ៍សង្ខេបលទ្ធផលប្រចាំថ្ងៃ - ថ្នាក់ប្រធានសាខា (Branch Manager Daily Report)</div>
+      <div className="grid grid-cols-[150px_minmax(0,1fr)_180px_minmax(0,1fr)] border-b border-slate-300 dark:border-slate-700">
+        <div className="flex min-h-12 items-center justify-end whitespace-nowrap border-b border-r border-slate-300 px-3 py-2 font-semibold dark:border-slate-700">សាខា៖</div>
+        <input disabled={reviewingAnotherSpecialist || reportLocked} value={branch} onChange={(event) => setBranch(event.target.value)} className={`${reportFieldClass} min-h-12 border-b border-r border-slate-300 dark:border-slate-700`} />
+        <div className="flex min-h-12 items-center justify-end whitespace-nowrap border-b border-r border-slate-300 px-3 py-2 font-semibold dark:border-slate-700">កាលបរិច្ឆេទ៖</div>
+        <input type="date" disabled={reviewingAnotherSpecialist || reportLocked} value={reportDate} onChange={(event) => changeReportDate(event.target.value)} className={`${reportFieldClass} min-h-12 border-b border-slate-300 dark:border-slate-700`} />
+        <div className="flex min-h-12 items-center justify-end whitespace-nowrap border-r border-slate-300 px-3 py-2 font-semibold dark:border-slate-700">ឈ្មោះប្រធានសាខា៖</div>
+        <input disabled={reviewingAnotherSpecialist || reportLocked} value={reporterName} onChange={(event) => setReporterName(event.target.value)} className={`${reportFieldClass} min-h-12 border-r border-slate-300 dark:border-slate-700`} />
+        <div className="flex min-h-12 items-center justify-end whitespace-nowrap border-r border-slate-300 px-3 py-2 font-semibold dark:border-slate-700">នាយកដ្ឋាន៖</div>
+        <input disabled={reviewingAnotherSpecialist || reportLocked} value={department} onChange={(event) => setDepartment(event.target.value)} className={`${reportFieldClass} min-h-12`} />
+      </div>
+    </>
+  );
+  const reportSheetHeader = isBranchManagerReport ? branchManagerReportSheetHeader : standardReportSheetHeader;
+  const displayedReportStatus = isBranchManagerReport ? branchManagerReportStatus : loadedReportStatus;
+  const reportSaveDisabled = isBranchManagerReport ? Boolean(savingBranchManagerReport) || branchManagerReportLocked : Boolean(savingReport) || reviewingAnotherSpecialist || reportLocked;
 
   return (
     <div className="space-y-4 pb-10">
       {datalist}
       {loanTypeDatalist}
+      {assetTypeDatalist}
       <datalist id="operation-report-reasons">{OPERATION_COLLECTION_REASONS.map((reason) => <option key={reason} value={reason} />)}</datalist>
       <datalist id="operation-report-solutions">{OPERATION_RESOLUTION_OPTIONS.map((solution) => <option key={solution} value={solution} />)}</datalist>
       <datalist id="operation-report-rejection-reasons">{OPERATION_REJECTION_REASONS.map((reason) => <option key={reason} value={reason} />)}</datalist>
 
       <section className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-sm dark:border-slate-800 dark:bg-slate-900 print:hidden">
           <div className="flex flex-wrap items-center gap-2">
-            <span className={`inline-flex items-center rounded-lg px-3 py-2 text-sm font-semibold ${operationReportStatusClass(loadedReportStatus)}`}>{operationReportStatusLabel(loadedReportStatus, language)}</span>
-            {reviewingAnotherSpecialist ? <button type="button" onClick={openMyReport} className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300"><FilePlus2 className="h-4 w-4" />{opText("របាយការណ៍ខ្ញុំ", "My Report")}</button> : null}
+            {canManageReports ? <div className="mr-2 inline-flex overflow-hidden rounded-xl border border-slate-300 bg-slate-50 p-1 dark:border-slate-700 dark:bg-slate-950"><button type="button" onClick={() => selectReportMode("operation")} className={`rounded-lg px-3 py-2 text-sm font-semibold transition ${reportMode === "operation" ? "bg-white text-emerald-700 shadow-sm dark:bg-slate-800 dark:text-emerald-300" : "text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white"}`}>{opText("របាយការណ៍ LS", "LS Report")}</button><button type="button" onClick={() => selectReportMode("branchManager")} className={`rounded-lg px-3 py-2 text-sm font-semibold transition ${reportMode === "branchManager" ? "bg-emerald-600 text-white shadow-sm" : "text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white"}`}>{opText("របាយការណ៍ BM", "BM Report")}</button></div> : null}
+            <span className={`inline-flex items-center rounded-lg px-3 py-2 text-sm font-semibold ${operationReportStatusClass(displayedReportStatus)}`}>{operationReportStatusLabel(displayedReportStatus, language)}</span>
+            {!isBranchManagerReport && reviewingAnotherSpecialist ? <button type="button" onClick={openMyReport} className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300"><FilePlus2 className="h-4 w-4" />{opText("របាយការណ៍ខ្ញុំ", "My Report")}</button> : null}
           </div>
           <div className="flex flex-wrap gap-2">
-            <button type="button" disabled={Boolean(savingReport) || reviewingAnotherSpecialist || reportLocked} onClick={() => void saveOperationReport("draft")} className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300">{savingReport === "draft" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}{opText("រក្សាទុកព្រាង", "Save Draft")}</button>
-            <button type="button" disabled={Boolean(savingReport) || reviewingAnotherSpecialist || reportLocked} onClick={() => void saveOperationReport("submitted")} className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50">{savingReport === "submitted" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}{opText("ដាក់ស្នើ", "Submit")}</button>
+            <button type="button" disabled={reportSaveDisabled} onClick={() => void (isBranchManagerReport ? saveBranchManagerReport("draft") : saveOperationReport("draft"))} className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300">{(isBranchManagerReport ? savingBranchManagerReport : savingReport) === "draft" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}{opText("រក្សាទុកព្រាង", "Save Draft")}</button>
+            <button type="button" disabled={reportSaveDisabled} onClick={() => void (isBranchManagerReport ? saveBranchManagerReport("submitted") : saveOperationReport("submitted"))} className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50">{(isBranchManagerReport ? savingBranchManagerReport : savingReport) === "submitted" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}{isBranchManagerReport ? opText("ដាក់ស្នើទៅថ្នាក់លើ", "Submit to Management") : opText("ដាក់ស្នើទៅ BM", "Submit to BM")}</button>
             {canViewLoanData ? <button type="button" onClick={onRefresh} className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300"><RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />{opText("ផ្ទុកឥណទានឡើងវិញ", "Refresh Loans")}</button> : null}
             <button type="button" disabled={exporting} onClick={() => void exportOperationReport()} className="inline-flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-700 hover:bg-emerald-100 disabled:cursor-wait disabled:opacity-60 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-300">{exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}{exporting ? opText("កំពុងបង្កើត Excel…", "Creating Excel…") : opText("នាំចេញ Excel", "Export Excel")}</button>
             <button type="button" onClick={() => window.print()} className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-700"><Printer className="h-4 w-4" />{opText("បោះពុម្ព", "Print")}</button>
@@ -5217,6 +5482,7 @@ function OperationReportView({ loans, loading, canViewLoanData, onRefresh, onOpe
       {reviewingAnotherSpecialist ? <section className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-4 text-sm text-amber-950 dark:border-amber-800 dark:bg-amber-950/25 dark:text-amber-100">
         <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center"><span><strong>{opText("សម្រាប់ពិនិត្យប៉ុណ្ណោះ៖", "Review only:")}</strong> {opText("របាយការណ៍នេះជារបស់", "This report belongs to")} {reporterName || loadedReporterUsername}.</span><button type="button" onClick={openMyReport} className="shrink-0 font-semibold underline underline-offset-2">{opText("ត្រឡប់ទៅរបាយការណ៍ខ្ញុំ", "Return to My Report")}</button></div>
         {loadedReportRecord?.reviewComment ? <div className="mt-3 border-t border-amber-200 pt-3 dark:border-amber-800"><p className="font-semibold">{opText("មតិយោបល់ពិនិត្យ", "Review Comment")}{loadedReportRecord.reviewedBy ? `: ${loadedReportRecord.reviewedBy}` : ""}</p><p className="mt-1 whitespace-pre-wrap">{loadedReportRecord.reviewComment}</p></div> : null}
+        {reviewCommentError ? <div role="alert" className="mt-3 rounded-lg border border-red-300 bg-red-50 px-3 py-2 font-semibold text-red-700 dark:border-red-800 dark:bg-red-950/30 dark:text-red-300">{opText("សូមសរសេរមូលហេតុក្នុងប្រអប់មតិយោបល់សិន រួចចុច «បញ្ជូនត្រឡប់ឱ្យកែតម្រូវ» ម្តងទៀត។", "Enter the correction reason in the comment box, then click Return for Correction again.")}</div> : null}
         {canManageReports && ["submitted", "reviewed"].includes(loadedReportStatus) ? <div className="mt-4 border-t border-amber-200 pt-4 dark:border-amber-800"><Field label={opText("មតិយោបល់របស់អ្នកគ្រប់គ្រង", "Manager Review Comment")}><textarea rows={2} value={reviewComment} onChange={(event) => setReviewComment(event.target.value)} placeholder={opText("ត្រូវបញ្ចូលពេលបញ្ជូនត្រឡប់", "Required when returning for correction")} className={inputClass} /></Field><div className="mt-3 flex flex-wrap gap-2">{loadedReportStatus === "submitted" ? <button type="button" disabled={Boolean(reviewingAction)} onClick={() => void reviewOperationReport("reviewed")} className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50">{reviewingAction === "reviewed" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}{opText("សម្គាល់ថាបានពិនិត្យ", "Mark Reviewed")}</button> : null}{loadedReportStatus === "reviewed" ? <button type="button" disabled={Boolean(reviewingAction)} onClick={() => void reviewOperationReport("approved")} className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50">{reviewingAction === "approved" ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />}{opText("អនុម័ត", "Approve")}</button> : null}<button type="button" disabled={Boolean(reviewingAction)} onClick={() => void reviewOperationReport("returned")} className="inline-flex items-center gap-2 rounded-xl border border-red-300 bg-white px-4 py-2 text-sm font-semibold text-red-700 hover:bg-red-50 disabled:opacity-50 dark:bg-slate-950 dark:text-red-300">{reviewingAction === "returned" ? <Loader2 className="h-4 w-4 animate-spin" /> : <XCircle className="h-4 w-4" />}{opText("បញ្ជូនត្រឡប់ឱ្យកែតម្រូវ", "Return for Correction")}</button></div></div> : null}
       </section> : loadedReportStatus === "returned" && loadedReportRecord?.reviewComment ? <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900 dark:border-red-800 dark:bg-red-950/25 dark:text-red-200"><strong>{opText("បានបញ្ជូនត្រឡប់ឱ្យកែតម្រូវ៖", "Returned for correction:")}</strong> {loadedReportRecord.reviewComment}</div> : null}
 
@@ -5224,11 +5490,13 @@ function OperationReportView({ loans, loading, canViewLoanData, onRefresh, onOpe
 
       <div role="tablist" aria-label="Operation Report forms" className="font-khmer-battambang sticky top-0 z-30 overflow-x-auto border-b border-slate-300 bg-slate-100 px-1 pt-1 shadow-sm dark:border-slate-700 dark:bg-slate-900 print:hidden">
         <div className="flex min-w-max items-end">
-          {([
+          {(isBranchManagerReport ? ([
+            ["summary", opText("សង្ខេបប្រចាំសាខា", "Dashboard")],
+          ] as const) : ([
             ["summary", opText("របាយការណ៍សង្ខេប", "Summary")],
             ["collection", opText("អតិថិជនប្រមូល និងដោះស្រាយ", "Collection & Resolution")],
             ["decisions", opText("ឥណទានស្នើសុំ អនុម័ត និងបដិសេធ", "Loan Decisions")],
-          ] as const).map(([value, label]) => <button key={value} type="button" role="tab" aria-selected={activeForm === value} onClick={() => setActiveForm(value)} className={`min-h-11 min-w-72 shrink-0 border-x border-t px-5 py-2 text-center text-lg transition ${activeForm === value ? "border-slate-300 border-t-2 border-t-emerald-700 bg-white text-emerald-700 dark:border-slate-700 dark:bg-slate-950 dark:text-emerald-300" : "border-transparent text-slate-500 hover:bg-white/70 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200"}`}>{label}</button>)}
+          ] as const)).map(([value, label]) => <button key={value} type="button" role="tab" aria-selected={activeForm === value} onClick={() => setActiveForm(value)} className={`min-h-11 min-w-72 shrink-0 border-x border-t px-5 py-2 text-center text-lg transition ${activeForm === value ? "border-slate-300 border-t-2 border-t-emerald-700 bg-white text-emerald-700 dark:border-slate-700 dark:bg-slate-950 dark:text-emerald-300" : "border-transparent text-slate-500 hover:bg-white/70 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200"}`}>{label}</button>)}
         </div>
       </div>
 
@@ -5236,18 +5504,38 @@ function OperationReportView({ loans, loading, canViewLoanData, onRefresh, onOpe
         <div className="overflow-x-auto">
           <div className="font-khmer-battambang min-w-[1180px] text-slate-950 dark:text-slate-100">
             {reportSheetHeader}
-            {activeForm === "summary" ? <OperationSummaryTable dueCount={dueCustomerCount} paidCount={paidCustomerCount} collectionRate={collectionRate} dueNoticeRows={dueNoticeRows} followUpRows={followUpRows} formalNoticeRows={formalNoticeRows} /> : null}
-            {activeForm === "collection" ? <>
+            {activeForm === "summary" ? isBranchManagerReport ? <BranchManagerDashboardReport records={branchManagerRecords} monthRecords={branchManagerMonthRecords} accountRecords={branchAccountRecords} monthAccountRecords={branchAccountMonthRecords} loans={branchManagerLoans} reportDate={reportDate} /> : <OperationSummaryTable dueCount={dueCustomerCount} paidCount={paidCustomerCount} collectionRate={collectionRate} dueNoticeRows={dueNoticeRows} followUpRows={followUpRows} formalNoticeRows={formalNoticeRows} /> : null}
+            {activeForm === "collection" ? isBranchManagerReport ? <BranchManagerConsolidatedReport records={branchManagerRecords} accountRecords={branchAccountRecords} loans={branchManagerLoans} /> : <>
               <div className="grid grid-cols-2"><CollectionReportTable title={opText("អតិថិជនដែលត្រូវប្រមូលសរុប", "Total Customers Due")} rows={collectionDueRows} onChange={setCollectionDueRows} /><CollectionReportTable title={opText("អតិថិជនដែលប្រមូលបានសរុប", "Total Customers Collected")} rows={collectionPaidRows} onChange={setCollectionPaidRows} accent="red" /></div>
-              <div className="space-y-8 border-t-4 border-double border-slate-900 pt-6"><ResolutionTable title={opText("ជូនដំណឹងទៅអតិថិជន ដល់ថ្ងៃកំណត់ត្រូវបង់", "Notify Customers Due Today")} rows={dueNoticeRows} onChange={setDueNoticeRows} /><ResolutionTable title={opText("បានបន្តទាក់ទងអតិថិជនដែលយ៉ឺតចាប់ពី ១ថ្ងៃ ដល់ ៣ថ្ងៃ", "Follow Up Customers 1–3 Days Overdue")} rows={followUpRows} onChange={setFollowUpRows} /><ResolutionTable title={opText("ផ្ញើលិខិតជូនដំណឹងផ្លូវការសម្រាប់អតិថិជនយ៉ឺតចាប់ពី ៤ថ្ងៃ", "Send Formal Notice for Customers 4+ Days Overdue")} rows={formalNoticeRows} onChange={setFormalNoticeRows} /></div>
+              <div className="space-y-8 border-t-4 border-double border-slate-900 pt-6"><ResolutionTable title={opText("ជូនដំណឹងទៅអតិថិជន ដល់ថ្ងៃកំណត់ត្រូវបង់", "Notify Customers Due Today")} rows={dueNoticeRows} onChange={setDueNoticeRows} /><ResolutionTable title={opText("បានបន្តទាក់ទងអតិថិជនដែលយ៉ឺតចាប់ពី ១ថ្ងៃ ដល់ ៣ថ្ងៃ", "Follow Up Customers 1–3 Days Overdue")} rows={followUpRows} onChange={setFollowUpRows} onRememberAssetType={rememberAssetType} /><ResolutionTable title={opText("ផ្ញើលិខិតជូនដំណឹងផ្លូវការសម្រាប់អតិថិជនយ៉ឺតចាប់ពី ៤ថ្ងៃ", "Send Formal Notice for Customers 4+ Days Overdue")} rows={formalNoticeRows} onChange={setFormalNoticeRows} /></div>
             </> : null}
-            {activeForm === "decisions" ? <div className="space-y-8 pb-4"><DecisionTable title={opText("អតិថិជនដែលស្នើឥណទាន", "Loan Requests")} rows={requestedRows} total={sumRows(requestedRows, "amount")} onChange={setRequestedRows} loans={loans} statusGroup="requested" /><DecisionTable title={opText("អតិថិជនដែលបានអនុម័ត", "Approved Loans")} rows={approvedRows} total={sumRows(approvedRows, "amount")} onChange={setApprovedRows} loans={loans} statusGroup="approved" /><DecisionTable title={opText("អតិថិជនដែលបានបដិសេធ", "Rejected Loans")} rows={rejectedRows} total={sumRows(rejectedRows, "amount")} onChange={setRejectedRows} loans={loans} statusGroup="rejected" showReason /></div> : null}
+            {!isBranchManagerReport && activeForm === "decisions" ? <div className="space-y-8 pb-4"><DecisionTable title={opText("អតិថិជនដែលស្នើឥណទាន", "Loan Requests")} rows={requestedRows} total={sumRows(requestedRows, "amount")} onChange={setRequestedRows} loans={visibleLoans} statusGroup="requested" /><DecisionTable title={opText("អតិថិជនដែលបានអនុម័ត", "Approved Loans")} rows={approvedRows} total={sumRows(approvedRows, "amount")} onChange={setApprovedRows} loans={visibleLoans} statusGroup="approved" /><DecisionTable title={opText("អតិថិជនដែលបានបដិសេធ", "Rejected Loans")} rows={rejectedRows} total={sumRows(rejectedRows, "amount")} onChange={setRejectedRows} loans={visibleLoans} statusGroup="rejected" showReason /></div> : null}
           </div>
         </div>
       </Card>
 
-      {activeForm === "summary" ? <div className="space-y-6 print:hidden"><OperationMyWorkToday loans={myDueLoans} report={myReportForDate} reportDate={reportDate} canPrepare={!reviewingAnotherSpecialist && !reportLocked && canViewLoanData} onPrepare={prepareDailyWork} onOpenLoan={onOpenLoan} /><OperationReportRecordsDashboard records={savedReports} loading={reportsLoading} currentUsername={user.username} canManageReports={canManageReports} deletingReportId={deletingReportId} onEdit={editSavedReport} onDelete={deleteSavedReport} /><PaymentDateAlerts loans={loans} canViewLoanData={canViewLoanData} onOpenLoan={onOpenLoan} /></div> : null}
+      {activeForm === "summary" ? <div className="space-y-6 print:hidden">{isBranchManagerReport ? <><BranchManagerWorkflowPanel sourceRecords={branchManagerRecords} accountRecords={branchAccountRecords} submissions={branchManagerReports} reportDate={reportDate} branch={branch} currentUsername={user.username} reviewingAction={reviewingAction} onOpen={(record) => { setReportDate(record.reportDate); setBranch(record.branch); }} onReview={(record, action) => void reviewBranchManagerSubmission(record, action)} onReviewAccount={(record, action) => void reviewAccountReport(record, action)} /><OperationReportRecordsDashboard records={branchLoanSpecialistRecords} loading={reportsLoading} currentUsername={user.username} canManageReports={canManageReports} deletingReportId={deletingReportId} onEdit={editSavedReport} onDelete={deleteSavedReport} /><PaymentDateAlerts loans={branchManagerLoans} canViewLoanData={canViewLoanData} onOpenLoan={onOpenLoan} /></> : <><OperationMyWorkToday loans={myDueLoans} report={myReportForDate} reportDate={reportDate} canPrepare={!reviewingAnotherSpecialist && !reportLocked && canViewLoanData} onPrepare={prepareDailyWork} onOpenLoan={onOpenLoan} /><OperationReportRecordsDashboard records={visibleSavedReports} loading={reportsLoading} currentUsername={user.username} canManageReports={canManageReports} deletingReportId={deletingReportId} onEdit={editSavedReport} onDelete={deleteSavedReport} /><PaymentDateAlerts loans={visibleLoans} canViewLoanData={canViewLoanData} onOpenLoan={onOpenLoan} /></>}</div> : null}
     </div>
+  );
+}
+
+function BranchManagerWorkflowPanel({ sourceRecords, accountRecords, submissions, reportDate, branch, currentUsername, reviewingAction, onOpen, onReview, onReviewAccount }: { sourceRecords: OperationReportRecord[]; accountRecords: AccountReportRecord[]; submissions: OperationReportRecord[]; reportDate: string; branch: string; currentUsername: string; reviewingAction: "reviewed" | "approved" | "returned" | null; onOpen: (record: OperationReportRecord) => void; onReview: (record: OperationReportRecord, action: "reviewed" | "approved" | "returned") => void; onReviewAccount: (record: AccountReportRecord, action: "reviewed" | "approved" | "returned") => void }) {
+  const { language } = useLanguage();
+  const text = (km: string, en: string) => language === "km" ? km : en;
+  const branchSubmissions = submissions.filter((record) => !branch.trim() || record.branch.trim().toLocaleLowerCase() === branch.trim().toLocaleLowerCase());
+  const currentSubmission = branchSubmissions.find((record) => record.reportDate === reportDate && record.reporterUsername === currentUsername);
+  const awaitingReview = sourceRecords.filter((record) => record.status === "submitted").length;
+  const accountAwaitingReview = accountRecords.filter((record) => record.status === "submitted").length;
+  return (
+    <section className="overflow-hidden rounded-xl border border-emerald-200 bg-white shadow-sm dark:border-emerald-900 dark:bg-slate-900">
+      <div className="border-b border-emerald-200 bg-emerald-50 px-5 py-4 dark:border-emerald-900 dark:bg-emerald-950/30"><p className="text-sm font-semibold text-emerald-700 dark:text-emerald-300">{text("លំហូររបាយការណ៍ LS + គណនេយ្យ → BM → ថ្នាក់លើ", "LS + Account Reports → BM → Management")}</p><h2 className="mt-1 text-xl font-bold text-slate-900 dark:text-white">{text("ការដាក់ស្នើរបាយការណ៍ប្រចាំសាខា", "Branch Report Submission")}</h2></div>
+      <div className="grid border-b border-slate-200 sm:grid-cols-4 dark:border-slate-800">
+        {[[text("របាយការណ៍ LS បានទទួល", "LS Reports Received"), sourceRecords.length], [text("របាយការណ៍គណនេយ្យ", "Account Reports"), accountRecords.length], [text("រង់ចាំ BM ពិនិត្យ", "Awaiting BM Review"), awaitingReview + accountAwaitingReview], [text("ស្ថានភាព BM", "BM Status"), operationReportStatusLabel(currentSubmission?.status || "draft", language)]].map(([label, value]) => <div key={label} className="border-b border-slate-200 px-5 py-4 sm:border-b-0 sm:border-r dark:border-slate-800"><p className="text-xs font-semibold text-slate-500">{label}</p><p className="mt-1 text-lg font-bold text-slate-900 dark:text-white">{value}</p></div>)}
+      </div>
+      <div className="px-5 py-4 text-sm text-slate-600 dark:text-slate-300">{awaitingReview || accountAwaitingReview ? text(`ត្រូវពិនិត្យរបាយការណ៍ LS ${awaitingReview} និងគណនេយ្យ ${accountAwaitingReview} មុនពេលដាក់ស្នើ BM Report ទៅថ្នាក់លើ។`, `Review ${awaitingReview} LS and ${accountAwaitingReview} Account Report(s) before submitting the BM Report.`) : sourceRecords.length && accountRecords.length ? text("របាយការណ៍ LS និងគណនេយ្យទាំងអស់បានត្រៀមរួចរាល់សម្រាប់ BM Report។", "All LS and Account Reports are ready for consolidation.") : text("រង់ចាំ LS និងគណនេយ្យដាក់ស្នើរបាយការណ៍សម្រាប់សាខា និងកាលបរិច្ឆេទនេះ។", "Waiting for LS and Account Reports for this branch and date.")}</div>
+      {accountRecords.length ? <div className="max-h-64 overflow-auto border-t border-slate-200 dark:border-slate-800"><div className="bg-slate-50 px-4 py-2 text-sm font-bold text-slate-700 dark:bg-slate-950 dark:text-slate-200">{text("របាយការណ៍គណនេយ្យដែលបានភ្ជាប់", "Linked Account Reports")}</div><table className="min-w-[720px] w-full text-left text-sm"><thead className="bg-slate-100 text-slate-600 dark:bg-slate-950 dark:text-slate-300"><tr><th className="px-4 py-3">{text("ថ្ងៃ", "Date")}</th><th className="px-4 py-3">{text("អ្នករាយការណ៍", "Reporter")}</th><th className="px-4 py-3">{text("សាខា", "Branch")}</th><th className="px-4 py-3">{text("ស្ថានភាព", "Status")}</th><th className="px-4 py-3 text-right">{text("សកម្មភាព", "Actions")}</th></tr></thead><tbody>{accountRecords.map((record) => <tr key={record.id} className="border-t border-slate-200 dark:border-slate-800"><td className="px-4 py-3 font-semibold">{record.reportDate}</td><td className="px-4 py-3">{record.reporterName || record.reporterUsername}</td><td className="px-4 py-3">{record.branch}</td><td className="px-4 py-3"><span className={`inline-flex rounded-md px-2 py-1 text-xs font-semibold ${operationReportStatusClass(record.status)}`}>{operationReportStatusLabel(record.status, language)}</span></td><td className="px-4 py-3"><div className="flex justify-end gap-2">{record.status === "submitted" ? <button type="button" disabled={Boolean(reviewingAction)} onClick={() => onReviewAccount(record, "reviewed")} className="rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white disabled:opacity-50">{text("ពិនិត្យ", "Review")}</button> : null}{record.status === "reviewed" ? <button type="button" disabled={Boolean(reviewingAction)} onClick={() => onReviewAccount(record, "approved")} className="rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white disabled:opacity-50">{text("អនុម័ត", "Approve")}</button> : null}{["submitted", "reviewed"].includes(record.status) ? <button type="button" disabled={Boolean(reviewingAction)} onClick={() => onReviewAccount(record, "returned")} className="rounded-lg border border-red-300 px-3 py-2 text-xs font-semibold text-red-700 disabled:opacity-50 dark:text-red-300">{text("ត្រឡប់", "Return")}</button> : null}</div></td></tr>)}</tbody></table></div> : null}
+      {branchSubmissions.length ? <div className="max-h-72 overflow-auto border-t border-slate-200 dark:border-slate-800"><table className="min-w-[820px] w-full text-left text-sm"><thead className="bg-slate-100 text-slate-600 dark:bg-slate-950 dark:text-slate-300"><tr><th className="px-4 py-3">{text("ថ្ងៃ", "Date")}</th><th className="px-4 py-3">{text("អ្នករាយការណ៍ BM", "BM Reporter")}</th><th className="px-4 py-3">{text("សាខា", "Branch")}</th><th className="px-4 py-3 text-center">{text("ប្រភពដែលបានភ្ជាប់", "Linked Sources")}</th><th className="px-4 py-3">{text("ស្ថានភាព", "Status")}</th><th className="px-4 py-3 text-right">{text("សកម្មភាព", "Actions")}</th></tr></thead><tbody>{branchSubmissions.map((record) => { const ownsRecord = record.reporterUsername === currentUsername; return <tr key={record.id} className="border-t border-slate-200 dark:border-slate-800"><td className="px-4 py-3 font-semibold">{record.reportDate}</td><td className="px-4 py-3">{record.reporterName || record.reporterUsername}</td><td className="px-4 py-3">{record.branch || "-"}</td><td className="px-4 py-3 text-center font-semibold">LS {record.data.sourceReportIds?.length || 0} / Account {record.data.sourceAccountReportIds?.length || 0}</td><td className="px-4 py-3"><span className={`inline-flex rounded-md px-2 py-1 text-xs font-semibold ${operationReportStatusClass(record.status)}`}>{operationReportStatusLabel(record.status, language)}</span></td><td className="px-4 py-3"><div className="flex justify-end gap-2"><button type="button" onClick={() => onOpen(record)} className="inline-flex min-h-9 items-center gap-2 rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200"><Eye className="h-3.5 w-3.5" />{text("មើល", "View")}</button>{!ownsRecord && record.status === "submitted" ? <button type="button" disabled={Boolean(reviewingAction)} onClick={() => onReview(record, "reviewed")} className="inline-flex min-h-9 items-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white disabled:opacity-50"><Check className="h-3.5 w-3.5" />{text("ពិនិត្យ", "Review")}</button> : null}{!ownsRecord && record.status === "reviewed" ? <button type="button" disabled={Boolean(reviewingAction)} onClick={() => onReview(record, "approved")} className="inline-flex min-h-9 items-center gap-2 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white disabled:opacity-50"><ShieldCheck className="h-3.5 w-3.5" />{text("អនុម័ត", "Approve")}</button> : null}{!ownsRecord && ["submitted", "reviewed"].includes(record.status) ? <button type="button" disabled={Boolean(reviewingAction)} onClick={() => onReview(record, "returned")} className="inline-flex min-h-9 items-center gap-2 rounded-lg border border-red-300 px-3 py-2 text-xs font-semibold text-red-700 disabled:opacity-50 dark:text-red-300"><XCircle className="h-3.5 w-3.5" />{text("ត្រឡប់", "Return")}</button> : null}</div></td></tr>; })}</tbody></table></div> : null}
+    </section>
   );
 }
 
@@ -5283,15 +5571,23 @@ function OperationReportRecordsDashboard({ records, loading, currentUsername, ca
   const [departmentFilter, setDepartmentFilter] = useState("");
   const [positionFilter, setPositionFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState<"" | OperationReportRecord["status"]>("");
+  const [reportPeriod, setReportPeriod] = useState<"all" | "daily" | "monthly" | "yearly">("all");
+  const [periodValue, setPeriodValue] = useState("");
   const specialistOptions = useMemo(() => Array.from(new Map(records.map((record) => [record.reporterUsername, record.reporterName || record.reporterUsername])).entries()).sort((a, b) => a[1].localeCompare(b[1])), [records]);
   const branchOptions = useMemo(() => Array.from(new Set(records.map((record) => record.branch).filter(Boolean))).sort(), [records]);
   const departmentOptions = useMemo(() => Array.from(new Set(records.map((record) => record.department).filter(Boolean))).sort(), [records]);
   const positionOptions = useMemo(() => Array.from(new Set(records.map((record) => record.reporterPosition).filter(Boolean))).sort(), [records]);
+  const yearOptions = useMemo(() => Array.from(new Set([String(new Date().getFullYear()), ...records.map((record) => record.reportDate.slice(0, 4))])).filter(Boolean).sort((left, right) => right.localeCompare(left)), [records]);
   const filtered = useMemo(() => {
     const search = query.trim().toLocaleLowerCase();
     return records.filter((record) => {
       const matchesSearch = !search || `${record.reportDate} ${record.reporterName} ${record.reporterUsername} ${record.reporterPosition} ${record.branch} ${record.department} ${record.status}`.toLocaleLowerCase().includes(search);
+      const matchesPeriod = reportPeriod === "all" || !periodValue
+        || (reportPeriod === "daily" && record.reportDate === periodValue)
+        || (reportPeriod === "monthly" && record.reportDate.startsWith(`${periodValue}-`))
+        || (reportPeriod === "yearly" && record.reportDate.startsWith(`${periodValue}-`));
       return matchesSearch
+        && matchesPeriod
         && (!fromDate || record.reportDate >= fromDate)
         && (!toDate || record.reportDate <= toDate)
         && (!specialist || record.reporterUsername === specialist)
@@ -5300,9 +5596,16 @@ function OperationReportRecordsDashboard({ records, loading, currentUsername, ca
         && (!positionFilter || record.reporterPosition === positionFilter)
         && (!statusFilter || record.status === statusFilter);
     });
-  }, [branchFilter, departmentFilter, fromDate, positionFilter, query, records, specialist, statusFilter, toDate]);
-  const advancedFilterCount = [fromDate, toDate, specialist, branchFilter, departmentFilter, positionFilter, statusFilter].filter(Boolean).length;
+  }, [branchFilter, departmentFilter, fromDate, periodValue, positionFilter, query, records, reportPeriod, specialist, statusFilter, toDate]);
+  const advancedFilterCount = [reportPeriod !== "all" ? reportPeriod : "", fromDate, toDate, specialist, branchFilter, departmentFilter, positionFilter, statusFilter].filter(Boolean).length;
+  const changeReportPeriod = (period: "all" | "daily" | "monthly" | "yearly") => {
+    const today = operationDateInputValue();
+    setReportPeriod(period);
+    setPeriodValue(period === "daily" ? today : period === "monthly" ? today.slice(0, 7) : period === "yearly" ? today.slice(0, 4) : "");
+  };
   const clearAdvancedSearch = () => {
+    setReportPeriod("all");
+    setPeriodValue("");
     setFromDate("");
     setToDate("");
     setSpecialist("");
@@ -5311,17 +5614,17 @@ function OperationReportRecordsDashboard({ records, loading, currentUsername, ca
     setPositionFilter("");
     setStatusFilter("");
   };
-  const submitted = records.filter((record) => record.status === "submitted").length;
-  const specialists = new Set(records.map((record) => record.reporterUsername)).size;
+  const submitted = filtered.filter((record) => record.status === "submitted").length;
+  const specialists = new Set(filtered.map((record) => record.reporterUsername)).size;
   const today = operationDateInputValue();
-  const todayReports = records.filter((record) => record.reportDate === today).length;
-  const rowCount = (record: OperationReportRecord, key: keyof OperationReportSavedData) => (record.data[key] || []).filter((row) => row.customer.trim()).length;
+  const todayReports = filtered.filter((record) => record.reportDate === today).length;
+  const rowCount = (record: OperationReportRecord, key: Exclude<keyof OperationReportSavedData, "sourceReportIds" | "sourceAccountReportIds">) => (record.data[key] || []).filter((row) => row.customer.trim()).length;
 
   return (
     <section className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
-      <div className="border-b border-slate-200 px-5 py-4 dark:border-slate-800"><p className="text-sm font-semibold text-emerald-700">{text("អ្នកឯកទេសឥណទានទាំងអស់", "All Loan Specialists")}</p><h2 className="mt-1 text-xl font-bold text-slate-900 dark:text-white">{text("កំណត់ត្រារបាយការណ៍ប្រចាំថ្ងៃ", "Daily Report Records")}</h2></div>
+      <div className="border-b border-slate-200 px-5 py-4 dark:border-slate-800"><p className="text-sm font-semibold text-emerald-700">{canManageReports ? text("អ្នកឯកទេសឥណទានទាំងអស់", "All Loan Specialists") : text("របាយការណ៍របស់ខ្ញុំ", "My LS Reports")}</p><h2 className="mt-1 text-xl font-bold text-slate-900 dark:text-white">{text("កំណត់ត្រារបាយការណ៍ប្រចាំថ្ងៃ", "Daily Report Records")}</h2></div>
       <div className="grid border-b border-slate-200 sm:grid-cols-2 xl:grid-cols-4 dark:border-slate-800">
-        {[[text("កំណត់ត្រាសរុប", "Total Records"), records.length], [text("បានដាក់ស្នើ", "Submitted"), submitted], [text("អ្នកឯកទេសឥណទាន", "Loan Specialists"), specialists], [text("បានរាយការណ៍ថ្ងៃនេះ", "Reported Today"), todayReports]].map(([label, value]) => <div key={label} className="border-b border-slate-200 px-5 py-4 last:border-b-0 sm:border-r xl:border-b-0 dark:border-slate-800"><p className="text-xs font-semibold text-slate-500">{label}</p><p className="mt-1 text-2xl font-bold text-slate-900 dark:text-white">{value}</p></div>)}
+        {[[text("កំណត់ត្រាសរុប", "Total Records"), filtered.length], [text("បានដាក់ស្នើ", "Submitted"), submitted], [text("អ្នកឯកទេសឥណទាន", "Loan Specialists"), specialists], [text("បានរាយការណ៍ថ្ងៃនេះ", "Reported Today"), todayReports]].map(([label, value]) => <div key={label} className="border-b border-slate-200 px-5 py-4 last:border-b-0 sm:border-r xl:border-b-0 dark:border-slate-800"><p className="text-xs font-semibold text-slate-500">{label}</p><p className="mt-1 text-2xl font-bold text-slate-900 dark:text-white">{value}</p></div>)}
       </div>
       <div className="border-b border-slate-200 dark:border-slate-800">
         <div className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center">
@@ -5329,6 +5632,10 @@ function OperationReportRecordsDashboard({ records, loading, currentUsername, ca
           <button type="button" aria-expanded={showAdvancedSearch} onClick={() => setShowAdvancedSearch((current) => !current)} className={`inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border px-4 py-2 text-sm font-semibold transition ${showAdvancedSearch || advancedFilterCount ? "border-emerald-600 bg-emerald-50 text-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-300" : "border-slate-300 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300"}`}><Filter className="h-4 w-4" />{text("ស្វែងរកកម្រិតខ្ពស់", "Advanced Search")}{advancedFilterCount ? <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-emerald-700 px-1.5 text-xs text-white">{advancedFilterCount}</span> : null}<ChevronDown className={`h-4 w-4 transition ${showAdvancedSearch ? "rotate-180" : ""}`} /></button>
         </div>
         {showAdvancedSearch ? <div className="grid gap-3 border-t border-slate-200 bg-slate-50/70 p-4 dark:border-slate-800 dark:bg-slate-950/40 sm:grid-cols-2 lg:grid-cols-4">
+          <Field label={text("ប្រភេទរយៈពេល", "Report Period")}><select value={reportPeriod} onChange={(event) => changeReportPeriod(event.target.value as "all" | "daily" | "monthly" | "yearly")} className={inputClass}><option value="all">{text("របាយការណ៍ទាំងអស់", "All Reports")}</option><option value="daily">{text("របាយការណ៍ប្រចាំថ្ងៃ", "Daily Report")}</option><option value="monthly">{text("របាយការណ៍ប្រចាំខែ", "Monthly Report")}</option><option value="yearly">{text("របាយការណ៍ប្រចាំឆ្នាំ", "Yearly Report")}</option></select></Field>
+          {reportPeriod === "daily" ? <Field label={text("ជ្រើសរើសថ្ងៃ", "Select Day")}><input type="date" value={periodValue} onChange={(event) => setPeriodValue(event.target.value)} className={inputClass} /></Field> : null}
+          {reportPeriod === "monthly" ? <Field label={text("ជ្រើសរើសខែ", "Select Month")}><input type="month" value={periodValue} onChange={(event) => setPeriodValue(event.target.value)} className={inputClass} /></Field> : null}
+          {reportPeriod === "yearly" ? <Field label={text("ជ្រើសរើសឆ្នាំ", "Select Year")}><select value={periodValue} onChange={(event) => setPeriodValue(event.target.value)} className={inputClass}>{yearOptions.map((year) => <option key={year} value={year}>{year}</option>)}</select></Field> : null}
           <Field label={text("ចាប់ពីថ្ងៃ", "From Date")}><input type="date" value={fromDate} max={toDate || undefined} onChange={(event) => setFromDate(event.target.value)} className={inputClass} /></Field>
           <Field label={text("ដល់ថ្ងៃ", "To Date")}><input type="date" value={toDate} min={fromDate || undefined} onChange={(event) => setToDate(event.target.value)} className={inputClass} /></Field>
           <Field label={text("អ្នកឯកទេសឥណទាន", "Loan Specialist")}><select value={specialist} onChange={(event) => setSpecialist(event.target.value)} className={inputClass}><option value="">{text("អ្នកឯកទេសទាំងអស់", "All Specialists")}</option>{specialistOptions.map(([username, name]) => <option key={username} value={username}>{name}{name !== username ? ` (${username})` : ""}</option>)}</select></Field>
@@ -5346,9 +5653,9 @@ function OperationReportRecordsDashboard({ records, loading, currentUsername, ca
             const ownsRecord = record.reporterUsername.trim().toLocaleLowerCase() === currentUsername.trim().toLocaleLowerCase();
             const canEdit = ownsRecord && ["draft", "returned"].includes(record.status);
             const canDelete = canManageReports || ownsRecord;
-            const canOpen = canEdit || canManageReports;
+            const canOpen = ownsRecord || canManageReports;
             const reviewing = canManageReports && !ownsRecord;
-            return <tr key={record.id} className="border-t border-slate-200 dark:border-slate-800"><td className="whitespace-nowrap px-4 py-3 font-semibold">{record.reportDate}</td><td className="px-4 py-3"><p className="font-semibold text-slate-900 dark:text-white">{record.reporterName || record.reporterUsername}</p><p className="text-xs text-slate-500">{record.reporterPosition}</p></td><td className="px-4 py-3 text-slate-600 dark:text-slate-300">{record.branch || "-"}</td><td className="px-4 py-3 text-center font-semibold">{rowCount(record, "collectionDueRows")}</td><td className="px-4 py-3 text-center font-semibold">{rowCount(record, "collectionPaidRows")}</td><td className="px-4 py-3 text-center font-semibold">{rowCount(record, "requestedRows")}</td><td className="px-4 py-3"><span className={`inline-flex rounded-md px-2 py-1 text-xs font-semibold ${operationReportStatusClass(record.status)}`}>{operationReportStatusLabel(record.status, language)}</span></td><td className="px-4 py-3"><div className="flex justify-end gap-2"><button type="button" disabled={!canOpen} onClick={() => onEdit(record)} title={canEdit ? text("កែសម្រួល និងធ្វើបច្ចុប្បន្នភាព", "Edit and update report") : reviewing ? text("ពិនិត្យ និងធ្វើបច្ចុប្បន្នភាពស្ថានភាព", "Review and update status") : text("អាចកែបានតែរបាយការណ៍ព្រាង ឬបានបញ្ជូនត្រឡប់របស់អ្នក", "Only your Draft or Returned reports can be edited")} className="inline-flex min-h-9 items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-50 disabled:text-slate-400 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-300 dark:disabled:border-slate-800 dark:disabled:bg-slate-900 dark:disabled:text-slate-600"><Pencil className="h-3.5 w-3.5" />{reviewing ? text("ពិនិត្យ/ធ្វើបច្ចុប្បន្នភាព", "Review / Update") : text("កែ/ធ្វើបច្ចុប្បន្នភាព", "Edit / Update")}</button><button type="button" disabled={!canDelete || deletingReportId === record.id} onClick={() => onDelete(record)} title={text("លុបរបាយការណ៍", "Delete report")} className="inline-flex min-h-9 items-center gap-2 rounded-lg border border-red-200 bg-white px-3 py-2 text-xs font-semibold text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400 dark:border-red-900 dark:bg-slate-950 dark:text-red-300 dark:disabled:border-slate-800 dark:disabled:text-slate-600">{deletingReportId === record.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}{text("លុប", "Delete")}</button></div></td></tr>;
+            return <tr key={record.id} className="border-t border-slate-200 dark:border-slate-800"><td className="whitespace-nowrap px-4 py-3 font-semibold">{record.reportDate}</td><td className="px-4 py-3"><p className="font-semibold text-slate-900 dark:text-white">{record.reporterName || record.reporterUsername}</p><p className="text-xs text-slate-500">{record.reporterPosition}</p></td><td className="px-4 py-3 text-slate-600 dark:text-slate-300">{record.branch || "-"}</td><td className="px-4 py-3 text-center font-semibold">{rowCount(record, "collectionDueRows")}</td><td className="px-4 py-3 text-center font-semibold">{rowCount(record, "collectionPaidRows")}</td><td className="px-4 py-3 text-center font-semibold">{rowCount(record, "requestedRows")}</td><td className="px-4 py-3"><span className={`inline-flex rounded-md px-2 py-1 text-xs font-semibold ${operationReportStatusClass(record.status)}`}>{operationReportStatusLabel(record.status, language)}</span></td><td className="px-4 py-3"><div className="flex justify-end gap-2"><button type="button" disabled={!canOpen} onClick={() => onEdit(record)} title={canEdit ? text("កែសម្រួល និងធ្វើបច្ចុប្បន្នភាព", "Edit and update report") : reviewing ? text("ពិនិត្យ និងធ្វើបច្ចុប្បន្នភាពស្ថានភាព", "Review and update status") : text("មើលរបាយការណ៍របស់អ្នក", "View your report")} className="inline-flex min-h-9 items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-50 disabled:text-slate-400 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-300 dark:disabled:border-slate-800 dark:disabled:bg-slate-900 dark:disabled:text-slate-600">{canEdit || reviewing ? <Pencil className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}{reviewing ? text("ពិនិត្យ/ធ្វើបច្ចុប្បន្នភាព", "Review / Update") : canEdit ? text("កែ/ធ្វើបច្ចុប្បន្នភាព", "Edit / Update") : text("មើល", "View")}</button><button type="button" disabled={!canDelete || deletingReportId === record.id} onClick={() => onDelete(record)} title={text("លុបរបាយការណ៍", "Delete report")} className="inline-flex min-h-9 items-center gap-2 rounded-lg border border-red-200 bg-white px-3 py-2 text-xs font-semibold text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400 dark:border-red-900 dark:bg-slate-950 dark:text-red-300 dark:disabled:border-slate-800 dark:disabled:bg-slate-900 dark:disabled:text-slate-600">{deletingReportId === record.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}{text("លុប", "Delete")}</button></div></td></tr>;
           }) : <tr><td colSpan={8} className="px-4 py-10 text-center text-slate-500">{text("រកមិនឃើញរបាយការណ៍ដែលបានរក្សាទុក", "No saved reports found.")}</td></tr>}</tbody>
         </table>
       </div>
@@ -5402,6 +5709,139 @@ function OperationSummaryTable({ dueCount, paidCount, collectionRate, dueNoticeR
         <tbody>{rows.slice(3).map(([label, count, amount]) => <tr key={String(label)}><td className="px-3 py-3 font-semibold">{label}</td><td className="px-3 py-3 text-center font-bold">{count}</td><td className="px-3 py-3 text-right font-semibold tabular-nums">{amount}</td></tr>)}</tbody>
       </table>
     </section>
+  );
+}
+
+function branchManagerStaffPerformance(records: OperationReportRecord[]) {
+  const grouped = new Map<string, { name: string; requested: number; approved: number; collected: number; rejected: number; contacts: number }>();
+  records.forEach((record) => {
+    const key = record.reporterUsername || record.reporterName;
+    const current = grouped.get(key) || { name: record.reporterName || record.reporterUsername, requested: 0, approved: 0, collected: 0, rejected: 0, contacts: 0 };
+    current.requested += (record.data.requestedRows || []).reduce((sum, row) => sum + operationNumber(row.amount), 0);
+    current.approved += (record.data.approvedRows || []).reduce((sum, row) => sum + operationNumber(row.amount), 0);
+    current.collected += (record.data.collectionPaidRows || []).reduce((sum, row) => sum + operationNumber(row.amount), 0);
+    current.rejected += (record.data.rejectedRows || []).reduce((sum, row) => sum + operationNumber(row.amount), 0);
+    current.contacts += (record.data.collectionDueRows || []).filter((row) => row.customer.trim()).length;
+    grouped.set(key, current);
+  });
+  return Array.from(grouped.values()).sort((left, right) => right.requested - left.requested || left.name.localeCompare(right.name));
+}
+
+function BranchManagerSection({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <section>
+      <h2 className="bg-[#087323] px-3 py-3 text-lg font-bold text-white">{title}</h2>
+      {children}
+    </section>
+  );
+}
+
+function BranchManagerDashboardReport({ records, monthRecords, accountRecords, monthAccountRecords, loans, reportDate }: { records: OperationReportRecord[]; monthRecords: OperationReportRecord[]; accountRecords: AccountReportRecord[]; monthAccountRecords: AccountReportRecord[]; loans: LoanEntity[]; reportDate: string }) {
+  const staffRows = branchManagerStaffPerformance(records);
+  const approvedAmount = staffRows.reduce((sum, row) => sum + row.approved, 0);
+  const monthStaffRows = branchManagerStaffPerformance(monthRecords);
+  const monthApprovedAmount = monthStaffRows.reduce((sum, row) => sum + row.approved, 0);
+  const approvedCustomers = records.reduce((sum, record) => sum + (record.data.approvedRows || []).filter((row) => row.customer.trim()).length, 0);
+  const monthApprovedCustomers = monthRecords.reduce((sum, record) => sum + (record.data.approvedRows || []).filter((row) => row.customer.trim()).length, 0);
+  const accountCount = (items: AccountReportRecord[], key: keyof Pick<AccountReportSavedData, "dueRows" | "paidRows" | "dueNoticeRows" | "promiseRows" | "closedRows">) => items.reduce((sum, record) => sum + (record.data[key] || []).filter((row) => row.customer.trim()).length, 0);
+  const accountAmount = (items: AccountReportRecord[], key: "paidRows") => items.reduce((sum, record) => sum + (record.data[key] || []).reduce((rowSum, row) => rowSum + accountNumber(row.amount), 0), 0);
+  const dueCustomers = accountCount(accountRecords, "dueRows");
+  const paidCustomers = accountCount(accountRecords, "paidRows");
+  const monthDueCustomers = accountCount(monthAccountRecords, "dueRows");
+  const monthPaidCustomers = accountCount(monthAccountRecords, "paidRows");
+  const collectedAmount = accountAmount(accountRecords, "paidRows");
+  const monthCollectedAmount = accountAmount(monthAccountRecords, "paidRows");
+  const outstanding = loans.filter((loan) => !["Closed", "Rejected", "Draft"].includes(loan.repaymentStatus)).reduce((sum, loan) => sum + loan.outstandingBalance, 0);
+  const overdueLoans = loans.filter((loan) => loan.nextPaymentDate && loan.nextPaymentDate.slice(0, 10) < reportDate && !["Closed", "Rejected"].includes(loan.repaymentStatus));
+  const overdueOutstanding = overdueLoans.reduce((sum, loan) => sum + loan.outstandingBalance, 0);
+  const overdue30Outstanding = overdueLoans.filter((loan) => Math.floor((new Date(`${reportDate}T00:00:00Z`).getTime() - new Date(`${loan.nextPaymentDate!.slice(0, 10)}T00:00:00Z`).getTime()) / 86_400_000) > 30).reduce((sum, loan) => sum + loan.outstandingBalance, 0);
+  const actionLoans = loans.filter((loan) => loan.nextPaymentDate && loan.nextPaymentDate.slice(0, 10) <= reportDate && !["Closed", "Rejected"].includes(loan.repaymentStatus)).slice(0, 8);
+  const collectionRate = dueCustomers ? paidCustomers / dueCustomers : 0;
+  const monthCollectionRate = monthDueCustomers ? monthPaidCustomers / monthDueCustomers : 0;
+  const par1 = outstanding ? overdueOutstanding / outstanding : 0;
+  const par30 = outstanding ? overdue30Outstanding / outstanding : 0;
+  const dueNoticeCount = accountCount(accountRecords, "dueNoticeRows");
+  const followUpCount = accountCount(accountRecords, "promiseRows");
+  const formalNoticeCount = accountCount(accountRecords, "closedRows");
+  const monthDueNoticeCount = accountCount(monthAccountRecords, "dueNoticeRows");
+  const monthFollowUpCount = accountCount(monthAccountRecords, "promiseRows");
+  const monthFormalNoticeCount = accountCount(monthAccountRecords, "closedRows");
+  const kpiRows = [
+    ["1", "ចំនួនទម្លាក់ឥណទានថ្មី ($)", operationCurrency(150000), operationCurrency(approvedAmount), operationCurrency(monthApprovedAmount), `${((monthApprovedAmount / 150000) * 100).toFixed(2)}%`, `សម្រេចបាន ${((monthApprovedAmount / 150000) * 100).toFixed(1)}% នៃគោលដៅខែ`],
+    ["2", "ចំនួនអតិថិជនថ្មី (នាក់)", 30, approvedCustomers, monthApprovedCustomers, `${((monthApprovedCustomers / 30) * 100).toFixed(2)}%`, "ជិតសម្រេចបានតាមផែនការ"],
+    ["3", "អត្រាប្រមូលប្រាក់ (%)", "95.00%", `${(collectionRate * 100).toFixed(2)}%`, `${(monthCollectionRate * 100).toFixed(2)}%`, `${((monthCollectionRate / 0.95) * 100).toFixed(2)}%`, "ត្រូវរុញច្រានការប្រមូលប្រាក់បន្ថែម"],
+    ["4", "ចំនួនប្រាក់ប្រមូលបាន ($)", operationCurrency(10000), operationCurrency(collectedAmount), operationCurrency(monthCollectedAmount), `${((monthCollectedAmount / 10000) * 100).toFixed(2)}%`, `ប្រមូលបាន ${((monthCollectedAmount / 10000) * 100).toFixed(1)}% នៃផែនការខែ`],
+    ["5", "អត្រាឥណទានយឺតយ៉ាវ PAR > 1 day (%)", "2.50%", `${(par1 * 100).toFixed(2)}%`, `${(par1 * 100).toFixed(2)}%`, `${((par1 / 0.025) * 100).toFixed(2)}%`, "លើសពីកម្រិតកំណត់ 1.2%"],
+    ["6", "អត្រាឥណទានយឺតយ៉ាវ PAR > 30 day (%)", "1.00%", `${(par30 * 100).toFixed(2)}%`, `${(par30 * 100).toFixed(2)}%`, `${((par30 / 0.01) * 100).toFixed(2)}%`, "លើសពីកម្រិតកំណត់ 1.2%"],
+    ["7", "ជូនដំណឹងទៅអតិថិជនមុន ៣ថ្ងៃ ដល់ថ្ងៃកំណត់ត្រូវបង់ (នាក់)", 0, dueNoticeCount, monthDueNoticeCount, "", ""],
+    ["8", "ជូនដំណឹងទៅអតិថិជនមុន ១ថ្ងៃ ដល់ថ្ងៃកំណត់ត្រូវបង់ (នាក់)", 0, followUpCount, monthFollowUpCount, "", ""],
+    ["9", "ជូនដំណឹងទៅអតិថិជន ដល់ថ្ងៃកំណត់ត្រូវបង់ (នាក់)", 0, formalNoticeCount, monthFormalNoticeCount, "", ""],
+  ];
+
+  return (
+    <div className="space-y-6 pb-6">
+      <BranchManagerSection title="១. សង្ខេបសូចនាករផលសម្រេចគន្លឹះរបស់សាខា (Branch Key KPI Summary)">
+        <table className="w-full table-fixed border-collapse text-sm [&_td]:border [&_td]:border-slate-300 [&_th]:border [&_th]:border-slate-300"><thead className="bg-[#087323] text-white"><tr>{["ល.រ", "សូចនាករគន្លឹះ (KPIs)", "គោលដៅប្រចាំខែ", "សម្រេចបានថ្ងៃនេះ", "សម្រេចបានសរុបប្រចាំខែ", "% សម្រេចធៀប KPI", "កំណត់សម្គាល់"].map((header) => <th key={header} className="px-3 py-3 text-center">{header}</th>)}</tr></thead><tbody>{kpiRows.map((row) => <tr key={String(row[0])}>{row.map((cell, index) => <td key={`${row[0]}-${index}`} className={`px-3 py-2 ${index === 0 ? "text-center" : index >= 2 && index <= 5 ? "text-right tabular-nums" : ""}`}>{cell}</td>)}</tr>)}</tbody></table>
+      </BranchManagerSection>
+      <BranchManagerSection title="២. សង្ខេបលទ្ធផលតាមមន្ត្រីឥណទាន (Staff Performance Breakdown)">
+        <BranchManagerStaffTable rows={staffRows} />
+      </BranchManagerSection>
+      <BranchManagerSection title="៣. បញ្ហាប្រឈមគន្លឹះ និង ផែនការសកម្មភាពដោះស្រាយរបស់ប្រធានសាខា (Key Issues & Action Plan)">
+        <table className="w-full table-fixed border-collapse text-sm [&_td]:border [&_td]:border-slate-300 [&_th]:border [&_th]:border-slate-300"><thead className="bg-[#087323] text-white"><tr>{["ល.រ", "បញ្ហាប្រឈម / ករណីយឺតយ៉ាវ", "ឈ្មោះអតិថិជន/មន្ត្រី", "ប្រាក់ដើម ($)", "ដំណោះស្រាយ/សកម្មភាពឆ្លើយតប", "អ្នកទទួលខុសត្រូវ", "កាលបរិច្ឆេទបញ្ចប់"].map((header) => <th key={header} className="px-3 py-3">{header}</th>)}</tr></thead><tbody>{actionLoans.length ? actionLoans.map((loan, index) => <tr key={loan.id}><td className="px-3 py-3 text-center">{index + 1}</td><td className="px-3 py-3">{loan.nextPaymentDate && loan.nextPaymentDate.slice(0, 10) < reportDate ? "អតិថិជនយឺតយ៉ាវត្រូវតាមដាន" : "អតិថិជនដល់ថ្ងៃបង់ត្រូវជូនដំណឹង"}</td><td className="px-3 py-3">{loan.borrower.fullName}</td><td className="px-3 py-3 text-right tabular-nums">{operationCurrency(loan.outstandingBalance)}</td><td className="px-3 py-3">{loan.nextPaymentDate && loan.nextPaymentDate.slice(0, 10) < reportDate ? "ប្រធានសាខាចុះផ្ទាល់ជាមួយ LS ដើម្បីសម្រុះសម្រួល" : "ជូនដំណឹងអតិថិជនដល់ថ្ងៃបង់"}</td><td className="px-3 py-3">{`BM & ${loan.loanContacts.loanSpecialist || loan.loanOfficer || ""}`.trim()}</td><td className="px-3 py-3 text-center">{loan.nextPaymentDate?.slice(0, 10) || reportDate}</td></tr>) : <tr><td colSpan={7} className="px-3 py-8 text-center text-slate-500">No key issues for this report date.</td></tr>}</tbody></table>
+      </BranchManagerSection>
+    </div>
+  );
+}
+
+function BranchManagerStaffTable({ rows }: { rows: Array<{ name: string; requested: number; approved: number; collected: number; rejected: number; contacts: number }> }) {
+  const totals = rows.reduce((sum, row) => ({ requested: sum.requested + row.requested, approved: sum.approved + row.approved, collected: sum.collected + row.collected, rejected: sum.rejected + row.rejected, contacts: sum.contacts + row.contacts }), { requested: 0, approved: 0, collected: 0, rejected: 0, contacts: 0 });
+  return (
+    <table className="w-full table-fixed border-collapse text-sm [&_td]:border [&_td]:border-slate-300 [&_th]:border [&_th]:border-slate-300">
+      <thead className="bg-[#087323] text-white"><tr>{["ល.រ", "ឈ្មោះមន្ត្រីឥណទាន", "ស្នើសុំ ($)", "អនុម័ត ($)", "បដិសេធ ($)", "ប្រមូលបាន ($)", "អតិថិជនដោះស្រាយ (នាក់)"].map((header) => <th key={header} className="px-3 py-3">{header}</th>)}</tr></thead>
+      <tbody>{rows.length ? rows.map((row, index) => <tr key={row.name}><td className="px-3 py-2 text-center">{index + 1}</td><td className="px-3 py-2">{row.name}</td><td className="px-3 py-2 text-right tabular-nums">{operationCurrency(row.requested)}</td><td className="px-3 py-2 text-right tabular-nums">{operationCurrency(row.approved)}</td><td className="px-3 py-2 text-right tabular-nums">{operationCurrency(row.rejected)}</td><td className="px-3 py-2 text-right tabular-nums">{operationCurrency(row.collected)}</td><td className="px-3 py-2 text-center">{row.contacts}</td></tr>) : <tr><td colSpan={7} className="px-3 py-8 text-center text-slate-500">No staff reports for this date.</td></tr>}</tbody>
+      <tfoot className="border-t-2 border-slate-900 bg-slate-100 font-bold text-red-700"><tr><td colSpan={2} className="px-3 py-3 text-center">សរុបសាខា (Total)</td><td className="px-3 py-3 text-right tabular-nums">{operationCurrency(totals.requested)}</td><td className="px-3 py-3 text-right tabular-nums">{operationCurrency(totals.approved)}</td><td className="px-3 py-3 text-right tabular-nums">{operationCurrency(totals.rejected)}</td><td className="px-3 py-3 text-right tabular-nums">{operationCurrency(totals.collected)}</td><td className="px-3 py-3 text-center">{totals.contacts}</td></tr></tfoot>
+    </table>
+  );
+}
+
+function BranchManagerConsolidatedReport({ records, accountRecords, loans }: { records: OperationReportRecord[]; accountRecords: AccountReportRecord[]; loans: LoanEntity[] }) {
+  const staffRows = branchManagerStaffPerformance(records);
+  const outstanding = loans.filter((loan) => !["Closed", "Rejected", "Draft"].includes(loan.repaymentStatus)).reduce((sum, loan) => sum + loan.outstandingBalance, 0);
+  const dueNoticeRows = accountRecords.flatMap((record) => record.data.dueNoticeRows || []);
+  const followUpRows = accountRecords.flatMap((record) => record.data.promiseRows || []);
+  const formalRows = accountRecords.flatMap((record) => record.data.closedRows || []);
+  const paidRows = accountRecords.flatMap((record) => (record.data.paidRows || []).map((row) => ({ staff: record.reporterName, customer: row.customer, activity: "ប្រមូលប្រាក់", amount: accountNumber(row.amount), principal: 0, status: row.reason, note: row.reason })));
+  const detailRows = [
+    ...paidRows,
+    ...accountRecords.flatMap((record) => (record.data.dueNoticeRows || []).map((row) => ({ staff: record.reporterName, customer: row.customer, activity: "ជូនដំណឹង", amount: accountNumber(row.interest), principal: accountNumber(row.principal), status: row.assetType, note: row.note }))),
+    ...accountRecords.flatMap((record) => (record.data.promiseRows || []).map((row) => ({ staff: record.reporterName, customer: row.customer, activity: "តាមដាន", amount: accountNumber(row.interest), principal: accountNumber(row.principal), status: row.assetType, note: row.note }))),
+    ...accountRecords.flatMap((record) => (record.data.closedRows || []).map((row) => ({ staff: record.reporterName, customer: row.customer, activity: "លិខិតជូនដំណឹង", amount: accountNumber(row.interest), principal: accountNumber(row.principal), status: row.assetType, note: row.note }))),
+  ].filter((row) => row.customer.trim());
+  const activeLoanCount = loans.filter((loan) => !["Closed", "Rejected", "Draft"].includes(loan.repaymentStatus)).length;
+  const actionInterest = followUpRows.reduce((sum, row) => sum + accountNumber(row.interest), 0) + formalRows.reduce((sum, row) => sum + accountNumber(row.interest), 0);
+  const actionPenalty = followUpRows.reduce((sum, row) => sum + accountNumber(row.penalty), 0) + formalRows.reduce((sum, row) => sum + accountNumber(row.penalty), 0);
+  const actionPrincipal = followUpRows.reduce((sum, row) => sum + accountNumber(row.principal), 0) + formalRows.reduce((sum, row) => sum + accountNumber(row.principal), 0);
+  const actionCustomers = followUpRows.filter((row) => row.customer.trim()).length + formalRows.filter((row) => row.customer.trim()).length;
+  const detailCashTotal = detailRows.reduce((sum, row) => sum + row.amount, 0);
+  const detailPrincipalTotal = detailRows.reduce((sum, row) => sum + row.principal, 0);
+
+  return (
+    <div className="space-y-8 pb-6">
+      <BranchManagerSection title="1. សង្ខេបលទ្ធផលការងារបុគ្គលិកឥណទាន (Staff Performance Breakdown)">
+        <BranchManagerStaffTable rows={staffRows} />
+      </BranchManagerSection>
+      <BranchManagerSection title="2. សង្ខេបលទ្ធផលរបស់គណនេយ្យ (Summary of account results)">
+        <table className="w-full table-fixed border-collapse text-sm [&_td]:border [&_td]:border-slate-300 [&_th]:border [&_th]:border-slate-300"><thead className="bg-[#087323] text-white"><tr>{["ល.រ", "ប្រភេទសកម្មភាព", "អតិថិជនទាក់ទង/ដោះស្រាយ", "ការប្រាក់ ($)", "ពិន័យ ($)", "ប្រាក់ដើម ($)", "អតិថិជនសរុប/ដោះស្រាយ (នាក់)"].map((header) => <th key={header} className="px-3 py-3">{header}</th>)}</tr></thead><tbody>{[
+          [1, "សរុបបំណុលដែលមាននៅសល់ (Total outstanding debt)", "", "", "", outstanding, activeLoanCount],
+          [2, "ជូនដំណឹងទៅអតិថិជន ដល់ថ្ងៃកំណត់ត្រូវបង់", dueNoticeRows.filter((row) => row.customer.trim()).length, "", "", "", dueNoticeRows.filter((row) => row.customer.trim()).length],
+          [3, "អតិថិជនដែលយឺតចាប់ពី ១ថ្ងៃ ដល់ ៣ថ្ងៃ", "", followUpRows.reduce((sum, row) => sum + accountNumber(row.interest), 0), followUpRows.reduce((sum, row) => sum + accountNumber(row.penalty), 0), followUpRows.reduce((sum, row) => sum + accountNumber(row.principal), 0), followUpRows.filter((row) => row.customer.trim()).length],
+          [4, "អតិថិជនដែលយឺតចាប់ពី ៤ថ្ងៃឡើងទៅ", "", formalRows.reduce((sum, row) => sum + accountNumber(row.interest), 0), formalRows.reduce((sum, row) => sum + accountNumber(row.penalty), 0), formalRows.reduce((sum, row) => sum + accountNumber(row.principal), 0), formalRows.filter((row) => row.customer.trim()).length],
+        ].map((row) => <tr key={String(row[0])}>{row.map((cell, index) => <td key={`${row[0]}-${index}`} className={`px-3 py-3 ${index === 0 || index === 2 || index === 6 ? "text-center" : index >= 3 && index <= 5 ? "text-right tabular-nums" : ""}`}>{typeof cell === "number" && index >= 3 && index <= 5 ? operationCurrency(cell) : cell}</td>)}</tr>)}</tbody><tfoot className="border-t-2 border-slate-900 bg-slate-100 font-bold text-red-700"><tr><td colSpan={2} className="px-3 py-3 text-center">សរុប</td><td className="px-3 py-3 text-center">{actionCustomers}</td><td className="px-3 py-3 text-right tabular-nums">{operationCurrency(actionInterest)}</td><td className="px-3 py-3 text-right tabular-nums">{operationCurrency(actionPenalty)}</td><td className="px-3 py-3 text-right tabular-nums">{operationCurrency(actionPrincipal)}</td><td className="px-3 py-3 text-center">{actionCustomers}</td></tr></tfoot></table>
+      </BranchManagerSection>
+      <BranchManagerSection title="បញ្ជីលម្អិតប្រមូលប្រាក់ប្រចាំថ្ងៃ">
+        <table className="w-full table-fixed border-collapse text-sm [&_td]:border [&_td]:border-slate-300 [&_th]:border [&_th]:border-slate-300"><thead className="bg-[#087323] text-white"><tr>{["ល.រ", "ឈ្មោះមន្ត្រីឥណទាន", "ឈ្មោះអតិថិជន", "ប្រភេទសកម្មភាព", "សាច់ប្រាក់ ($)", "ប្រាក់ដើម ($)", "ស្ថានភាព/ដំណោះស្រាយ", "មូលហេតុ/ចំណាត់ការ"].map((header) => <th key={header} className="px-3 py-3">{header}</th>)}</tr></thead><tbody>{detailRows.length ? detailRows.map((row, index) => <tr key={`${row.staff}-${row.customer}-${index}`}><td className="px-3 py-2 text-center">{index + 1}</td><td className="px-3 py-2">{row.staff}</td><td className="px-3 py-2">{row.customer}</td><td className="px-3 py-2">{row.activity}</td><td className="px-3 py-2 text-right tabular-nums">{operationCurrency(row.amount)}</td><td className="px-3 py-2 text-right tabular-nums">{operationCurrency(row.principal)}</td><td className="px-3 py-2">{row.status}</td><td className="px-3 py-2">{row.note}</td></tr>) : <tr><td colSpan={8} className="px-3 py-8 text-center text-slate-500">No consolidated detail for this date.</td></tr>}</tbody>{detailRows.length ? <tfoot className="border-t-2 border-slate-900 bg-slate-100 font-bold text-red-700"><tr><td colSpan={4} className="px-3 py-3 text-center">សរុប</td><td className="px-3 py-3 text-right tabular-nums">{operationCurrency(detailCashTotal)}</td><td className="px-3 py-3 text-right tabular-nums">{operationCurrency(detailPrincipalTotal)}</td><td colSpan={2} /></tr></tfoot> : null}</table>
+      </BranchManagerSection>
+    </div>
   );
 }
 
@@ -5519,7 +5959,7 @@ function CollectionReportTable({ title, rows, onChange, accent = "green" }: { ti
   );
 }
 
-function ResolutionTable({ title, rows, onChange }: { title: string; rows: OperationReportResolutionRow[]; onChange: (rows: OperationReportResolutionRow[]) => void }) {
+function ResolutionTable({ title, rows, onChange, onRememberAssetType }: { title: string; rows: OperationReportResolutionRow[]; onChange: (rows: OperationReportResolutionRow[]) => void; onRememberAssetType?: (value: string) => void }) {
   const { language } = useLanguage();
   const text = (km: string, en: string) => language === "km" ? km : en;
   const interestTotal = rows.reduce((sum, row) => sum + operationNumber(row.interest), 0);
@@ -5536,7 +5976,7 @@ function ResolutionTable({ title, rows, onChange }: { title: string; rows: Opera
   return (
     <ReportTable title={title} count={rows.filter((row) => row.customer.trim()).length} total={interestTotal}>
       <thead className="bg-emerald-800 text-white"><tr><th className="w-14 px-3 py-3">{text("ល.រ", "No.")}</th><th className="px-3 py-3">{text("ឈ្មោះអតិថិជន", "Customer Name")}</th><th className="px-3 py-3">{text("ប្រភេទទ្រព្យ", "Asset Type")}</th><th className="w-36 px-3 py-3 text-right">{text("ការប្រាក់ ($)", "Interest ($)")}</th><th className="w-32 px-3 py-3 text-right">{text("ពិន័យ ($)", "Penalty ($)")}</th><th className="w-40 px-3 py-3 text-right">{text("ប្រាក់ដើម ($)", "Principal ($)")}</th><th className="px-3 py-3">{text("ដំណោះស្រាយ", "Solution")}</th></tr></thead>
-      <tbody>{rows.map((row, index) => <tr key={row.id}><td className="px-3 py-2 text-center text-slate-500">{index + 1}</td><td className="px-2 py-1"><input data-operation-row={index} data-operation-field="customer" list="operation-report-customers" value={row.customer} onKeyDown={(event) => onEnter(event, index, "customer")} onChange={(event) => onChange(rows.map((item) => item.id === row.id ? { ...item, customer: event.target.value } : item))} className={inputClass} placeholder={text("ឈ្មោះអតិថិជន", "Customer name")} /></td><td className="px-2 py-1"><input data-operation-row={index} data-operation-field="assetType" value={row.assetType} onKeyDown={(event) => onEnter(event, index, "assetType")} onChange={(event) => onChange(rows.map((item) => item.id === row.id ? { ...item, assetType: event.target.value } : item))} className={inputClass} placeholder={text("ប្រភេទទ្រព្យ", "Asset type")} /></td><td className="px-2 py-1"><input data-operation-row={index} data-operation-field="interest" type="number" min="0" value={row.interest} onKeyDown={(event) => onEnter(event, index, "interest")} onChange={(event) => onChange(rows.map((item) => item.id === row.id ? { ...item, interest: event.target.value } : item))} className={`${inputClass} text-right`} placeholder="0.00" /></td><td className="px-2 py-1"><input data-operation-row={index} data-operation-field="penalty" type="number" min="0" value={row.penalty} onKeyDown={(event) => onEnter(event, index, "penalty")} onChange={(event) => onChange(rows.map((item) => item.id === row.id ? { ...item, penalty: event.target.value } : item))} className={`${inputClass} text-right`} placeholder="0.00" /></td><td className="px-2 py-1"><input data-operation-row={index} data-operation-field="principal" type="number" min="0" value={row.principal} onKeyDown={(event) => onEnter(event, index, "principal")} onChange={(event) => onChange(rows.map((item) => item.id === row.id ? { ...item, principal: event.target.value } : item))} className={`${inputClass} text-right`} placeholder="0.00" /></td><td className="px-2 py-1"><div className="flex items-center gap-2"><input data-operation-row={index} data-operation-field="solution" list="operation-report-solutions" value={row.solution} onKeyDown={(event) => onEnter(event, index, "solution")} onChange={(event) => onChange(rows.map((item) => item.id === row.id ? { ...item, solution: event.target.value } : item))} className={inputClass} placeholder={text("ដំណោះស្រាយ", "Solution")} /><OperationReportImageCell compact images={row.images} imageUrl={row.imageUrl} imageName={row.imageName} onChange={(attachment) => onChange(rows.map((item) => item.id === row.id ? { ...item, ...attachment } : item))} /></div></td></tr>)}</tbody>
+      <tbody>{rows.map((row, index) => <tr key={row.id}><td className="px-3 py-2 text-center text-slate-500">{index + 1}</td><td className="px-2 py-1"><input data-operation-row={index} data-operation-field="customer" list="operation-report-customers" value={row.customer} onKeyDown={(event) => onEnter(event, index, "customer")} onChange={(event) => onChange(rows.map((item) => item.id === row.id ? { ...item, customer: event.target.value } : item))} className={inputClass} placeholder={text("ឈ្មោះអតិថិជន", "Customer name")} /></td><td className="px-2 py-1"><input data-operation-row={index} data-operation-field="assetType" list={onRememberAssetType ? "operation-report-asset-types" : undefined} value={row.assetType} onBlur={(event) => onRememberAssetType?.(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") onRememberAssetType?.(event.currentTarget.value); onEnter(event, index, "assetType"); }} onChange={(event) => onChange(rows.map((item) => item.id === row.id ? { ...item, assetType: event.target.value } : item))} className={inputClass} placeholder={onRememberAssetType ? text("ជ្រើសរើស ឬបញ្ចូលប្រភេទទ្រព្យ", "Select or enter asset type") : text("ប្រភេទទ្រព្យ", "Asset type")} /></td><td className="px-2 py-1"><input data-operation-row={index} data-operation-field="interest" type="number" min="0" value={row.interest} onKeyDown={(event) => onEnter(event, index, "interest")} onChange={(event) => onChange(rows.map((item) => item.id === row.id ? { ...item, interest: event.target.value } : item))} className={`${inputClass} text-right`} placeholder="0.00" /></td><td className="px-2 py-1"><input data-operation-row={index} data-operation-field="penalty" type="number" min="0" value={row.penalty} onKeyDown={(event) => onEnter(event, index, "penalty")} onChange={(event) => onChange(rows.map((item) => item.id === row.id ? { ...item, penalty: event.target.value } : item))} className={`${inputClass} text-right`} placeholder="0.00" /></td><td className="px-2 py-1"><input data-operation-row={index} data-operation-field="principal" type="number" min="0" value={row.principal} onKeyDown={(event) => onEnter(event, index, "principal")} onChange={(event) => onChange(rows.map((item) => item.id === row.id ? { ...item, principal: event.target.value } : item))} className={`${inputClass} text-right`} placeholder="0.00" /></td><td className="px-2 py-1"><div className="flex items-center gap-2"><input data-operation-row={index} data-operation-field="solution" list="operation-report-solutions" value={row.solution} onKeyDown={(event) => onEnter(event, index, "solution")} onChange={(event) => onChange(rows.map((item) => item.id === row.id ? { ...item, solution: event.target.value } : item))} className={inputClass} placeholder={text("ដំណោះស្រាយ", "Solution")} /><OperationReportImageCell compact images={row.images} imageUrl={row.imageUrl} imageName={row.imageName} onChange={(attachment) => onChange(rows.map((item) => item.id === row.id ? { ...item, ...attachment } : item))} /></div></td></tr>)}</tbody>
       <tfoot className="border-t-2 border-slate-900 bg-slate-100 font-bold text-red-700 dark:bg-slate-800"><tr><td colSpan={3} className="px-3 py-3 text-center">{text("សរុប", "Total")}</td><td className="px-3 py-3 text-right">{operationCurrency(interestTotal)}</td><td className="px-3 py-3 text-right">{operationCurrency(penaltyTotal)}</td><td className="px-3 py-3 text-right">{operationCurrency(principalTotal)}</td><td /></tr></tfoot>
     </ReportTable>
   );

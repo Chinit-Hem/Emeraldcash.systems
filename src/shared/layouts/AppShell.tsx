@@ -61,6 +61,18 @@ function AppShellContent({ children }: AppShellProps) {
   }, []);
 
   useEffect(() => {
+    const previousHtmlOverflow = document.documentElement.style.overflow;
+    const previousBodyOverflow = document.body.style.overflow;
+    document.documentElement.style.overflow = "hidden";
+    document.body.style.overflow = "hidden";
+
+    return () => {
+      document.documentElement.style.overflow = previousHtmlOverflow;
+      document.body.style.overflow = previousBodyOverflow;
+    };
+  }, []);
+
+  useEffect(() => {
     const query = searchParams?.toString?.() || "";
     const currentLocation = query ? `${pathname}?${query}` : pathname;
     currentLocationRef.current = currentLocation;
@@ -302,7 +314,7 @@ function AppShellContent({ children }: AppShellProps) {
   }
 
   return (
-    <div className={`flex min-h-screen h-dvh min-w-0 flex-col overflow-hidden bg-transparent ${bottomPaddingClass} xl:pb-0`}>
+    <div className={`flex h-dvh max-h-dvh min-h-0 min-w-0 flex-col overflow-hidden bg-transparent ${bottomPaddingClass} xl:pb-0`}>
       <AuthUserProvider user={user}>
         <MobileBackHandler isMenuOpen={isSidebarOpen} onCloseMenu={closeSidebar} />
 

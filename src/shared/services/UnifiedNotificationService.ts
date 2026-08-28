@@ -30,6 +30,7 @@ type AuditRow = {
 };
 
 const MAX_LIMIT = 100;
+let ensureReadTablePromise: Promise<void> | null = null;
 
 function hasPermission(user: SessionUser, permission: Parameters<typeof hasAppPermission>[1]) {
   return hasAppPermission(user.role, permission);
@@ -46,9 +47,14 @@ function metadataValue(metadata: unknown, key: string) {
   return value[key] == null ? "" : String(value[key]);
 }
 
-function auditNotification(row: AuditRow): UnifiedNotification | null {
+function metadataObject(metadata: unknown) {
+  if (typeof metadata === "string") { try { return JSON.parse(metadata) as Record<string, unknown>; } catch { return {}; } }
+  return metadata && typeof metadata === "object" ? metadata as Record<string, unknown> : {};
+}
+
+function auditNotification(row: AuditRow, user: SessionUser): UnifiedNotification | null {
   const resourceType = row.resource_type || "";
-  const source: NotificationSource = resourceType === "loan"
+  const source: NotificationSource = ["loan", "operation_report", "account_report"].includes(resourceType)
     ? "loan"
     : resourceType.startsWith("lms_") ? "lms"
       : resourceType === "user" ? "hr"
@@ -56,6 +62,37 @@ function auditNotification(row: AuditRow): UnifiedNotification | null {
   const action = row.action || "system.activity";
   const actor = row.actor_username || "A team member";
   const loanNumber = metadataValue(row.metadata, "loanNumber");
+  const metadata = metadataObject(row.metadata);
+  const recipients = Array.isArray(metadata.recipientUsernames) ? metadata.recipientUsernames.map(String) : [];
+  if (recipients.length && !recipients.includes(user.username)) return null;
+  if (actor === user.username) return null;
+
+  if (resourceType === "operation_report") {
+    if (!action.endsWith(".submit")) return null;
+    if (!recipients.length) return null;
+    const reportType = metadataValue(metadata, "reportType");
+    const branch = metadataValue(metadata, "branch");
+    const reportDate = metadataValue(metadata, "reportDate");
+    return {
+      id: String(row.id), source: "loan", type: action,
+      title: reportType === "bm" ? "BM Report submitted" : "LS Report submitted",
+      message: `${actor} submitted ${reportType === "bm" ? "a BM" : "an LS"} Report${branch ? ` for ${branch}` : ""}${reportDate ? ` on ${reportDate}` : ""}.`,
+      readAt: null, createdAt: toIsoDate(row.created_at), href: "/loan?view=operationReport",
+    };
+  }
+
+  if (resourceType === "account_report") {
+    if (!action.endsWith(".submit")) return null;
+    if (!recipients.length) return null;
+    const branch = metadataValue(metadata, "branch");
+    const reportDate = metadataValue(metadata, "reportDate");
+    return {
+      id: String(row.id), source: "loan", type: action,
+      title: "Account Report submitted",
+      message: `${actor} submitted an Account Report${branch ? ` for ${branch}` : ""}${reportDate ? ` on ${reportDate}` : ""}.`,
+      readAt: null, createdAt: toIsoDate(row.created_at), href: "/loan?view=accounting&accountMode=accountReport",
+    };
+  }
 
   if (source === "loan") {
     return {
@@ -86,22 +123,28 @@ function auditNotification(row: AuditRow): UnifiedNotification | null {
 }
 
 async function ensureReadTable() {
-  await dbManager.executeUnsafe(
-    `CREATE TABLE IF NOT EXISTS unified_notification_reads (
-      username VARCHAR(128) NOT NULL,
-      source VARCHAR(16) NOT NULL,
-      source_id VARCHAR(128) NOT NULL,
-      read_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-      PRIMARY KEY (username, source, source_id)
-    )`,
-    [],
-    8_000
-  );
+  if (!ensureReadTablePromise) {
+    ensureReadTablePromise = dbManager.executeUnsafe(
+      `CREATE TABLE IF NOT EXISTS unified_notification_reads (
+        username VARCHAR(128) NOT NULL,
+        source VARCHAR(16) NOT NULL,
+        source_id VARCHAR(128) NOT NULL,
+        read_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+        PRIMARY KEY (username, source, source_id)
+      )`,
+      [],
+      8_000
+    ).then(() => undefined).catch((error) => {
+      ensureReadTablePromise = null;
+      throw error;
+    });
+  }
+  await ensureReadTablePromise;
 }
 
 async function auditNotifications(user: SessionUser, limit: number) {
   const allowedTypes: string[] = [];
-  if (hasPermission(user, "loans:view")) allowedTypes.push("loan");
+  if (hasPermission(user, "loans:view")) allowedTypes.push("loan", "operation_report", "account_report");
   if (hasPermission(user, "lms:view")) allowedTypes.push("lms_lesson");
   if (hasPermission(user, "users:view")) allowedTypes.push("user");
   if (!allowedTypes.length) return [] as UnifiedNotification[];
@@ -120,7 +163,7 @@ async function auditNotifications(user: SessionUser, limit: number) {
     8_000
   );
   return rows.flatMap((row) => {
-    const notification = auditNotification(row);
+    const notification = auditNotification(row, user);
     return notification ? [notification] : [];
   });
 }
@@ -139,7 +182,12 @@ async function getReadKeys(username: string, notifications: UnifiedNotification[
   return new Set(rows.map((row) => `${row.source}:${row.source_id}`));
 }
 
-export async function getUnifiedNotifications(user: SessionUser, requestedLimit = 20) {
+type UnifiedNotificationResult = { notifications: UnifiedNotification[]; unreadCount: number };
+const NOTIFICATION_CACHE_TTL_MS = 10_000;
+const notificationCache = new Map<string, { data: UnifiedNotificationResult; expiresAt: number }>();
+const notificationRequests = new Map<string, Promise<UnifiedNotificationResult>>();
+
+async function loadUnifiedNotifications(user: SessionUser, requestedLimit = 20): Promise<UnifiedNotificationResult> {
   const limit = Math.min(Math.max(requestedLimit, 1), MAX_LIMIT);
   const [smsResult, vmsResult, auditsResult] = await Promise.allSettled([
     hasPermission(user, "sms:view") ? smsService.getNotifications(user.username, { limit }) : Promise.resolve(null),
@@ -176,6 +224,33 @@ export async function getUnifiedNotifications(user: SessionUser, requestedLimit 
   return { notifications: merged, unreadCount: merged.filter((notification) => !notification.readAt).length };
 }
 
+export function getUnifiedNotifications(user: SessionUser, requestedLimit = 20): Promise<UnifiedNotificationResult> {
+  const limit = Math.min(Math.max(requestedLimit, 1), MAX_LIMIT);
+  const cacheKey = user.username + ":" + limit;
+  const cached = notificationCache.get(cacheKey);
+  if (cached && cached.expiresAt > Date.now()) return Promise.resolve(cached.data);
+
+  const pending = notificationRequests.get(cacheKey);
+  if (pending) return pending;
+
+  const request = loadUnifiedNotifications(user, limit)
+    .then((data) => {
+      notificationCache.set(cacheKey, { data, expiresAt: Date.now() + NOTIFICATION_CACHE_TTL_MS });
+      return data;
+    })
+    .finally(() => {
+      notificationRequests.delete(cacheKey);
+    });
+  notificationRequests.set(cacheKey, request);
+  return request;
+}
+
+function invalidateNotificationCache(username: string) {
+  for (const key of notificationCache.keys()) {
+    if (key.startsWith(username + ":")) notificationCache.delete(key);
+  }
+}
+
 export async function markUnifiedNotificationsRead(
   user: SessionUser,
   requested?: Array<Pick<UnifiedNotification, "source" | "id">>
@@ -205,4 +280,5 @@ export async function markUnifiedNotificationsRead(
       8_000
     )));
   }
+  invalidateNotificationCache(user.username);
 }

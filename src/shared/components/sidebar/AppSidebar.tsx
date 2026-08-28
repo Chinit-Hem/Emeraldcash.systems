@@ -13,6 +13,8 @@ import {
   ClipboardList,
   Clock3,
   FolderOpen,
+  Gauge,
+  HandCoins,
   Home,
   History,
   KeyRound,
@@ -22,17 +24,16 @@ import {
   LogOut,
   Menu,
   Moon,
-  Package,
   RotateCcw,
   Settings,
   Send,
   ShieldCheck,
   Sun,
-  Truck,
   Users,
   UserRound,
+  Warehouse,
 } from "lucide-react";
-import { MoneyBagIcon } from "@/shared/components/icons/MoneyBagIcon";
+import { TukTukIcon } from "@/shared/components/icons/TukTukIcon";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTheme } from "@/shared/hooks/theme-provider";
 import { hasAppPermission } from "@/shared/utils/permissions";
@@ -198,12 +199,12 @@ export function getNavigationItems(
     }),
   ];
   if (hasAppPermission(user.role, "vehicles:view")) {
-    workspaceModules.push(item("vehicle-management", "Vehicle Management", "គ្រប់គ្រងយានយន្ត", "/vms", Car, {
+    workspaceModules.push(item("vehicle-management", "Vehicle Management", "គ្រប់គ្រងយានយន្ត", "/vms", Gauge, {
       children: [
-        item("vehicle-all", "Vehicles", "យានយន្ត", "/vehicles", Package, { badge: formatCount(vehicleCounts.total) }),
+        item("vehicle-all", "Vehicles", "យានយន្ត", "/vehicles", Warehouse, { badge: formatCount(vehicleCounts.total) }),
         item("vehicle-cars", "Cars", "រថយន្ត", "/vehicles?category=cars", Car, { badge: formatCount(vehicleCounts.Cars) }),
         item("vehicle-motorcycles", "Motorcycles", "ម៉ូតូ", "/vehicles?category=motorcycles", Bike, { badge: formatCount(vehicleCounts.Motorcycles) }),
-        item("vehicle-tuktuks", "TukTuks", "តុកតុក", "/vehicles?category=tuktuks", Truck, { badge: formatCount(vehicleCounts.TukTuks) }),
+        item("vehicle-tuktuks", "TukTuks", "តុកតុក", "/vehicles?category=tuktuks", TukTukIcon, { badge: formatCount(vehicleCounts.TukTuks) }),
       ],
     }));
   }
@@ -233,9 +234,9 @@ export function getNavigationItems(
     workspaceModules.push(item("asset-inventory", "Asset Inventory", "សារពើភ័ណ្ឌទ្រព្យសម្បត្តិ", "/sms/dashboard", Boxes, { children: smsChildren }));
   }
   if (hasAppPermission(user.role, "loans:view")) {
-    workspaceModules.push(item("loan-management", "Loan Management", "គ្រប់គ្រងប្រាក់កម្ចី", "/loan", MoneyBagIcon, {
+    workspaceModules.push(item("loan-management", "Loan Management", "គ្រប់គ្រងប្រាក់កម្ចី", "/loan", HandCoins, {
       children: [
-        item("loan-portfolio", "Portfolio", "បញ្ជីប្រាក់កម្ចី", "/loan", LayoutDashboard),
+        item("loan-portfolio", "Dashboard", "ផ្ទាំងគ្រប់គ្រង", "/loan", LayoutDashboard),
         item("loan-borrowers", "Borrowers", "អតិថិជនខ្ចីប្រាក់", "/loan?view=borrowers", Users),
         item("loan-contacts", "Contacts", "ទំនាក់ទំនង", "/loan?view=contacts", UserRound),
         item("loan-accounting", "Accounting", "គណនេយ្យ", "/loan?view=accounting", Landmark),
@@ -420,7 +421,7 @@ export function AppSidebar({ user, collapsed = false, onToggleCollapse, onNaviga
                 aria-hidden={isCollapsedHeaderMenuVisible}
               >
                 <span className="flex h-11 w-11 items-center justify-center overflow-hidden rounded-xl border border-emerald-100 bg-white p-1 shadow-sm dark:border-emerald-500/20">
-                  <Image src="/logo.png" alt="Emerald Cash logo" width={40} height={40} className="h-10 w-10 object-contain" priority />
+                  <Image src="/logo.png" alt="Emerald Cash logo" width={40} height={40} style={{ width: 40, height: 40 }} className="object-contain" priority />
                 </span>
               </span>
               <span
@@ -440,7 +441,7 @@ export function AppSidebar({ user, collapsed = false, onToggleCollapse, onNaviga
               className="flex min-w-0 flex-1 items-center gap-3"
             >
               <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-emerald-100 bg-white p-1 shadow-sm dark:border-emerald-500/20">
-                <Image src="/logo.png" alt="Emerald Cash logo" width={40} height={40} className="h-10 w-10 object-contain" priority />
+                <Image src="/logo.png" alt="Emerald Cash logo" width={40} height={40} style={{ width: 40, height: 40 }} className="object-contain" priority />
               </div>
               <div className="min-w-0">
                 <p id="mobile-navigation-title" className="truncate text-sm font-bold text-slate-950 dark:text-white">Emerald Cash</p>

@@ -58,28 +58,23 @@ export async function ensureAuditLogsTable(): Promise<void> {
       "ensureAuditLogsTable"
     );
 
-    await queryWithRetry(
-      async () => sql`
-        CREATE INDEX IF NOT EXISTS idx_audit_logs_created_at ON audit_logs(created_at DESC)
-      `,
-      "ensureAuditLogsTable-created-index"
-    );
-
-    await queryWithRetry(
-      async () => sql`
-        CREATE INDEX IF NOT EXISTS idx_audit_logs_actor ON audit_logs(actor_username, created_at DESC)
-      `,
-      "ensureAuditLogsTable-actor-index"
-    );
-
-    await queryWithRetry(
-      async () => sql`
-        CREATE INDEX IF NOT EXISTS idx_audit_logs_resource ON audit_logs(resource_type, resource_id)
-      `,
-      "ensureAuditLogsTable-resource-index"
-    );
-  })().finally(() => {
+    await Promise.all([
+      queryWithRetry(
+        async () => sql`CREATE INDEX IF NOT EXISTS idx_audit_logs_created_at ON audit_logs(created_at DESC)`,
+        "ensureAuditLogsTable-created-index"
+      ),
+      queryWithRetry(
+        async () => sql`CREATE INDEX IF NOT EXISTS idx_audit_logs_actor ON audit_logs(actor_username, created_at DESC)`,
+        "ensureAuditLogsTable-actor-index"
+      ),
+      queryWithRetry(
+        async () => sql`CREATE INDEX IF NOT EXISTS idx_audit_logs_resource ON audit_logs(resource_type, resource_id)`,
+        "ensureAuditLogsTable-resource-index"
+      ),
+    ]);
+  })().catch((error) => {
     ensureAuditLogsTablePromise = null;
+    throw error;
   });
 
   return ensureAuditLogsTablePromise;

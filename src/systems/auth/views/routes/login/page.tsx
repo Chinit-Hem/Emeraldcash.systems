@@ -10,7 +10,6 @@ import React, { Suspense, useCallback, useEffect, useRef, useState } from "react
 const SHOW_LOGIN_DEBUG = process.env.NODE_ENV !== "production";
 const TURNSTILE_SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY?.trim() || "";
 const TURNSTILE_ENABLED = Boolean(TURNSTILE_SITE_KEY);
-const LAST_APP_LOCATION_KEY = "emerald-cash.last-app-location";
 
 type TurnstileRenderOptions = {
   sitekey: string
@@ -236,30 +235,17 @@ function LoginForm() {
         }
       }
 
-      // Redirect to original destination when safe, otherwise app home.
-      // Keep legacy /dashboard links working by mapping them to root.
+      // Redirect to the original destination when safe; direct logins start in the System Hub.
       const requestedRedirect = searchParams.get("redirect");
-      let rememberedRedirect: string | null = null;
-      try {
-        rememberedRedirect = window.sessionStorage.getItem(LAST_APP_LOCATION_KEY);
-      } catch {
-        // Continue with the URL redirect or app home when storage is unavailable.
-      }
-      const preferredRedirect = requestedRedirect || rememberedRedirect;
       const safeRedirect =
-        preferredRedirect &&
-        preferredRedirect.startsWith("/") &&
-        !preferredRedirect.startsWith("//") &&
-        !preferredRedirect.startsWith("/login")
-          ? preferredRedirect
-          : "/";
+        requestedRedirect &&
+        requestedRedirect.startsWith("/") &&
+        !requestedRedirect.startsWith("//") &&
+        !requestedRedirect.startsWith("/login")
+          ? requestedRedirect
+          : "/home";
 
-      // Default post-login destination must be the ERP Home hub.
-      // Keep legacy "/dashboard" working by mapping it to "/".
-      const redirectTo =
-        safeRedirect === "/dashboard" ? "/" : safeRedirect;
-
-      router.replace(redirectTo);
+      router.replace(safeRedirect);
     } catch (err) {
       submitGuardRef.current = false;
       if (TURNSTILE_ENABLED) {
@@ -290,15 +276,15 @@ function LoginForm() {
             
             {/* Logo */}
             <div className="absolute -bottom-8 left-1/2 -translate-x-1/2">
-              <div className="flex h-20 w-40 items-center justify-center rounded-2xl bg-white p-3 shadow-lg shadow-emerald-500/25 ring-4 ring-white/60 dark:bg-white dark:ring-slate-800/80">
+              <div className="flex h-24 w-24 items-center justify-center rounded-2xl bg-white p-2 shadow-lg shadow-emerald-500/25 ring-4 ring-white/60 dark:bg-white dark:ring-slate-800/80">
                 <Image
-                  src="/logo-horizontal.png"
+                  src="/logo.png"
                   alt={brandName}
-                  width={144}
-                  height={60}
+                  width={102}
+                  height={128}
                   priority
-                  sizes="144px"
-                  className="h-auto w-full object-contain"
+                  sizes="96px"
+                  className="h-full w-auto object-contain"
                 />
               </div>
             </div>

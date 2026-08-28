@@ -157,6 +157,7 @@ export class SmsAssetService extends BaseService<SmsAssetEntity, SmsAssetDB> {
   private static instance: SmsAssetService | null = null;
   private static assetMetadataColumnsReady = false;
   private static assetMetadataColumnsPromise: Promise<void> | null = null;
+  private static notificationsTablePromise: Promise<void> | null = null;
 
   public readonly tableName = "sms_assets";
 
@@ -201,30 +202,37 @@ export class SmsAssetService extends BaseService<SmsAssetEntity, SmsAssetDB> {
   }
 
   private async ensureNotificationsTable(): Promise<void> {
-    await dbManager.executeUnsafe(
-      `
-        CREATE TABLE IF NOT EXISTS sms_notifications (
-          id SERIAL PRIMARY KEY,
-          type VARCHAR(64) NOT NULL,
-          title VARCHAR(200) NOT NULL,
-          message TEXT NOT NULL,
-          recipient_id VARCHAR(128) NOT NULL,
-          actor_id VARCHAR(128),
-          asset_id UUID,
-          transfer_id UUID,
-          read_at TIMESTAMP WITH TIME ZONE,
-          created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-        )
-      `,
-      [],
-      5000
-    );
-
-    await dbManager.executeUnsafe(
-      `CREATE INDEX IF NOT EXISTS idx_sms_notifications_recipient_read ON sms_notifications(recipient_id, read_at, created_at DESC)`,
-      [],
-      5000
-    );
+    if (!SmsAssetService.notificationsTablePromise) {
+      SmsAssetService.notificationsTablePromise = (async () => {
+        await dbManager.executeUnsafe(
+          `
+            CREATE TABLE IF NOT EXISTS sms_notifications (
+              id SERIAL PRIMARY KEY,
+              type VARCHAR(64) NOT NULL,
+              title VARCHAR(200) NOT NULL,
+              message TEXT NOT NULL,
+              recipient_id VARCHAR(128) NOT NULL,
+              actor_id VARCHAR(128),
+              asset_id UUID,
+              transfer_id UUID,
+              read_at TIMESTAMP WITH TIME ZONE,
+              created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+            )
+          `,
+          [],
+          5000
+        );
+        await dbManager.executeUnsafe(
+          `CREATE INDEX IF NOT EXISTS idx_sms_notifications_recipient_lower_read ON sms_notifications(LOWER(recipient_id), read_at, created_at DESC)`,
+          [],
+          5000
+        );
+      })().catch((error) => {
+        SmsAssetService.notificationsTablePromise = null;
+        throw error;
+      });
+    }
+    await SmsAssetService.notificationsTablePromise;
   }
 
   private async getAdminNotificationRecipients(): Promise<string[]> {
@@ -1082,8 +1090,9 @@ if (status === 'accepted') {
     try {
       await this.ensureNotificationsTable();
       const limit = Math.min(Math.max(options.limit || 20, 1), 100);
-      const rows = await dbManager.executeUnsafe<SmsNotificationDB>(
-        `
+      const [rows, countRows] = await Promise.all([
+        dbManager.executeUnsafe<SmsNotificationDB>(
+          `
           SELECT *
           FROM sms_notifications
           WHERE LOWER(recipient_id) = LOWER($1)
@@ -1111,11 +1120,11 @@ if (status === 'accepted') {
           ORDER BY created_at DESC
           LIMIT $3
         `,
-        [recipientId, !!options.unreadOnly, limit],
-        8000
-      );
-      const countRows = await dbManager.executeUnsafe<{ count: number }>(
-        `
+          [recipientId, !!options.unreadOnly, limit],
+          8000
+        ),
+        dbManager.executeUnsafe<{ count: number }>(
+          `
           SELECT COUNT(*)::integer AS count
           FROM sms_notifications
           WHERE LOWER(recipient_id) = LOWER($1)
@@ -1141,9 +1150,10 @@ if (status === 'accepted') {
               )
             )
         `,
-        [recipientId],
-        5000
-      );
+          [recipientId],
+          5000
+        ),
+      ]);
 
       return {
         success: true,

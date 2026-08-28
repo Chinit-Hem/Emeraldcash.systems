@@ -163,6 +163,7 @@ function getVehicleOrderClause(filters: VehicleFilters): string {
 
 export class VehicleService extends BaseService<VehicleEntity, VehicleDB> {
   private static instance: VehicleService | null = null;
+  private static stockNotificationsTablePromise: Promise<void> | null = null;
 
   /**
    * Private constructor - use getInstance() instead
@@ -181,6 +182,34 @@ export class VehicleService extends BaseService<VehicleEntity, VehicleDB> {
       VehicleService.instance = new VehicleService();
     }
     return VehicleService.instance;
+  }
+
+  private async ensureStockNotificationsTable(): Promise<void> {
+    if (!VehicleService.stockNotificationsTablePromise) {
+      VehicleService.stockNotificationsTablePromise = (async () => {
+        const sql = dbManager.getClient();
+        await sql`
+          CREATE TABLE IF NOT EXISTS stock_notifications (
+            id SERIAL PRIMARY KEY,
+            type VARCHAR(20) NOT NULL,
+            title VARCHAR(200) NOT NULL,
+            message TEXT NOT NULL,
+            recipient_id VARCHAR(100) NOT NULL,
+            related_model_key VARCHAR(200),
+            is_read BOOLEAN NOT NULL DEFAULT false,
+            created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+          )
+        `;
+        await sql`
+          CREATE INDEX IF NOT EXISTS idx_stock_notifications_recipient
+          ON stock_notifications(recipient_id, created_at DESC)
+        `;
+      })().catch((error) => {
+        VehicleService.stockNotificationsTablePromise = null;
+        throw error;
+      });
+    }
+    await VehicleService.stockNotificationsTablePromise;
   }
 
   // ============================================================================
@@ -845,21 +874,8 @@ conditions.push(`(NULLIF(TRIM(COALESCE(image_id, '')), '') IS NULL AND NULLIF(TR
   ): Promise<ServiceResult<boolean>> {
     const startTime = Date.now();
     try {
+      await this.ensureStockNotificationsTable();
       const sql = dbManager.getClient();
-
-      // Create notifications table if not exists
-      await sql`
-        CREATE TABLE IF NOT EXISTS stock_notifications (
-          id SERIAL PRIMARY KEY,
-          type VARCHAR(20) NOT NULL,
-          title VARCHAR(200) NOT NULL,
-          message TEXT NOT NULL,
-          recipient_id VARCHAR(100) NOT NULL,
-          related_model_key VARCHAR(200),
-          is_read BOOLEAN DEFAULT false,
-          created_at TIMESTAMP DEFAULT NOW()
-        )
-      `;
 
       // Insert notification
       await sql`
@@ -905,6 +921,7 @@ conditions.push(`(NULLIF(TRIM(COALESCE(image_id, '')), '') IS NULL AND NULLIF(TR
   }>>> {
     const startTime = Date.now();
     try {
+      await this.ensureStockNotificationsTable();
       const sql = dbManager.getClient();
 
       const result = await sql`
@@ -946,6 +963,7 @@ conditions.push(`(NULLIF(TRIM(COALESCE(image_id, '')), '') IS NULL AND NULLIF(TR
   public async markNotificationRead(id: number): Promise<ServiceResult<boolean>> {
     const startTime = Date.now();
     try {
+      await this.ensureStockNotificationsTable();
       const sql = dbManager.getClient();
 
       await sql`
@@ -977,6 +995,7 @@ conditions.push(`(NULLIF(TRIM(COALESCE(image_id, '')), '') IS NULL AND NULLIF(TR
   ): Promise<ServiceResult<boolean>> {
     const startTime = Date.now();
     try {
+      await this.ensureStockNotificationsTable();
       const sql = dbManager.getClient();
       await sql`
         UPDATE stock_notifications

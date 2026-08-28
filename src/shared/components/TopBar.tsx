@@ -74,28 +74,47 @@ export default function TopBar({
   const dateButtonRef = useRef<HTMLButtonElement | null>(null);
   const chatButtonRef = useRef<HTMLButtonElement | null>(null);
   const chatMenuRef = useRef<HTMLDivElement | null>(null);
+  const notificationsRequestRef = useRef<Promise<void> | null>(null);
+  const notificationsLoadedRef = useRef(false);
+  const notificationsLoadedAtRef = useRef(0);
 
   const [dropdownStyle, setDropdownStyle] = useState<React.CSSProperties>({});
 
-  const loadNotifications = useCallback(async () => {
+  const loadNotifications = useCallback((force = false): Promise<void> => {
     if (!canReadNotifications) {
       setNotifications([]);
-      return;
+      notificationsLoadedRef.current = false;
+      return Promise.resolve();
     }
-    setNotificationsLoading(true);
-    try {
-      const response = await fetch("/api/notifications?limit=20", { credentials: "include", cache: "no-store" });
-      const payload = await response.json().catch(() => null) as { success?: boolean; data?: { notifications?: AppNotification[] } } | null;
-      if (response.ok && payload?.success) setNotifications(payload.data?.notifications ?? []);
-    } finally {
-      setNotificationsLoading(false);
-    }
+    if (!force && notificationsLoadedRef.current && Date.now() - notificationsLoadedAtRef.current < 15_000) return Promise.resolve();
+    if (notificationsRequestRef.current) return notificationsRequestRef.current;
+
+    if (!notificationsLoadedRef.current) setNotificationsLoading(true);
+    const request = (async () => {
+      try {
+        const response = await fetch("/api/notifications?limit=20", { credentials: "include", cache: "no-store" });
+        const payload = await response.json().catch(() => null) as { success?: boolean; data?: { notifications?: AppNotification[] } } | null;
+        if (response.ok && payload?.success) {
+          setNotifications(payload.data?.notifications ?? []);
+          notificationsLoadedRef.current = true;
+          notificationsLoadedAtRef.current = Date.now();
+        }
+      } finally {
+        setNotificationsLoading(false);
+      }
+    })().finally(() => {
+      if (notificationsRequestRef.current === request) notificationsRequestRef.current = null;
+    });
+    notificationsRequestRef.current = request;
+    return request;
   }, [canReadNotifications]);
 
   const markNotificationsRead = useCallback(async (notification?: AppNotification) => {
     if (!canReadNotifications) return;
+    const readAt = new Date().toISOString();
+    setNotifications((current) => current.map((item) => !notification || (item.source === notification.source && item.id === notification.id) ? { ...item, readAt: item.readAt || readAt } : item));
     const response = await fetch("/api/notifications", { method: "PATCH", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify(notification ? { notifications: [{ source: notification.source, id: notification.id }] } : {}) });
-    if (response.ok) await loadNotifications();
+    if (!response.ok) await loadNotifications(true);
   }, [canReadNotifications, loadNotifications]);
 
   const loadChatUnread = useCallback(async () => {
@@ -132,7 +151,7 @@ export default function TopBar({
 
   useEffect(() => {
     void loadNotifications();
-    const refresh = window.setInterval(() => void loadNotifications(), 60_000);
+    const refresh = window.setInterval(() => void loadNotifications(true), 60_000);
     return () => window.clearInterval(refresh);
   }, [loadNotifications]);
 

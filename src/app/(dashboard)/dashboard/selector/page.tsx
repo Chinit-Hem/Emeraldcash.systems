@@ -16,15 +16,14 @@ import {
   CheckCircle2,
   CircleAlert,
   Database,
-  FileText,
   GraduationCap,
+  HandCoins,
   Loader2,
   Plus,
   type LucideIcon,
   UserRound,
   Users,
 } from "lucide-react";
-import { MoneyBagIcon } from "@/shared/components/icons/MoneyBagIcon";
 
 type ApiResponse<T> = {
   success: boolean;
@@ -100,6 +99,7 @@ type SystemCardDefinition = {
     icon: string;
     title: string;
     button: string;
+    card: string;
   };
 };
 
@@ -118,6 +118,7 @@ function KpiCard({
   value,
   icon: Icon,
   iconClass,
+  cardClass,
   change,
   helper,
   negative = false,
@@ -126,12 +127,16 @@ function KpiCard({
   value: MetricValue;
   icon: LucideIcon;
   iconClass: string;
+  cardClass: string;
   change?: string;
   helper: string;
   negative?: boolean;
 }) {
   return (
-    <article className="rounded-2xl bg-white p-5 shadow-[0_8px_24px_rgba(15,23,42,0.05)] ring-1 ring-slate-200/70 transition-shadow hover:shadow-lg dark:bg-slate-900 dark:ring-slate-800">
+    <article className={cn(
+      "rounded-2xl bg-white p-5 shadow-[0_8px_24px_rgba(15,23,42,0.05)] ring-1 ring-slate-200/70 transition-all hover:-translate-y-0.5 hover:shadow-lg dark:bg-slate-900 dark:ring-slate-800",
+      cardClass,
+    )}>
       <div className="flex items-start gap-3">
         <span className={cn("flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl ring-1", iconClass)}>
           <Icon className="h-7 w-7" strokeWidth={1.9} aria-hidden="true" />
@@ -163,7 +168,10 @@ function SystemModuleCard({
     <Link
       href={system.href}
       prefetch
-      className="group flex min-h-[320px] flex-col rounded-2xl bg-white p-5 shadow-[0_8px_24px_rgba(15,23,42,0.05)] ring-1 ring-slate-200/70 transition-all hover:-translate-y-1 hover:shadow-xl dark:bg-slate-900 dark:ring-slate-800"
+      className={cn(
+        "group flex min-h-[320px] flex-col rounded-2xl bg-white p-5 shadow-[0_8px_24px_rgba(15,23,42,0.05)] ring-1 ring-slate-200/70 transition-all hover:-translate-y-1 hover:shadow-xl dark:bg-slate-900 dark:ring-slate-800",
+        system.theme.card,
+      )}
     >
       <div className="flex items-center gap-3">
         <span className={cn("flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl ring-1 transition-transform group-hover:scale-105", system.theme.icon)}>
@@ -258,7 +266,7 @@ function RecentAlertsCard({ notifications, loading }: { notifications: Notificat
         {!loading && notifications?.length ? notifications.slice(0, 4).map((alert) => {
           const unread = !alert.readAt;
           return (
-            <div key={alert.title} className="flex items-center gap-3">
+            <div key={`${alert.source}:${alert.id}`} className="flex items-center gap-3">
               <span className={cn("flex h-8 w-8 shrink-0 items-center justify-center rounded-full", unread ? "bg-orange-50 text-orange-500 dark:bg-orange-500/10" : "bg-slate-100 text-slate-500 dark:bg-slate-800")}>
                 {unread ? <CircleAlert className="h-4 w-4" aria-hidden="true" /> : <CheckCircle2 className="h-4 w-4" aria-hidden="true" />}
               </span>
@@ -288,7 +296,7 @@ function QuickActionsCard({ role }: { role?: string }) {
   const actions = [
     { label: "Add Employee", href: "/settings?tab=users", icon: Users, visible: hasAppPermission(role, "users:create"), tone: "text-emerald-600 bg-emerald-50 dark:bg-emerald-500/10 dark:text-emerald-300" },
     { label: "New Vehicle", href: "/vehicles?action=new", icon: Car, visible: hasAppPermission(role, "vehicles:create"), tone: "text-emerald-600 bg-emerald-50 dark:bg-emerald-500/10 dark:text-emerald-300" },
-    { label: "Create Loan", href: "/loan?newLoan=1", icon: FileText, visible: hasAppPermission(role, "loans:create"), tone: "text-emerald-600 bg-emerald-50 dark:bg-emerald-500/10 dark:text-emerald-300" },
+    { label: "Create Loan", href: "/loan?newLoan=1", icon: HandCoins, visible: hasAppPermission(role, "loans:create"), tone: "text-emerald-600 bg-emerald-50 dark:bg-emerald-500/10 dark:text-emerald-300" },
     { label: "New Asset", href: "/sms/assets?action=new", icon: Plus, visible: hasAppPermission(role, "sms:create"), tone: "text-emerald-600 bg-emerald-50 dark:bg-emerald-500/10 dark:text-emerald-300" },
   ].filter((action) => action.visible);
 
@@ -398,6 +406,7 @@ export default function SystemHubSelectorPage() {
           icon: "bg-emerald-50 text-emerald-600 ring-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-300 dark:ring-emerald-500/30",
           title: "text-emerald-700 dark:text-emerald-300",
           button: "bg-emerald-600 hover:bg-emerald-700",
+          card: "hover:bg-emerald-50/70 hover:ring-emerald-300 dark:hover:bg-emerald-500/10 dark:hover:ring-emerald-500/50",
         },
       },
       {
@@ -411,6 +420,7 @@ export default function SystemHubSelectorPage() {
           icon: "bg-violet-50 text-violet-600 ring-violet-200 dark:bg-violet-500/10 dark:text-violet-300 dark:ring-violet-500/30",
           title: "text-violet-700 dark:text-violet-300",
           button: "bg-violet-600 hover:bg-violet-700",
+          card: "hover:bg-violet-50/70 hover:ring-violet-300 dark:hover:bg-violet-500/10 dark:hover:ring-violet-500/50",
         },
       },
       {
@@ -424,6 +434,7 @@ export default function SystemHubSelectorPage() {
           icon: "bg-orange-50 text-orange-600 ring-orange-200 dark:bg-orange-500/10 dark:text-orange-300 dark:ring-orange-500/30",
           title: "text-orange-700 dark:text-orange-300",
           button: "bg-orange-500 hover:bg-orange-600",
+          card: "hover:bg-orange-50/70 hover:ring-orange-300 dark:hover:bg-orange-500/10 dark:hover:ring-orange-500/50",
         },
       },
       {
@@ -431,12 +442,13 @@ export default function SystemHubSelectorPage() {
         title: "Loan",
         description: "Loan Management",
         href: "/loan",
-        icon: MoneyBagIcon,
+        icon: HandCoins,
         visible: hasAppPermission(role, "loans:view"),
         theme: {
           icon: "bg-blue-50 text-blue-600 ring-blue-200 dark:bg-blue-500/10 dark:text-blue-300 dark:ring-blue-500/30",
           title: "text-blue-700 dark:text-blue-300",
           button: "bg-blue-600 hover:bg-blue-700",
+          card: "hover:bg-blue-50/70 hover:ring-blue-300 dark:hover:bg-blue-500/10 dark:hover:ring-blue-500/50",
         },
       },
       {
@@ -450,6 +462,7 @@ export default function SystemHubSelectorPage() {
           icon: "bg-rose-50 text-rose-600 ring-rose-200 dark:bg-rose-500/10 dark:text-rose-300 dark:ring-rose-500/30",
           title: "text-rose-700 dark:text-rose-300",
           button: "bg-rose-600 hover:bg-rose-700",
+          card: "hover:bg-rose-50/70 hover:ring-rose-300 dark:hover:bg-rose-500/10 dark:hover:ring-rose-500/50",
         },
       },
     ];
@@ -512,11 +525,11 @@ export default function SystemHubSelectorPage() {
         </header>
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
-          <KpiCard label="Total Users" value={totalUsers} icon={Users} iconClass="bg-emerald-50 text-emerald-600 ring-emerald-100 dark:bg-emerald-500/10 dark:text-emerald-300 dark:ring-emerald-500/20" helper="Registered accounts" />
-          <KpiCard label="Available Systems" value={systems.length} icon={Database} iconClass="bg-indigo-50 text-indigo-600 ring-indigo-100 dark:bg-indigo-500/10 dark:text-indigo-300 dark:ring-indigo-500/20" helper="Available to your role" />
-          <KpiCard label="Unread Alerts" value={openAlerts} icon={AlertTriangle} iconClass="bg-orange-50 text-orange-600 ring-orange-100 dark:bg-orange-500/10 dark:text-orange-300 dark:ring-orange-500/20" helper="From asset notifications" />
-          <KpiCard label="Total Assets" value={totalAssets} icon={Boxes} iconClass="bg-emerald-50 text-emerald-600 ring-emerald-100 dark:bg-emerald-500/10 dark:text-emerald-300 dark:ring-emerald-500/20" helper="In asset inventory" />
-          <KpiCard label="Active Loans" value={activeLoans} icon={Users} iconClass="bg-amber-50 text-amber-600 ring-amber-100 dark:bg-amber-500/10 dark:text-amber-300 dark:ring-amber-500/20" helper="Current loan portfolio" />
+          <KpiCard label="Total Users" value={totalUsers} icon={Users} iconClass="bg-emerald-50 text-emerald-600 ring-emerald-100 dark:bg-emerald-500/10 dark:text-emerald-300 dark:ring-emerald-500/20" cardClass="hover:bg-emerald-50/70 hover:ring-emerald-300 dark:hover:bg-emerald-500/10 dark:hover:ring-emerald-500/50" helper="Registered accounts" />
+          <KpiCard label="Available Systems" value={systems.length} icon={Database} iconClass="bg-indigo-50 text-indigo-600 ring-indigo-100 dark:bg-indigo-500/10 dark:text-indigo-300 dark:ring-indigo-500/20" cardClass="hover:bg-indigo-50/70 hover:ring-indigo-300 dark:hover:bg-indigo-500/10 dark:hover:ring-indigo-500/50" helper="Available to your role" />
+          <KpiCard label="Unread Alerts" value={openAlerts} icon={AlertTriangle} iconClass="bg-orange-50 text-orange-600 ring-orange-100 dark:bg-orange-500/10 dark:text-orange-300 dark:ring-orange-500/20" cardClass="hover:bg-orange-50/70 hover:ring-orange-300 dark:hover:bg-orange-500/10 dark:hover:ring-orange-500/50" helper="From asset notifications" />
+          <KpiCard label="Total Assets" value={totalAssets} icon={Boxes} iconClass="bg-emerald-50 text-emerald-600 ring-emerald-100 dark:bg-emerald-500/10 dark:text-emerald-300 dark:ring-emerald-500/20" cardClass="hover:bg-emerald-50/70 hover:ring-emerald-300 dark:hover:bg-emerald-500/10 dark:hover:ring-emerald-500/50" helper="In asset inventory" />
+          <KpiCard label="Active Loans" value={activeLoans} icon={HandCoins} iconClass="bg-amber-50 text-amber-600 ring-amber-100 dark:bg-amber-500/10 dark:text-amber-300 dark:ring-amber-500/20" cardClass="hover:bg-amber-50/70 hover:ring-amber-300 dark:hover:bg-amber-500/10 dark:hover:ring-amber-500/50" helper="Current loan portfolio" />
         </div>
 
         {systems.length > 0 ? (
