@@ -58,6 +58,17 @@ const USER_POSITION_OPTIONS = ["General Assistant", "Accounting Intern", "Assist
 const USER_DEPARTMENT_OPTIONS = ["Branch Operations", "Loan Operations", "Finance & Accounting", "Human Resources", "Information Technology", "Risk & Compliance", "Marketing", "Management"];
 const USER_BRANCH_OPTIONS = ["Head Office", "Boeung Keng Kang"];
 const USER_PASSWORD_MIN_LENGTH = 8;
+const PAWN_ROLE_POLICY = [
+  ["Pawnbroker / Appraiser", "Create customer, appraisal, pawn/loan draft, collateral photos", "Approve own appraisal, disburse cash, delete records"],
+  ["Cashier / Teller", "Receive repayments, issue approved cash disbursements, print receipts", "Change loan terms, approve or void own payment"],
+  ["Branch Manager", "Review appraisals and staff reports; approve up to $5,000", "Approve own transaction; reconcile own cash"],
+  ["Vault Custodian", "Confirm item intake, release, and vault transfer", "Create loans or receive customer payments"],
+  ["Accountant", "Reconcile cash/bank, view Account Reports, post approved adjustments", "Create/approve pawn loans or change collateral"],
+  ["Credit / Regional Manager", "Approve over-limit loans, BM reports, and exceptions", "Daily cashier transactions"],
+  ["Compliance / Internal Audit", "Read-only reports, audit logs, and exceptions", "Edit, approve, delete, or disburse"],
+  ["Executive / Owner", "Dashboard and high-level approval", "Daily operational edits"],
+  ["System Admin", "Users, roles, and technical settings", "Financial approval or transaction edits"],
+] as const;
 
 const UserAvatar = memo(({
   user,
@@ -1250,6 +1261,11 @@ export default function SettingsContent() {
             </div>
 
             {/* System Shortcuts */}
+            <div className="overflow-hidden rounded-2xl border border-emerald-200 bg-white shadow-sm dark:border-emerald-900 dark:bg-slate-900">
+              <div className="border-b border-emerald-200 bg-emerald-50/70 p-4 dark:border-emerald-900 dark:bg-emerald-950/30 sm:p-5"><div className="flex items-center gap-3"><div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300"><Shield className="w-5 h-5" /></div><div><h3 className="text-lg font-bold text-slate-800 dark:text-white">{language === "km" ? "គោលនយោបាយសិទ្ធិបុគ្គលិកហាងបញ្ចាំ" : "Pawn Shop Role & Permission Policy"}</h3><p className="text-sm text-slate-500 dark:text-slate-400">{language === "km" ? "សម្រាប់អ្នកគ្រប់គ្រងកំណត់សិទ្ធិ និងបែងចែកភារកិច្ច។" : "Admin reference for role assignment and separation of duties."}</p></div></div></div>
+              <div className="overflow-x-auto"><table className="min-w-[860px] w-full text-left text-sm"><thead className="bg-slate-50 text-slate-600 dark:bg-slate-950 dark:text-slate-300"><tr><th className="px-4 py-3">{language === "km" ? "តួនាទី" : "Role"}</th><th className="px-4 py-3">{language === "km" ? "សិទ្ធិសំខាន់" : "Main access"}</th><th className="px-4 py-3">{language === "km" ? "មិនអនុញ្ញាត" : "Must not do"}</th></tr></thead><tbody>{PAWN_ROLE_POLICY.map(([role, access, prohibited]) => <tr key={role} className="border-t border-slate-200 dark:border-slate-800"><td className="px-4 py-3 font-semibold text-slate-900 dark:text-white">{role}</td><td className="px-4 py-3 text-slate-600 dark:text-slate-300">{access}</td><td className="px-4 py-3 text-red-700 dark:text-red-300">{prohibited}</td></tr>)}</tbody></table></div>
+            </div>
+
             <div className="overflow-hidden rounded-2xl border border-slate-200/70 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900 sm:p-5">
               <div className="mb-4">
                 <h3 className="text-base font-bold text-slate-900 dark:text-white sm:text-lg">

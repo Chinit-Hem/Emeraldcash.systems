@@ -14,6 +14,7 @@ import {
   Landmark,
   LogOut,
   MessageSquare,
+  Plus,
   Search,
   Settings2,
   UserRound,
@@ -321,6 +322,7 @@ export default function TopBar({
           : "បុគ្គលិក"
       : user.role
     : "";
+  const displayUserName = user && user.full_name?.trim() && user.full_name.trim().toLocaleLowerCase() !== roleLabel.trim().toLocaleLowerCase() ? user.full_name : user?.username || "";
 
   const systems = [
     {
@@ -453,11 +455,7 @@ export default function TopBar({
                   </p>
                 ) : null}
               </div>
-            ) : (
-              <p className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-600 dark:text-slate-300">
-                {language === "km" ? "ប្រព័ន្ធ" : ""}
-              </p>
-            )}
+            ) : null}
           </div>
 
           <div className="mx-auto hidden min-w-[280px] max-w-xl flex-1 items-center justify-center md:flex">
@@ -477,6 +475,8 @@ export default function TopBar({
           <div className="ml-auto flex shrink-0 items-center justify-end gap-2">
             {actions}
 
+            {hasAppPermission(user?.role, "loans:create") ? <button type="button" onClick={() => router.push("/loan?view=loans&newLoan=1")} className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-emerald-600 px-2.5 text-xs font-semibold text-white transition hover:bg-emerald-700 sm:px-3" title={language === "km" ? "បង្កើតកម្ចីថ្មី" : "Quick create loan"}><Plus className="h-4 w-4" /><span className="hidden xl:inline">{language === "km" ? "បង្កើតថ្មី" : "Create"}</span></button> : null}
+
             {systems.length > 0 ? (
               <div className="relative">
                 <button
@@ -489,8 +489,7 @@ export default function TopBar({
                   aria-haspopup="menu"
                 >
                   <Grid2X2 className="h-4 w-4 text-emerald-600 dark:text-emerald-300" aria-hidden="true" />
-                  <span className="hidden sm:inline">{language === "km" ? "ប្រព័ន្ធ" : "Systems"}</span>
-                  <ChevronDown className={`hidden h-3.5 w-3.5 text-slate-400 transition-transform sm:block ${isSystemsMenuOpen ? "rotate-180" : ""}`} aria-hidden="true" />
+                  <ChevronDown className={`h-3.5 w-3.5 text-slate-400 transition-transform ${isSystemsMenuOpen ? "rotate-180" : ""}`} aria-hidden="true" />
                 </button>
 
                 {isSystemsMenuOpen ? (
@@ -532,7 +531,7 @@ export default function TopBar({
                 aria-expanded={isDateMenuOpen}
               >
                 <CalendarDays className="h-4 w-4 text-slate-400" />
-                <span>{displayDate}</span>
+                <span className="hidden xl:inline text-slate-400">{language === "km" ? "ថ្ងៃធ្វើការ" : "Business Date"}</span><span>{displayDate}</span>
                 <ChevronDown className={`h-3.5 w-3.5 text-slate-400 transition-transform ${isDateMenuOpen ? "rotate-180" : ""}`} />
               </button>
               {isDateMenuOpen ? <div ref={dateMenuRef} className="absolute right-0 top-[calc(100%+0.75rem)] z-[260] w-64 rounded-2xl border border-slate-200 bg-white p-4 shadow-2xl shadow-slate-900/15 dark:border-slate-700 dark:bg-slate-900 dark:shadow-black/40"><p className="text-sm font-semibold text-slate-800 dark:text-slate-100">{language === "km" ? "កាលបរិច្ឆេទការងារ" : "Working date"}</p><p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{language === "km" ? "ជ្រើសរើសកាលបរិច្ឆេទសម្រាប់ការងារ" : "Choose the date you are working with."}</p><input type="date" value={workingDate} onChange={(event) => setWorkingDate(event.target.value)} className="mt-4 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100" /><button type="button" onClick={() => { const now = new Date(); const parts = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Phnom_Penh", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(now); const year = parts.find((part) => part.type === "year")?.value; const month = parts.find((part) => part.type === "month")?.value; const day = parts.find((part) => part.type === "day")?.value; if (year && month && day) setWorkingDate(`${year}-${month}-${day}`); }} className="mt-3 text-sm font-semibold text-emerald-700 hover:text-emerald-800 dark:text-emerald-300">{language === "km" ? "ប្រើថ្ងៃនេះ" : "Use today"}</button></div> : null}
@@ -604,7 +603,7 @@ export default function TopBar({
                   </div>
                   <div className="hidden min-w-0 max-w-[130px] flex-col truncate sm:flex">
                     <span className="truncate text-xs font-semibold leading-4 text-slate-900 dark:text-white">
-                      {user.full_name || user.username}
+                      {displayUserName}
                     </span>
                     <span className="truncate text-[10px] leading-3 text-slate-500 dark:text-slate-400">
                       {roleLabel}
@@ -633,7 +632,7 @@ export default function TopBar({
                         />
                       </div>
                       <div className="min-w-0">
-                        <p className="truncate text-lg font-semibold text-slate-900 dark:text-white">{user.full_name || user.username}</p>
+                        <p className="truncate text-lg font-semibold text-slate-900 dark:text-white">{displayUserName}</p>
                         <p className="mt-1 truncate text-sm text-slate-500 dark:text-slate-400">@{user.username} · {roleLabel}</p>
                         <button
                           type="button"

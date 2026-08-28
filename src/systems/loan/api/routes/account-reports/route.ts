@@ -81,6 +81,10 @@ function canManage(role: string) {
   return ["admin", "manager / approver", "branch manager", "bm", "credit manager", "executive viewer"].includes(role.trim().toLocaleLowerCase());
 }
 
+function hasCustomerActivity(data: Record<string, unknown>) {
+  return ["dueRows", "paidRows", "dueNoticeRows", "promiseRows", "closedRows"].some((key) => Array.isArray(data[key]) && data[key].some((row) => row && typeof row === "object" && typeof (row as { customer?: unknown }).customer === "string" && (row as { customer: string }).customer.trim()));
+}
+
 function dateValue(value: string | Date) {
   if (!(value instanceof Date)) return String(value).slice(0, 10);
   const parts = new Intl.DateTimeFormat("en-US", { timeZone: "Asia/Phnom_Penh", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(value);
@@ -138,6 +142,7 @@ export async function POST(request: NextRequest) {
     const department = String(body.department || "").trim().slice(0, 100);
     const branch = String(body.branch || "").trim().slice(0, 100);
     if (!branch) return NextResponse.json({ success: false, error: "A branch is required for an Account Report" }, { status: 400 });
+    if (status === "submitted" && !hasCustomerActivity(reportData)) return NextResponse.json({ success: false, error: "Add at least one customer activity before submitting an Account Report" }, { status: 400 });
     const existing = await queryWithRetry(async () => sql<Pick<AccountReportRow, "status">>`SELECT status FROM account_reports WHERE report_date = ${reportDate}::date AND reporter_username = ${session.username} LIMIT 1`, "findAccountReportForSave");
     if (existing[0] && !["draft", "returned"].includes(existing[0].status)) return NextResponse.json({ success: false, error: "This report is locked for review" }, { status: 409 });
     const rows = await queryWithRetry(async () => sql<AccountReportRow>`

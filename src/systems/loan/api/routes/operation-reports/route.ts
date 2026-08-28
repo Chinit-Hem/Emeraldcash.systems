@@ -126,6 +126,10 @@ function canManageOperationReports(role: string) {
   return ["admin", "manager / approver", "branch manager", "bm", "credit manager"].includes(normalized);
 }
 
+function hasCustomerActivity(data: Record<string, unknown>, keys: string[]) {
+  return keys.some((key) => Array.isArray(data[key]) && data[key].some((row) => row && typeof row === "object" && typeof (row as { customer?: unknown }).customer === "string" && (row as { customer: string }).customer.trim()));
+}
+
 function mapReport(row: ReportRow) {
   let data = row.report_data;
   if (typeof data === "string") {
@@ -206,6 +210,9 @@ export async function POST(request: NextRequest) {
     const department = String(body.department || "").trim().slice(0, 100);
     const branch = String(body.branch || "").trim().slice(0, 100);
     if (!branch) return NextResponse.json({ success: false, error: "A branch is required for a report" }, { status: 400 });
+    if (reportType === "ls" && status === "submitted" && !hasCustomerActivity(reportData, ["collectionDueRows", "collectionPaidRows", "dueNoticeRows", "followUpRows", "formalNoticeRows", "requestedRows", "approvedRows", "rejectedRows"])) {
+      return NextResponse.json({ success: false, error: "Add at least one customer activity before submitting an LS report" }, { status: 400 });
+    }
     if (reportType === "bm" && status === "submitted") {
       const sourceReportIds = Array.isArray(reportData.sourceReportIds) ? reportData.sourceReportIds.map(String).filter((id) => /^[0-9a-f-]{36}$/i.test(id)) : [];
       if (!sourceReportIds.length) return NextResponse.json({ success: false, error: "A BM Report must include reviewed LS reports" }, { status: 400 });

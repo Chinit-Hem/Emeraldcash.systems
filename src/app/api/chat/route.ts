@@ -43,7 +43,7 @@ export async function GET(req: NextRequest) {
     await ensureChatTable();
     const otherUser = new URL(req.url).searchParams.get("with")?.trim() || "";
     const [participants, unreadRows, messages] = await Promise.all([
-      dbManager.executeUnsafe<ChatRow>(`SELECT username, COALESCE(full_name, username) AS full_name FROM users WHERE username <> $1 ORDER BY COALESCE(full_name, username), username LIMIT 100`, [session.username], 10_000),
+      dbManager.executeUnsafe<ChatRow>(`SELECT username, COALESCE(full_name, username) AS full_name, COALESCE(position, role, '') AS position, COALESCE(branch, department, '') AS branch FROM users WHERE username <> $1 ORDER BY COALESCE(full_name, username), username LIMIT 100`, [session.username], 10_000),
       dbManager.executeUnsafe<ChatRow>(`SELECT COUNT(*) AS count FROM internal_chat_messages WHERE LOWER(recipient_username) = LOWER($1) AND read_at IS NULL`, [session.username], 10_000),
       otherUser ? dbManager.executeUnsafe<ChatRow>(`SELECT id, sender_username, recipient_username, body, read_at, created_at FROM internal_chat_messages WHERE (LOWER(sender_username) = LOWER($1) AND LOWER(recipient_username) = LOWER($2)) OR (LOWER(sender_username) = LOWER($2) AND LOWER(recipient_username) = LOWER($1)) ORDER BY created_at DESC LIMIT 100`, [session.username, otherUser], 10_000) : Promise.resolve([]),
     ]);
@@ -51,7 +51,7 @@ export async function GET(req: NextRequest) {
       await dbManager.executeUnsafe(`UPDATE internal_chat_messages SET read_at = COALESCE(read_at, NOW()) WHERE LOWER(sender_username) = LOWER($1) AND LOWER(recipient_username) = LOWER($2)`, [otherUser, session.username], 10_000);
     }
     return NextResponse.json({ success: true, data: {
-      participants: participants.map((row) => ({ username: text(row.username), fullName: text(row.full_name) })),
+      participants: participants.map((row) => ({ username: text(row.username), fullName: text(row.full_name), position: text(row.position), branch: text(row.branch) })),
       unreadCount: Number(unreadRows[0]?.count ?? 0),
       messages: messages.reverse().map((row) => ({ id: text(row.id), senderUsername: text(row.sender_username), recipientUsername: text(row.recipient_username), body: text(row.body), readAt: row.read_at ? text(row.read_at) : null, createdAt: text(row.created_at) })),
     } }, { headers: { "Cache-Control": "no-store" } });

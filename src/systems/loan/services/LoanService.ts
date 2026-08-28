@@ -735,8 +735,8 @@ function approvalRulesForLoan(loan: LoanEntity): ApprovalRule[] {
   const collateralChecker: ApprovalRule = { key: "collateral_checker", label: "Collateral Checker", roles: ["Loan Operations"] };
 
   if (type.includes("pawn")) {
-    if (amount <= 2_000) return [collateralChecker, branchManager];
-    if (amount <= 10_000) return [collateralChecker, branchManager, financeManager];
+    if (amount <= 5_000) return [collateralChecker, branchManager];
+    if (amount <= 10_000) return [collateralChecker, branchManager, creditManager];
     return [collateralChecker, branchManager, creditManager, chiefExecutive];
   }
   if (type.includes("bank")) {
