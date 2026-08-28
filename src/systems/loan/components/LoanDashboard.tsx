@@ -5702,7 +5702,7 @@ function OperationReportView({ loans, loading, canViewLoanData, onRefresh, onOpe
         <div className="overflow-x-auto">
           <div className="font-khmer-battambang min-w-[1180px] text-slate-950 dark:text-slate-100">
             {reportSheetHeader}
-            {activeForm === "summary" ? isBranchManagerReport ? <BranchManagerDashboardReport records={branchManagerRecords} monthRecords={branchManagerMonthRecords} accountRecords={branchAccountRecords} monthAccountRecords={branchAccountMonthRecords} loans={branchManagerLoans} reportDate={reportDate} /> : <OperationSummaryTable dueCount={dueCustomerCount} paidCount={paidCustomerCount} collectionRate={collectionRate} dueNoticeRows={dueNoticeRows} followUpRows={followUpRows} formalNoticeRows={formalNoticeRows} /> : null}
+            {activeForm === "summary" ? isBranchManagerReport ? <BranchManagerDashboardReport records={branchManagerRecords} monthRecords={branchManagerMonthRecords} accountRecords={branchAccountRecords} monthAccountRecords={branchAccountMonthRecords} loans={branchManagerLoans} reportDate={reportDate} /> : <OperationSummaryTable dueCount={dueCustomerCount} paidCount={paidCustomerCount} collectionRate={collectionRate} followUpRows={followUpRows} formalNoticeRows={formalNoticeRows} requestedRows={requestedRows} approvedRows={approvedRows} rejectedRows={rejectedRows} /> : null}
             {activeForm === "collection" ? isBranchManagerReport ? <BranchManagerConsolidatedReport records={branchManagerRecords} accountRecords={branchAccountRecords} loans={branchManagerLoans} /> : <>
               <div className="grid grid-cols-2"><CollectionReportTable title={opText("អតិថិជនដែលត្រូវប្រមូលសរុប", "Total Customers Due")} rows={collectionDueRows} onChange={setCollectionDueRows} onRememberField={rememberField} /><CollectionReportTable title={opText("អតិថិជនដែលប្រមូលបានសរុប", "Total Customers Collected")} rows={collectionPaidRows} onChange={setCollectionPaidRows} accent="red" onRememberField={rememberField} /></div>
               <div className="space-y-8 border-t-4 border-double border-slate-900 pt-6"><ResolutionTable title={opText("អតិថិជនដែលដោះស្រាយសរុប", "Total Customers to Resolve")} rows={followUpRows} onChange={setFollowUpRows} onRememberAssetType={rememberAssetType} onRememberField={rememberField} /><ResolutionTable title={opText("អតិថិជនដែលដោះស្រាយបានសរុប", "Total Customers Resolved")} rows={formalNoticeRows} onChange={setFormalNoticeRows} onRememberAssetType={rememberAssetType} onRememberField={rememberField} /></div>
@@ -5884,27 +5884,31 @@ function PaymentDateAlerts({ loans, canViewLoanData, onOpenLoan }: { loans: Loan
   );
 }
 
-function OperationSummaryTable({ dueCount, paidCount, collectionRate, dueNoticeRows, followUpRows, formalNoticeRows }: { dueCount: number; paidCount: number; collectionRate: number; dueNoticeRows: OperationReportResolutionRow[]; followUpRows: OperationReportResolutionRow[]; formalNoticeRows: OperationReportResolutionRow[] }) {
+function OperationSummaryTable({ dueCount, paidCount, collectionRate, followUpRows, formalNoticeRows, requestedRows, approvedRows, rejectedRows }: { dueCount: number; paidCount: number; collectionRate: number; followUpRows: OperationReportResolutionRow[]; formalNoticeRows: OperationReportResolutionRow[]; requestedRows: OperationReportLoanDecisionRow[]; approvedRows: OperationReportLoanDecisionRow[]; rejectedRows: OperationReportLoanDecisionRow[] }) {
   const { language } = useLanguage();
   const text = (km: string, en: string) => language === "km" ? km : en;
   const resolutionCount = (rows: OperationReportResolutionRow[]) => rows.filter((row) => row.customer.trim()).length;
-  const interestTotal = (rows: OperationReportResolutionRow[]) => rows.reduce((sum, row) => sum + operationNumber(row.interest), 0);
-  const rows = [
-    [text("អតិថិជនត្រូវបង់សរុប", "Total Customers Due"), dueCount, ""],
-    [text("អតិថិជនដែលបានបង់សរុប", "Total Customers Collected"), paidCount, ""],
-    [text("អត្រាប្រមូលចូលគិតជាភាគរយ", "Collection Rate"), `${collectionRate}%`, ""],
-    [text("ជូនដំណឹងទៅអតិថិជន ដល់ថ្ងៃកំណត់ត្រូវបង់", "Notify Customers Due Today"), resolutionCount(dueNoticeRows), operationCurrency(interestTotal(dueNoticeRows))],
-    [text("បានបន្តទាក់ទងអតិថិជនដែលយឺតចាប់ពី ១ថ្ងៃ ដល់ ៣ថ្ងៃ", "Follow Up Customers 1-3 Days Overdue"), resolutionCount(followUpRows), operationCurrency(interestTotal(followUpRows))],
-    [text("ផ្ញើលិខិតជូនដំណឹងផ្លូវការសម្រាប់អតិថិជនយឺតចាប់ពី ៤ថ្ងៃ", "Formal Notice for Customers 4+ Days Overdue"), resolutionCount(formalNoticeRows), operationCurrency(interestTotal(formalNoticeRows))],
+  const decisionCount = (rows: OperationReportLoanDecisionRow[]) => rows.filter((row) => row.customer.trim()).length;
+  const decisionTotal = (rows: OperationReportLoanDecisionRow[]) => rows.reduce((sum, row) => sum + operationNumber(row.amount), 0);
+  const toResolveCount = resolutionCount(followUpRows);
+  const resolvedCount = resolutionCount(formalNoticeRows);
+  const resolutionRate = toResolveCount ? Math.round((resolvedCount / toResolveCount) * 100) : null;
+  const loanRows: Array<[string, number, string]> = [
+    [text("ចំនួនឯកសារស្នើឥណទានដាក់ចូល", "Loan Applications Submitted"), decisionCount(requestedRows), decisionTotal(requestedRows) ? operationCurrency(decisionTotal(requestedRows)) : "-"],
+    [text("ចំនួនឥណទានបានអនុម័ត", "Loans Approved"), decisionCount(approvedRows), decisionTotal(approvedRows) ? operationCurrency(decisionTotal(approvedRows)) : "-"],
+    [text("ចំនួនឥណទានបដិសេធ", "Loans Rejected"), decisionCount(rejectedRows), decisionTotal(rejectedRows) ? operationCurrency(decisionTotal(rejectedRows)) : "-"],
   ];
+  const totalLoanCount = loanRows.reduce((sum, row) => sum + row[1], 0);
+  const totalLoanAmount = decisionTotal(requestedRows) + decisionTotal(approvedRows) + decisionTotal(rejectedRows);
 
   return (
     <section aria-label="Operation Report summary">
       <table className="w-full table-fixed border-collapse text-sm [&_td]:border [&_td]:border-slate-300 [&_th]:border [&_th]:border-slate-300 dark:[&_td]:border-slate-700 dark:[&_th]:border-slate-700">
-        <thead className="bg-[#087323] text-white"><tr><th className="px-3 py-3 text-left">{text("ការប្រមូល", "Collection")}</th><th className="w-48 px-3 py-3 text-center">{text("ចំនួនអតិថិជន (នាក់)", "Customers")}</th><th className="w-64 px-3 py-3 text-right">{text("ចំនួនទឹកប្រាក់", "Amount")}</th></tr></thead>
-        <tbody>{rows.slice(0, 3).map(([label, count, amount]) => <tr key={String(label)}><td className="px-3 py-3 font-semibold">{label}</td><td className="px-3 py-3 text-center font-bold">{count}</td><td className="px-3 py-3 text-right font-semibold tabular-nums">{amount}</td></tr>)}</tbody>
-        <thead className="bg-[#087323] text-white"><tr><th className="px-3 py-3 text-left">{text("ការដោះស្រាយ", "Resolution")}</th><th className="w-48 px-3 py-3 text-center">{text("ចំនួន (នាក់)", "Customers")}</th><th className="w-64 px-3 py-3 text-right">{text("ជាសាច់ប្រាក់ (សរុបគិតជាដុល្លារ)", "Amount ($)")}</th></tr></thead>
-        <tbody>{rows.slice(3).map(([label, count, amount]) => <tr key={String(label)}><td className="px-3 py-3 font-semibold">{label}</td><td className="px-3 py-3 text-center font-bold">{count}</td><td className="px-3 py-3 text-right font-semibold tabular-nums">{amount}</td></tr>)}</tbody>
+        <thead className="bg-[#087323] text-white"><tr><th className="px-3 py-3 text-center">{text("ការប្រមូល និង ដោះស្រាយ", "Collection & Resolution")}</th><th className="w-64 px-3 py-3 text-center">{text("ចំនួនប្រមូល (នាក់)", "Collected Customers")}</th><th className="w-64 px-3 py-3 text-center">{text("ចំនួនដោះស្រាយ (នាក់)", "Resolved Customers")}</th></tr></thead>
+        <tbody><tr><td className="px-3 py-3 font-semibold">{text("អតិថិជនប្រមូល និងដោះស្រាយសរុប", "Total Customers for Collection & Resolution")}</td><td className="px-3 py-3 text-center font-bold">{dueCount}</td><td className="px-3 py-3 text-center font-bold">{toResolveCount}</td></tr><tr><td className="px-3 py-3 font-semibold">{text("ចំនួនអតិថិជនដែលប្រមូល និងដោះស្រាយបាន", "Customers Collected & Resolved")}</td><td className="px-3 py-3 text-center font-bold">{paidCount}</td><td className="px-3 py-3 text-center font-bold">{resolvedCount}</td></tr><tr><td className="px-3 py-3 font-semibold">{text("អត្រាប្រមូលចូលគិតជាភាគរយ", "Collection & Resolution Rate")}</td><td className="px-3 py-3 text-center font-bold">{dueCount ? `${collectionRate}%` : "0%"}</td><td className="px-3 py-3 text-center font-bold">{resolutionRate === null ? "0%" : `${resolutionRate}%`}</td></tr></tbody>
+        <thead className="bg-[#087323] text-white"><tr><th className="px-3 py-3 text-center">{text("ការចេញឥណទាន", "Loan Issuance")}</th><th className="w-64 px-3 py-3 text-center">{text("ចំនួន (នាក់)", "Count")}</th><th className="w-64 px-3 py-3 text-center">{text("ជាសាច់ប្រាក់ (សរុបគិតជាដុល្លារ)", "Total Amount ($)")}</th></tr></thead>
+        <tbody>{loanRows.map(([label, count, amount]) => <tr key={label}><td className="px-3 py-3 font-semibold">{label}</td><td className="px-3 py-3 text-center font-bold">{count}</td><td className="px-3 py-3 text-right font-semibold tabular-nums">{amount}</td></tr>)}</tbody>
+        <tfoot className="border-y-2 border-double border-slate-900 bg-slate-100 font-bold text-red-700 dark:bg-slate-800"><tr><td className="px-3 py-3 text-center">{text("សរុប", "Total")}</td><td className="px-3 py-3 text-center">{totalLoanCount}</td><td className="px-3 py-3 text-right tabular-nums">{totalLoanAmount ? operationCurrency(totalLoanAmount) : "-"}</td></tr></tfoot>
       </table>
     </section>
   );

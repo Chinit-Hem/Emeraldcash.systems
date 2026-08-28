@@ -519,13 +519,19 @@ export async function exportOperationReportExcel(data: OperationReportExcelData)
   await addBrandHeader(workbook, summary, data, 8);
   const dueCount = nonEmpty(data.collectionDueRows).length;
   const paidCount = nonEmpty(data.collectionPaidRows).length;
-  const summaryRows: Array<Array<string | number>> = [
-    ["អតិថិជនត្រូវបង់សរុប", dueCount, ""],
-    ["អតិថិជនដែលបានបង់សរុប", paidCount, ""],
-    ["អត្រាប្រមូលចូលគិតជាភាគរយ", dueCount ? paidCount / dueCount : 0, ""],
-    ["ជូនដំណឹងទៅអតិថិជន ដល់ថ្ងៃកំណត់ត្រូវបង់", nonEmpty(data.dueNoticeRows).length, data.dueNoticeRows.reduce((sum, row) => sum + numberValue(row.interest), 0)],
-    ["បានបន្តទាក់ទងអតិថិជនដែលយឺតចាប់ពី ១ថ្ងៃ ដល់ ៣ថ្ងៃ", nonEmpty(data.followUpRows).length, data.followUpRows.reduce((sum, row) => sum + numberValue(row.interest), 0)],
-    ["ផ្ញើលិខិតជូនដំណឹងផ្លូវការសម្រាប់អតិថិជនយឺតចាប់ពី ៤ថ្ងៃ", nonEmpty(data.formalNoticeRows).length, data.formalNoticeRows.reduce((sum, row) => sum + numberValue(row.interest), 0)],
+  const toResolveCount = nonEmpty(data.followUpRows).length;
+  const resolvedCount = nonEmpty(data.formalNoticeRows).length;
+  const decisionCount = (rows: DecisionRow[]) => nonEmpty(rows).length;
+  const decisionTotal = (rows: DecisionRow[]) => rows.reduce((sum, row) => sum + numberValue(row.amount), 0);
+  const collectionResolutionRows: Array<Array<string | number>> = [
+    ["អតិថិជនប្រមូល និងដោះស្រាយសរុប", dueCount, toResolveCount],
+    ["ចំនួនអតិថិជនដែលប្រមូល និងដោះស្រាយបាន", paidCount, resolvedCount],
+    ["អត្រាប្រមូលចូលគិតជាភាគរយ", dueCount ? paidCount / dueCount : 0, toResolveCount ? resolvedCount / toResolveCount : 0],
+  ];
+  const loanRows: Array<Array<string | number>> = [
+    ["ចំនួនឯកសារស្នើឥណទានដាក់ចូល", decisionCount(data.requestedRows), decisionTotal(data.requestedRows)],
+    ["ចំនួនឥណទានបានអនុម័ត", decisionCount(data.approvedRows), decisionTotal(data.approvedRows)],
+    ["ចំនួនឥណទានបដិសេធ", decisionCount(data.rejectedRows), decisionTotal(data.rejectedRows)],
   ];
   const addSummaryBand = (headerRow: number, headers: string[], values: Array<Array<string | number>>) => {
     summary.mergeCells(headerRow, 1, headerRow, 2);
@@ -549,11 +555,19 @@ export async function exportOperationReportExcel(data: OperationReportExcelData)
       summary.getCell(row, 5).value = amount;
     });
   };
-  addSummaryBand(11, ["ការប្រមូល", "ចំនួនអតិថិជន (នាក់)", "ចំនួនទឹកប្រាក់"], summaryRows.slice(0, 3));
-  addSummaryBand(15, ["ការដោះស្រាយ", "ចំនួន (នាក់)", "ជាសាច់ប្រាក់ (សរុបគិតជាដុល្លារ)"], summaryRows.slice(3));
-  summary.getCell("C14").numFmt = "0%";
-  [16, 17, 18].forEach((row) => { summary.getCell(row, 5).numFmt = "$#,##0.00"; });
-  styleCells(summary, 11, 18, 1, 8);
+  addSummaryBand(11, ["ការប្រមូល និង ដោះស្រាយ", "ចំនួនប្រមូល (នាក់)", "ចំនួនដោះស្រាយ (នាក់)"], collectionResolutionRows);
+  addSummaryBand(15, ["ការចេញឥណទាន", "ចំនួន (នាក់)", "ជាសាច់ប្រាក់ (សរុបគិតជាដុល្លារ)"], loanRows);
+  [summary.getCell("C14"), summary.getCell("E14")].forEach((cell) => { if (typeof cell.value === "number") cell.numFmt = "0%"; });
+  [16, 17, 18].forEach((excelRow) => { summary.getCell(excelRow, 5).numFmt = "$#,##0.00;-$#,##0.00;-"; });
+  summary.mergeCells(19, 1, 19, 2);
+  summary.mergeCells(19, 3, 19, 4);
+  summary.mergeCells(19, 5, 19, 8);
+  summary.getCell(19, 1).value = "សរុប";
+  summary.getCell(19, 3).value = loanRows.reduce((sum, row) => sum + Number(row[1] || 0), 0);
+  summary.getCell(19, 5).value = loanRows.reduce((sum, row) => sum + Number(row[2] || 0), 0);
+  summary.getCell(19, 5).numFmt = "$#,##0.00;-$#,##0.00;-";
+  [1, 3, 5].forEach((column) => { const cell = summary.getCell(19, column); cell.font = { name: KHMER_FONT, bold: true, color: { argb: RED } }; cell.alignment = { horizontal: column === 5 ? "right" : "center", vertical: "middle" }; });
+  styleCells(summary, 11, 19, 1, 8);
 
   const collection = workbook.addWorksheet("អតិថិជនប្រមូល&ដោះស្រាយ");
   configureSheet(collection, [7, 26, 20, 16, 16, 18, 30, 18]);
