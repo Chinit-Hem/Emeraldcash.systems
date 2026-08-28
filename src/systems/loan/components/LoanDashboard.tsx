@@ -4795,16 +4795,6 @@ function AccountReportView() {
     }
   };
 
-  const clearAccountReportFields = () => {
-    if (!window.confirm("Clear only the Account Report fields? The saved report record, report date, and reporter details will remain.")) return;
-    setDueRows(createAccountCollectionRows());
-    setPaidRows(createAccountCollectionRows());
-    setDueNoticeRows(createAccountResolutionRows());
-    setPromiseRows(createAccountResolutionRows());
-    setClosedRows(createAccountResolutionRows());
-    toastSuccess("Account Report fields cleared. Saved report records were not changed.");
-  };
-
   const prepareFromLoans = async () => {
     setLoadingLoans(true);
     try {
@@ -4869,7 +4859,6 @@ function AccountReportView() {
         <span className={`inline-flex items-center rounded-lg px-3 py-2 text-sm font-semibold ${operationReportStatusClass(loadedStatus)}`}>{operationReportStatusLabel(loadedStatus, "en")}</span>
         <button type="button" disabled={Boolean(savingReport) || reportLocked} onClick={() => void saveAccountReport("draft")} className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300">{savingReport === "draft" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}Save Draft</button>
         <button type="button" disabled={Boolean(savingReport) || reportLocked} onClick={() => void saveAccountReport("submitted")} className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50">{savingReport === "submitted" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}Submit to BM</button>
-        <button type="button" disabled={Boolean(savingReport) || reportLocked} onClick={clearAccountReportFields} title={reportLocked ? "A submitted report must be returned before its fields can be changed." : "Clear only the editable fields; saved report records are kept."} className="inline-flex items-center gap-2 rounded-xl border border-red-200 bg-white px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-red-900 dark:bg-slate-950 dark:text-red-300"><X className="h-4 w-4" />Clear fields</button>
         <button type="button" disabled={loadingLoans} onClick={() => void prepareFromLoans()} className="inline-flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-700 hover:bg-emerald-100 disabled:opacity-50 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-300"><RefreshCw className={`h-4 w-4 ${loadingLoans ? "animate-spin" : ""}`} />Prepare from loans</button>
         <button type="button" onClick={exportAccountReport} className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300"><Download className="h-4 w-4" />Export</button>
         <button type="button" onClick={() => window.print()} className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-700"><Printer className="h-4 w-4" />Print</button>
@@ -5541,21 +5530,6 @@ function OperationReportView({ loans, loading, canViewLoanData, onRefresh, onOpe
     setValidationErrors([]);
   };
 
-  const clearReportForm = () => {
-    if (reviewingAnotherSpecialist || reportLocked) return;
-    if (!window.confirm(opText("សម្អាតតែទិន្នន័យក្នុងប្រអប់បញ្ចូល ដោយរក្សាទុកកំណត់ត្រារបាយការណ៍នេះដដែល មែនទេ?", "Clear only the form fields while keeping this report record?"))) return;
-    setCollectionDueRows(createOperationCollectionRows());
-    setCollectionPaidRows(createOperationCollectionRows());
-    setDueNoticeRows(createOperationResolutionRows());
-    setFollowUpRows(createOperationResolutionRows());
-    setFormalNoticeRows(createOperationResolutionRows());
-    setRequestedRows([{ id: 1, customer: "", type: "", amount: "", reason: "" }]);
-    setApprovedRows([{ id: 1, customer: "", type: "", amount: "", reason: "" }]);
-    setRejectedRows([{ id: 1, customer: "", type: "", amount: "", reason: "" }]);
-    setValidationErrors([]);
-    toastSuccess(opText("បានសម្អាតទិន្នន័យក្នុងប្រអប់បញ្ចូល។ កំណត់ត្រា កាលបរិច្ឆេទ និងព័ត៌មានអ្នករាយការណ៍ត្រូវបានរក្សាទុកដដែល។", "Form fields cleared. The report record, date, and reporter details are unchanged."));
-  };
-
   const changeReportDate = (date: string) => {
     if (isBranchManagerReport) {
       setReportDate(date);
@@ -5743,7 +5717,6 @@ function OperationReportView({ loans, loading, canViewLoanData, onRefresh, onOpe
           <div className="flex flex-wrap gap-2">
             <button type="button" onClick={() => setSavedValuesOpen((open) => !open)} className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300"><List className="h-4 w-4" />{opText("តម្លៃដែលបានរក្សាទុក", "Saved values")}</button>
             {!isBranchManagerReport ? <button type="button" disabled={reviewingAnotherSpecialist} onClick={startNewOperationReport} className="inline-flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-700 hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-300"><FilePlus2 className="h-4 w-4" />{opText("របាយការណ៍ថ្មី", "New Report")}</button> : null}
-            {!isBranchManagerReport ? <button type="button" disabled={reviewingAnotherSpecialist || reportLocked} onClick={clearReportForm} title={reportLocked ? opText("របាយការណ៍ដែលបានដាក់ស្នើត្រូវរង់ចាំអ្នកគ្រប់គ្រងបញ្ជូនត្រឡប់មុនពេលកែប្រែ", "A submitted report must be returned by a manager before it can be changed.") : undefined} className="inline-flex items-center gap-2 rounded-xl border border-red-200 bg-white px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-red-900 dark:bg-slate-950 dark:text-red-300"><X className="h-4 w-4" />{opText("សម្អាតទិន្នន័យ", "Clear form")}</button> : null}
             <button type="button" disabled={reportSaveDisabled} onClick={() => void (isBranchManagerReport ? saveBranchManagerReport("draft") : saveOperationReport("draft"))} className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300">{(isBranchManagerReport ? savingBranchManagerReport : savingReport) === "draft" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}{opText("រក្សាទុកព្រាង", "Save Draft")}</button>
             <button type="button" disabled={reportSaveDisabled} onClick={() => void (isBranchManagerReport ? saveBranchManagerReport("submitted") : saveOperationReport("submitted"))} className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50">{(isBranchManagerReport ? savingBranchManagerReport : savingReport) === "submitted" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}{isBranchManagerReport ? opText("ដាក់ស្នើទៅថ្នាក់លើ", "Submit to Management") : opText("ដាក់ស្នើទៅ BM", "Submit to BM")}</button>
             {canViewLoanData ? <button type="button" disabled={loading || reportsLoading} onClick={refreshReportSources} className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-wait disabled:opacity-50 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300"><RefreshCw className={`h-4 w-4 ${loading || reportsLoading ? "animate-spin" : ""}`} />{opText("ផ្ទុកទិន្នន័យឡើងវិញ", "Refresh data")}</button> : null}
