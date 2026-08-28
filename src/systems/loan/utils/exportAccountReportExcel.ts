@@ -172,6 +172,16 @@ function addResolutionTable(sheet: ExcelJS.Worksheet, startRow: number, title: s
   return totalRow + 3;
 }
 
+function addResolutionGroupTitle(sheet: ExcelJS.Worksheet, row: number, title: string) {
+  sheet.mergeCells(row, 1, row, 8);
+  const cell = sheet.getCell(row, 1);
+  cell.value = title;
+  cell.font = { name: BODY_FONT, size: 13, bold: true, color: { argb: GREEN } };
+  cell.alignment = { vertical: "middle" };
+  styleRange(sheet, row, row, 1, 8);
+  return row + 1;
+}
+
 function configureSheet(sheet: ExcelJS.Worksheet) {
   [7, 20, 20, 16, 16, 16, 16, 32].forEach((width, index) => { sheet.getColumn(index + 1).width = width; });
   sheet.views = [{ state: "frozen", ySplit: 10 }];
@@ -230,8 +240,8 @@ function addSummaryTable(sheet: ExcelJS.Worksheet, data: AccountReportExcelData)
   sheet.mergeCells("C11:D11");
   sheet.mergeCells("E11:H11");
   const collectionRows: Array<[string, number, number | string]> = [
-    ["អតិថិជនត្រូវបង់សរុប", dueCount, ""],
-    ["ចំនួនអតិថិជនដែលបានបង់សរុប", paidCount, ""],
+    ["អតិថិជនដែលប្រមូលសរុប", dueCount, ""],
+    ["អតិថិជនដែលប្រមូលបានសរុប", paidCount, ""],
     ["អត្រាប្រមូលប្រាក់គិតជាភាគរយ", collectionRate, ""],
   ];
   collectionRows.forEach(([label, count, amount], index) => {
@@ -252,8 +262,8 @@ function addSummaryTable(sheet: ExcelJS.Worksheet, data: AccountReportExcelData)
   sheet.mergeCells("E15:H15");
   const resolutionRows: Array<[string, number, number | string]> = [
     ["អ្នកជំពាក់អតិថិជន ដល់ថ្ងៃកំណត់ត្រូវបង់", dueNoticeCount, ""],
-    ["បានបង់តាមកំណត់និងលើកលែងជាថ្មី", promiseCount, promiseAmount],
-    ["ធ្វើវិធីសាស្រ្តដោះស្រាយបន្ថែម", closedCount, closedAmount],
+    ["បានបន្តទាក់ទងអតិថិជនដែលយឺតចាប់ពី ១ថ្ងៃ ដល់ ៣ថ្ងៃ", promiseCount, promiseAmount],
+    ["ផ្ញើលិខិតជូនដំណឹងផ្លូវការសម្រាប់អតិថិជនយឺតចាប់ពី ៤ថ្ងៃ", closedCount, closedAmount],
   ];
   resolutionRows.forEach(([label, count, amount], index) => {
     const row = 16 + index;
@@ -292,12 +302,13 @@ export async function exportAccountReportExcel(data: AccountReportExcelData) {
   await addReportHeader(workbook, detailSheet, data);
   addSummaryTable(summarySheet, data);
 
-  addCollectionTable(detailSheet, 11, 1, "អតិថិជនដែលត្រូវប្រមូលសរុប", data.dueRows);
+  addCollectionTable(detailSheet, 11, 1, "អតិថិជនដែលប្រមូលសរុប", data.dueRows);
   addCollectionTable(detailSheet, 11, 5, "អតិថិជនដែលប្រមូលបានសរុប", data.paidRows, RED);
   let row = 26;
+  row = addResolutionGroupTitle(detailSheet, row, "អតិថិជនដែលដោះស្រាយសរុប");
   row = addResolutionTable(detailSheet, row, "ជូនដំណឹងទៅអតិថិជន ដល់ថ្ងៃកំណត់ត្រូវបង់", data.dueNoticeRows);
-  row = addResolutionTable(detailSheet, row, "បានបង់តាមកំណត់និងលើកលែងជាថ្មី", data.promiseRows);
-  addResolutionTable(detailSheet, row, "ធ្វើវិធីសាស្រ្តដោះស្រាយបន្ថែម", data.closedRows);
+  row = addResolutionTable(detailSheet, row, "បានបន្តទាក់ទងអតិថិជនដែលយឺតចាប់ពី ១ថ្ងៃ ដល់ ៣ថ្ងៃ", data.promiseRows);
+  addResolutionTable(detailSheet, row, "ផ្ញើលិខិតជូនដំណឹងផ្លូវការសម្រាប់អតិថិជនយឺតចាប់ពី ៤ថ្ងៃ", data.closedRows);
 
   const buffer = await workbook.xlsx.writeBuffer();
   const blob = new Blob([buffer as BlobPart], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
