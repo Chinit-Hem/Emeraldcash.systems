@@ -49,8 +49,10 @@ export type OperationReportExcelData = {
 export type BranchManagerOperationReportExcelData = OperationReportExcelData & {
   savedReports: OperationReportRecordForExcel[];
   monthReports: OperationReportRecordForExcel[];
+  yearReports: OperationReportRecordForExcel[];
   accountReports: AccountReportRecordForExcel[];
   monthAccountReports: AccountReportRecordForExcel[];
+  yearAccountReports: AccountReportRecordForExcel[];
   loans: LoanForBranchManagerExcel[];
 };
 
@@ -391,8 +393,10 @@ export async function buildBranchManagerOperationReportWorkbook(data: BranchMana
 
   const dayRecords = reportRowsForDate(data.savedReports, data.reportDate);
   const monthRecords = data.monthReports;
+  const yearRecords = data.yearReports;
   const dayAccountRecords = reportRowsForDate(data.accountReports, data.reportDate);
   const monthAccountRecords = data.monthAccountReports;
+  const yearAccountRecords = data.yearAccountReports;
   const staffRows = branchManagerStaffRows(dayRecords);
   const monthStaffRows = branchManagerStaffRows(monthRecords);
   const scopedLoans = branchLoans(data.loans, data.branch);
@@ -487,9 +491,28 @@ export async function buildBranchManagerOperationReportWorkbook(data: BranchMana
     ...(record.data.closedRows || []).filter((item) => item.customer.trim()).map((item) => [record.reporterName, item.customer, "លិខិតជូនដំណឹង", numberValue(item.interest), numberValue(item.principal), item.assetType, item.note]),
   ]).map((item, index) => [index + 1, ...item]), [5, 6], [5, 6]);
 
-  // The final BM form contains only the Dashboard worksheet. Account Report
-  // data remains linked above and continues to feed its KPI values.
+  // Keep the printable Dashboard concise; detailed consolidation remains in
+  // the app, while the workbook adds a compact daily/monthly/yearly summary.
   workbook.removeWorksheet(consolidated.id);
+
+  const periods = workbook.addWorksheet("ប្រចាំថ្ងៃ-ខែ-ឆ្នាំ");
+  configureSheet(periods, [18, 14, 14, 16, 16, 18, 16, 16, 18, 18]);
+  periods.views = [{ state: "frozen", ySplit: 6 }];
+  const periodRow = await addBranchManagerHeader(workbook, periods, data, 10, true);
+  const periodMetrics = [
+    ["ប្រចាំថ្ងៃ", data.reportDate, dayRecords, dayAccountRecords],
+    ["ប្រចាំខែ", data.reportDate.slice(0, 7), monthRecords, monthAccountRecords],
+    ["ប្រចាំឆ្នាំ", data.reportDate.slice(0, 4), yearRecords, yearAccountRecords],
+  ] as const;
+  addBmTable(periods, periodRow, "សង្ខេបទិន្នន័យ BM ប្រចាំថ្ងៃ / ខែ / ឆ្នាំ", ["រយៈពេល", "កាលបរិច្ឆេទ", "LS Reports", "Account Reports", "សំណើឥណទាន", "អនុម័តឥណទាន", "ប្រាក់អនុម័ត ($)", "ត្រូវប្រមូល", "ប្រមូលបាន", "ប្រាក់ប្រមូលបាន ($)"], periodMetrics.map(([label, period, lsRecords, accountRecords]) => {
+    const requested = lsRecords.reduce((sum, record) => sum + nonEmpty(record.data.requestedRows || []).length, 0);
+    const approved = lsRecords.reduce((sum, record) => sum + nonEmpty(record.data.approvedRows || []).length, 0);
+    const approvedAmount = branchManagerStaffRows([...lsRecords]).reduce((sum, staff) => sum + staff.approved, 0);
+    const due = accountCount([...accountRecords], "dueRows");
+    const paid = accountCount([...accountRecords], "paidRows");
+    const paidAmount = accountRecords.reduce((sum, record) => sum + moneySum(record.data.paidRows, "amount"), 0);
+    return [label, period, lsRecords.length, accountRecords.length, requested, approved, approvedAmount, due, paid, paidAmount];
+  }), [7, 10], [7, 10], [3, 4, 5, 6, 8, 9]);
 
   return workbook;
 }

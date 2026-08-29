@@ -4676,6 +4676,7 @@ function AccountReportView() {
   const accountReportBranchName = branch.trim().toLocaleLowerCase() === "boeung keng kang" ? "បឹងកេងកង" : branch;
   const restoredLocalDraft = useRef(false);
   const initializedSavedAccountReport = useRef(false);
+  const accountReportFormRef = useRef<HTMLDivElement>(null);
   const localDraftStorageKey = `emeraldcash.account-report.draft.${user.username}`;
   const assetTypeStorageKey = `emeraldcash.account-report.asset-types.${user.username}`;
   const rememberedFieldsStorageKey = `emeraldcash.account-report.fields.${user.username}`;
@@ -4789,6 +4790,15 @@ function AccountReportView() {
     setLoadedStatus(record.status);
     setLoadedReporterUsername(record.reporterUsername);
   }, []);
+
+  const openSavedAccountReport = useCallback((record: AccountReportRecord, sheet: AccountReportSheet) => {
+    applySavedReport(record);
+    setActiveSheet(sheet);
+    window.setTimeout(() => accountReportFormRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 80);
+    toastSuccess(record.reporterUsername === user.username
+      ? (language === "km" ? "បានផ្ទុករបាយការណ៍គណនេយ្យរបស់អ្នក។" : "Your Account Report was loaded.")
+      : (language === "km" ? `កំពុងមើលរបាយការណ៍គណនេយ្យរបស់ ${record.reporterName || record.reporterUsername}។` : `Viewing ${record.reporterName || record.reporterUsername}'s Account Report.`));
+  }, [applySavedReport, language, toastSuccess, user.username]);
 
   const loadAccountReports = useCallback(async () => {
     setReportsLoading(true);
@@ -4972,6 +4982,7 @@ function AccountReportView() {
           អតិថិជនប្រមូល&amp;ដោះស្រាយ
         </button>
       </div>
+      <div ref={accountReportFormRef} className="scroll-mt-20">
       <Card className="overflow-hidden rounded-xl border border-slate-300 bg-white p-0 shadow-sm dark:border-slate-700 dark:bg-slate-950">
         <fieldset disabled={reportLocked} className="min-w-0 border-0 p-0 disabled:opacity-90">
         <div className="overflow-hidden">
@@ -5016,7 +5027,8 @@ function AccountReportView() {
         </div>
         </fieldset>
       </Card>
-      {activeSheet === "summary" ? <AccountReportRecordsDashboard records={savedReports} loading={reportsLoading} currentUsername={user.username} language={language} onOpen={(record) => { applySavedReport(record); setActiveSheet("summary"); window.scrollTo({ top: 0, behavior: "smooth" }); toastSuccess(record.reporterUsername === user.username ? (language === "km" ? "បានផ្ទុករបាយការណ៍គណនេយ្យរបស់អ្នក។" : "Your Account Report was loaded.") : (language === "km" ? `កំពុងមើលរបាយការណ៍គណនេយ្យរបស់ ${record.reporterName || record.reporterUsername}។` : `Viewing ${record.reporterName || record.reporterUsername}'s Account Report.`)); }} /> : null}
+      </div>
+      {activeSheet === "summary" ? <AccountReportRecordsDashboard records={savedReports} loading={reportsLoading} currentUsername={user.username} language={language} onOpen={openSavedAccountReport} /> : null}
       <datalist id="account-report-reasons">{ACCOUNT_REPORT_COLLECTION_REASONS.map((reason) => <option key={reason} value={reason} />)}</datalist>
       <datalist id="account-report-asset-types">{selectableAssetTypes.map((type) => <option key={type} value={type} />)}</datalist>
       {ACCOUNT_REPORT_REUSABLE_FIELDS.map((field) => <datalist key={field} id={`account-report-${field}-options`}>{reusableAccountValues(field).map((value) => <option key={value} value={value} />)}</datalist>)}
@@ -5024,7 +5036,7 @@ function AccountReportView() {
   );
 }
 
-function AccountReportRecordsDashboard({ records, loading, currentUsername, language, onOpen }: { records: AccountReportRecord[]; loading: boolean; currentUsername: string; language: Language; onOpen: (record: AccountReportRecord) => void }) {
+function AccountReportRecordsDashboard({ records, loading, currentUsername, language, onOpen }: { records: AccountReportRecord[]; loading: boolean; currentUsername: string; language: Language; onOpen: (record: AccountReportRecord, sheet: AccountReportSheet) => void }) {
   const text = (km: string, en: string) => language === "km" ? km : en;
   const { success: toastSuccess, error: toastError } = useToast();
   const [query, setQuery] = useState("");
@@ -5112,7 +5124,7 @@ function AccountReportRecordsDashboard({ records, loading, currentUsername, lang
           <div className="flex items-end justify-between gap-3"><p className="pb-3 text-sm text-slate-500"><strong className="text-slate-900 dark:text-white">{filtered.length}</strong> {text(`ក្នុងចំណោម ${records.length} កំណត់ត្រា`, `of ${records.length} records`)}</p><button type="button" disabled={!advancedFilterCount} onClick={clearAdvancedSearch} className="mb-0.5 inline-flex min-h-11 items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-40 dark:text-slate-300 dark:hover:bg-slate-800"><X className="h-4 w-4" />{text("សម្អាត", "Clear")}</button></div>
         </div> : null}
       </div>
-      <div className="max-h-96 overflow-x-auto overflow-y-auto"><table className="min-w-[900px] w-full text-left text-sm"><thead className="sticky top-0 z-10 bg-slate-100 text-slate-600 dark:bg-slate-950 dark:text-slate-300"><tr><th className="px-4 py-3">{text("ថ្ងៃ", "Date")}</th><th className="px-4 py-3">{text("អ្នករាយការណ៍", "Reporter")}</th><th className="px-4 py-3">{text("សាខា", "Branch")}</th><th className="px-4 py-3 text-center">{text("ត្រូវបង់", "Due")}</th><th className="px-4 py-3 text-center">{text("បានបង់", "Paid")}</th><th className="px-4 py-3">{text("ស្ថានភាព", "Status")}</th><th className="px-4 py-3 text-right">{text("សកម្មភាព", "Actions")}</th></tr></thead><tbody>{loading ? <tr><td colSpan={7} className="px-4 py-10 text-center text-slate-500"><Loader2 className="mr-2 inline h-4 w-4 animate-spin" />{text("កំពុងផ្ទុកកំណត់ត្រា...", "Loading records...")}</td></tr> : filtered.length ? filtered.map((record) => { const ownsRecord = record.reporterUsername.trim().toLocaleLowerCase() === currentUsername.trim().toLocaleLowerCase(); return <tr key={record.id} className="border-t border-slate-200 dark:border-slate-800"><td className="whitespace-nowrap px-4 py-3 font-semibold">{record.reportDate}</td><td className="px-4 py-3"><p className="font-semibold text-slate-900 dark:text-white">{record.reporterName || record.reporterUsername}</p><p className="text-xs text-slate-500">{record.reporterPosition}</p></td><td className="px-4 py-3">{record.branch || "-"}</td><td className="px-4 py-3 text-center font-semibold">{rowCount(record, "dueRows")}</td><td className="px-4 py-3 text-center font-semibold">{rowCount(record, "paidRows")}</td><td className="px-4 py-3"><span className={`inline-flex rounded-md px-2 py-1 text-xs font-semibold ${operationReportStatusClass(record.status)}`}>{operationReportStatusLabel(record.status, language)}</span></td><td className="px-4 py-3 text-right"><button type="button" onClick={() => onOpen(record)} className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-300">{ownsRecord && ["draft", "returned"].includes(record.status) ? <Pencil className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}{ownsRecord && ["draft", "returned"].includes(record.status) ? text("កែ", "Edit") : text("មើល", "View")}</button></td></tr>; }) : <tr><td colSpan={7} className="px-4 py-10 text-center text-slate-500">{text("រកមិនឃើញរបាយការណ៍ដែលបានរក្សាទុក", "No saved Account Reports found.")}</td></tr>}</tbody></table></div>
+      <div className="max-h-96 overflow-x-auto overflow-y-auto"><table className="min-w-[1040px] w-full text-left text-sm"><thead className="sticky top-0 z-10 bg-slate-100 text-slate-600 dark:bg-slate-950 dark:text-slate-300"><tr><th className="px-4 py-3">{text("ថ្ងៃ", "Date")}</th><th className="px-4 py-3">{text("អ្នករាយការណ៍", "Reporter")}</th><th className="px-4 py-3">{text("សាខា", "Branch")}</th><th className="px-4 py-3 text-center">{text("ត្រូវបង់", "Due")}</th><th className="px-4 py-3 text-center">{text("បានបង់", "Paid")}</th><th className="px-4 py-3">{text("ស្ថានភាព", "Status")}</th><th className="px-4 py-3 text-right">{text("សកម្មភាព", "Actions")}</th></tr></thead><tbody>{loading ? <tr><td colSpan={7} className="px-4 py-10 text-center text-slate-500"><Loader2 className="mr-2 inline h-4 w-4 animate-spin" />{text("កំពុងផ្ទុកកំណត់ត្រា...", "Loading records...")}</td></tr> : filtered.length ? filtered.map((record) => { const ownsRecord = record.reporterUsername.trim().toLocaleLowerCase() === currentUsername.trim().toLocaleLowerCase(); const editable = ownsRecord && ["draft", "returned"].includes(record.status); return <tr key={record.id} className="border-t border-slate-200 dark:border-slate-800"><td className="whitespace-nowrap px-4 py-3 font-semibold">{record.reportDate}</td><td className="px-4 py-3"><p className="font-semibold text-slate-900 dark:text-white">{record.reporterName || record.reporterUsername}</p><p className="text-xs text-slate-500">{record.reporterPosition}</p></td><td className="px-4 py-3">{record.branch || "-"}</td><td className="px-4 py-3 text-center font-semibold">{rowCount(record, "dueRows")}</td><td className="px-4 py-3 text-center font-semibold">{rowCount(record, "paidRows")}</td><td className="px-4 py-3"><span className={`inline-flex rounded-md px-2 py-1 text-xs font-semibold ${operationReportStatusClass(record.status)}`}>{operationReportStatusLabel(record.status, language)}</span></td><td className="px-4 py-3"><div className="flex flex-nowrap justify-end gap-2"><button type="button" onClick={() => onOpen(record, "summary")} className="inline-flex min-h-10 items-center gap-2 whitespace-nowrap rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-300">{editable ? <Pencil className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}{text("សង្ខេប", "Summary")}</button><button type="button" onClick={() => onOpen(record, "collection")} className="inline-flex min-h-10 items-center gap-2 whitespace-nowrap rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700 hover:bg-blue-100 dark:border-blue-800 dark:bg-blue-950/30 dark:text-blue-300"><List className="h-3.5 w-3.5" />{text("ប្រមូល និងដោះស្រាយ", "Collection & Resolution")}</button></div></td></tr>; }) : <tr><td colSpan={7} className="px-4 py-10 text-center text-slate-500">{text("រកមិនឃើញរបាយការណ៍ដែលបានរក្សាទុក", "No saved Account Reports found.")}</td></tr>}</tbody></table></div>
     </section>
   );
 }
@@ -5407,9 +5419,11 @@ function OperationReportView({ loans, loading, canViewLoanData, onRefresh, onOpe
   const collectionRate = dueCustomerCount ? Math.round((paidCustomerCount / dueCustomerCount) * 100) : 0;
   const branchManagerRecords = useMemo(() => visibleSavedReports.filter((record) => record.reportDate === reportDate && (!branch.trim() || record.branch.trim().toLocaleLowerCase() === branch.trim().toLocaleLowerCase()) && ["submitted", "reviewed", "approved"].includes(record.status)), [branch, reportDate, visibleSavedReports]);
   const branchManagerMonthRecords = useMemo(() => visibleSavedReports.filter((record) => record.reportDate.startsWith(reportDate.slice(0, 7)) && (!branch.trim() || record.branch.trim().toLocaleLowerCase() === branch.trim().toLocaleLowerCase()) && ["submitted", "reviewed", "approved"].includes(record.status)), [branch, reportDate, visibleSavedReports]);
+  const branchManagerYearRecords = useMemo(() => visibleSavedReports.filter((record) => record.reportDate.startsWith(reportDate.slice(0, 4)) && (!branch.trim() || record.branch.trim().toLocaleLowerCase() === branch.trim().toLocaleLowerCase()) && ["submitted", "reviewed", "approved"].includes(record.status)), [branch, reportDate, visibleSavedReports]);
   const branchAccountRecords = useMemo(() => accountReports.filter((record) => record.reportDate === reportDate && (!branch.trim() || record.branch.trim().toLocaleLowerCase() === branch.trim().toLocaleLowerCase()) && ["submitted", "reviewed", "approved"].includes(record.status)), [accountReports, branch, reportDate]);
   const branchAccountReportHistory = useMemo(() => accountReports.filter((record) => !branch.trim() || record.branch.trim().toLocaleLowerCase() === branch.trim().toLocaleLowerCase()), [accountReports, branch]);
   const branchAccountMonthRecords = useMemo(() => accountReports.filter((record) => record.reportDate.startsWith(reportDate.slice(0, 7)) && (!branch.trim() || record.branch.trim().toLocaleLowerCase() === branch.trim().toLocaleLowerCase()) && ["submitted", "reviewed", "approved"].includes(record.status)), [accountReports, branch, reportDate]);
+  const branchAccountYearRecords = useMemo(() => accountReports.filter((record) => record.reportDate.startsWith(reportDate.slice(0, 4)) && (!branch.trim() || record.branch.trim().toLocaleLowerCase() === branch.trim().toLocaleLowerCase()) && ["submitted", "reviewed", "approved"].includes(record.status)), [accountReports, branch, reportDate]);
   const branchLoanSpecialistRecords = useMemo(() => visibleSavedReports.filter((record) => !branch.trim() || record.branch.trim().toLocaleLowerCase() === branch.trim().toLocaleLowerCase()), [branch, visibleSavedReports]);
   const ownBranchManagerReport = branchManagerReports.find((record) => record.reporterUsername === user.username && record.reportDate === reportDate && record.branch.trim().toLocaleLowerCase() === branch.trim().toLocaleLowerCase());
   const branchManagerReportStatus: OperationReportStatus = ownBranchManagerReport?.status || "draft";
@@ -5423,11 +5437,12 @@ function OperationReportView({ loans, loading, canViewLoanData, onRefresh, onOpe
   const reportLocked = !["draft", "returned"].includes(effectiveReportStatus);
 
   useEffect(() => {
-    if (isBranchManagerReport && activeForm !== "summary") setActiveForm("summary");
+    if (isBranchManagerReport && activeForm === "decisions") setActiveForm("summary");
   }, [activeForm, isBranchManagerReport]);
 
-  const loadSavedReports = useCallback(async () => {
-    setReportsLoading(true);
+  const loadSavedReports = useCallback(async (options: { silent?: boolean } = {}) => {
+    const silent = Boolean(options.silent);
+    if (!silent) setReportsLoading(true);
     try {
       const [records, bmRecords, accountingRecords] = await Promise.all([
         api<OperationReportRecord[]>("/api/loan/operation-reports?limit=500"),
@@ -5438,13 +5453,28 @@ function OperationReportView({ loans, loading, canViewLoanData, onRefresh, onOpe
       setBranchManagerReports(bmRecords);
       setAccountReports(accountingRecords);
     } catch (caught) {
-      toastError(caught instanceof Error ? caught.message : opText("មិនអាចផ្ទុករបាយការណ៍ដែលបានរក្សាទុក", "Could not load saved reports"));
+      if (!silent) toastError(caught instanceof Error ? caught.message : opText("មិនអាចផ្ទុករបាយការណ៍ដែលបានរក្សាទុក", "Could not load saved reports"));
     } finally {
-      setReportsLoading(false);
+      if (!silent) setReportsLoading(false);
     }
   }, [canManageReports, toastError]);
 
   useEffect(() => { void loadSavedReports(); }, [loadSavedReports]);
+
+  useEffect(() => {
+    if (!isBranchManagerReport || !canManageReports) return;
+    const refreshSources = () => {
+      if (document.visibilityState === "visible") void loadSavedReports({ silent: true });
+    };
+    const intervalId = window.setInterval(refreshSources, 30_000);
+    window.addEventListener("focus", refreshSources);
+    document.addEventListener("visibilitychange", refreshSources);
+    return () => {
+      window.clearInterval(intervalId);
+      window.removeEventListener("focus", refreshSources);
+      document.removeEventListener("visibilitychange", refreshSources);
+    };
+  }, [canManageReports, isBranchManagerReport, loadSavedReports]);
 
   useEffect(() => {
     try {
@@ -5804,7 +5834,7 @@ function OperationReportView({ loans, loading, canViewLoanData, onRefresh, onOpe
       const { exportBranchManagerOperationReportExcel, exportOperationReportExcel } = await import("@/systems/loan/utils/exportOperationReportExcel");
       const exportData = { reportDate, branch, reporterName, reporterRole, department, collectionDueRows, collectionPaidRows, dueNoticeRows, followUpRows, formalNoticeRows, requestedRows, approvedRows, rejectedRows };
       if (isBranchManagerReport) {
-        await exportBranchManagerOperationReportExcel({ ...exportData, savedReports: branchManagerRecords, monthReports: branchManagerMonthRecords, accountReports: branchAccountRecords, monthAccountReports: branchAccountMonthRecords, loans: branchManagerLoans });
+        await exportBranchManagerOperationReportExcel({ ...exportData, savedReports: branchManagerRecords, monthReports: branchManagerMonthRecords, yearReports: branchManagerYearRecords, accountReports: branchAccountRecords, monthAccountReports: branchAccountMonthRecords, yearAccountReports: branchAccountYearRecords, loans: branchManagerLoans });
       } else {
         await exportOperationReportExcel(exportData);
       }
@@ -5923,7 +5953,7 @@ function OperationReportView({ loans, loading, canViewLoanData, onRefresh, onOpe
           </div>
         </div>
       </section>
-      {!reviewingAnotherSpecialist ? <section className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm dark:border-slate-800 dark:bg-slate-900">{!isBranchManagerReport ? <><span className={`font-semibold ${hasUnsavedChanges ? "text-amber-700 dark:text-amber-300" : "text-emerald-700 dark:text-emerald-300"}`}>{hasUnsavedChanges ? opText("មានការកែប្រែមិនទាន់រក្សាទុក", "Unsaved changes") : opText("ទិន្នន័យបានរក្សាទុក", "Saved")}</span>{ownSavedReport?.updatedAt ? <span className="text-slate-500">{opText("រក្សាទុកចុងក្រោយ", "Last saved")}: {new Date(ownSavedReport.updatedAt).toLocaleString()}</span> : null}</> : <span className="font-semibold text-slate-600 dark:text-slate-300">{opText("ស្ថានភាពរបាយការណ៍ BM", "BM report status")}</span>}<span className={`font-semibold ${submitRequirements.length ? "text-amber-700 dark:text-amber-300" : "text-emerald-700 dark:text-emerald-300"}`}>{submitRequirements.length ? opText(`ត្រូវបំពេញ ${submitRequirements.length} ចំណុច មុនដាក់ស្នើ`, `${submitRequirements.length} requirement(s) before submit`) : isBranchManagerReport ? opText("រួចរាល់សម្រាប់ដាក់ស្នើទៅថ្នាក់លើ", "Ready to submit to management") : opText("រួចរាល់សម្រាប់ដាក់ស្នើទៅ BM", "Ready to submit to BM")}</span></section> : null}
+      {!reviewingAnotherSpecialist ? <section className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm dark:border-slate-800 dark:bg-slate-900">{!isBranchManagerReport ? <><span className={`font-semibold ${hasUnsavedChanges ? "text-amber-700 dark:text-amber-300" : "text-emerald-700 dark:text-emerald-300"}`}>{hasUnsavedChanges ? opText("មានការកែប្រែមិនទាន់រក្សាទុក", "Unsaved changes") : opText("ទិន្នន័យបានរក្សាទុក", "Saved")}</span>{ownSavedReport?.updatedAt ? <span className="text-slate-500">{opText("រក្សាទុកចុងក្រោយ", "Last saved")}: {new Date(ownSavedReport.updatedAt).toLocaleString()}</span> : null}</> : <><span className="font-semibold text-slate-600 dark:text-slate-300">{opText("ស្ថានភាពរបាយការណ៍ BM", "BM report status")}</span><span className="text-slate-500">{opText(`ទិន្នន័យប្រចាំថ្ងៃ៖ LS ${branchManagerRecords.length} · គណនេយ្យ ${branchAccountRecords.length} · ធ្វើបច្ចុប្បន្នភាពស្វ័យប្រវត្តិ`, `Daily sources: LS ${branchManagerRecords.length} · Account ${branchAccountRecords.length} · auto-updated`)}</span></>}<span className={`font-semibold ${submitRequirements.length ? "text-amber-700 dark:text-amber-300" : "text-emerald-700 dark:text-emerald-300"}`}>{submitRequirements.length ? opText(`ត្រូវបំពេញ ${submitRequirements.length} ចំណុច មុនដាក់ស្នើ`, `${submitRequirements.length} requirement(s) before submit`) : isBranchManagerReport ? opText("រួចរាល់សម្រាប់ដាក់ស្នើទៅថ្នាក់លើ", "Ready to submit to management") : opText("រួចរាល់សម្រាប់ដាក់ស្នើទៅ BM", "Ready to submit to BM")}</span></section> : null}
       {savedValuesOpen ? <RememberedReportValuesManager fields={rememberedFields} onRemove={forgetField} onClose={() => setSavedValuesOpen(false)} /> : null}
 
       {reviewingAnotherSpecialist ? <section className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-4 text-sm text-amber-950 dark:border-amber-800 dark:bg-amber-950/25 dark:text-amber-100">
@@ -5940,6 +5970,7 @@ function OperationReportView({ loans, loading, canViewLoanData, onRefresh, onOpe
         <div className="flex items-end">
           {(isBranchManagerReport ? ([
             ["summary", opText("សង្ខេបប្រចាំសាខា", "Dashboard")],
+            ["collection", opText("ទិន្នន័យរួម LS + គណនេយ្យប្រចាំថ្ងៃ", "Daily LS + Account Consolidation")],
           ] as const) : ([
             ["summary", opText("របាយការណ៍សង្ខេប", "Summary")],
             ["collection", opText("អតិថិជនប្រមូល និងដោះស្រាយ", "Collection & Resolution")],
@@ -5953,7 +5984,7 @@ function OperationReportView({ loans, loading, canViewLoanData, onRefresh, onOpe
         <div className="overflow-hidden">
           <div className="font-khmer-battambang min-w-0 text-slate-950 dark:text-slate-100">
             {reportSheetHeader}
-            {activeForm === "summary" ? isBranchManagerReport ? <BranchManagerDashboardReport records={branchManagerRecords} monthRecords={branchManagerMonthRecords} accountRecords={branchAccountRecords} monthAccountRecords={branchAccountMonthRecords} loans={branchManagerLoans} reportDate={reportDate} /> : <OperationSummaryTable dueCount={dueCustomerCount} paidCount={paidCustomerCount} collectionRate={collectionRate} followUpRows={followUpRows} formalNoticeRows={formalNoticeRows} requestedRows={requestedRows} approvedRows={approvedRows} rejectedRows={rejectedRows} /> : null}
+            {activeForm === "summary" ? isBranchManagerReport ? <BranchManagerDashboardReport records={branchManagerRecords} monthRecords={branchManagerMonthRecords} yearRecords={branchManagerYearRecords} accountRecords={branchAccountRecords} monthAccountRecords={branchAccountMonthRecords} yearAccountRecords={branchAccountYearRecords} loans={branchManagerLoans} reportDate={reportDate} /> : <OperationSummaryTable dueCount={dueCustomerCount} paidCount={paidCustomerCount} collectionRate={collectionRate} followUpRows={followUpRows} formalNoticeRows={formalNoticeRows} requestedRows={requestedRows} approvedRows={approvedRows} rejectedRows={rejectedRows} /> : null}
             {activeForm === "collection" ? isBranchManagerReport ? <BranchManagerConsolidatedReport records={branchManagerRecords} accountRecords={branchAccountRecords} loans={branchManagerLoans} /> : <>
               <div className="grid grid-cols-1 lg:grid-cols-2"><CollectionReportTable title={opText("អតិថិជនដែលត្រូវប្រមូលសរុប", "Total Customers Due")} rows={collectionDueRows} onChange={setCollectionDueRows} onRememberField={rememberField} /><CollectionReportTable title={opText("អតិថិជនដែលប្រមូលបានសរុប", "Total Customers Collected")} rows={collectionPaidRows} onChange={setCollectionPaidRows} accent="red" onRememberField={rememberField} /></div>
               <div className="space-y-8 border-t-4 border-double border-slate-900 pt-6"><ResolutionTable title={opText("អតិថិជនដែលដោះស្រាយសរុប", "Total Customers to Resolve")} rows={followUpRows} onChange={setFollowUpRows} onRememberAssetType={rememberAssetType} onRememberField={rememberField} /><ResolutionTable title={opText("អតិថិជនដែលដោះស្រាយបានសរុប", "Total Customers Resolved")} rows={formalNoticeRows} onChange={setFormalNoticeRows} onRememberAssetType={rememberAssetType} onRememberField={rememberField} /></div>
@@ -6230,7 +6261,10 @@ function BranchManagerSection({ title, children }: { title: string; children: Re
   );
 }
 
-function BranchManagerDashboardReport({ records, monthRecords, accountRecords, monthAccountRecords, loans, reportDate }: { records: OperationReportRecord[]; monthRecords: OperationReportRecord[]; accountRecords: AccountReportRecord[]; monthAccountRecords: AccountReportRecord[]; loans: LoanEntity[]; reportDate: string }) {
+function BranchManagerDashboardReport({ records, monthRecords, yearRecords, accountRecords, monthAccountRecords, yearAccountRecords, loans, reportDate }: { records: OperationReportRecord[]; monthRecords: OperationReportRecord[]; yearRecords: OperationReportRecord[]; accountRecords: AccountReportRecord[]; monthAccountRecords: AccountReportRecord[]; yearAccountRecords: AccountReportRecord[]; loans: LoanEntity[]; reportDate: string }) {
+  const { language } = useLanguage();
+  const text = (km: string, en: string) => language === "km" ? km : en;
+  const [viewPeriod, setViewPeriod] = useState<"daily" | "monthly" | "yearly">("daily");
   const staffRows = branchManagerStaffPerformance(records);
   const approvedAmount = staffRows.reduce((sum, row) => sum + row.approved, 0);
   const monthStaffRows = branchManagerStaffPerformance(monthRecords);
@@ -6263,6 +6297,18 @@ function BranchManagerDashboardReport({ records, monthRecords, accountRecords, m
   const monthDueNoticeCount = accountCount(monthAccountRecords, "dueNoticeRows");
   const monthFollowUpCount = accountCount(monthAccountRecords, "promiseRows");
   const monthFormalNoticeCount = accountCount(monthAccountRecords, "closedRows");
+  const periodRecords = viewPeriod === "daily" ? records : viewPeriod === "monthly" ? monthRecords : yearRecords;
+  const periodAccountRecords = viewPeriod === "daily" ? accountRecords : viewPeriod === "monthly" ? monthAccountRecords : yearAccountRecords;
+  const periodStaffRows = branchManagerStaffPerformance(periodRecords);
+  const periodRequestedCustomers = periodRecords.reduce((sum, record) => sum + (record.data.requestedRows || []).filter((row) => row.customer.trim()).length, 0);
+  const periodApprovedCustomers = periodRecords.reduce((sum, record) => sum + (record.data.approvedRows || []).filter((row) => row.customer.trim()).length, 0);
+  const periodApprovedAmount = periodStaffRows.reduce((sum, row) => sum + row.approved, 0);
+  const periodDueCustomers = accountCount(periodAccountRecords, "dueRows");
+  const periodPaidCustomers = accountCount(periodAccountRecords, "paidRows");
+  const periodCollectedAmount = accountAmount(periodAccountRecords, "paidRows");
+  const periodCollectionRate = periodDueCustomers ? Math.round((periodPaidCustomers / periodDueCustomers) * 100) : 0;
+  const periodResolutionActions = accountCount(periodAccountRecords, "dueNoticeRows") + accountCount(periodAccountRecords, "promiseRows") + accountCount(periodAccountRecords, "closedRows");
+  const periodLabel = viewPeriod === "daily" ? reportDate : viewPeriod === "monthly" ? reportDate.slice(0, 7) : reportDate.slice(0, 4);
   const kpiRows = [
     ["1", "ចំនួនទម្លាក់ឥណទានថ្មី ($)", operationCurrency(150000), operationCurrency(approvedAmount), operationCurrency(monthApprovedAmount), `${((monthApprovedAmount / 150000) * 100).toFixed(2)}%`, `សម្រេចបាន ${((monthApprovedAmount / 150000) * 100).toFixed(1)}% នៃគោលដៅខែ`],
     ["2", "ចំនួនអតិថិជនថ្មី (នាក់)", 30, approvedCustomers, monthApprovedCustomers, `${((monthApprovedCustomers / 30) * 100).toFixed(2)}%`, "ជិតសម្រេចបានតាមផែនការ"],
@@ -6277,6 +6323,23 @@ function BranchManagerDashboardReport({ records, monthRecords, accountRecords, m
 
   return (
     <div className="space-y-6 pb-6">
+      <section className="overflow-hidden border border-slate-300 bg-white dark:border-slate-700 dark:bg-slate-950">
+        <div className="flex flex-col justify-between gap-3 bg-slate-100 px-4 py-3 sm:flex-row sm:items-center dark:bg-slate-900">
+          <div><p className="font-bold text-slate-900 dark:text-white">{text("ទិន្នន័យ BM តាមរយៈពេល", "BM Data by Period")}</p><p className="text-xs text-slate-500">{text(`សាខាសរុបសម្រាប់ ${periodLabel}`, `Branch totals for ${periodLabel}`)}</p></div>
+          <div className="inline-flex rounded-xl border border-slate-300 bg-white p-1 dark:border-slate-700 dark:bg-slate-950">{([['daily', text("ប្រចាំថ្ងៃ", "Daily")], ['monthly', text("ប្រចាំខែ", "Monthly")], ['yearly', text("ប្រចាំឆ្នាំ", "Yearly")]] as const).map(([period, label]) => <button key={period} type="button" onClick={() => setViewPeriod(period)} className={`rounded-lg px-3 py-2 text-sm font-semibold ${viewPeriod === period ? "bg-emerald-600 text-white" : "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"}`}>{label}</button>)}</div>
+        </div>
+        <div className="grid sm:grid-cols-2 xl:grid-cols-4">{[
+          [text("របាយការណ៍ LS", "LS Reports"), periodRecords.length],
+          [text("របាយការណ៍គណនេយ្យ", "Account Reports"), periodAccountRecords.length],
+          [text("សំណើ / អនុម័ត", "Requested / Approved"), `${periodRequestedCustomers} / ${periodApprovedCustomers}`],
+          [text("ប្រាក់អនុម័ត", "Approved Amount"), operationCurrency(periodApprovedAmount)],
+          [text("ត្រូវប្រមូល / ប្រមូលបាន", "Due / Collected"), `${periodDueCustomers} / ${periodPaidCustomers}`],
+          [text("អត្រាប្រមូល", "Collection Rate"), `${periodCollectionRate}%`],
+          [text("ចំនួនប្រាក់ប្រមូលបាន", "Collected Amount"), operationCurrency(periodCollectedAmount)],
+          [text("សកម្មភាពដោះស្រាយ", "Resolution Actions"), periodResolutionActions],
+        ].map(([label, value]) => <div key={label} className="border-t border-slate-200 px-4 py-3 sm:border-r dark:border-slate-800"><p className="text-xs font-semibold text-slate-500">{label}</p><p className="mt-1 text-lg font-bold text-slate-900 dark:text-white">{value}</p></div>)}</div>
+        {viewPeriod !== "daily" ? <div className="overflow-x-auto border-t border-slate-300 dark:border-slate-700"><BranchManagerStaffTable rows={periodStaffRows} /></div> : null}
+      </section>
       <BranchManagerSection title="១. សង្ខេបសូចនាករផលសម្រេចគន្លឹះរបស់សាខា (Branch Key KPI Summary)">
         <table className="w-full table-fixed border-collapse text-sm [&_td]:border [&_td]:border-slate-300 [&_th]:border [&_th]:border-slate-300"><colgroup><col className="w-12" /><col className="w-[29%]" /><col /><col /><col /><col /><col className="w-[22%]" /></colgroup><thead className="bg-[#087323] text-white"><tr>{["ល.រ", "សូចនាករគន្លឹះ (KPIs)", "គោលដៅប្រចាំខែ", "សម្រេចបានថ្ងៃនេះ", "សម្រេចបានសរុបប្រចាំខែ", "% សម្រេចធៀប KPI", "កំណត់សម្គាល់"].map((header) => <th key={header} className="px-3 py-3 text-center">{header}</th>)}</tr></thead><tbody>{kpiRows.map((row) => <tr key={String(row[0])}>{row.map((cell, index) => <td key={`${row[0]}-${index}`} className={`px-3 py-2 ${index === 0 ? "text-center" : index >= 2 && index <= 5 ? "text-right tabular-nums" : ""}`}>{cell}</td>)}</tr>)}</tbody></table>
       </BranchManagerSection>
