@@ -77,8 +77,12 @@ export async function ensureAccountReportsTable() {
   tableReady = true;
 }
 
-function canManage(role: string) {
+function canViewAll(role: string) {
   return ["admin", "manager / approver", "branch manager", "bm", "credit manager", "executive viewer"].includes(role.trim().toLocaleLowerCase());
+}
+
+function canReview(role: string) {
+  return ["admin", "manager / approver", "branch manager", "bm", "credit manager"].includes(role.trim().toLocaleLowerCase());
 }
 
 function hasCustomerActivity(data: Record<string, unknown>) {
@@ -108,7 +112,7 @@ export async function GET(request: NextRequest) {
     await ensureAccountReportsTable();
     const { searchParams } = new URL(request.url);
     const requestedReporter = searchParams.get("reporter")?.trim() || "";
-    const reporter = canManage(session.role) ? requestedReporter : session.username;
+    const reporter = canViewAll(session.role) ? requestedReporter : session.username;
     const branch = searchParams.get("branch")?.trim() || "";
     const requestedLimit = Number.parseInt(searchParams.get("limit") || "200", 10);
     const limit = Math.min(500, Math.max(1, Number.isFinite(requestedLimit) ? requestedLimit : 200));
@@ -163,7 +167,7 @@ export async function POST(request: NextRequest) {
 export async function PATCH(request: NextRequest) {
   const session = getSession(request);
   if (!session) return NextResponse.json({ success: false, error: "Unauthorized - Please log in" }, { status: 401 });
-  if (!canManage(session.role)) return NextResponse.json({ success: false, error: "Only managers can review Account Reports" }, { status: 403 });
+  if (!canReview(session.role)) return NextResponse.json({ success: false, error: "Only managers can review Account Reports" }, { status: 403 });
   try {
     await ensureAccountReportsTable();
     const body = await request.json() as Record<string, unknown>;
@@ -172,13 +176,29 @@ export async function PATCH(request: NextRequest) {
     const comment = String(body.comment || "").trim().slice(0, 2000);
     if (!/^[0-9a-f-]{36}$/i.test(id) || !["reviewed", "approved", "returned"].includes(action)) return NextResponse.json({ success: false, error: "Invalid review request" }, { status: 400 });
     if (action === "returned" && !comment) return NextResponse.json({ success: false, error: "Add a correction comment" }, { status: 400 });
-    const current = await queryWithRetry(async () => sql<Pick<AccountReportRow, "status" | "reporter_username">>`SELECT status, reporter_username FROM account_reports WHERE id = ${id}::uuid LIMIT 1`, "findAccountReportForReview");
+    const current = await queryWithRetry(async () => sql<Pick<AccountReportRow, "status" | "reporter_username" | "report_date" | "branch">>`SELECT status, reporter_username, report_date, branch FROM account_reports WHERE id = ${id}::uuid LIMIT 1`, "findAccountReportForReview");
     if (!current[0]) return NextResponse.json({ success: false, error: "Report not found" }, { status: 404 });
     if (current[0].reporter_username === session.username) return NextResponse.json({ success: false, error: "You cannot review your own report" }, { status: 409 });
     const allowed = action === "reviewed" ? current[0].status === "submitted" : action === "approved" ? current[0].status === "reviewed" : ["submitted", "reviewed"].includes(current[0].status);
     if (!allowed) return NextResponse.json({ success: false, error: "Invalid status transition" }, { status: 409 });
     const rows = await queryWithRetry(async () => sql<AccountReportRow>`UPDATE account_reports SET status = ${action}, reviewed_by = ${session.username}, reviewed_at = CURRENT_TIMESTAMP, review_comment = ${comment}, updated_at = CURRENT_TIMESTAMP WHERE id = ${id}::uuid RETURNING *`, "reviewAccountReport");
-    return NextResponse.json({ success: true, data: mapReport(rows[0]) });
+    const report = mapReport(rows[0]);
+    await recordAuditEvent(auditEventFromRequest(request, {
+      action: `account_report.${action}`,
+      actorUsername: session.username,
+      actorRole: session.role,
+      resourceType: "account_report",
+      resourceId: report.id,
+      status: "success",
+      metadata: {
+        reporterUsername: report.reporterUsername,
+        reportDate: report.reportDate,
+        branch: current[0].branch,
+        comment,
+        recipientUsernames: action === "returned" ? [current[0].reporter_username] : [],
+      },
+    }));
+    return NextResponse.json({ success: true, data: report });
   } catch (error) {
     return NextResponse.json({ success: false, error: error instanceof Error ? error.message : "Could not review account report" }, { status: 500 });
   }

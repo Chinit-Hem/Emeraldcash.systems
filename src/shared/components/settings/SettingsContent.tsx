@@ -1468,8 +1468,13 @@ export default function SettingsContent() {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                    {t.password}
+                    {language === "km" ? "កំណត់ពាក្យសម្ងាត់ថ្មីដោយ Admin" : "Admin password reset"}
                   </label>
+                  <div className="mb-2 rounded-xl border border-blue-200 bg-blue-50 p-3 text-xs text-blue-800 dark:border-blue-500/30 dark:bg-blue-500/10 dark:text-blue-200">
+                    {language === "km"
+                      ? "Admin អាចកំណត់ពាក្យសម្ងាត់ថ្មីឱ្យអ្នកប្រើប្រាស់ដោយមិនចាំបាច់ដឹងពាក្យសម្ងាត់ចាស់។ ទុកវាលទាំងពីរទទេ ប្រសិនបើមិនប្តូរ។"
+                      : "An Admin can set a new password for this user without knowing the old password. Leave both fields blank to keep it unchanged."}
+                  </div>
                   <input
                     type="password"
                     title={t.password}
@@ -1481,8 +1486,8 @@ export default function SettingsContent() {
                   />
                   <p className="mt-1.5 text-xs text-slate-500 dark:text-slate-400">
                     {language === "km"
-                      ? "ទុកទទេ ប្រសិនបើមិនប្តូរ។ បើប្តូរ ត្រូវមានយ៉ាងតិច 8 តួអក្សរ។"
-                      : "Leave blank to keep the current password. Use at least 8 characters when changing it."}
+                      ? `ពាក្យសម្ងាត់ថ្មីត្រូវមានយ៉ាងតិច ${USER_PASSWORD_MIN_LENGTH} តួអក្សរ។`
+                      : `The new password must contain at least ${USER_PASSWORD_MIN_LENGTH} characters.`}
                     </p>
                   </div>
                 <div>

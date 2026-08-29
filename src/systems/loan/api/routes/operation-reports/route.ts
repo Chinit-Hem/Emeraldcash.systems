@@ -297,8 +297,8 @@ export async function PATCH(request: NextRequest) {
     if (!["reviewed", "approved", "returned"].includes(action)) return NextResponse.json({ success: false, error: "Invalid review action" }, { status: 400 });
     if (action === "returned" && !comment) return NextResponse.json({ success: false, error: "Add a correction comment before returning the report" }, { status: 400 });
 
-    const current = await queryWithRetry(async () => sql<Pick<ReportRow, "status" | "reporter_username">>`
-      SELECT status, reporter_username FROM operation_reports WHERE id = ${id}::uuid LIMIT 1
+    const current = await queryWithRetry(async () => sql<Pick<ReportRow, "status" | "reporter_username" | "report_type" | "report_date" | "branch">>`
+      SELECT status, reporter_username, report_type, report_date, branch FROM operation_reports WHERE id = ${id}::uuid LIMIT 1
     `, "findOperationReportForReview");
     if (!current[0]) return NextResponse.json({ success: false, error: "Report not found" }, { status: 404 });
     if (current[0].reporter_username === session.username) return NextResponse.json({ success: false, error: "You cannot review your own report" }, { status: 409 });
@@ -323,7 +323,14 @@ export async function PATCH(request: NextRequest) {
       resourceType: "operation_report",
       resourceId: report.id,
       status: "success",
-      metadata: { reporterUsername: report.reporterUsername, reportDate: report.reportDate, comment },
+      metadata: {
+        reporterUsername: report.reporterUsername,
+        reportDate: report.reportDate,
+        reportType: current[0].report_type,
+        branch: current[0].branch,
+        comment,
+        recipientUsernames: action === "returned" ? [current[0].reporter_username] : [],
+      },
     }));
     return NextResponse.json({ success: true, data: report });
   } catch (error) {

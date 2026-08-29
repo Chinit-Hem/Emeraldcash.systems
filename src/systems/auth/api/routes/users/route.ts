@@ -365,6 +365,27 @@ export async function PUT(req: NextRequest) {
       if (rawConfirmPassword !== undefined && rawConfirmPassword !== passwordValidation.value) {
         return createErrorResponse("Passwords do not match", "password_mismatch", 400);
       }
+
+      // This endpoint is the privileged user-management reset flow. Personal
+      // password changes use /api/auth/change-password and require the old password.
+      if (session.role !== "Admin") {
+        log("WARN", "PUT /api/auth/users - Forbidden: password reset requires Admin role", {
+          requestId,
+          username: session.username,
+          targetUsername,
+        });
+        await recordAuditEvent(auditEventFromRequest(req, {
+          action: "user.password_reset.denied",
+          actorUsername: session.username,
+          actorRole: session.role,
+          resourceType: "user",
+          resourceId: targetUsername,
+          status: "denied",
+          severity: "warning",
+          metadata: { reason: "admin_role_required" },
+        }));
+        return createErrorResponse("Only Admin users can reset a password without the old password", "forbidden", 403);
+      }
     }
 
     const rawRole = body.role ?? body.newRole ?? body.new_role;

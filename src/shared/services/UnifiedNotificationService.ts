@@ -68,28 +68,39 @@ function auditNotification(row: AuditRow, user: SessionUser): UnifiedNotificatio
   if (actor === user.username) return null;
 
   if (resourceType === "operation_report") {
-    if (!action.endsWith(".submit")) return null;
+    const isSubmitted = action.endsWith(".submit");
+    const isReturned = action.endsWith(".returned");
+    if (!isSubmitted && !isReturned) return null;
     if (!recipients.length) return null;
     const reportType = metadataValue(metadata, "reportType");
     const branch = metadataValue(metadata, "branch");
     const reportDate = metadataValue(metadata, "reportDate");
+    const reportLabel = reportType === "bm" ? "BM" : "LS";
+    const comment = metadataValue(metadata, "comment");
     return {
       id: String(row.id), source: "loan", type: action,
-      title: reportType === "bm" ? "BM Report submitted" : "LS Report submitted",
-      message: `${actor} submitted ${reportType === "bm" ? "a BM" : "an LS"} Report${branch ? ` for ${branch}` : ""}${reportDate ? ` on ${reportDate}` : ""}.`,
+      title: isReturned ? `${reportLabel} Report returned` : `${reportLabel} Report submitted`,
+      message: isReturned
+        ? `${actor} returned your ${reportLabel} Report${branch ? ` for ${branch}` : ""}${reportDate ? ` on ${reportDate}` : ""} for correction.${comment ? ` ${comment}` : ""}`
+        : `${actor} submitted ${reportType === "bm" ? "a BM" : "an LS"} Report${branch ? ` for ${branch}` : ""}${reportDate ? ` on ${reportDate}` : ""}.`,
       readAt: null, createdAt: toIsoDate(row.created_at), href: "/loan?view=operationReport",
     };
   }
 
   if (resourceType === "account_report") {
-    if (!action.endsWith(".submit")) return null;
+    const isSubmitted = action.endsWith(".submit");
+    const isReturned = action.endsWith(".returned");
+    if (!isSubmitted && !isReturned) return null;
     if (!recipients.length) return null;
     const branch = metadataValue(metadata, "branch");
     const reportDate = metadataValue(metadata, "reportDate");
+    const comment = metadataValue(metadata, "comment");
     return {
       id: String(row.id), source: "loan", type: action,
-      title: "Account Report submitted",
-      message: `${actor} submitted an Account Report${branch ? ` for ${branch}` : ""}${reportDate ? ` on ${reportDate}` : ""}.`,
+      title: isReturned ? "Account Report returned" : "Account Report submitted",
+      message: isReturned
+        ? `${actor} returned your Account Report${branch ? ` for ${branch}` : ""}${reportDate ? ` on ${reportDate}` : ""} for correction.${comment ? ` ${comment}` : ""}`
+        : `${actor} submitted an Account Report${branch ? ` for ${branch}` : ""}${reportDate ? ` on ${reportDate}` : ""}.`,
       readAt: null, createdAt: toIsoDate(row.created_at), href: "/loan?view=accounting&accountMode=accountReport",
     };
   }

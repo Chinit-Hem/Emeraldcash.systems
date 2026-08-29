@@ -285,6 +285,7 @@ function LoginForm() {
                   priority
                   sizes="96px"
                   className="h-full w-auto object-contain"
+                  style={{ height: "100%", width: "auto" }}
                 />
               </div>
             </div>
