@@ -44,32 +44,65 @@ export default function EditAssetPage() {
   const [asset, setAsset] = useState<SmsAsset | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const assetFormData = useMemo(() => asset ? {
+    name: asset.name,
+    type: asset.type,
+    status: asset.status,
+    itemCode: asset.itemCode ?? undefined,
+    category: asset.category ?? undefined,
+    quantity: asset.quantity ?? 1,
+    location: asset.location ?? undefined,
+    assignedTo: asset.assignedTo ?? undefined,
+    imageUrl: asset.imageUrl ?? undefined,
+    documentUrl: asset.documentUrl ?? undefined,
+    description: asset.description ?? undefined,
+    refId: asset.refId ?? undefined,
+  } : undefined, [asset]);
 
   useEffect(() => {
     if (!id) return;
 
-    const loadAsset = async () => {
-      setLoading(true);
+    const loadAsset = async (showLoading: boolean) => {
+      if (showLoading) setLoading(true);
       setError(null);
       try {
         const res = await fetch(`/api/sms/assets/${id}`);
         const data = await res.json();
 
         if (!data?.success || !data?.data) {
-          setError(data?.error || "Asset not found");
-          setAsset(null);
+          if (showLoading) {
+            setError(data?.error || "Asset not found");
+            setAsset(null);
+          }
           return;
         }
 
-        setAsset(data.data as SmsAsset);
+        const fetchedAsset = data.data as SmsAsset;
+        setAsset(fetchedAsset);
+        try { sessionStorage.setItem(`sms-selected-asset-${id}`, JSON.stringify(fetchedAsset)); } catch { /* Cache is optional. */ }
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to load asset");
+        if (showLoading) setError(err instanceof Error ? err.message : "Failed to load asset");
       } finally {
-        setLoading(false);
+        if (showLoading) setLoading(false);
       }
     };
 
-    void loadAsset();
+    let hasCachedAsset = false;
+    try {
+      const cached = sessionStorage.getItem(`sms-selected-asset-${id}`);
+      if (cached) {
+        const parsed = JSON.parse(cached) as SmsAsset;
+        if (parsed.id === id) {
+          setAsset(parsed);
+          setLoading(false);
+          hasCachedAsset = true;
+        }
+      }
+    } catch {
+      // Continue with the network request when cached data is unavailable.
+    }
+
+    void loadAsset(!hasCachedAsset);
   }, [id]);
 
   const handleSave = async (
@@ -134,20 +167,7 @@ export default function EditAssetPage() {
         isOpen={true}
         onClose={handleClose}
         onSave={handleSave}
-        initialData={asset ? {
-          name: asset.name,
-          type: asset.type,
-          status: asset.status,
-          itemCode: asset.itemCode ?? undefined,
-          category: asset.category ?? undefined,
-          quantity: asset.quantity ?? 1,
-          location: asset.location ?? undefined,
-          assignedTo: asset.assignedTo ?? undefined,
-          imageUrl: asset.imageUrl ?? undefined,
-          documentUrl: asset.documentUrl ?? undefined,
-          description: asset.description ?? undefined,
-          refId: asset.refId ?? undefined,
-        } : undefined}
+        initialData={assetFormData}
         title={(
           <>
             Edit <span data-no-translate>{asset.name}</span>

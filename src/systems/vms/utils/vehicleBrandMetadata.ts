@@ -245,8 +245,12 @@ const BRAND_CANONICAL_NAMES: Record<string, string> = {
   MERCEDES: "Mercedes-Benz",
   "Mercedes Benz": "Mercedes-Benz",
   "masda": "Mazda",
+  landrover: "Land Rover",
+  "land-rover": "Land Rover",
   "rang rover": "Land Rover",
+  rangrover: "Land Rover",
   "range rover": "Land Rover",
+  rangerover: "Land Rover",
   "toyota": "Toyota",
   bmw: "BMW",
   "toyota motor corporation": "Toyota",
@@ -555,6 +559,22 @@ export function getCanonicalBrandName(brand: unknown): string {
   if (!normalizedBrandName) return "";
 
   return getBrandRecordValue(BRAND_CANONICAL_NAMES, normalizedBrandName) ?? normalizedBrandName;
+}
+
+export function getBrandAliases(brand: unknown): string[] {
+  const normalizedBrandName = normalizeBrandName(brand);
+  const canonicalBrandName = getCanonicalBrandName(normalizedBrandName);
+  const canonicalKey = getBrandKey(canonicalBrandName);
+  if (!canonicalKey) return [];
+
+  const aliases = new Set<string>([normalizedBrandName, canonicalBrandName]);
+  Object.entries(BRAND_CANONICAL_NAMES).forEach(([alias, canonicalName]) => {
+    if (getBrandKey(getCanonicalBrandName(canonicalName)) === canonicalKey) {
+      aliases.add(alias);
+    }
+  });
+
+  return Array.from(aliases).filter(Boolean);
 }
 
 export function getDisplayBrandName(brand: unknown): string {

@@ -51,20 +51,32 @@ export function canRoleAccessLesson(
   );
 }
 
-export async function ensureLmsLessonRoleAccessTable(): Promise<void> {
-  await dbManager.executeUnsafe(`
-    CREATE TABLE IF NOT EXISTS lms_lesson_role_access (
-      lesson_id INTEGER NOT NULL REFERENCES lms_lessons(id) ON DELETE CASCADE,
-      role VARCHAR(50) NOT NULL,
-      created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-      PRIMARY KEY (lesson_id, role)
-    )
-  `);
+let roleAccessTableInitialization: Promise<void> | null = null;
 
-  await dbManager.executeUnsafe(`
-    CREATE INDEX IF NOT EXISTS idx_lms_lesson_role_access_role
-    ON lms_lesson_role_access(role)
-  `);
+export function ensureLmsLessonRoleAccessTable(): Promise<void> {
+  if (roleAccessTableInitialization) return roleAccessTableInitialization;
+
+  roleAccessTableInitialization = (async () => {
+    await dbManager.executeUnsafe(`
+      CREATE TABLE IF NOT EXISTS lms_lesson_role_access (
+        lesson_id INTEGER NOT NULL REFERENCES lms_lessons(id) ON DELETE CASCADE,
+        role VARCHAR(50) NOT NULL,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (lesson_id, role)
+      )
+    `);
+
+    await dbManager.executeUnsafe(`
+      CREATE INDEX IF NOT EXISTS idx_lms_lesson_role_access_role
+      ON lms_lesson_role_access(role)
+    `);
+  })().catch((error) => {
+    // Permit a later request to retry after a transient database failure.
+    roleAccessTableInitialization = null;
+    throw error;
+  });
+
+  return roleAccessTableInitialization;
 }
 
 export async function getAllowedRolesForLessons(

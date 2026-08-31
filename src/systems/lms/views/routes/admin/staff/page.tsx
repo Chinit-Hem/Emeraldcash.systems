@@ -170,16 +170,21 @@ export default function StaffAdminPage() {
     setIsUsersLoading(true);
     setUserActionError("");
     try {
-      // Fetch Settings users
-      const usersRes = await fetch("/api/auth/users", { 
-        cache: "no-store",
-        credentials: "include"
-      });
-      const usersData = (await usersRes.json().catch(() => ({}))) as {
+      const [usersRes, staffRes] = await Promise.all([
+        fetch("/api/auth/users", {
+          cache: "no-store",
+          credentials: "include"
+        }),
+        fetch("/api/lms/staff")
+      ]);
+      const [usersData, staffData] = await Promise.all([
+        usersRes.json().catch(() => ({})) as Promise<{
         ok?: boolean;
         error?: string;
         users?: ManagedUser[];
-      };
+        }>,
+        staffRes.json().catch(() => ({ success: false, data: [] }))
+      ]);
 
       if (!usersRes.ok || usersData.ok === false || !Array.isArray(usersData.users)) {
         throw new Error(usersData.error || "Failed to load users");
@@ -187,9 +192,6 @@ export default function StaffAdminPage() {
 
       setUsers(usersData.users);
 
-      // Fetch LMS staff
-      const staffRes = await fetch("/api/lms/staff");
-      const staffData = await staffRes.json();
       if (staffData.success) {
         setLmsStaff(staffData.data);
       }

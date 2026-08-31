@@ -38,14 +38,14 @@ export function ConfirmDeleteModal({
   // Handle keyboard shortcuts
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
+      if (e.key === "Escape" && !isDeleting) {
         onCancel();
       }
-      if (e.key === "Enter" && !isDeleting) {
+      if (e.key === "Enter" && canDelete && !isDeleting) {
         onConfirm();
       }
     },
-    [onCancel, onConfirm, isDeleting]
+    [canDelete, onCancel, onConfirm, isDeleting]
   );
 
   useEffect(() => {
@@ -120,7 +120,9 @@ export function ConfirmDeleteModal({
   return (
     <div
       className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
-      onClick={onCancel}
+      onClick={() => {
+        if (!isDeleting) onCancel();
+      }}
       role="dialog"
       aria-modal="true"
       aria-labelledby="delete-modal-title"

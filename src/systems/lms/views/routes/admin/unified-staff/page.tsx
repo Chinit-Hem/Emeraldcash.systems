@@ -74,14 +74,15 @@ export default function UnifiedStaffPage() {
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      // Fetch Settings users
-      const usersRes = await fetch("/api/auth/users", { cache: "no-store" });
-      const usersData = await usersRes.json();
+      const [usersRes, staffRes] = await Promise.all([
+        fetch("/api/auth/users", { cache: "no-store" }),
+        fetch("/api/lms/staff")
+      ]);
+      const [usersData, staffData] = await Promise.all([
+        usersRes.json(),
+        staffRes.json()
+      ]);
       const settingsData = usersData.ok ? usersData.users : [];
-
-      // Fetch LMS staff
-      const staffRes = await fetch("/api/lms/staff");
-      const staffData = await staffRes.json();
       const lmsData = staffData.success ? staffData.data : [];
 
       // Merge into unified view

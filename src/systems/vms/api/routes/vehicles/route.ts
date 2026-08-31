@@ -294,9 +294,15 @@ const getHandler = withErrorHandling(async (req, { logger, requestId, startTime 
 
     // Cache successful fresh result, including meta
     if (vehiclesResult.success && vehiclesResult.data) {
-      // Include stats in the meta to be cached
-      const meta = { ...vehiclesResult.meta, stats: statsResult.data, total: countResult.data };
-      setCachedVehicles(vehiclesResult.data, meta, filters);
+      // Keep the fresh count on the live response as well as in the cache. Without
+      // this assignment, an uncached paginated request reports only page length as
+      // its total and clients incorrectly stop loading after the first page.
+      vehiclesResult.meta = {
+        ...vehiclesResult.meta,
+        stats: statsResult.data ?? undefined,
+        total: countResult.data,
+      };
+      setCachedVehicles(vehiclesResult.data, vehiclesResult.meta, filters);
       logger.info("LRU Cache SET", { filterKey: JSON.stringify({category: filters.category, brand: filters.brand}), size: vehiclesResult.data.length });
     }
   }

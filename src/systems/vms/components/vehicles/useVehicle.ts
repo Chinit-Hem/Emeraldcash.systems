@@ -36,9 +36,20 @@ export function useVehicle(id: string): UseVehicleResult {
     setError(null);
 
     try {
-      // Try cache first for instant UI
+      // Try the selected-row handoff first for instant list-to-form navigation,
+      // then fall back to the older full-list cache when available.
       if (!fetchedRef.current) {
         try {
+          const selectedVehicle = sessionStorage.getItem(`vms-selected-vehicle-${id}`);
+          if (selectedVehicle) {
+            const parsedVehicle = JSON.parse(selectedVehicle) as Vehicle;
+            if (parsedVehicle?.VehicleId === id) {
+              setVehicle(parsedVehicle);
+              setLoading(false);
+              fetchedRef.current = true;
+            }
+          }
+
           const cached = localStorage.getItem("vms-vehicles");
           if (cached) {
             const parsed = JSON.parse(cached);

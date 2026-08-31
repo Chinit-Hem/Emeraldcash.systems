@@ -26,6 +26,7 @@ import { getFuzzySuggestions } from "@/systems/vms/utils/fuzzySearch";
 import {
   INVALID_BRAND_NAMES,
   brandMatchesFilter,
+  getBrandAliases,
   getBrandFallbackLabel,
   getBrandKey,
   getBrandLogoSources,
@@ -107,8 +108,10 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { memo, useCallback, useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
+const loadAddVehicleModal = () => import("@/systems/vms/components/vehicles/AddVehicleModalOptimistic");
+
 const AddVehicleModalOptimistic = dynamic(
-  () => import("@/systems/vms/components/vehicles/AddVehicleModalOptimistic"),
+  loadAddVehicleModal,
   {
     ssr: false,
     loading: () => <VehicleFormModalSkeleton />,
@@ -161,6 +164,12 @@ const DEFAULT_FILTER_STATE: FilterState = {
   taxType: "",
   hasImage: "",
 };
+
+function normalizeFilterToken(value: unknown): string {
+  return typeof value === "string"
+    ? value.trim().toLocaleLowerCase("en-US").replace(/[^a-z0-9]+/g, "")
+    : "";
+}
 
 // ============================================================================
 // Configuration
@@ -791,7 +800,7 @@ function BrandFilterSection({
   onToggleExpanded: () => void;
   onBrandSelect: (brand: string) => void;
 }) {
-  const selectedBrandKey = getBrandKey(selectedBrand);
+  const selectedBrandKey = getBrandKey(getCanonicalBrandName(selectedBrand));
   const hasHiddenBrands = brands.length > BRAND_FILTER_VISIBLE_COUNT;
   const visibleBrands = isExpanded ? brands : brands.slice(0, BRAND_FILTER_VISIBLE_COUNT);
 
@@ -801,7 +810,7 @@ function BrandFilterSection({
 
       <div className="mt-4 grid [grid-template-columns:repeat(auto-fit,minmax(46px,1fr))] gap-x-1.5 gap-y-3 sm:mt-7 sm:grid-cols-5 sm:gap-x-3 sm:gap-y-8 md:grid-cols-6 lg:grid-cols-10">
         {visibleBrands.map((brand) => {
-          const isActive = selectedBrandKey === getBrandKey(brand.name);
+          const isActive = selectedBrandKey === getBrandKey(getCanonicalBrandName(brand.name));
 
           return (
             <button
@@ -1185,7 +1194,9 @@ function ActionButton({
 
 return (
     <button
+      type="button"
       title={label}
+      aria-label={label}
       onClick={(e) => {
         e.stopPropagation();
         onClick(e);
@@ -1234,6 +1245,15 @@ function VehicleImageActions({ vehicle, photoCount }: { vehicle: Vehicle; photoC
   const menuRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
+    try {
+      const savedIds = JSON.parse(localStorage.getItem("vms-saved-vehicle-ids") || "[]") as unknown;
+      setIsSaved(Array.isArray(savedIds) && savedIds.includes(vehicle.VehicleId));
+    } catch {
+      setIsSaved(false);
+    }
+  }, [vehicle.VehicleId]);
+
+  useEffect(() => {
     if (!isMenuOpen) return;
 
     const closeMenu = () => setIsMenuOpen(false);
@@ -1274,7 +1294,19 @@ function VehicleImageActions({ vehicle, photoCount }: { vehicle: Vehicle; photoC
 
   const handleSave = (event: React.MouseEvent<HTMLButtonElement>) => {
     event.stopPropagation();
-    setIsSaved(prev => !prev);
+    setIsSaved(prev => {
+      const nextSaved = !prev;
+      try {
+        const stored = JSON.parse(localStorage.getItem("vms-saved-vehicle-ids") || "[]") as unknown;
+        const savedIds = new Set(Array.isArray(stored) ? stored.filter((id): id is string => typeof id === "string") : []);
+        if (nextSaved) savedIds.add(vehicle.VehicleId);
+        else savedIds.delete(vehicle.VehicleId);
+        localStorage.setItem("vms-saved-vehicle-ids", JSON.stringify([...savedIds]));
+      } catch {
+        // Saving remains available for this session when storage is blocked.
+      }
+      return nextSaved;
+    });
     setIsMenuOpen(false);
   };
 
@@ -1306,11 +1338,6 @@ function VehicleImageActions({ vehicle, photoCount }: { vehicle: Vehicle; photoC
     }
   };
 
-  const handleReport = (event: React.MouseEvent<HTMLButtonElement>) => {
-    event.stopPropagation();
-    setIsMenuOpen(false);
-  };
-
   const menu =
     isMenuOpen && menuPosition && typeof document !== "undefined"
       ? createPortal(
@@ -1335,14 +1362,6 @@ function VehicleImageActions({ vehicle, photoCount }: { vehicle: Vehicle; photoC
             >
               <Share2 className="h-3 w-3 sm:h-5 sm:w-5" />
               <span>Share</span>
-            </button>
-            <button
-              type="button"
-              onClick={handleReport}
-              className="flex w-full items-center gap-2 px-2 py-1.5 text-left text-[11px] transition hover:bg-white/10 sm:gap-3 sm:px-4 sm:py-3 sm:text-base"
-            >
-              <AlertCircle className="h-3 w-3 sm:h-5 sm:w-5" />
-              <span>Report</span>
             </button>
           </div>,
           document.body
@@ -1410,14 +1429,22 @@ function VehicleGroupHeader({
 
 const VehicleCard = memo(function VehicleCard({
   vehicle,
+  canEdit,
+  canDelete,
   onView,
+  onEdit,
+  onDelete,
   getImageUrl,
   t,
   language,
   priority
 }: {
   vehicle: Vehicle;
+  canEdit: boolean;
+  canDelete: boolean;
   onView: (id: string) => void;
+  onEdit: (id: string) => void;
+  onDelete: (vehicle: Vehicle) => void;
   getImageUrl: (imageValue: unknown) => string | null;
   t: Translations;
   language: Language;
@@ -1515,6 +1542,13 @@ return (
           )}
         </div>
 
+        {(canEdit || canDelete) && (
+          <div className="mt-1 flex items-center justify-end gap-1 border-t border-slate-100 pt-1 dark:border-slate-800 sm:gap-2 sm:pt-2">
+            {canEdit && <ActionButton onClick={() => onEdit(vehicle.VehicleId)} icon={Pen} label="Edit" variant="edit" />}
+            {canDelete && <ActionButton onClick={() => onDelete(vehicle)} icon={Trash2} label="Delete" variant="delete" />}
+          </div>
+        )}
+
       </div>
     </div>
   );
@@ -1522,13 +1556,18 @@ return (
 
 const MobileVehicleListCard = memo(function MobileVehicleListCard({
   vehicle,
+  canEdit,
+  canDelete,
   onView,
+  onEdit,
+  onDelete,
   getImageUrl,
   priority,
   language,
 }: {
   vehicle: Vehicle;
-  isAdmin: boolean;
+  canEdit: boolean;
+  canDelete: boolean;
   onView: (id: string) => void;
   onEdit: (id: string) => void;
   onDelete: (vehicle: Vehicle) => void;
@@ -1610,6 +1649,13 @@ const MobileVehicleListCard = memo(function MobileVehicleListCard({
             {vehicle.PriceNew == null ? "-" : `$${vehicle.PriceNew.toLocaleString()}`}
           </div>
 
+          {(canEdit || canDelete) && (
+            <div className="mt-1 flex items-center gap-1 sm:mt-2 sm:gap-2">
+              {canEdit && <ActionButton onClick={() => onEdit(vehicle.VehicleId)} icon={Pen} label="Edit" variant="edit" />}
+              {canDelete && <ActionButton onClick={() => onDelete(vehicle)} icon={Trash2} label="Delete" variant="delete" />}
+            </div>
+          )}
+
           {/* Color hidden on Vehicles list */}
           {false && vehicle.Color && (
             <div className="mt-1.5 flex items-center gap-2">
@@ -1645,7 +1691,10 @@ export default function VehiclesClientEnhanced() {
     [nativeVehicleListSearch, searchParams]
   );
   const effectiveVehicleListSearchParams = useMemo(
-    () => getVehicleListSearchParamsWithFallback(activeVehicleListSearchParams),
+    // On the list page the visible URL is authoritative. Reusing a previously
+    // stored filter after Back/Forward makes the UI disagree with the address bar.
+    // The helper still restores the saved view mode independently.
+    () => getVehicleListSearchParamsWithFallback(activeVehicleListSearchParams, { includeStoredFallback: false }),
     [activeVehicleListSearchParams]
   );
   const user = useAuthUser();
@@ -1744,6 +1793,14 @@ export default function VehiclesClientEnhanced() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [isVehicleSearchFocused, setIsVehicleSearchFocused] = useState(false);
   const shouldOpenAddVehicleModal = searchParams.get("action") === "new";
+
+  // Warm the separately bundled form while the vehicle list is settling so
+  // the first click does not wait for a client-side chunk download.
+  useEffect(() => {
+    if (!canCreateVehicle) return;
+    const preloadTimer = window.setTimeout(() => void loadAddVehicleModal(), 150);
+    return () => window.clearTimeout(preloadTimer);
+  }, [canCreateVehicle]);
 
   useEffect(() => {
     if (!shouldOpenAddVehicleModal || !canCreateVehicle) return;
@@ -1953,22 +2010,6 @@ export default function VehiclesClientEnhanced() {
     setShowAllModels(true);
   }, [selectedBrandName]);
 
-  useEffect(() => {
-    const selectedBrandKey = getBrandKey(filters.brand);
-    if (!selectedBrandKey) return;
-
-    const selectedBrandIsVisible = brandOptions.some(
-      (brand) => getBrandKey(brand.name) === selectedBrandKey
-    );
-    if (selectedBrandIsVisible) return;
-
-    setFilters((prev) =>
-      getBrandKey(prev.brand) === selectedBrandKey
-        ? { ...prev, brand: "", model: "" }
-        : prev
-    );
-  }, [brandOptions, filters.brand]);
-
   const bodyTypeOptions = useMemo<BodyTypeOption[]>(() => {
     const counts = new Map<string, number>();
 
@@ -2030,9 +2071,8 @@ export default function VehiclesClientEnhanced() {
       const noImageParam =
         effectiveVehicleListSearchParams.get("withoutImage") ??
         effectiveVehicleListSearchParams.get("noImage");
-      const currentFilters = filterResetValuesRef.current.filters;
       const nextFilters: FilterState = {
-        ...currentFilters,
+        ...DEFAULT_FILTER_STATE,
         hasImage: isTruthyQueryParam(noImageParam) ? "no" : "",
       };
       const filterParamKeys = [
@@ -2254,11 +2294,11 @@ export default function VehiclesClientEnhanced() {
       .split(/\s+/)
       .filter(Boolean);
     const categoryFilter = deferredFilters.category !== "all" ? deferredFilters.category : "";
-    const conditionFilter = deferredFilters.condition !== "all" ? deferredFilters.condition.toLowerCase() : "";
-    const modelFilter = deferredFilters.model.toLowerCase();
-    const yearFilter = deferredFilters.year;
-    const plateFilter = deferredFilters.plate.toLowerCase();
-    const taxTypeFilter = deferredFilters.taxType.toLowerCase();
+    const conditionFilter = deferredFilters.condition !== "all" ? normalizeFilterToken(deferredFilters.condition) : "";
+    const modelFilter = deferredFilters.model.trim().toLowerCase();
+    const yearFilter = deferredFilters.year.trim();
+    const plateFilter = deferredFilters.plate.trim().toLowerCase();
+    const taxTypeFilter = normalizeFilterToken(deferredFilters.taxType);
     const minPrice = Number.parseFloat(deferredFilters.minPrice);
     const maxPrice = Number.parseFloat(deferredFilters.maxPrice);
     const hasMinPrice = Number.isFinite(minPrice);
@@ -2269,20 +2309,25 @@ export default function VehiclesClientEnhanced() {
     for (const vehicle of vehicles) {
       if (quickCategoryFilter && !categoryMatchesFilter(vehicle.Category, quickCategoryFilter)) continue;
       if (categoryFilter && !categoryMatchesFilter(vehicle.Category, categoryFilter)) continue;
-      if (conditionFilter && vehicle.Condition?.toLowerCase() !== conditionFilter) continue;
+      if (conditionFilter && normalizeFilterToken(vehicle.Condition) !== conditionFilter) continue;
       if (deferredFilters.brand && !brandMatchesFilter(vehicle.Brand, deferredFilters.brand)) continue;
       if (modelFilter && !vehicle.Model?.toLowerCase().includes(modelFilter)) continue;
       if (yearFilter && !vehicle.Year?.toString().includes(yearFilter)) continue;
       if (plateFilter && !vehicle.Plate?.toLowerCase().includes(plateFilter)) continue;
       if (deferredFilters.bodyType && !bodyTypeMatchesFilter(vehicle.BodyType, deferredFilters.bodyType)) continue;
-      if (hasMinPrice && (vehicle.PriceNew || 0) < minPrice) continue;
-      if (hasMaxPrice && (vehicle.PriceNew || 0) > maxPrice) continue;
-      if (taxTypeFilter && !vehicle.TaxType?.toLowerCase().includes(taxTypeFilter)) continue;
+      const vehiclePrice = Number(vehicle.PriceNew);
+      const hasVehiclePrice = vehicle.PriceNew !== null && vehicle.PriceNew !== undefined && String(vehicle.PriceNew).trim() !== "";
+      if ((hasMinPrice || hasMaxPrice) && (!hasVehiclePrice || !Number.isFinite(vehiclePrice))) continue;
+      if (hasMinPrice && vehiclePrice < minPrice) continue;
+      if (hasMaxPrice && vehiclePrice > maxPrice) continue;
+      if (taxTypeFilter && normalizeFilterToken(vehicle.TaxType) !== taxTypeFilter) continue;
       if (onlyWithoutImage && vehicleHasDisplayableImage(vehicle.Image)) continue;
 
       if (searchTerms.length > 0) {
         const searchableText = [
           vehicle.Brand,
+          getCanonicalBrandName(vehicle.Brand),
+          ...getBrandAliases(vehicle.Brand),
           vehicle.Model,
           vehicle.Plate,
           vehicle.Category,
@@ -2344,6 +2389,8 @@ export default function VehiclesClientEnhanced() {
     for (const vehicle of vehicles) {
       const searchableText = [
         vehicle.Brand,
+        getCanonicalBrandName(vehicle.Brand),
+        ...getBrandAliases(vehicle.Brand),
         vehicle.Model,
         vehicle.Plate,
         vehicle.Category,
@@ -2661,11 +2708,11 @@ export default function VehiclesClientEnhanced() {
 
   const handleBrandSelect = useCallback((brand: string) => {
     preserveVehicleListScrollForUpdate();
-    const selectedBrandKey = getBrandKey(brand);
+    const selectedBrandKey = getBrandKey(getCanonicalBrandName(brand));
     setFilters(prev => ({
       ...prev,
       search: "",
-      brand: getBrandKey(prev.brand) === selectedBrandKey ? "" : getCanonicalBrandName(brand),
+      brand: getBrandKey(getCanonicalBrandName(prev.brand)) === selectedBrandKey ? "" : getCanonicalBrandName(brand),
       model: "",
     }));
     setShowAllModels(true);
@@ -3243,7 +3290,10 @@ const getVehicleImageUrl = useCallback((imageValue: unknown): string | null => {
 <select
                     title="Filter by category"
                     value={filters.category}
-                    onChange={(e) => setFilters(prev => ({ ...prev, category: e.target.value }))}
+                    onChange={(e) => {
+                      setQuickFilter(null);
+                      setFilters(prev => ({ ...prev, category: e.target.value }));
+                    }}
                     className={FILTER_FIELD_CLASS}
                   >
                     <option value="all">All Categories</option>
@@ -3564,7 +3614,11 @@ const getVehicleImageUrl = useCallback((imageValue: unknown): string | null => {
                     <VehicleCard
                       key={vehicle.VehicleId}
                       vehicle={vehicle}
+                      canEdit={canEditVehicle}
+                      canDelete={canDeleteVehicle}
                       onView={handleView}
+                      onEdit={handleEdit}
+                      onDelete={handleDelete}
                       getImageUrl={getVehicleImageUrl}
                       t={t}
                       language={language}
@@ -3585,12 +3639,13 @@ const getVehicleImageUrl = useCallback((imageValue: unknown): string | null => {
                   <VehicleGroupHeader label={group.label} count={group.count} avgPrice={group.avgPrice} />
                 </div>
                 {/* Group Vehicles List */}
-                <div className="space-y-1.5 sm:space-y-3 lg:space-y-4">
+                <div className="space-y-1.5 sm:space-y-3 lg:hidden">
                   {group.vehicles.map((vehicle, index) => (
                     <MobileVehicleListCard
                       key={vehicle.VehicleId}
                       vehicle={vehicle}
-                      isAdmin={canEditVehicle || canDeleteVehicle}
+                      canEdit={canEditVehicle}
+                      canDelete={canDeleteVehicle}
                       onView={handleView}
                       onEdit={handleEdit}
                       onDelete={handleDelete}
@@ -3601,7 +3656,7 @@ const getVehicleImageUrl = useCallback((imageValue: unknown): string | null => {
                   ))}
                 </div>
 
-                <div className="hidden overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-[0_4px_20px_rgba(0,0,0,0.08)] dark:border-slate-700/80 dark:bg-slate-900 dark:shadow-[0_18px_40px_rgba(2,6,23,0.5)]">
+                <div className="hidden overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-[0_4px_20px_rgba(0,0,0,0.08)] dark:border-slate-700/80 dark:bg-slate-900 dark:shadow-[0_18px_40px_rgba(2,6,23,0.5)] lg:block">
                   <div className="overflow-x-auto">
                     <table className="w-full">
                       <thead className="sticky top-0 z-10">

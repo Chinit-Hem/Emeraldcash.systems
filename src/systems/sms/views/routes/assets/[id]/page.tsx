@@ -413,6 +413,9 @@ export default function SmsAssetDetailPage() {
                   {canEditAsset && (
                     <Link
                       href={buildAssetEditPath(asset.id, assetsBackHref)}
+                      onClick={() => {
+                        try { sessionStorage.setItem(`sms-selected-asset-${asset.id}`, JSON.stringify(asset)); } catch { /* Best-effort form handoff. */ }
+                      }}
                       scroll={false}
                       className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-100"
                     >

@@ -53,6 +53,7 @@ function EditVehicleInner() {
   const { success, error: showError } = useToast();
 
   const canEditVehicle = hasAppPermission(user?.role, "vehicles:edit");
+  const canDeleteVehicle = hasAppPermission(user?.role, "vehicles:delete");
   const userRole = user?.role || "Viewer";
 
   const handleBackToList = useCallback(() => {
@@ -437,8 +438,8 @@ function EditVehicleInner() {
 
           </div>
 
-          {/* Delete Section - Only for Admin */}
-          <div className="px-4 pb-4 md:px-6 md:pb-6">
+          {/* Delete Section - only shown to users with delete permission */}
+          {canDeleteVehicle && <div className="px-4 pb-4 md:px-6 md:pb-6">
             <div className="rounded-2xl border border-red-200 bg-red-50/70 p-4 dark:border-red-900/40 dark:bg-red-950/20 md:p-5">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div>
@@ -473,7 +474,7 @@ function EditVehicleInner() {
                 </GlassButton>
               </div>
             </div>
-          </div>
+          </div>}
         </GlassCard>
       </div>
 

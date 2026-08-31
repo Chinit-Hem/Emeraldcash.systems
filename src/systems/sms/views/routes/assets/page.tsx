@@ -48,6 +48,8 @@ interface SmsAsset {
   status: 'Available' | 'In Use' | 'Borrowed' | 'Out' | 'Not Returned';
 }
 
+const EMPTY_ASSET_FORM_DATA = {};
+
 interface SmsStats {
   totalAssets: number;
   todayChange: number;
@@ -850,7 +852,7 @@ export default function AssetsPage() {
           isOpen={createModalOpen}
           onClose={closeCreateModal}
           onSave={handleSaveAsset}
-          initialData={{}}
+          initialData={EMPTY_ASSET_FORM_DATA}
           title="New Asset"
           isEdit={false}
         />

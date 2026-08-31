@@ -17,6 +17,8 @@ interface UseYoutubeDurationLookupOptions {
   onDurationDetected: (durationMinutes: number, youtubeUrl: string) => void;
 }
 
+const durationCache = new Map<string, { durationMinutes: number; durationLabel?: string }>();
+
 export function useYoutubeDurationLookup({
   enabled,
   youtubeUrl,
@@ -67,7 +69,18 @@ export function useYoutubeDurationLookup({
       videoId,
     });
 
-    fetch("/api/lms/youtube-duration", {
+    const cachedDuration = durationCache.get(videoId);
+    if (cachedDuration) {
+      onDurationDetected(cachedDuration.durationMinutes, url);
+      setDurationLookup({
+        status: "ready",
+        message: `Detected ${cachedDuration.durationLabel ?? `${cachedDuration.durationMinutes} min`} from YouTube.`,
+        videoId,
+      });
+      return;
+    }
+
+    const lookupTimer = window.setTimeout(() => fetch("/api/lms/youtube-duration", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -97,6 +110,7 @@ export function useYoutubeDurationLookup({
           return;
         }
 
+        durationCache.set(videoId, { durationMinutes, durationLabel });
         onDurationDetected(durationMinutes, url);
         setDurationLookup({
           status: "ready",
@@ -119,10 +133,11 @@ export function useYoutubeDurationLookup({
             videoId,
           });
         }
-      });
+      }), 350);
 
     return () => {
       cancelled = true;
+      window.clearTimeout(lookupTimer);
       controller.abort();
     };
   }, [enabled, onDurationCleared, onDurationDetected, youtubeUrl]);

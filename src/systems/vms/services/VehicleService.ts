@@ -19,6 +19,7 @@ import {
   getCategorySearchPattern
 } from "@/systems/vms/utils/categoryMapping";
 import { getFuzzySuggestions, type FuzzySuggestion } from "@/systems/vms/utils/fuzzySearch";
+import { getBrandAliases } from "@/systems/vms/utils/vehicleBrandMetadata";
 import { dbManager } from "@/lib/db-singleton";
 import type { StockItemTable } from "@/systems/vms/types/stock-schema";
 import type {
@@ -311,9 +312,14 @@ conditions.push(`(NULLIF(TRIM(COALESCE(image_id, '')), '') IS NULL AND NULLIF(TR
 
     // Brand filter with ILIKE - removed TRIM for performance
     if (filters?.brand) {
-      conditions.push(`brand ILIKE $${_paramIndex}`);
-      params.push(VehicleService.buildIlikePattern(filters.brand));
-      _paramIndex++;
+      const brandAliases = getBrandAliases(filters.brand);
+      const brandConditions = brandAliases.map((alias) => {
+        const condition = `brand ILIKE $${_paramIndex}`;
+        params.push(VehicleService.buildIlikePattern(alias));
+        _paramIndex++;
+        return condition;
+      });
+      conditions.push(`(${brandConditions.join(" OR ")})`);
     }
 
     // Model filter with ILIKE - removed TRIM for performance

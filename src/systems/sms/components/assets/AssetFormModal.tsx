@@ -172,7 +172,9 @@ export default function AssetFormModal({
   const [imagePreview, setImagePreview] = useState<string | null>(initialData?.imageUrl || null);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [uploadProgress, setUploadProgress] = useState(0);
-  const { users } = useSmsUsers({ enabled: isOpen });
+  // The modal remains mounted while closed, so preload assignees before the
+  // user opens the form instead of showing a late-populating field.
+  const { users } = useSmsUsers();
 
   // Sync formData and imagePreview whenever the modal opens or initialData changes
   useEffect(() => {
