@@ -61,6 +61,13 @@ const LoanRevenueChart = dynamic(() => import("./charts/LoanRevenueChart").then(
 type ApiResponse<T> = { success: boolean; data?: T; error?: string };
 type RememberedReportFields = Record<string, string[]>;
 
+function normalizeReportBranchLabel(value: string) {
+  const normalized = value.normalize("NFKC").toLocaleLowerCase().replace(/[\s\u200B-\u200D\uFEFF_-]+/gu, "");
+  if (normalized.includes("sensok") || normalized.includes("សែនសុខ")) return "sen-sok";
+  if (normalized.includes("boeungkengkang") || normalized.includes("bkk") || normalized.includes("បឹងកេងកង")) return "bkk";
+  return normalized;
+}
+
 function useRememberedReportFields(storageKey: string) {
   const [fields, setFields] = useState<RememberedReportFields>({});
 
@@ -5478,19 +5485,19 @@ function OperationReportView({ loans, loading, canViewLoanData, onRefresh, onOpe
   const dueCustomerCount = countRows(collectionDueRows);
   const paidCustomerCount = countRows(collectionPaidRows);
   const collectionRate = dueCustomerCount ? Math.round((paidCustomerCount / dueCustomerCount) * 100) : 0;
-  const branchManagerRecords = useMemo(() => visibleSavedReports.filter((record) => record.reportDate === reportDate && (!branch.trim() || record.branch.trim().toLocaleLowerCase() === branch.trim().toLocaleLowerCase()) && ["submitted", "reviewed", "approved"].includes(record.status)), [branch, reportDate, visibleSavedReports]);
-  const branchManagerMonthRecords = useMemo(() => visibleSavedReports.filter((record) => record.reportDate.startsWith(reportDate.slice(0, 7)) && (!branch.trim() || record.branch.trim().toLocaleLowerCase() === branch.trim().toLocaleLowerCase()) && ["submitted", "reviewed", "approved"].includes(record.status)), [branch, reportDate, visibleSavedReports]);
-  const branchManagerYearRecords = useMemo(() => visibleSavedReports.filter((record) => record.reportDate.startsWith(reportDate.slice(0, 4)) && (!branch.trim() || record.branch.trim().toLocaleLowerCase() === branch.trim().toLocaleLowerCase()) && ["submitted", "reviewed", "approved"].includes(record.status)), [branch, reportDate, visibleSavedReports]);
-  const branchAccountRecords = useMemo(() => accountReports.filter((record) => record.reportDate === reportDate && (!branch.trim() || record.branch.trim().toLocaleLowerCase() === branch.trim().toLocaleLowerCase()) && ["submitted", "reviewed", "approved"].includes(record.status)), [accountReports, branch, reportDate]);
-  const branchAccountReportHistory = useMemo(() => accountReports.filter((record) => !branch.trim() || record.branch.trim().toLocaleLowerCase() === branch.trim().toLocaleLowerCase()), [accountReports, branch]);
-  const branchAccountMonthRecords = useMemo(() => accountReports.filter((record) => record.reportDate.startsWith(reportDate.slice(0, 7)) && (!branch.trim() || record.branch.trim().toLocaleLowerCase() === branch.trim().toLocaleLowerCase()) && ["submitted", "reviewed", "approved"].includes(record.status)), [accountReports, branch, reportDate]);
-  const branchAccountYearRecords = useMemo(() => accountReports.filter((record) => record.reportDate.startsWith(reportDate.slice(0, 4)) && (!branch.trim() || record.branch.trim().toLocaleLowerCase() === branch.trim().toLocaleLowerCase()) && ["submitted", "reviewed", "approved"].includes(record.status)), [accountReports, branch, reportDate]);
-  const branchLoanSpecialistRecords = useMemo(() => visibleSavedReports.filter((record) => !branch.trim() || record.branch.trim().toLocaleLowerCase() === branch.trim().toLocaleLowerCase()), [branch, visibleSavedReports]);
-  const ownBranchManagerReport = branchManagerReports.find((record) => record.reporterUsername === user.username && record.reportDate === reportDate && record.branch.trim().toLocaleLowerCase() === branch.trim().toLocaleLowerCase());
+  const branchManagerRecords = useMemo(() => visibleSavedReports.filter((record) => record.reportDate === reportDate && (!branch.trim() || normalizeReportBranchLabel(record.branch) === normalizeReportBranchLabel(branch)) && ["submitted", "reviewed", "approved"].includes(record.status)), [branch, reportDate, visibleSavedReports]);
+  const branchManagerMonthRecords = useMemo(() => visibleSavedReports.filter((record) => record.reportDate.startsWith(reportDate.slice(0, 7)) && (!branch.trim() || normalizeReportBranchLabel(record.branch) === normalizeReportBranchLabel(branch)) && ["submitted", "reviewed", "approved"].includes(record.status)), [branch, reportDate, visibleSavedReports]);
+  const branchManagerYearRecords = useMemo(() => visibleSavedReports.filter((record) => record.reportDate.startsWith(reportDate.slice(0, 4)) && (!branch.trim() || normalizeReportBranchLabel(record.branch) === normalizeReportBranchLabel(branch)) && ["submitted", "reviewed", "approved"].includes(record.status)), [branch, reportDate, visibleSavedReports]);
+  const branchAccountRecords = useMemo(() => accountReports.filter((record) => record.reportDate === reportDate && (!branch.trim() || normalizeReportBranchLabel(record.branch) === normalizeReportBranchLabel(branch)) && ["submitted", "reviewed", "approved"].includes(record.status)), [accountReports, branch, reportDate]);
+  const branchAccountReportHistory = useMemo(() => accountReports.filter((record) => !branch.trim() || normalizeReportBranchLabel(record.branch) === normalizeReportBranchLabel(branch)), [accountReports, branch]);
+  const branchAccountMonthRecords = useMemo(() => accountReports.filter((record) => record.reportDate.startsWith(reportDate.slice(0, 7)) && (!branch.trim() || normalizeReportBranchLabel(record.branch) === normalizeReportBranchLabel(branch)) && ["submitted", "reviewed", "approved"].includes(record.status)), [accountReports, branch, reportDate]);
+  const branchAccountYearRecords = useMemo(() => accountReports.filter((record) => record.reportDate.startsWith(reportDate.slice(0, 4)) && (!branch.trim() || normalizeReportBranchLabel(record.branch) === normalizeReportBranchLabel(branch)) && ["submitted", "reviewed", "approved"].includes(record.status)), [accountReports, branch, reportDate]);
+  const branchLoanSpecialistRecords = useMemo(() => visibleSavedReports.filter((record) => !branch.trim() || normalizeReportBranchLabel(record.branch) === normalizeReportBranchLabel(branch)), [branch, visibleSavedReports]);
+  const ownBranchManagerReport = branchManagerReports.find((record) => record.reporterUsername === user.username && record.reportDate === reportDate && normalizeReportBranchLabel(record.branch) === normalizeReportBranchLabel(branch));
   const branchManagerReportStatus: OperationReportStatus = ownBranchManagerReport?.status || "draft";
   const branchManagerReportLocked = ["submitted", "reviewed", "approved"].includes(branchManagerReportStatus);
   const branchManagerLoans = useMemo(() => loans.filter((loan) => {
-    const matchesBranch = !branch.trim() || String(loan.branchLocation || "").trim().toLocaleLowerCase() === branch.trim().toLocaleLowerCase();
+    const matchesBranch = !branch.trim() || normalizeReportBranchLabel(String(loan.branchLocation || "")) === normalizeReportBranchLabel(branch);
     return matchesBranch && !["Closed", "Rejected"].includes(loan.repaymentStatus);
   }), [branch, loans]);
   const reviewingAnotherSpecialist = loadedReporterUsername !== user.username;
