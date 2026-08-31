@@ -5040,9 +5040,9 @@ function AccountReportView() {
         <div className="overflow-visible">
           <div className="min-w-0 p-0 text-slate-950 dark:text-slate-100">
             {!viewOnly ? <>
-            <div className="grid min-h-28 grid-cols-[120px_minmax(0,1fr)] border-b border-slate-300 bg-white dark:border-slate-700 dark:bg-slate-950 sm:min-h-36 sm:grid-cols-[220px_1fr]">
-              <div className="flex items-center justify-center p-3 sm:p-4"><EmeraldCashLogo className="h-auto w-28 object-contain sm:w-44" /></div>
-              <div className="font-khmer-muol-light flex items-center justify-center px-3 text-center text-xl text-red-700 sm:px-5 sm:text-3xl">ក្រុមហ៊ុន អេមើរ៉ល ឃែស ឯ.ក</div>
+            <div className="relative flex min-h-28 items-center justify-center border-b border-slate-300 bg-white dark:border-slate-700 dark:bg-slate-950 sm:min-h-36">
+              <div className="absolute inset-y-0 left-0 flex items-center justify-center p-3 sm:p-4"><EmeraldCashLogo className="h-auto w-28 object-contain sm:w-44" /></div>
+              <div className="font-khmer-muol-light w-full px-20 text-center text-xl text-red-700 sm:px-32 sm:text-3xl">ក្រុមហ៊ុន អេមើរ៉ល ឃែស ឯ.ក</div>
             </div>
             <div className="font-khmer-muol-light border-b border-slate-300 py-3 text-center text-2xl text-emerald-700 dark:border-slate-700">របាយការណ៍លទ្ធផលប្រចាំថ្ងៃ សាខា {accountReportBranchName}</div>
             <div className="grid grid-cols-1 border-b border-slate-300 dark:border-slate-700 lg:grid-cols-[1fr_180px_1.4fr_1fr]">
@@ -5946,9 +5946,9 @@ function OperationReportView({ loans, loading, canViewLoanData, onRefresh, onOpe
   const reportFieldClass = "block w-full border-0 bg-transparent px-3 py-2 text-slate-950 outline-none focus:bg-emerald-50 disabled:opacity-100 dark:text-slate-100 dark:focus:bg-emerald-950/30";
   const standardReportSheetHeader = (
     <>
-      <div className="grid min-h-36 grid-cols-[220px_1fr] border-b border-slate-300 bg-white dark:border-slate-700 dark:bg-slate-950">
-        <div className="flex items-center justify-center p-4"><EmeraldCashLogo className="h-auto w-44 object-contain" /></div>
-        <div className="font-khmer-muol-light flex items-center justify-center px-5 text-center text-3xl text-red-700">ក្រុមហ៊ុន អេមើរ៉ល ឃែស ឯ.ក</div>
+      <div className="relative flex min-h-36 items-center justify-center border-b border-slate-300 bg-white dark:border-slate-700 dark:bg-slate-950">
+        <div className="absolute inset-y-0 left-0 flex items-center justify-center p-4"><EmeraldCashLogo className="h-auto w-44 object-contain" /></div>
+        <div className="font-khmer-muol-light w-full px-32 text-center text-3xl text-red-700">ក្រុមហ៊ុន អេមើរ៉ល ឃែស ឯ.ក</div>
       </div>
       <div className="font-khmer-muol-light flex items-center justify-center border-b border-slate-300 py-3 text-center text-2xl text-emerald-700 dark:border-slate-700">របាយការណ៍លទ្ធផលប្រចាំថ្ងៃ សាខា បឹងកេងកង</div>
       <div className="grid grid-cols-[1fr_180px_1.4fr_1fr] border-b border-slate-300 dark:border-slate-700">
