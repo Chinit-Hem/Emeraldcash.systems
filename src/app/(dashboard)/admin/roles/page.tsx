@@ -8,7 +8,7 @@ const roleDescriptions: Record<string, string> = {
   Admin: "Full system access and security administration.",
   Staff: "Standard day-to-day system access.",
   "Loan Operations": "Loan preparation, collection, collateral review, and operational reporting.",
-  "Manager / Approver": "Management review and loan approval authority.",
+  "Manager / Approver": "Branch management, loan approval, reporting, and read-only LMS, VMS, and SMS access.",
   Finance: "Accounting, disbursement, repayment, and financial reporting.",
   "Human Resources": "Employee records, learning, and HR reporting.",
   "IT Support": "Read-only system support and configuration visibility.",

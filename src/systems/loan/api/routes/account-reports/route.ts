@@ -4,6 +4,7 @@ import { auditEventFromRequest, recordAuditEvent } from "@/lib/audit-log";
 import { getSession } from "@/lib/auth-helpers";
 import { queryWithRetry, sql } from "@/lib/db-singleton";
 import { getReportNotificationRecipients } from "@/systems/loan/api/reportRecipients";
+import { branchesMatch, getReportBranchAccess, normalizeReportBranch } from "@/systems/loan/api/reportBranchAccess";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -113,13 +114,23 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const requestedReporter = searchParams.get("reporter")?.trim() || "";
     const reporter = canViewAll(session.role) ? requestedReporter : session.username;
-    const branch = searchParams.get("branch")?.trim() || "";
+    const requestedBranch = searchParams.get("branch")?.trim() || "";
+    const branchAccess = await getReportBranchAccess(session);
+    if (branchAccess.isBranchManager && !branchAccess.branch) {
+      return NextResponse.json({ success: false, error: "Your Branch Manager account must be assigned to a branch" }, { status: 403 });
+    }
+    const branch = branchAccess.branch || requestedBranch;
+    const branchKey = normalizeReportBranch(branch);
     const requestedLimit = Number.parseInt(searchParams.get("limit") || "200", 10);
     const limit = Math.min(500, Math.max(1, Number.isFinite(requestedLimit) ? requestedLimit : 200));
     const rows = await queryWithRetry(async () => sql<AccountReportRow>`
       SELECT * FROM account_reports
       WHERE (${reporter} = '' OR reporter_username = ${reporter})
-        AND (${branch} = '' OR LOWER(BTRIM(branch)) = LOWER(BTRIM(${branch})))
+        AND (${branchKey} = '' OR CASE
+          WHEN REGEXP_REPLACE(LOWER(branch), '[[:space:]​_-]+', '', 'g') LIKE '%sensok%' OR REGEXP_REPLACE(LOWER(branch), '[[:space:]​_-]+', '', 'g') LIKE '%សែនសុខ%' THEN 'sen-sok'
+          WHEN REGEXP_REPLACE(LOWER(branch), '[[:space:]​_-]+', '', 'g') LIKE '%boeungkengkang%' OR REGEXP_REPLACE(LOWER(branch), '[[:space:]​_-]+', '', 'g') LIKE '%bkk%' OR REGEXP_REPLACE(LOWER(branch), '[[:space:]​_-]+', '', 'g') LIKE '%បឹងកេងកង%' THEN 'bkk'
+          ELSE REGEXP_REPLACE(LOWER(branch), '[[:space:]​_-]+', '', 'g')
+        END = ${branchKey})
       ORDER BY report_date DESC, updated_at DESC
       LIMIT ${limit}
     `, "listAccountReports");
@@ -178,6 +189,10 @@ export async function PATCH(request: NextRequest) {
     if (action === "returned" && !comment) return NextResponse.json({ success: false, error: "Add a correction comment" }, { status: 400 });
     const current = await queryWithRetry(async () => sql<Pick<AccountReportRow, "status" | "reporter_username" | "report_date" | "branch">>`SELECT status, reporter_username, report_date, branch FROM account_reports WHERE id = ${id}::uuid LIMIT 1`, "findAccountReportForReview");
     if (!current[0]) return NextResponse.json({ success: false, error: "Report not found" }, { status: 404 });
+    const branchAccess = await getReportBranchAccess(session);
+    if (branchAccess.isBranchManager && (!branchAccess.branch || !branchesMatch(current[0].branch, branchAccess.branch))) {
+      return NextResponse.json({ success: false, error: "Branch Managers can only review Account Reports from their assigned branch" }, { status: 403 });
+    }
     if (current[0].reporter_username === session.username) return NextResponse.json({ success: false, error: "You cannot review your own report" }, { status: 409 });
     const allowed = action === "reviewed" ? current[0].status === "submitted" : action === "approved" ? current[0].status === "reviewed" : ["submitted", "reviewed"].includes(current[0].status);
     if (!allowed) return NextResponse.json({ success: false, error: "Invalid status transition" }, { status: 409 });
@@ -201,5 +216,30 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ success: true, data: report });
   } catch (error) {
     return NextResponse.json({ success: false, error: error instanceof Error ? error.message : "Could not review account report" }, { status: 500 });
+  }
+}
+
+export async function DELETE(request: NextRequest) {
+  const session = getSession(request);
+  if (!session) return NextResponse.json({ success: false, error: "Unauthorized - Please log in" }, { status: 401 });
+  try {
+    await ensureAccountReportsTable();
+    const id = new URL(request.url).searchParams.get("id") || "";
+    if (!/^[0-9a-f-]{36}$/i.test(id)) return NextResponse.json({ success: false, error: "Invalid report" }, { status: 400 });
+    const current = await queryWithRetry(async () => sql<Pick<AccountReportRow, "reporter_username" | "report_date" | "branch">>`SELECT reporter_username, report_date, branch FROM account_reports WHERE id = ${id}::uuid LIMIT 1`, "findAccountReportForDelete");
+    if (!current[0]) return NextResponse.json({ success: false, error: "Report not found" }, { status: 404 });
+    const ownsReport = current[0].reporter_username === session.username;
+    if (!ownsReport && !canReview(session.role)) return NextResponse.json({ success: false, error: "You can only delete your own Account Report" }, { status: 403 });
+    if (!ownsReport) {
+      const branchAccess = await getReportBranchAccess(session);
+      if (branchAccess.isBranchManager && (!branchAccess.branch || !branchesMatch(current[0].branch, branchAccess.branch))) {
+        return NextResponse.json({ success: false, error: "Branch Managers can only delete Account Reports from their assigned branch" }, { status: 403 });
+      }
+    }
+    await queryWithRetry(async () => sql`DELETE FROM account_reports WHERE id = ${id}::uuid`, "deleteAccountReport");
+    await recordAuditEvent(auditEventFromRequest(request, { action: "account_report.delete", actorUsername: session.username, actorRole: session.role, resourceType: "account_report", resourceId: id, status: "success", metadata: { reporterUsername: current[0].reporter_username, reportDate: dateValue(current[0].report_date), branch: current[0].branch } }));
+    return NextResponse.json({ success: true, data: { id } });
+  } catch (error) {
+    return NextResponse.json({ success: false, error: error instanceof Error ? error.message : "Could not delete Account Report" }, { status: 500 });
   }
 }

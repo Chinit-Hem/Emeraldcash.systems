@@ -4,6 +4,7 @@ import { auditEventFromRequest, recordAuditEvent } from "@/lib/audit-log";
 import { getSession } from "@/lib/auth-helpers";
 import { queryWithRetry, sql } from "@/lib/db-singleton";
 import { getReportNotificationRecipients } from "@/systems/loan/api/reportRecipients";
+import { branchesMatch, getReportBranchAccess, normalizeReportBranch } from "@/systems/loan/api/reportBranchAccess";
 import { ensureAccountReportsTable } from "@/systems/loan/api/routes/account-reports/route";
 
 export const runtime = "nodejs";
@@ -169,7 +170,13 @@ export async function GET(request: NextRequest) {
     if (requestedReportType === "bm" && !canManageOperationReports(session.role)) {
       return NextResponse.json({ success: false, error: "Only managers can view Branch Manager Reports" }, { status: 403 });
     }
-    const branch = searchParams.get("branch")?.trim() || "";
+    const requestedBranch = searchParams.get("branch")?.trim() || "";
+    const branchAccess = await getReportBranchAccess(session);
+    if (branchAccess.isBranchManager && !branchAccess.branch) {
+      return NextResponse.json({ success: false, error: "Your Branch Manager account must be assigned to a branch" }, { status: 403 });
+    }
+    const branch = branchAccess.branch || requestedBranch;
+    const branchKey = normalizeReportBranch(branch);
     const requestedLimit = Number.parseInt(searchParams.get("limit") || "200", 10);
     const limit = Math.min(500, Math.max(1, Number.isFinite(requestedLimit) ? requestedLimit : 200));
     const rows = await queryWithRetry(async () => sql<ReportRow>`
@@ -177,7 +184,11 @@ export async function GET(request: NextRequest) {
       WHERE report_date BETWEEN ${from}::date AND ${to}::date
         AND (${reporter} = '' OR reporter_username = ${reporter})
         AND report_type = ${requestedReportType}
-        AND (${branch} = '' OR branch = ${branch})
+        AND (${branchKey} = '' OR CASE
+          WHEN REGEXP_REPLACE(LOWER(branch), '[[:space:]​_-]+', '', 'g') LIKE '%sensok%' OR REGEXP_REPLACE(LOWER(branch), '[[:space:]​_-]+', '', 'g') LIKE '%សែនសុខ%' THEN 'sen-sok'
+          WHEN REGEXP_REPLACE(LOWER(branch), '[[:space:]​_-]+', '', 'g') LIKE '%boeungkengkang%' OR REGEXP_REPLACE(LOWER(branch), '[[:space:]​_-]+', '', 'g') LIKE '%bkk%' OR REGEXP_REPLACE(LOWER(branch), '[[:space:]​_-]+', '', 'g') LIKE '%បឹងកេងកង%' THEN 'bkk'
+          ELSE REGEXP_REPLACE(LOWER(branch), '[[:space:]​_-]+', '', 'g')
+        END = ${branchKey})
       ORDER BY report_date DESC, updated_at DESC
       LIMIT ${limit}
     `, "listOperationReports");
@@ -210,6 +221,10 @@ export async function POST(request: NextRequest) {
     const department = String(body.department || "").trim().slice(0, 100);
     const branch = String(body.branch || "").trim().slice(0, 100);
     if (!branch) return NextResponse.json({ success: false, error: "A branch is required for a report" }, { status: 400 });
+    const branchAccess = await getReportBranchAccess(session);
+    if (branchAccess.isBranchManager && (!branchAccess.branch || !branchesMatch(branch, branchAccess.branch))) {
+      return NextResponse.json({ success: false, error: branchAccess.branch ? `Branch Managers can only prepare reports for ${branchAccess.branch}` : "Your Branch Manager account must be assigned to a branch" }, { status: 403 });
+    }
     if (reportType === "ls" && status === "submitted" && !hasCustomerActivity(reportData, ["collectionDueRows", "collectionPaidRows", "dueNoticeRows", "followUpRows", "formalNoticeRows", "requestedRows", "approvedRows", "rejectedRows"])) {
       return NextResponse.json({ success: false, error: "Add at least one customer activity before submitting an LS report" }, { status: 400 });
     }
@@ -220,7 +235,11 @@ export async function POST(request: NextRequest) {
         SELECT id, status FROM operation_reports
         WHERE report_type = 'ls'
           AND report_date = ${reportDate}::date
-          AND LOWER(BTRIM(branch)) = LOWER(BTRIM(${branch}))
+          AND CASE
+            WHEN REGEXP_REPLACE(LOWER(branch), '[[:space:]​_-]+', '', 'g') LIKE '%sensok%' OR REGEXP_REPLACE(LOWER(branch), '[[:space:]​_-]+', '', 'g') LIKE '%សែនសុខ%' THEN 'sen-sok'
+            WHEN REGEXP_REPLACE(LOWER(branch), '[[:space:]​_-]+', '', 'g') LIKE '%boeungkengkang%' OR REGEXP_REPLACE(LOWER(branch), '[[:space:]​_-]+', '', 'g') LIKE '%bkk%' OR REGEXP_REPLACE(LOWER(branch), '[[:space:]​_-]+', '', 'g') LIKE '%បឹងកេងកង%' THEN 'bkk'
+            ELSE REGEXP_REPLACE(LOWER(branch), '[[:space:]​_-]+', '', 'g')
+          END = ${normalizeReportBranch(branch)}
       `, "validateBranchManagerReportSources");
       const eligibleSourceIds = eligibleSources.filter((source) => ["reviewed", "approved"].includes(source.status)).map((source) => source.id);
       const hasEveryEligibleSource = eligibleSourceIds.length === sourceReportIds.length && eligibleSourceIds.every((id) => sourceReportIds.includes(id));
@@ -233,7 +252,11 @@ export async function POST(request: NextRequest) {
       const eligibleAccountSources = await queryWithRetry(async () => sql<{ id: string; status: string }>`
         SELECT id, status FROM account_reports
         WHERE report_date = ${reportDate}::date
-          AND LOWER(BTRIM(branch)) = LOWER(BTRIM(${branch}))
+          AND CASE
+            WHEN REGEXP_REPLACE(LOWER(branch), '[[:space:]​_-]+', '', 'g') LIKE '%sensok%' OR REGEXP_REPLACE(LOWER(branch), '[[:space:]​_-]+', '', 'g') LIKE '%សែនសុខ%' THEN 'sen-sok'
+            WHEN REGEXP_REPLACE(LOWER(branch), '[[:space:]​_-]+', '', 'g') LIKE '%boeungkengkang%' OR REGEXP_REPLACE(LOWER(branch), '[[:space:]​_-]+', '', 'g') LIKE '%bkk%' OR REGEXP_REPLACE(LOWER(branch), '[[:space:]​_-]+', '', 'g') LIKE '%បឹងកេងកង%' THEN 'bkk'
+            ELSE REGEXP_REPLACE(LOWER(branch), '[[:space:]​_-]+', '', 'g')
+          END = ${normalizeReportBranch(branch)}
       `, "validateBranchManagerAccountReportSources");
       const eligibleAccountSourceIds = eligibleAccountSources.filter((source) => ["reviewed", "approved"].includes(source.status)).map((source) => source.id);
       const hasEveryEligibleAccountSource = eligibleAccountSourceIds.length === sourceAccountReportIds.length && eligibleAccountSourceIds.every((id) => sourceAccountReportIds.includes(id));
@@ -301,6 +324,10 @@ export async function PATCH(request: NextRequest) {
       SELECT status, reporter_username, report_type, report_date, branch FROM operation_reports WHERE id = ${id}::uuid LIMIT 1
     `, "findOperationReportForReview");
     if (!current[0]) return NextResponse.json({ success: false, error: "Report not found" }, { status: 404 });
+    const branchAccess = await getReportBranchAccess(session);
+    if (branchAccess.isBranchManager && (!branchAccess.branch || !branchesMatch(current[0].branch, branchAccess.branch))) {
+      return NextResponse.json({ success: false, error: "Branch Managers can only review reports from their assigned branch" }, { status: 403 });
+    }
     if (current[0].reporter_username === session.username) return NextResponse.json({ success: false, error: "You cannot review your own report" }, { status: 409 });
     const allowed = action === "reviewed" ? current[0].status === "submitted" : action === "approved" ? current[0].status === "reviewed" : ["submitted", "reviewed"].includes(current[0].status);
     if (!allowed) return NextResponse.json({ success: false, error: `This report cannot be marked ${action} from its current status` }, { status: 409 });
@@ -348,14 +375,20 @@ export async function DELETE(request: NextRequest) {
     const id = searchParams.get("id") || "";
     if (!/^[0-9a-f-]{36}$/i.test(id)) return NextResponse.json({ success: false, error: "Invalid report" }, { status: 400 });
 
-    const current = await queryWithRetry(async () => sql<Pick<ReportRow, "status" | "reporter_username" | "report_date">>`
-      SELECT status, reporter_username, report_date FROM operation_reports WHERE id = ${id}::uuid LIMIT 1
+    const current = await queryWithRetry(async () => sql<Pick<ReportRow, "status" | "reporter_username" | "report_date" | "branch">>`
+      SELECT status, reporter_username, report_date, branch FROM operation_reports WHERE id = ${id}::uuid LIMIT 1
     `, "findOperationReportForDelete");
     if (!current[0]) return NextResponse.json({ success: false, error: "Report not found" }, { status: 404 });
 
     const ownsReport = current[0].reporter_username === session.username;
     if (!ownsReport && !canManageOperationReports(session.role)) {
       return NextResponse.json({ success: false, error: "You can only delete your own report" }, { status: 403 });
+    }
+    if (!ownsReport) {
+      const branchAccess = await getReportBranchAccess(session);
+      if (branchAccess.isBranchManager && (!branchAccess.branch || !branchesMatch(current[0].branch, branchAccess.branch))) {
+        return NextResponse.json({ success: false, error: "Branch Managers can only delete reports from their assigned branch" }, { status: 403 });
+      }
     }
 
     await queryWithRetry(async () => sql`

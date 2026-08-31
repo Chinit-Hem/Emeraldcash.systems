@@ -1,1 +1,1 @@
-export { GET, PATCH, POST } from "@/systems/loan/api/routes/account-reports/route";
+export { DELETE, GET, PATCH, POST } from "@/systems/loan/api/routes/account-reports/route";

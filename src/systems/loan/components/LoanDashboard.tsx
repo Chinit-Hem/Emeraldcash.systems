@@ -4652,10 +4652,11 @@ function appendAccountRowOnEnter<T extends { id: number }>(
 
 function AccountReportView() {
   const user = useAuthUser();
+  const searchParams = useSearchParams();
   const { language } = useLanguage();
   const { success: toastSuccess, error: toastError } = useToast();
   const [reportDate, setReportDate] = useState(accountReportDateInputValue());
-  const [reporterName, setReporterName] = useState(user.full_name || user.username || "Pha Sreymom");
+  const [reporterName, setReporterName] = useState(user.full_name || user.username || "");
   const [reporterRole, setReporterRole] = useState(user.position || "Assistant Accountant");
   const [department, setDepartment] = useState(user.department || "Accountant");
   const [branch, setBranch] = useState(user.branch || "Boeung Keng Kang");
@@ -4674,6 +4675,9 @@ function AccountReportView() {
   const [rememberedAssetTypes, setRememberedAssetTypes] = useState<string[]>([]);
   const [localDraftHydrated, setLocalDraftHydrated] = useState(false);
   const [savedValuesOpen, setSavedValuesOpen] = useState(false);
+  const [reportPanel, setReportPanel] = useState<"records" | "form">("records");
+  const [viewOnly, setViewOnly] = useState(false);
+  const [deletingReportId, setDeletingReportId] = useState<string | null>(null);
   const accountReportBranchName = branch.trim().toLocaleLowerCase() === "boeung keng kang" ? "បឹងកេងកង" : branch;
   const restoredLocalDraft = useRef(false);
   const initializedSavedAccountReport = useRef(false);
@@ -4792,14 +4796,31 @@ function AccountReportView() {
     setLoadedReporterUsername(record.reporterUsername);
   }, []);
 
-  const openSavedAccountReport = useCallback((record: AccountReportRecord, sheet: AccountReportSheet) => {
+  const openSavedAccountReport = useCallback((record: AccountReportRecord, sheet: AccountReportSheet, readOnly = false) => {
     applySavedReport(record);
-    setActiveSheet(sheet);
+    setActiveSheet(readOnly ? "collection" : sheet);
+    setViewOnly(readOnly);
+    setReportPanel("form");
     window.setTimeout(() => accountReportFormRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 80);
     toastSuccess(record.reporterUsername === user.username
       ? (language === "km" ? "បានផ្ទុករបាយការណ៍គណនេយ្យរបស់អ្នក។" : "Your Account Report was loaded.")
       : (language === "km" ? `កំពុងមើលរបាយការណ៍គណនេយ្យរបស់ ${record.reporterName || record.reporterUsername}។` : `Viewing ${record.reporterName || record.reporterUsername}'s Account Report.`));
   }, [applySavedReport, language, toastSuccess, user.username]);
+
+  useEffect(() => {
+    if (searchParams.get("reportPanel") === "records") {
+      setReportPanel("records");
+      setActiveSheet("summary");
+      setViewOnly(true);
+    }
+  }, [searchParams]);
+
+  useEffect(() => {
+    if (reportPanel === "records") {
+      setActiveSheet("summary");
+      setViewOnly(false);
+    }
+  }, [localDraftHydrated, reportPanel]);
 
   const loadAccountReports = useCallback(async () => {
     setReportsLoading(true);
@@ -4862,11 +4883,31 @@ function AccountReportView() {
     setClosedRows(createAccountResolutionRows());
     setLoadedStatus("draft");
     setLoadedReporterUsername(user.username);
-    setActiveSheet("summary");
+    setActiveSheet("collection");
+    setViewOnly(false);
+    setReportPanel("form");
     toastSuccess(language === "km" ? "បានចាប់ផ្ដើមរបាយការណ៍គណនេយ្យថ្មី។ កំណត់ត្រាចាស់មិនត្រូវបានលុបទេ។" : "New Account Report started. Existing report records were not deleted.");
   };
 
+  const deleteAccountReport = async (record: AccountReportRecord) => {
+    if (!window.confirm(language === "km" ? `លុបរបាយការណ៍គណនេយ្យរបស់ ${record.reporterName || record.reporterUsername} មែនទេ?` : `Delete ${record.reporterName || record.reporterUsername}'s Account Report?`)) return;
+    setDeletingReportId(record.id);
+    try {
+      await api<{ id: string }>(`/api/loan/account-reports?id=${encodeURIComponent(record.id)}`, { method: "DELETE" });
+      toastSuccess(language === "km" ? "បានលុបរបាយការណ៍គណនេយ្យ។" : "Account Report deleted.");
+      await loadAccountReports();
+    } catch (caught) {
+      toastError(caught instanceof Error ? caught.message : "Could not delete Account Report");
+    } finally {
+      setDeletingReportId(null);
+    }
+  };
+
   const saveAccountReport = async (status: "draft" | "submitted") => {
+    if (viewOnly) {
+      toastError(language === "km" ? "សូមចុច កែ ឬ ធ្វើបច្ចុប្បន្នភាព ដើម្បីកែប្រែរបាយការណ៍នេះ។" : "Choose Edit or Update before changing this report.");
+      return;
+    }
     if (reviewingAnotherAccountReport) {
       toastError(language === "km" ? "របាយការណ៍នេះជារបស់អ្នករាយការណ៍ផ្សេង ហើយអាចមើលបានតែប៉ុណ្ណោះ។" : "This Account Report belongs to another reporter and is view-only.");
       return;
@@ -4890,7 +4931,7 @@ function AccountReportView() {
   };
 
   const prepareFromLoans = async () => {
-    if (reportLocked) return;
+    if (reportLocked || viewOnly) return;
     setLoadingLoans(true);
     try {
       const loans = await api<LoanEntity[]>("/api/loan/loans?limit=200");
@@ -4930,26 +4971,31 @@ function AccountReportView() {
   const renderCollectionTable = (title: string, rows: AccountCollectionRow[], setter: (rows: AccountCollectionRow[]) => void, headerClass = khmerHeader) => {
     const total = rows.reduce((sum, row) => sum + accountNumber(row.amount), 0);
     const onEnter = (event: ReactKeyboardEvent<HTMLInputElement>, index: number, field: keyof Omit<AccountCollectionRow, "id">) => appendAccountRowOnEnter(event, index, rows, setter, (id) => ({ id, customer: "", amount: "", reason: "" }), field);
-    return <section className="min-w-0"><h3 className={`flex items-center justify-between border border-slate-300 px-3 py-2 text-sm font-bold ${headerClass}`}><span>{title}</span><button type="button" onClick={() => setter(rows.length > 1 ? rows.slice(0, -1) : createAccountCollectionRows().slice(0, 1))} className="inline-flex items-center gap-1 rounded px-2 py-1 text-xs hover:bg-white/15"><X className="h-3.5 w-3.5" />Remove last row</button></h3><table className="w-full table-fixed border-collapse text-sm"><thead className={headerClass}><tr><th className="w-14 border border-slate-300 px-2 py-2">ល.រ</th><th className="border border-slate-300 px-2 py-2">ឈ្មោះអតិថិជន</th><th className="w-36 border border-slate-300 px-2 py-2">ជាសាច់ប្រាក់ ($)</th><th className="border border-slate-300 px-2 py-2">មូលហេតុ</th></tr></thead><tbody>{rows.map((row, index) => <tr key={row.id}><td className="border border-slate-300 px-2 py-2 text-center">{index + 1}</td><td className="border border-slate-300"><input data-account-row={index} data-account-field="customer" {...reusableFieldProps("customer")} value={row.customer} placeholder="ឈ្មោះអតិថិជន" onKeyDown={(event) => onEnter(event, index, "customer")} onChange={(event) => updateCollection(rows, row.id, "customer", event.target.value, setter)} className={cellInput} /></td><td className="border border-slate-300"><input data-account-row={index} data-account-field="amount" {...reusableFieldProps("amount")} value={row.amount} placeholder="0.00" onKeyDown={(event) => onEnter(event, index, "amount")} onChange={(event) => updateCollection(rows, row.id, "amount", event.target.value, setter)} className={`${cellInput} text-right tabular-nums`} /></td><td className="border border-slate-300"><input data-account-row={index} data-account-field="reason" {...reusableFieldProps("reason")} value={row.reason} placeholder="ជ្រើសរើស ឬបញ្ចូលមូលហេតុ" onKeyDown={(event) => onEnter(event, index, "reason")} onChange={(event) => updateCollection(rows, row.id, "reason", event.target.value, setter)} className={cellInput} /></td></tr>)}</tbody><tfoot><tr className="border-t-2 border-slate-900 bg-slate-100 font-bold text-red-600 dark:bg-slate-800"><td colSpan={2} className="border border-slate-300 px-2 py-2 text-center">សរុប</td><td className="border border-slate-300 px-2 py-2 text-right tabular-nums">{formatCurrency(total)}</td><td className="border border-slate-300" /></tr></tfoot></table></section>;
+    return <section className="min-w-0 overflow-x-auto"><div className="min-w-[560px]"><h3 className={`flex items-center justify-between border border-slate-300 px-3 py-2 text-sm font-bold ${headerClass}`}><span>{title}</span><button type="button" onClick={() => setter(rows.length > 1 ? rows.slice(0, -1) : createAccountCollectionRows().slice(0, 1))} className="inline-flex items-center gap-1 rounded px-2 py-1 text-xs hover:bg-white/15"><X className="h-3.5 w-3.5" />Remove last row</button></h3><table className="w-full table-fixed border-collapse text-sm"><thead className={headerClass}><tr><th className="w-14 border border-slate-300 px-2 py-2">ល.រ</th><th className="border border-slate-300 px-2 py-2">ឈ្មោះអតិថិជន</th><th className="w-36 border border-slate-300 px-2 py-2">ជាសាច់ប្រាក់ ($)</th><th className="border border-slate-300 px-2 py-2">មូលហេតុ</th></tr></thead><tbody>{rows.map((row, index) => <tr key={row.id}><td className="border border-slate-300 px-2 py-2 text-center">{index + 1}</td><td className="border border-slate-300"><input data-account-row={index} data-account-field="customer" {...reusableFieldProps("customer")} value={row.customer} placeholder="ឈ្មោះអតិថិជន" onKeyDown={(event) => onEnter(event, index, "customer")} onChange={(event) => updateCollection(rows, row.id, "customer", event.target.value, setter)} className={cellInput} /></td><td className="border border-slate-300"><input data-account-row={index} data-account-field="amount" {...reusableFieldProps("amount")} value={row.amount} placeholder="0.00" onKeyDown={(event) => onEnter(event, index, "amount")} onChange={(event) => updateCollection(rows, row.id, "amount", event.target.value, setter)} className={`${cellInput} text-right tabular-nums`} /></td><td className="border border-slate-300"><input data-account-row={index} data-account-field="reason" {...reusableFieldProps("reason")} value={row.reason} placeholder="ជ្រើសរើស ឬបញ្ចូលមូលហេតុ" onKeyDown={(event) => onEnter(event, index, "reason")} onChange={(event) => updateCollection(rows, row.id, "reason", event.target.value, setter)} className={cellInput} /></td></tr>)}</tbody><tfoot><tr className="border-t-2 border-slate-900 bg-slate-100 font-bold text-red-600 dark:bg-slate-800"><td colSpan={2} className="border border-slate-300 px-2 py-2 text-center">សរុប</td><td className="border border-slate-300 px-2 py-2 text-right tabular-nums">{formatCurrency(total)}</td><td className="border border-slate-300" /></tr></tfoot></table></div></section>;
   };
 
   const renderResolutionTable = (title: string, rows: AccountResolutionRow[], setter: (rows: AccountResolutionRow[]) => void, totals: { interest: number; penalty: number; principal: number }, allowImages = false) => {
     const onEnter = (event: ReactKeyboardEvent<HTMLInputElement>, index: number, field: AccountResolutionTextField) => appendAccountRowOnEnter(event, index, rows, setter, (id) => ({ id, customer: "", assetType: "", interest: "", penalty: "", principal: "", note: "" }), field);
     return (
-    <section>
+    <section className="min-w-0 overflow-x-auto">
+      <div className="min-w-[900px]">
       <h3 className="flex items-center justify-between border border-slate-300 px-3 py-2 text-sm font-bold text-red-600"><span>{title}</span><button type="button" onClick={() => setter(rows.length > 1 ? rows.slice(0, -1) : createAccountResolutionRows().slice(0, 1))} className="inline-flex items-center gap-1 rounded px-2 py-1 text-xs text-red-700 hover:bg-red-50"><X className="h-3.5 w-3.5" />Remove last row</button></h3>
       <table className="w-full table-fixed border-collapse text-sm">
         <thead className={khmerHeader}><tr><th className="w-14 border border-slate-300 px-2 py-2">ល.រ</th><th className="border border-slate-300 px-2 py-2">ឈ្មោះអតិថិជន</th><th className="border border-slate-300 px-2 py-2">ប្រភេទទ្រព្យ</th><th className="w-32 border border-slate-300 px-2 py-2">ការប្រាក់ ($)</th><th className="w-32 border border-slate-300 px-2 py-2">ពិន័យ ($)</th><th className="w-36 border border-slate-300 px-2 py-2">ប្រាក់ដើម ($)</th><th className="border border-slate-300 px-2 py-2">មូលហេតុ</th>{allowImages ? <th className="w-44 border border-slate-300 px-2 py-2">រូបភាពលិខិត</th> : null}</tr></thead>
         <tbody>{rows.map((row, index) => <tr key={row.id}><td className="border border-slate-300 px-2 py-2 text-center">{index + 1}</td><td className="border border-slate-300"><input data-account-row={index} data-account-field="customer" {...reusableFieldProps("customer")} value={row.customer} placeholder="ឈ្មោះអតិថិជន" onKeyDown={(event) => onEnter(event, index, "customer")} onChange={(event) => updateResolution(rows, row.id, "customer", event.target.value, setter)} className={cellInput} /></td><td className="border border-slate-300"><input data-account-row={index} data-account-field="assetType" {...reusableFieldProps("assetType")} value={row.assetType} placeholder="ជ្រើសរើស ឬបញ្ចូលប្រភេទទ្រព្យ" onBlur={(event) => { rememberAssetType(event.target.value); rememberField("assetType", event.target.value); }} onKeyDown={(event) => { if (event.key === "Enter") rememberAssetType(event.currentTarget.value); onEnter(event, index, "assetType"); }} onChange={(event) => updateResolution(rows, row.id, "assetType", event.target.value, setter)} className={cellInput} /></td><td className="border border-slate-300"><input data-account-row={index} data-account-field="interest" {...reusableFieldProps("interest")} value={row.interest} placeholder="0.00" onKeyDown={(event) => onEnter(event, index, "interest")} onChange={(event) => updateResolution(rows, row.id, "interest", event.target.value, setter)} className={`${cellInput} text-right tabular-nums`} /></td><td className="border border-slate-300"><input data-account-row={index} data-account-field="penalty" {...reusableFieldProps("penalty")} value={row.penalty} placeholder="0.00" onKeyDown={(event) => onEnter(event, index, "penalty")} onChange={(event) => updateResolution(rows, row.id, "penalty", event.target.value, setter)} className={`${cellInput} text-right tabular-nums`} /></td><td className="border border-slate-300"><input data-account-row={index} data-account-field="principal" {...reusableFieldProps("principal")} value={row.principal} placeholder="0.00" onKeyDown={(event) => onEnter(event, index, "principal")} onChange={(event) => updateResolution(rows, row.id, "principal", event.target.value, setter)} className={`${cellInput} text-right tabular-nums`} /></td><td className="border border-slate-300"><input data-account-row={index} data-account-field="note" {...reusableFieldProps("note")} value={row.note} placeholder="ជ្រើសរើស ឬបញ្ចូលមូលហេតុ" onKeyDown={(event) => onEnter(event, index, "note")} onChange={(event) => updateResolution(rows, row.id, "note", event.target.value, setter)} className={cellInput} /></td>{allowImages ? <td className="border border-slate-300 px-2 py-1"><OperationReportImageCell images={row.images} imageUrl={row.imageUrl} imageName={row.imageName} onChange={(attachment) => setter(rows.map((item) => item.id === row.id ? { ...item, ...attachment } : item))} /></td> : null}</tr>)}</tbody>
         <tfoot><tr className="border-t-2 border-slate-900 bg-slate-100 font-bold text-red-600 dark:bg-slate-800"><td colSpan={3} className="border border-slate-300 px-2 py-2 text-center">សរុប</td><td className="border border-slate-300 px-2 py-2 text-right tabular-nums">{formatCurrency(totals.interest)}</td><td className="border border-slate-300 px-2 py-2 text-right tabular-nums">{totals.penalty ? formatCurrency(totals.penalty) : "-"}</td><td className="border border-slate-300 px-2 py-2 text-right tabular-nums">{formatCurrency(totals.principal)}</td><td className="border border-slate-300" />{allowImages ? <td className="border border-slate-300" /> : null}</tr></tfoot>
       </table>
+      </div>
     </section>
     );
   };
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap justify-end gap-2 print:hidden">
+    <div className="min-w-0 space-y-4 lg:[zoom:0.9]">
+      <div className={`${reportPanel === "records" ? "hidden" : "sticky"} top-0 z-40 space-y-2 border-b border-slate-200 bg-slate-50/95 pb-2 backdrop-blur-md dark:border-slate-800 dark:bg-slate-950/95 print:static print:border-0 print:bg-transparent print:pb-0`}>
+      <div className="rounded-lg border border-slate-200 bg-white px-3 py-2 shadow-sm dark:border-slate-800 dark:bg-slate-900 print:hidden">
+      <div className="flex flex-wrap items-center justify-end gap-2">
+        <button type="button" onClick={() => setReportPanel("records")} className="inline-flex items-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-100 dark:border-blue-800 dark:bg-blue-950/30 dark:text-blue-300"><List className="h-4 w-4" />{language === "km" ? "កំណត់ត្រា" : "Records"}</button>
         <button type="button" onClick={() => setSavedValuesOpen((open) => !open)} className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300"><List className="h-4 w-4" />Saved values</button>
         <button type="button" disabled={Boolean(savingReport) || loadingLoans} onClick={startNewAccountReport} className="inline-flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-700 hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-300"><FilePlus2 className="h-4 w-4" />{language === "km" ? "របាយការណ៍ថ្មី" : "New Report"}</button>
         <span className={`inline-flex items-center rounded-lg px-3 py-2 text-sm font-semibold ${operationReportStatusClass(loadedStatus)}`}>{operationReportStatusLabel(loadedStatus, language)}</span>
@@ -4959,43 +5005,49 @@ function AccountReportView() {
         <button type="button" onClick={exportAccountReport} className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300"><Download className="h-4 w-4" />Export</button>
         <button type="button" onClick={() => window.print()} className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-700"><Printer className="h-4 w-4" />Print</button>
       </div>
-      {savedValuesOpen ? <RememberedReportValuesManager fields={rememberedFields} onRemove={forgetField} onClose={() => setSavedValuesOpen(false)} /> : null}
-      {loadedStatus === "returned" ? <section className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900 dark:border-red-800 dark:bg-red-950/25 dark:text-red-200"><strong>Returned for correction:</strong> {savedReports.find((record) => record.reporterUsername === loadedReporterUsername && record.reportDate === reportDate)?.reviewComment || "Please update the report and submit it again."}</section> : null}
-      {reviewingAnotherAccountReport ? <section className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950 dark:border-amber-800 dark:bg-amber-950/25 dark:text-amber-100"><strong>{language === "km" ? "សម្រាប់មើលតែប៉ុណ្ណោះ៖" : "View only:"}</strong> {language === "km" ? "របាយការណ៍នេះជារបស់" : "This Account Report belongs to"} {reporterName || loadedReporterUsername}.</section> : null}
-      {duplicateAccountCustomers.length ? <section role="alert" className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/25 dark:text-amber-100"><strong>Duplicate customer warning:</strong> {duplicateAccountCustomers.join(", ")}</section> : null}
-      <div role="tablist" aria-label="Account report sheets" className="font-khmer-battambang sticky top-0 z-30 flex min-h-12 items-end overflow-hidden border-b border-slate-300 bg-slate-100 px-1 pt-1 shadow-sm print:hidden dark:border-slate-700 dark:bg-slate-900">
-        <button
-          type="button"
-          role="tab"
-          aria-selected={activeSheet === "summary"}
-          onClick={() => setActiveSheet("summary")}
-          className={`min-h-11 min-w-0 flex-1 border-x border-t px-2 py-2 text-center text-sm transition sm:px-5 sm:text-lg ${activeSheet === "summary" ? "border-slate-300 border-t-2 border-t-emerald-700 bg-white text-emerald-700 dark:border-slate-700 dark:bg-slate-950 dark:text-emerald-300" : "border-transparent text-slate-500 hover:bg-white/70 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200"}`}
-        >
-          របាយការណ៍សង្ខេប
-        </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={activeSheet === "collection"}
-          onClick={() => setActiveSheet("collection")}
-          className={`min-h-11 min-w-0 flex-1 border-x border-t px-2 py-2 text-center text-sm transition sm:px-5 sm:text-lg ${activeSheet === "collection" ? "border-slate-300 border-t-2 border-t-emerald-700 bg-white text-emerald-700 dark:border-slate-700 dark:bg-slate-950 dark:text-emerald-300" : "border-transparent text-slate-500 hover:bg-white/70 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200"}`}
-        >
-          អតិថិជនប្រមូល&amp;ដោះស្រាយ
-        </button>
       </div>
+      {reportLocked && !reviewingAnotherAccountReport ? <section className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-950 dark:border-amber-800 dark:bg-amber-950/25 dark:text-amber-100"><strong>{language === "km" ? "របាយការណ៍ត្រូវបានចាក់សោសម្រាប់ពិនិត្យ៖" : "Report locked for review:"}</strong> {language === "km" ? "របាយការណ៍គណនេយ្យដែលបានដាក់ស្នើ មិនអាចកែប្រែ ឬដាក់ស្នើម្តងទៀតបានទេ រហូតដល់ BM បញ្ជូនត្រឡប់ឱ្យកែតម្រូវ។" : "A submitted Account Report cannot be changed or submitted again until the BM returns it for correction."}</section> : null}
+      <div role="tablist" aria-label="Account report sheets" className="font-khmer-battambang rounded-xl border border-slate-200 bg-slate-100 p-2 shadow-sm print:hidden dark:border-slate-700 dark:bg-slate-900">
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeSheet === "summary"}
+            onClick={() => setActiveSheet("summary")}
+            className={`min-h-12 min-w-0 rounded-xl border-2 px-4 py-2 text-center text-base font-bold shadow-sm transition-all ${activeSheet === "summary" ? "border-blue-700 bg-blue-600 text-white shadow-md ring-2 ring-blue-200 hover:bg-blue-700 dark:ring-blue-900" : "border-blue-200 bg-blue-50 text-blue-800 hover:-translate-y-0.5 hover:border-blue-400 hover:bg-blue-100 hover:shadow-md dark:border-blue-800 dark:bg-blue-950/40 dark:text-blue-200 dark:hover:bg-blue-900/60"}`}
+          >
+            របាយការណ៍សង្ខេប
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeSheet === "collection"}
+            onClick={() => setActiveSheet("collection")}
+            className={`min-h-12 min-w-0 rounded-xl border-2 px-4 py-2 text-center text-base font-bold shadow-sm transition-all ${activeSheet === "collection" ? "border-emerald-700 bg-emerald-600 text-white shadow-md ring-2 ring-emerald-200 hover:bg-emerald-700 dark:ring-emerald-900" : "border-emerald-200 bg-emerald-50 text-emerald-800 hover:-translate-y-0.5 hover:border-emerald-400 hover:bg-emerald-100 hover:shadow-md dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200 dark:hover:bg-emerald-900/60"}`}
+          >
+            អតិថិជនប្រមូល&amp;ដោះស្រាយ
+          </button>
+        </div>
+      </div>
+      </div>
+      {reportPanel === "form" && savedValuesOpen ? <RememberedReportValuesManager fields={rememberedFields} onRemove={forgetField} onClose={() => setSavedValuesOpen(false)} /> : null}
+      {reportPanel === "form" && loadedStatus === "returned" ? <section className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900 dark:border-red-800 dark:bg-red-950/25 dark:text-red-200"><strong>Returned for correction:</strong> {savedReports.find((record) => record.reporterUsername === loadedReporterUsername && record.reportDate === reportDate)?.reviewComment || "Please update the report and submit it again."}</section> : null}
+      {reportPanel === "form" && reviewingAnotherAccountReport ? <section className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950 dark:border-amber-800 dark:bg-amber-950/25 dark:text-amber-100"><strong>{language === "km" ? "សម្រាប់មើលតែប៉ុណ្ណោះ៖" : "View only:"}</strong> {language === "km" ? "របាយការណ៍នេះជារបស់" : "This Account Report belongs to"} {reporterName || loadedReporterUsername}.</section> : null}
+      {reportPanel === "form" && duplicateAccountCustomers.length ? <section role="alert" className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/25 dark:text-amber-100"><strong>Duplicate customer warning:</strong> {duplicateAccountCustomers.join(", ")}</section> : null}
       <div ref={accountReportFormRef} className="scroll-mt-20">
-      <Card className="overflow-hidden rounded-xl border border-slate-300 bg-white p-0 shadow-sm dark:border-slate-700 dark:bg-slate-950">
-        <fieldset disabled={reportLocked} className="min-w-0 border-0 p-0 disabled:opacity-90">
-        <div className="overflow-hidden">
+      <Card className="min-w-0 overflow-hidden rounded-xl border border-slate-300 bg-white p-0 shadow-sm dark:border-slate-700 dark:bg-slate-950">
+        <fieldset disabled={reportPanel === "records" || reportLocked || viewOnly} className="min-w-0 border-0 p-0 disabled:opacity-90">
+        <div className="overflow-visible">
           <div className="min-w-0 p-0 text-slate-950 dark:text-slate-100">
+            {!viewOnly ? <>
             <div className="grid min-h-28 grid-cols-[120px_minmax(0,1fr)] border-b border-slate-300 bg-white dark:border-slate-700 dark:bg-slate-950 sm:min-h-36 sm:grid-cols-[220px_1fr]">
               <div className="flex items-center justify-center p-3 sm:p-4"><EmeraldCashLogo className="h-auto w-28 object-contain sm:w-44" /></div>
               <div className="font-khmer-muol-light flex items-center justify-center px-3 text-center text-xl text-red-700 sm:px-5 sm:text-3xl">ក្រុមហ៊ុន អេមើរ៉ល ឃែស ឯ.ក</div>
             </div>
-            <div className="font-khmer-muol-light border-b border-slate-300 py-3 text-center text-2xl text-emerald-700 dark:border-slate-700">របាយការណ៍គណនេយ្យ សាខា {accountReportBranchName}</div>
-            <div className="grid grid-cols-[1fr_180px_1.4fr_1fr] border-b border-slate-300 dark:border-slate-700">
-              <div className="border-r border-slate-300 dark:border-slate-700" />
-              <div className="col-span-2 grid grid-cols-[180px_minmax(0,1fr)]">
+            <div className="font-khmer-muol-light border-b border-slate-300 py-3 text-center text-2xl text-emerald-700 dark:border-slate-700">របាយការណ៍លទ្ធផលប្រចាំថ្ងៃ សាខា {accountReportBranchName}</div>
+            <div className="grid grid-cols-1 border-b border-slate-300 dark:border-slate-700 lg:grid-cols-[1fr_180px_1.4fr_1fr]">
+              <div className="hidden border-r border-slate-300 dark:border-slate-700 lg:block" />
+              <div className="grid grid-cols-[120px_minmax(0,1fr)] sm:grid-cols-[180px_minmax(0,1fr)] lg:col-span-2">
                 <div className="flex min-h-12 items-center justify-end whitespace-nowrap border-b border-slate-300 px-3 py-2 text-right font-semibold dark:border-slate-700">កាលបរិច្ឆេទ៖</div>
                 <DateInput title="Report date" disabled={reportLocked} value={reportDate} onChange={changeAccountReportDate} className="block min-h-12 w-full border-0 border-b border-slate-300 px-3 py-2 outline-none focus:bg-emerald-50 disabled:opacity-70 dark:border-slate-700 dark:bg-transparent dark:focus:bg-emerald-950/30" />
                 <div className="flex min-h-12 items-center justify-end whitespace-nowrap border-b border-slate-300 px-3 py-2 text-right font-semibold dark:border-slate-700">ឈ្មោះ៖</div>
@@ -5003,13 +5055,12 @@ function AccountReportView() {
                 <div className="flex min-h-12 items-center justify-end whitespace-nowrap border-b border-slate-300 px-3 py-2 text-right font-semibold dark:border-slate-700">តួនាទី៖</div>
                 <input disabled={reportLocked} {...reusableFieldProps("reporterRole")} value={reporterRole} onChange={(event) => setReporterRole(event.target.value)} className="block min-h-12 w-full border-0 border-b border-slate-300 px-3 py-2 outline-none focus:bg-emerald-50 disabled:opacity-70 dark:border-slate-700 dark:bg-transparent dark:focus:bg-emerald-950/30" />
                 <div className="flex min-h-12 items-center justify-end whitespace-nowrap px-3 py-2 text-right font-semibold">នាយកដ្ឋាន៖</div>
-                <input disabled={reportLocked} {...reusableFieldProps("department")} value={department} onChange={(event) => setDepartment(event.target.value)} className="block min-h-12 w-full border-0 border-b border-slate-300 px-3 py-2 outline-none focus:bg-emerald-50 disabled:opacity-70 dark:border-slate-700 dark:bg-transparent dark:focus:bg-emerald-950/30" />
-                <div className="flex min-h-12 items-center justify-end whitespace-nowrap px-3 py-2 text-right font-semibold">សាខា៖</div>
-                <input disabled={reportLocked} {...reusableFieldProps("branch")} value={branch} onChange={(event) => setBranch(event.target.value)} className="block min-h-12 w-full border-0 px-3 py-2 outline-none focus:bg-emerald-50 disabled:opacity-70 dark:bg-transparent dark:focus:bg-emerald-950/30" />
+                <input disabled={reportLocked} {...reusableFieldProps("department")} value={department} onChange={(event) => setDepartment(event.target.value)} className="block min-h-12 w-full border-0 px-3 py-2 outline-none focus:bg-emerald-50 disabled:opacity-70 dark:bg-transparent dark:focus:bg-emerald-950/30" />
               </div>
-              <div className="border-l border-slate-300 p-3 text-sm text-slate-500 dark:border-slate-700">{accountReportDisplayDate(reportDate)}</div>
+              <div aria-hidden="true" className="hidden border-l border-slate-300 dark:border-slate-700 lg:block" />
             </div>
             <div className="h-10 border-b border-slate-300 dark:border-slate-700" />
+            </> : null}
             {activeSheet === "summary" ? (
               <table className="w-full table-fixed border-collapse text-sm">
                 <thead className={khmerHeader}><tr><th className="border border-slate-300 px-3 py-3">ការប្រមូល</th><th className="border border-slate-300 px-3 py-3">ចំនួនអតិថិជន (នាក់)</th><th className="border border-slate-300 px-3 py-3">ចំនួនទឹកប្រាក់</th></tr></thead>
@@ -5020,7 +5071,7 @@ function AccountReportView() {
               </table>
             ) : (
               <>
-                <div className="grid grid-cols-2 gap-0">{renderCollectionTable("អតិថិជនដែលប្រមូលសរុប", dueRows, setDueRows)}{renderCollectionTable("អតិថិជនដែលប្រមូលបានសរុប", paidRows, setPaidRows, redHeader)}</div>
+                <div className="grid grid-cols-1 gap-0 xl:grid-cols-2">{renderCollectionTable("អតិថិជនដែលប្រមូលសរុប", dueRows, setDueRows)}{renderCollectionTable("អតិថិជនដែលប្រមូលបានសរុប", paidRows, setPaidRows, redHeader)}</div>
                 <div className="space-y-8 border-t-4 border-double border-slate-900 pt-6"><section><h3 className="font-khmer-muol-light border border-slate-300 px-3 py-2 text-sm font-bold text-emerald-700">អតិថិជនដែលដោះស្រាយសរុប</h3>{renderResolutionTable("ជូនដំណឹងទៅអតិថិជន ដល់ថ្ងៃកំណត់ត្រូវបង់", dueNoticeRows, setDueNoticeRows, { interest: resolutionTotal(dueNoticeRows, "interest"), penalty: resolutionTotal(dueNoticeRows, "penalty"), principal: resolutionTotal(dueNoticeRows, "principal") })}</section>{renderResolutionTable("បានបន្តទាក់ទងអតិថិជនដែលយឺតចាប់ពី ១ថ្ងៃ ដល់ ៣ថ្ងៃ", promiseRows, setPromiseRows, { interest: promiseInterestTotal, penalty: promisePenaltyTotal, principal: promisePrincipalTotal })}{renderResolutionTable("ផ្ញើលិខិតជូនដំណឹងផ្លូវការសម្រាប់អតិថិជនយឺតចាប់ពី ៤ថ្ងៃ", closedRows, setClosedRows, { interest: closedInterestTotal, penalty: closedPenaltyTotal, principal: closedPrincipalTotal }, true)}</div>
               </>
             )}
@@ -5029,7 +5080,7 @@ function AccountReportView() {
         </fieldset>
       </Card>
       </div>
-      {activeSheet === "summary" ? <AccountReportRecordsDashboard records={savedReports} loading={reportsLoading} currentUsername={user.username} language={language} onOpen={openSavedAccountReport} /> : null}
+      {reportPanel === "records" ? <AccountReportRecordsDashboard records={savedReports} loading={reportsLoading} currentUsername={user.username} language={language} deletingReportId={deletingReportId} canManageReports={["admin", "manager / approver", "branch manager", "bm", "credit manager"].includes(user.role.trim().toLocaleLowerCase())} onCreate={startNewAccountReport} onOpen={openSavedAccountReport} onDelete={deleteAccountReport} /> : null}
       <datalist id="account-report-reasons">{ACCOUNT_REPORT_COLLECTION_REASONS.map((reason) => <option key={reason} value={reason} />)}</datalist>
       <datalist id="account-report-asset-types">{selectableAssetTypes.map((type) => <option key={type} value={type} />)}</datalist>
       {ACCOUNT_REPORT_REUSABLE_FIELDS.map((field) => <datalist key={field} id={`account-report-${field}-options`}>{reusableAccountValues(field).map((value) => <option key={value} value={value} />)}</datalist>)}
@@ -5037,7 +5088,7 @@ function AccountReportView() {
   );
 }
 
-function AccountReportRecordsDashboard({ records, loading, currentUsername, language, onOpen }: { records: AccountReportRecord[]; loading: boolean; currentUsername: string; language: Language; onOpen: (record: AccountReportRecord, sheet: AccountReportSheet) => void }) {
+function AccountReportRecordsDashboard({ records, loading, currentUsername, language, deletingReportId, canManageReports, onCreate, onOpen, onDelete }: { records: AccountReportRecord[]; loading: boolean; currentUsername: string; language: Language; deletingReportId: string | null; canManageReports: boolean; onCreate: () => void; onOpen: (record: AccountReportRecord, sheet: AccountReportSheet, readOnly?: boolean) => void; onDelete: (record: AccountReportRecord) => void }) {
   const text = (km: string, en: string) => language === "km" ? km : en;
   const { success: toastSuccess, error: toastError } = useToast();
   const [query, setQuery] = useState("");
@@ -5109,7 +5160,7 @@ function AccountReportRecordsDashboard({ records, loading, currentUsername, lang
 
   return (
     <section className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900 print:hidden">
-      <div className="border-b border-slate-200 px-5 py-4 dark:border-slate-800"><p className="text-sm font-semibold text-emerald-700">{text("លំហូរ៖ ព្រាង → ដាក់ស្នើទៅ BM → ពិនិត្យ → អនុម័ត ឬបញ្ជូនត្រឡប់", "Flow: Draft → Submit to BM → Review → Approve or Return")}</p><h2 className="mt-1 text-xl font-bold text-slate-900 dark:text-white">{text("កំណត់ត្រារបាយការណ៍គណនេយ្យប្រចាំថ្ងៃ / ខែ / ឆ្នាំ", "Daily / Monthly / Yearly Account Report Records")}</h2></div>
+      <div className="flex flex-col gap-3 border-b border-slate-200 px-5 py-4 dark:border-slate-800 sm:flex-row sm:items-center sm:justify-between"><div><p className="text-sm font-semibold text-emerald-700">{text("លំហូរ៖ ព្រាង → ដាក់ស្នើទៅ BM → ពិនិត្យ → អនុម័ត ឬបញ្ជូនត្រឡប់", "Flow: Draft → Submit to BM → Review → Approve or Return")}</p><h2 className="mt-1 text-xl font-bold text-slate-900 dark:text-white">{text("កំណត់ត្រារបាយការណ៍គណនេយ្យប្រចាំថ្ងៃ / ខែ / ឆ្នាំ", "Daily / Monthly / Yearly Account Report Records")}</h2></div><button type="button" onClick={onCreate} className="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-700"><FilePlus2 className="h-4 w-4" />{text("របាយការណ៍ថ្មី", "New Report")}</button></div>
       <div className="grid border-b border-slate-200 sm:grid-cols-2 xl:grid-cols-4 dark:border-slate-800">{[[text("កំណត់ត្រាសរុប", "Total Records"), filtered.length], [text("រង់ចាំ BM", "Awaiting BM"), submitted], [text("បានបញ្ជូនត្រឡប់", "Returned"), returned], [text("បានរាយការណ៍ថ្ងៃនេះ", "Reported Today"), todayReports]].map(([label, value]) => <div key={label} className="border-b border-slate-200 px-5 py-4 last:border-b-0 sm:border-r xl:border-b-0 dark:border-slate-800"><p className="text-xs font-semibold text-slate-500">{label}</p><p className="mt-1 text-2xl font-bold text-slate-900 dark:text-white">{value}</p></div>)}</div>
       <div className="border-b border-slate-200 dark:border-slate-800">
         <div className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center"><div className="relative flex-1"><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={text("ស្វែងរកថ្ងៃ អ្នករាយការណ៍ មុខតំណែង សាខា នាយកដ្ឋាន ឬស្ថានភាព", "Search date, reporter, position, branch, department, or status")} className={`${inputClass} pl-10`} /></div><button type="button" disabled={exportingHistory || !filtered.length} onClick={() => void exportHistory()} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-700 hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-300">{exportingHistory ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}{text("នាំចេញ Excel", "Export Excel")}</button><button type="button" aria-expanded={showAdvancedSearch} onClick={() => setShowAdvancedSearch((current) => !current)} className={`inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border px-4 py-2 text-sm font-semibold transition ${showAdvancedSearch || advancedFilterCount ? "border-emerald-600 bg-emerald-50 text-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-300" : "border-slate-300 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300"}`}><Filter className="h-4 w-4" />{text("ស្វែងរកកម្រិតខ្ពស់", "Advanced Search")}{advancedFilterCount ? <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-emerald-700 px-1.5 text-xs text-white">{advancedFilterCount}</span> : null}<ChevronDown className={`h-4 w-4 transition ${showAdvancedSearch ? "rotate-180" : ""}`} /></button></div>
@@ -5125,7 +5176,7 @@ function AccountReportRecordsDashboard({ records, loading, currentUsername, lang
           <div className="flex items-end justify-between gap-3"><p className="pb-3 text-sm text-slate-500"><strong className="text-slate-900 dark:text-white">{filtered.length}</strong> {text(`ក្នុងចំណោម ${records.length} កំណត់ត្រា`, `of ${records.length} records`)}</p><button type="button" disabled={!advancedFilterCount} onClick={clearAdvancedSearch} className="mb-0.5 inline-flex min-h-11 items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-40 dark:text-slate-300 dark:hover:bg-slate-800"><X className="h-4 w-4" />{text("សម្អាត", "Clear")}</button></div>
         </div> : null}
       </div>
-      <div className="max-h-96 overflow-x-auto overflow-y-auto"><table className="min-w-[1040px] w-full text-left text-sm"><thead className="sticky top-0 z-10 bg-slate-100 text-slate-600 dark:bg-slate-950 dark:text-slate-300"><tr><th className="px-4 py-3">{text("ថ្ងៃ", "Date")}</th><th className="px-4 py-3">{text("អ្នករាយការណ៍", "Reporter")}</th><th className="px-4 py-3">{text("សាខា", "Branch")}</th><th className="px-4 py-3 text-center">{text("ត្រូវបង់", "Due")}</th><th className="px-4 py-3 text-center">{text("បានបង់", "Paid")}</th><th className="px-4 py-3">{text("ស្ថានភាព", "Status")}</th><th className="px-4 py-3 text-right">{text("សកម្មភាព", "Actions")}</th></tr></thead><tbody>{loading ? <tr><td colSpan={7} className="px-4 py-10 text-center text-slate-500"><Loader2 className="mr-2 inline h-4 w-4 animate-spin" />{text("កំពុងផ្ទុកកំណត់ត្រា...", "Loading records...")}</td></tr> : filtered.length ? filtered.map((record) => { const ownsRecord = record.reporterUsername.trim().toLocaleLowerCase() === currentUsername.trim().toLocaleLowerCase(); const editable = ownsRecord && ["draft", "returned"].includes(record.status); return <tr key={record.id} className="border-t border-slate-200 dark:border-slate-800"><td className="whitespace-nowrap px-4 py-3 font-semibold">{record.reportDate}</td><td className="px-4 py-3"><p className="font-semibold text-slate-900 dark:text-white">{record.reporterName || record.reporterUsername}</p><p className="text-xs text-slate-500">{record.reporterPosition}</p></td><td className="px-4 py-3">{record.branch || "-"}</td><td className="px-4 py-3 text-center font-semibold">{rowCount(record, "dueRows")}</td><td className="px-4 py-3 text-center font-semibold">{rowCount(record, "paidRows")}</td><td className="px-4 py-3"><span className={`inline-flex rounded-md px-2 py-1 text-xs font-semibold ${operationReportStatusClass(record.status)}`}>{operationReportStatusLabel(record.status, language)}</span></td><td className="px-4 py-3"><div className="flex flex-nowrap justify-end gap-2"><button type="button" onClick={() => onOpen(record, "summary")} className="inline-flex min-h-10 items-center gap-2 whitespace-nowrap rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-300">{editable ? <Pencil className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}{text("សង្ខេប", "Summary")}</button><button type="button" onClick={() => onOpen(record, "collection")} className="inline-flex min-h-10 items-center gap-2 whitespace-nowrap rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700 hover:bg-blue-100 dark:border-blue-800 dark:bg-blue-950/30 dark:text-blue-300"><List className="h-3.5 w-3.5" />{text("ប្រមូល និងដោះស្រាយ", "Collection & Resolution")}</button></div></td></tr>; }) : <tr><td colSpan={7} className="px-4 py-10 text-center text-slate-500">{text("រកមិនឃើញរបាយការណ៍ដែលបានរក្សាទុក", "No saved Account Reports found.")}</td></tr>}</tbody></table></div>
+      <div className="max-h-96 overflow-x-auto overflow-y-auto"><table className="min-w-[1180px] w-full text-left text-sm"><thead className="sticky top-0 z-10 bg-slate-100 text-slate-600 dark:bg-slate-950 dark:text-slate-300"><tr><th className="px-4 py-3">{text("ថ្ងៃ", "Date")}</th><th className="px-4 py-3">{text("អ្នករាយការណ៍", "Reporter")}</th><th className="px-4 py-3">{text("សាខា", "Branch")}</th><th className="px-4 py-3 text-center">{text("ត្រូវបង់", "Due")}</th><th className="px-4 py-3 text-center">{text("បានបង់", "Paid")}</th><th className="px-4 py-3">{text("ស្ថានភាព", "Status")}</th><th className="px-4 py-3 text-right">{text("គ្រប់គ្រង", "Manage")}</th></tr></thead><tbody>{loading ? <tr><td colSpan={7} className="px-4 py-10 text-center text-slate-500"><Loader2 className="mr-2 inline h-4 w-4 animate-spin" />{text("កំពុងផ្ទុកកំណត់ត្រា...", "Loading records...")}</td></tr> : filtered.length ? filtered.map((record) => { const ownsRecord = record.reporterUsername.trim().toLocaleLowerCase() === currentUsername.trim().toLocaleLowerCase(); const editable = ownsRecord && ["draft", "returned"].includes(record.status); const deletable = ownsRecord || canManageReports; return <tr key={record.id} className="border-t border-slate-200 dark:border-slate-800"><td className="whitespace-nowrap px-4 py-3 font-semibold">{record.reportDate}</td><td className="px-4 py-3"><p className="font-semibold text-slate-900 dark:text-white">{record.reporterName || record.reporterUsername}</p><p className="text-xs text-slate-500">{record.reporterPosition}</p></td><td className="px-4 py-3">{record.branch || "-"}</td><td className="px-4 py-3 text-center font-semibold">{rowCount(record, "dueRows")}</td><td className="px-4 py-3 text-center font-semibold">{rowCount(record, "paidRows")}</td><td className="px-4 py-3"><span className={`inline-flex rounded-md px-2 py-1 text-xs font-semibold ${operationReportStatusClass(record.status)}`}>{operationReportStatusLabel(record.status, language)}</span></td><td className="px-4 py-3"><div className="flex flex-nowrap justify-end gap-2"><button type="button" onClick={() => onOpen(record, "summary", true)} className="inline-flex min-h-10 items-center gap-1.5 whitespace-nowrap rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700 hover:bg-emerald-100"><Eye className="h-3.5 w-3.5" />{text("មើល", "View")}</button><button type="button" disabled={!editable} onClick={() => onOpen(record, "summary", false)} className="inline-flex min-h-10 items-center gap-1.5 whitespace-nowrap rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700 hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-40"><Pencil className="h-3.5 w-3.5" />{text("កែ", "Edit")}</button><button type="button" disabled={!editable} onClick={() => onOpen(record, "collection", false)} className="inline-flex min-h-10 items-center gap-1.5 whitespace-nowrap rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700 hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-40"><RefreshCw className="h-3.5 w-3.5" />{text("ធ្វើបច្ចុប្បន្នភាព", "Update")}</button><button type="button" disabled={!deletable || deletingReportId === record.id} onClick={() => onDelete(record)} className="inline-flex min-h-10 items-center gap-1.5 whitespace-nowrap rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-700 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-40">{deletingReportId === record.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}{text("លុប", "Delete")}</button></div></td></tr>; }) : <tr><td colSpan={7} className="px-4 py-10 text-center text-slate-500">{text("រកមិនឃើញរបាយការណ៍ដែលបានរក្សាទុក", "No saved Account Reports found.")}</td></tr>}</tbody></table></div>
     </section>
   );
 }
@@ -5322,6 +5373,9 @@ function OperationReportView({ loans, loading, canViewLoanData, onRefresh, onOpe
   const { language } = useLanguage();
   const opText = (km: string, en: string) => language === "km" ? km : en;
   const user = useAuthUser();
+  const searchParams = useSearchParams();
+  const [reportPanel, setReportPanel] = useState<"records" | "form">("records");
+  const [viewOnly, setViewOnly] = useState(false);
   const [reportDate, setReportDate] = useState(operationDateInputValue());
   const [branch, setBranch] = useState(user.branch || "Boeung Keng Kang");
   const [reporterName, setReporterName] = useState(user.full_name || user.username || "");
@@ -5680,7 +5734,22 @@ function OperationReportView({ loans, loading, canViewLoanData, onRefresh, onOpe
     }
   };
 
-  const openSavedReport = (record: OperationReportRecord) => {
+  useEffect(() => {
+    if (searchParams.get("reportPanel") === "records") {
+      setReportPanel("records");
+      setActiveForm("summary");
+      setViewOnly(true);
+    }
+  }, [searchParams]);
+
+  useEffect(() => {
+    if (reportPanel === "records") {
+      setActiveForm("summary");
+      setViewOnly(false);
+    }
+  }, [localDraftHydrated, reportPanel]);
+
+  const openSavedReport = (record: OperationReportRecord, readOnly = false) => {
     setReportDate(record.reportDate);
     setBranch(record.branch);
     setReporterName(record.reporterName);
@@ -5698,13 +5767,17 @@ function OperationReportView({ loans, loading, canViewLoanData, onRefresh, onOpe
     setLoadedReportStatus(record.status);
     setReviewComment(record.reviewComment || "");
     setValidationErrors([]);
-    setActiveForm("summary");
+    setActiveForm(readOnly ? "collection" : "summary");
+    setViewOnly(readOnly);
+    setReportPanel("form");
     window.scrollTo({ top: 0, behavior: "smooth" });
     toastSuccess(record.reporterUsername === user.username ? opText("បានផ្ទុករបាយការណ៍របស់អ្នក", "Your saved report was loaded.") : opText(`កំពុងពិនិត្យរបាយការណ៍របស់ ${record.reporterName}`, `Reviewing ${record.reporterName}'s report.`));
   };
 
   const editSavedReport = (record: OperationReportRecord) => {
-    openSavedReport(record);
+    const ownsRecord = record.reporterUsername.trim().toLocaleLowerCase() === user.username.trim().toLocaleLowerCase();
+    const editable = ownsRecord && ["draft", "returned"].includes(record.status);
+    openSavedReport(record, !editable);
     setActiveForm("collection");
   };
 
@@ -5728,6 +5801,8 @@ function OperationReportView({ loans, loading, canViewLoanData, onRefresh, onOpe
   };
 
   const startOwnReport = (date = operationDateInputValue()) => {
+    setReportPanel("form");
+    setViewOnly(false);
     setReportDate(date);
     setBranch(user.branch || "Boeung Keng Kang");
     setReporterName(user.full_name || user.username);
@@ -5784,8 +5859,13 @@ function OperationReportView({ loans, loading, canViewLoanData, onRefresh, onOpe
       return;
     }
     startOwnReport(nextDate);
-    setActiveForm("summary");
+    setActiveForm("collection");
     toastSuccess(opText("បានចាប់ផ្ដើមរបាយការណ៍ថ្មី។ កំណត់ត្រាចាស់មិនត្រូវបានលុបទេ។", "New report started. Existing report records were not deleted."));
+  };
+
+  const startNewLsReportFromRecords = () => {
+    if (isBranchManagerReport) selectReportMode("operation");
+    startNewOperationReport();
   };
 
   const saveBranchManagerReport = async (status: "draft" | "submitted") => {
@@ -5925,9 +6005,17 @@ function OperationReportView({ loans, loading, canViewLoanData, onRefresh, onOpe
   ].filter(Boolean) : [];
   const submitRequirements = isBranchManagerReport ? branchManagerSubmissionRequirements : submissionRequirements;
   const reportSubmitDisabled = reportSaveDisabled || submitRequirements.length > 0;
+  const reportFormTabClass = (value: "summary" | "collection" | "decisions") => {
+    const color = value === "summary"
+      ? activeForm === value ? "border-blue-700 bg-blue-600 text-white ring-blue-200 hover:bg-blue-700 dark:ring-blue-900" : "border-blue-200 bg-blue-50 text-blue-800 hover:border-blue-400 hover:bg-blue-100 dark:border-blue-800 dark:bg-blue-950/40 dark:text-blue-200 dark:hover:bg-blue-900/60"
+      : value === "collection"
+        ? activeForm === value ? "border-emerald-700 bg-emerald-600 text-white ring-emerald-200 hover:bg-emerald-700 dark:ring-emerald-900" : "border-emerald-200 bg-emerald-50 text-emerald-800 hover:border-emerald-400 hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200 dark:hover:bg-emerald-900/60"
+        : activeForm === value ? "border-amber-600 bg-amber-500 text-white ring-amber-200 hover:bg-amber-600 dark:ring-amber-900" : "border-amber-200 bg-amber-50 text-amber-800 hover:border-amber-400 hover:bg-amber-100 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200 dark:hover:bg-amber-900/60";
+    return `min-h-12 min-w-0 rounded-xl border-2 px-4 py-2 text-center text-base font-bold shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md ${activeForm === value ? "shadow-md ring-2" : ""} ${color}`;
+  };
 
   return (
-    <div className="space-y-4 pb-10">
+    <div className="min-w-0 space-y-4 pb-10 lg:[zoom:0.9]">
       {datalist}
       {loanTypeDatalist}
       {assetTypeDatalist}
@@ -5936,14 +6024,16 @@ function OperationReportView({ loans, loading, canViewLoanData, onRefresh, onOpe
       <datalist id="operation-report-solutions">{OPERATION_RESOLUTION_OPTIONS.map((solution) => <option key={solution} value={solution} />)}</datalist>
       <datalist id="operation-report-rejection-reasons">{OPERATION_REJECTION_REASONS.map((reason) => <option key={reason} value={reason} />)}</datalist>
 
-      <section className="overflow-x-auto rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-sm dark:border-slate-800 dark:bg-slate-900 print:hidden">
-        <div className="flex min-w-max items-center gap-2">
+      <div className={`${reportPanel === "records" ? "hidden" : "sticky"} top-0 z-40 space-y-2 border-b border-slate-200 bg-slate-50/95 pb-2 backdrop-blur-md dark:border-slate-800 dark:bg-slate-950/95 print:static print:border-0 print:bg-transparent print:pb-0`}>
+      <section className="rounded-lg border border-slate-200 bg-white px-3 py-2 shadow-sm dark:border-slate-800 dark:bg-slate-900 print:hidden">
+        <div className="flex flex-wrap items-center gap-2">
           <div className="flex shrink-0 items-center gap-2">
-            {canManageReports ? <div className="inline-flex overflow-hidden rounded-xl border border-slate-300 bg-slate-50 p-1 dark:border-slate-700 dark:bg-slate-950"><button type="button" onClick={() => selectReportMode("operation")} className={`rounded-lg px-3 py-2 text-sm font-semibold transition ${reportMode === "operation" ? "bg-white text-emerald-700 shadow-sm dark:bg-slate-800 dark:text-emerald-300" : "text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white"}`}>{opText("របាយការណ៍ LS", "LS Report")}</button><button type="button" onClick={() => selectReportMode("branchManager")} className={`rounded-lg px-3 py-2 text-sm font-semibold transition ${reportMode === "branchManager" ? "bg-emerald-600 text-white shadow-sm" : "text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white"}`}>{opText("របាយការណ៍ BM", "BM Report")}</button></div> : null}
+            {canManageReports ? <div className="inline-flex overflow-hidden rounded-xl border border-slate-300 bg-slate-50 p-1 dark:border-slate-700 dark:bg-slate-950"><button type="button" onClick={() => selectReportMode("operation")} className={`rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${reportMode === "operation" ? "bg-white text-emerald-700 shadow-sm hover:bg-emerald-50 dark:bg-slate-800 dark:text-emerald-300 dark:hover:bg-emerald-950/40" : "text-slate-500 hover:bg-emerald-100 hover:text-emerald-800 dark:text-slate-400 dark:hover:bg-emerald-950/50 dark:hover:text-emerald-200"}`}>{opText("របាយការណ៍ LS", "LS Report")}</button><button type="button" onClick={() => selectReportMode("branchManager")} className={`rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${reportMode === "branchManager" ? "bg-emerald-600 text-white shadow-sm hover:bg-emerald-700" : "text-slate-500 hover:bg-blue-100 hover:text-blue-800 dark:text-slate-400 dark:hover:bg-blue-950/50 dark:hover:text-blue-200"}`}>{opText("របាយការណ៍ BM", "BM Report")}</button></div> : null}
             <span className={`inline-flex items-center rounded-lg px-3 py-2 text-sm font-semibold ${operationReportStatusClass(displayedReportStatus)}`}>{operationReportStatusLabel(displayedReportStatus, language)}</span>
             {!isBranchManagerReport && reviewingAnotherSpecialist ? <button type="button" onClick={openMyReport} className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300"><FilePlus2 className="h-4 w-4" />{opText("របាយការណ៍ខ្ញុំ", "My Report")}</button> : null}
           </div>
-          <div className="flex shrink-0 gap-2">
+          <div className="flex flex-wrap gap-2">
+            <button type="button" onClick={() => setReportPanel("records")} className="inline-flex items-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-100 dark:border-blue-800 dark:bg-blue-950/30 dark:text-blue-300"><List className="h-4 w-4" />{opText("កំណត់ត្រា", "Records")}</button>
             <button type="button" onClick={() => setSavedValuesOpen((open) => !open)} className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300"><List className="h-4 w-4" />{opText("តម្លៃដែលបានរក្សាទុក", "Saved values")}</button>
             {!isBranchManagerReport ? <button type="button" disabled={reviewingAnotherSpecialist} onClick={startNewOperationReport} className="inline-flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-700 hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-300"><FilePlus2 className="h-4 w-4" />{opText("របាយការណ៍ថ្មី", "New Report")}</button> : null}
             <button type="button" disabled={reportSaveDisabled} onClick={() => void (isBranchManagerReport ? saveBranchManagerReport("draft") : saveOperationReport("draft"))} className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300">{(isBranchManagerReport ? savingBranchManagerReport : savingReport) === "draft" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}{opText("រក្សាទុកព្រាង", "Save Draft")}</button>
@@ -5954,21 +6044,11 @@ function OperationReportView({ loans, loading, canViewLoanData, onRefresh, onOpe
           </div>
         </div>
       </section>
-      {!reviewingAnotherSpecialist ? <section className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm dark:border-slate-800 dark:bg-slate-900">{!isBranchManagerReport ? <><span className={`font-semibold ${hasUnsavedChanges ? "text-amber-700 dark:text-amber-300" : "text-emerald-700 dark:text-emerald-300"}`}>{hasUnsavedChanges ? opText("មានការកែប្រែមិនទាន់រក្សាទុក", "Unsaved changes") : opText("ទិន្នន័យបានរក្សាទុក", "Saved")}</span>{ownSavedReport?.updatedAt ? <span className="text-slate-500">{opText("រក្សាទុកចុងក្រោយ", "Last saved")}: {new Date(ownSavedReport.updatedAt).toLocaleString()}</span> : null}</> : <><span className="font-semibold text-slate-600 dark:text-slate-300">{opText("ស្ថានភាពរបាយការណ៍ BM", "BM report status")}</span><span className="text-slate-500">{opText(`ទិន្នន័យប្រចាំថ្ងៃ៖ LS ${branchManagerRecords.length} · គណនេយ្យ ${branchAccountRecords.length} · ធ្វើបច្ចុប្បន្នភាពស្វ័យប្រវត្តិ`, `Daily sources: LS ${branchManagerRecords.length} · Account ${branchAccountRecords.length} · auto-updated`)}</span></>}<span className={`font-semibold ${submitRequirements.length ? "text-amber-700 dark:text-amber-300" : "text-emerald-700 dark:text-emerald-300"}`}>{submitRequirements.length ? opText(`ត្រូវបំពេញ ${submitRequirements.length} ចំណុច មុនដាក់ស្នើ`, `${submitRequirements.length} requirement(s) before submit`) : isBranchManagerReport ? opText("រួចរាល់សម្រាប់ដាក់ស្នើទៅថ្នាក់លើ", "Ready to submit to management") : opText("រួចរាល់សម្រាប់ដាក់ស្នើទៅ BM", "Ready to submit to BM")}</span></section> : null}
-      {savedValuesOpen ? <RememberedReportValuesManager fields={rememberedFields} onRemove={forgetField} onClose={() => setSavedValuesOpen(false)} /> : null}
+      {!reviewingAnotherSpecialist ? <section className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-lg border border-slate-200 bg-slate-50 px-4 py-2 text-sm dark:border-slate-800 dark:bg-slate-900">{!isBranchManagerReport ? <><span className={`font-semibold ${hasUnsavedChanges ? "text-amber-700 dark:text-amber-300" : "text-emerald-700 dark:text-emerald-300"}`}>{hasUnsavedChanges ? opText("មានការកែប្រែមិនទាន់រក្សាទុក", "Unsaved changes") : opText("ទិន្នន័យបានរក្សាទុក", "Saved")}</span>{ownSavedReport?.updatedAt ? <span className="text-slate-500">{opText("រក្សាទុកចុងក្រោយ", "Last saved")}: {new Date(ownSavedReport.updatedAt).toLocaleString()}</span> : null}</> : <><span className="font-semibold text-slate-600 dark:text-slate-300">{opText("ស្ថានភាពរបាយការណ៍ BM", "BM report status")}</span><span className="text-slate-500">{opText(`ទិន្នន័យប្រចាំថ្ងៃ៖ LS ${branchManagerRecords.length} · គណនេយ្យ ${branchAccountRecords.length} · ធ្វើបច្ចុប្បន្នភាពស្វ័យប្រវត្តិ`, `Daily sources: LS ${branchManagerRecords.length} · Account ${branchAccountRecords.length} · auto-updated`)}</span></>}<span className={`font-semibold ${submitRequirements.length ? "text-amber-700 dark:text-amber-300" : "text-emerald-700 dark:text-emerald-300"}`}>{submitRequirements.length ? opText(`ត្រូវបំពេញ ${submitRequirements.length} ចំណុច មុនដាក់ស្នើ`, `${submitRequirements.length} requirement(s) before submit`) : isBranchManagerReport ? opText("រួចរាល់សម្រាប់ដាក់ស្នើទៅថ្នាក់លើ", "Ready to submit to management") : opText("រួចរាល់សម្រាប់ដាក់ស្នើទៅ BM", "Ready to submit to BM")}</span></section> : null}
+      {!isBranchManagerReport && !reviewingAnotherSpecialist && reportLocked ? <section className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-950 dark:border-amber-800 dark:bg-amber-950/25 dark:text-amber-100"><strong>{opText("របាយការណ៍ត្រូវបានចាក់សោសម្រាប់ពិនិត្យ៖", "Report locked for review:")}</strong> {opText("របាយការណ៍ដែលបានដាក់ស្នើ មិនអាចកែប្រែ ឬដាក់ស្នើម្តងទៀតបានទេ រហូតដល់ BM បញ្ជូនត្រឡប់ឱ្យកែតម្រូវ។ សម្រាប់របាយការណ៍ថ្មី សូមជ្រើសរើសកាលបរិច្ឆេទថ្មី។", "A submitted report cannot be changed or submitted again until the BM returns it for correction. Choose a new report date to create a new report.")}</section> : null}
 
-      {reviewingAnotherSpecialist ? <section className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-4 text-sm text-amber-950 dark:border-amber-800 dark:bg-amber-950/25 dark:text-amber-100">
-        <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center"><span><strong>{opText("សម្រាប់ពិនិត្យប៉ុណ្ណោះ៖", "Review only:")}</strong> {opText("របាយការណ៍នេះជារបស់", "This report belongs to")} {reporterName || loadedReporterUsername}.</span><button type="button" onClick={openMyReport} className="shrink-0 font-semibold underline underline-offset-2">{opText("ត្រឡប់ទៅរបាយការណ៍ខ្ញុំ", "Return to My Report")}</button></div>
-        {loadedReportRecord?.reviewComment ? <div className="mt-3 border-t border-amber-200 pt-3 dark:border-amber-800"><p className="font-semibold">{opText("មតិយោបល់ពិនិត្យ", "Review Comment")}{loadedReportRecord.reviewedBy ? `: ${loadedReportRecord.reviewedBy}` : ""}</p><p className="mt-1 whitespace-pre-wrap">{loadedReportRecord.reviewComment}</p></div> : null}
-        {reviewCommentError ? <div role="alert" className="mt-3 rounded-lg border border-red-300 bg-red-50 px-3 py-2 font-semibold text-red-700 dark:border-red-800 dark:bg-red-950/30 dark:text-red-300">{opText("សូមសរសេរមូលហេតុក្នុងប្រអប់មតិយោបល់សិន រួចចុច «បញ្ជូនត្រឡប់ឱ្យកែតម្រូវ» ម្តងទៀត។", "Enter the correction reason in the comment box, then click Return for Correction again.")}</div> : null}
-        {canManageReports && ["submitted", "reviewed"].includes(loadedReportStatus) ? <div className="mt-4 border-t border-amber-200 pt-4 dark:border-amber-800"><Field label={opText("មតិយោបល់របស់អ្នកគ្រប់គ្រង", "Manager Review Comment")}><textarea rows={2} value={reviewComment} onChange={(event) => setReviewComment(event.target.value)} placeholder={opText("ត្រូវបញ្ចូលពេលបញ្ជូនត្រឡប់", "Required when returning for correction")} className={inputClass} /></Field><div className="mt-3 flex flex-wrap gap-2">{loadedReportStatus === "submitted" ? <button type="button" disabled={Boolean(reviewingAction)} onClick={() => void reviewOperationReport("reviewed")} className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50">{reviewingAction === "reviewed" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}{opText("សម្គាល់ថាបានពិនិត្យ", "Mark Reviewed")}</button> : null}{loadedReportStatus === "reviewed" ? <button type="button" disabled={Boolean(reviewingAction)} onClick={() => void reviewOperationReport("approved")} className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50">{reviewingAction === "approved" ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />}{opText("អនុម័ត", "Approve")}</button> : null}<button type="button" disabled={Boolean(reviewingAction)} onClick={() => void reviewOperationReport("returned")} className="inline-flex items-center gap-2 rounded-xl border border-red-300 bg-white px-4 py-2 text-sm font-semibold text-red-700 hover:bg-red-50 disabled:opacity-50 dark:bg-slate-950 dark:text-red-300">{reviewingAction === "returned" ? <Loader2 className="h-4 w-4 animate-spin" /> : <XCircle className="h-4 w-4" />}{opText("បញ្ជូនត្រឡប់ឱ្យកែតម្រូវ", "Return for Correction")}</button></div></div> : null}
-      </section> : loadedReportStatus === "returned" && loadedReportRecord?.reviewComment ? <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900 dark:border-red-800 dark:bg-red-950/25 dark:text-red-200"><strong>{opText("បានបញ្ជូនត្រឡប់ឱ្យកែតម្រូវ៖", "Returned for correction:")}</strong> {loadedReportRecord.reviewComment}</div> : null}
-
-      {validationErrors.length ? <section role="alert" className="rounded-lg border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-900 dark:border-red-800 dark:bg-red-950/25 dark:text-red-200"><p className="font-bold">{opText("សូមបំពេញតម្រូវការទាំងនេះមុនពេលដាក់ស្នើ៖", "Complete these requirements before submitting:")}</p><ul className="mt-2 list-disc space-y-1 pl-5">{validationErrors.map((error) => <li key={error}>{error}</li>)}</ul></section> : null}
-      {!isBranchManagerReport && !reviewingAnotherSpecialist && reportLocked ? <section className="rounded-lg border border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-950 dark:border-amber-800 dark:bg-amber-950/25 dark:text-amber-100"><strong>{opText("របាយការណ៍ត្រូវបានចាក់សោសម្រាប់ពិនិត្យ៖", "Report locked for review:")}</strong> {opText("របាយការណ៍ដែលបានដាក់ស្នើ មិនអាចកែប្រែ ឬដាក់ស្នើម្តងទៀតបានទេ រហូតដល់ BM បញ្ជូនត្រឡប់ឱ្យកែតម្រូវ។ សម្រាប់របាយការណ៍ថ្មី សូមជ្រើសរើសកាលបរិច្ឆេទថ្មី។", "A submitted report cannot be changed or submitted again until the BM returns it for correction. Choose a new report date to create a new report.")}</section> : null}
-
-      <div role="tablist" aria-label="Operation Report forms" className="font-khmer-battambang sticky top-0 z-30 overflow-hidden border-b border-slate-300 bg-slate-100 px-1 pt-1 shadow-sm dark:border-slate-700 dark:bg-slate-900 print:hidden">
-        <div className="flex items-end">
+      <div role="tablist" aria-label="Operation Report forms" className="font-khmer-battambang rounded-xl border border-slate-200 bg-slate-100 p-2 shadow-sm dark:border-slate-700 dark:bg-slate-900 print:hidden">
+        <div className={`grid grid-cols-1 gap-2 sm:grid-cols-2 ${isBranchManagerReport ? "" : "xl:grid-cols-3"}`}>
           {(isBranchManagerReport ? ([
             ["summary", opText("សង្ខេបប្រចាំសាខា", "Dashboard")],
             ["collection", opText("ទិន្នន័យរួម LS + គណនេយ្យប្រចាំថ្ងៃ", "Daily LS + Account Consolidation")],
@@ -5976,15 +6056,25 @@ function OperationReportView({ loans, loading, canViewLoanData, onRefresh, onOpe
             ["summary", opText("របាយការណ៍សង្ខេប", "Summary")],
             ["collection", opText("អតិថិជនប្រមូល និងដោះស្រាយ", "Collection & Resolution")],
             ["decisions", opText("ឥណទានស្នើសុំ អនុម័ត និងបដិសេធ", "Loan Decisions")],
-          ] as const)).map(([value, label]) => <button key={value} type="button" role="tab" aria-selected={activeForm === value} onClick={() => setActiveForm(value)} className={`min-h-11 min-w-0 flex-1 border-x border-t px-2 py-2 text-center text-sm transition sm:px-5 sm:text-lg ${activeForm === value ? "border-slate-300 border-t-2 border-t-emerald-700 bg-white text-emerald-700 dark:border-slate-700 dark:bg-slate-950 dark:text-emerald-300" : "border-transparent text-slate-500 hover:bg-white/70 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200"}`}>{label}</button>)}
+          ] as const)).map(([value, label]) => <button key={value} type="button" role="tab" aria-selected={activeForm === value} onClick={() => setActiveForm(value)} className={reportFormTabClass(value)}>{label}</button>)}
         </div>
       </div>
+      </div>
+      {reportPanel === "form" && savedValuesOpen ? <RememberedReportValuesManager fields={rememberedFields} onRemove={forgetField} onClose={() => setSavedValuesOpen(false)} /> : null}
 
-      <Card className="overflow-hidden rounded-xl border border-slate-300 bg-white p-0 shadow-sm dark:border-slate-700 dark:bg-slate-950">
-        <fieldset disabled={reportSaveDisabled} className="min-w-0 border-0 p-0 disabled:opacity-90">
+      {reportPanel === "form" && reviewingAnotherSpecialist ? <section className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-4 text-sm text-amber-950 dark:border-amber-800 dark:bg-amber-950/25 dark:text-amber-100">
+        <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center"><span><strong>{opText("សម្រាប់ពិនិត្យប៉ុណ្ណោះ៖", "Review only:")}</strong> {opText("របាយការណ៍នេះជារបស់", "This report belongs to")} {reporterName || loadedReporterUsername}.</span><button type="button" onClick={openMyReport} className="shrink-0 font-semibold underline underline-offset-2">{opText("ត្រឡប់ទៅរបាយការណ៍ខ្ញុំ", "Return to My Report")}</button></div>
+        {loadedReportRecord?.reviewComment ? <div className="mt-3 border-t border-amber-200 pt-3 dark:border-amber-800"><p className="font-semibold">{opText("មតិយោបល់ពិនិត្យ", "Review Comment")}{loadedReportRecord.reviewedBy ? `: ${loadedReportRecord.reviewedBy}` : ""}</p><p className="mt-1 whitespace-pre-wrap">{loadedReportRecord.reviewComment}</p></div> : null}
+        {reviewCommentError ? <div role="alert" className="mt-3 rounded-lg border border-red-300 bg-red-50 px-3 py-2 font-semibold text-red-700 dark:border-red-800 dark:bg-red-950/30 dark:text-red-300">{opText("សូមសរសេរមូលហេតុក្នុងប្រអប់មតិយោបល់សិន រួចចុច «បញ្ជូនត្រឡប់ឱ្យកែតម្រូវ» ម្តងទៀត។", "Enter the correction reason in the comment box, then click Return for Correction again.")}</div> : null}
+        {canManageReports && ["submitted", "reviewed"].includes(loadedReportStatus) ? <div className="mt-4 border-t border-amber-200 pt-4 dark:border-amber-800"><Field label={opText("មតិយោបល់របស់អ្នកគ្រប់គ្រង", "Manager Review Comment")}><textarea rows={2} value={reviewComment} onChange={(event) => setReviewComment(event.target.value)} placeholder={opText("ត្រូវបញ្ចូលពេលបញ្ជូនត្រឡប់", "Required when returning for correction")} className={inputClass} /></Field><div className="mt-3 flex flex-wrap gap-2">{loadedReportStatus === "submitted" ? <button type="button" disabled={Boolean(reviewingAction)} onClick={() => void reviewOperationReport("reviewed")} className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50">{reviewingAction === "reviewed" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}{opText("សម្គាល់ថាបានពិនិត្យ", "Mark Reviewed")}</button> : null}{loadedReportStatus === "reviewed" ? <button type="button" disabled={Boolean(reviewingAction)} onClick={() => void reviewOperationReport("approved")} className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50">{reviewingAction === "approved" ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />}{opText("អនុម័ត", "Approve")}</button> : null}<button type="button" disabled={Boolean(reviewingAction)} onClick={() => void reviewOperationReport("returned")} className="inline-flex items-center gap-2 rounded-xl border border-red-300 bg-white px-4 py-2 text-sm font-semibold text-red-700 hover:bg-red-50 disabled:opacity-50 dark:bg-slate-950 dark:text-red-300">{reviewingAction === "returned" ? <Loader2 className="h-4 w-4 animate-spin" /> : <XCircle className="h-4 w-4" />}{opText("បញ្ជូនត្រឡប់ឱ្យកែតម្រូវ", "Return for Correction")}</button></div></div> : null}
+      </section> : loadedReportStatus === "returned" && loadedReportRecord?.reviewComment ? <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900 dark:border-red-800 dark:bg-red-950/25 dark:text-red-200"><strong>{opText("បានបញ្ជូនត្រឡប់ឱ្យកែតម្រូវ៖", "Returned for correction:")}</strong> {loadedReportRecord.reviewComment}</div> : null}
+
+      {reportPanel === "form" && validationErrors.length ? <section role="alert" className="rounded-lg border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-900 dark:border-red-800 dark:bg-red-950/25 dark:text-red-200"><p className="font-bold">{opText("សូមបំពេញតម្រូវការទាំងនេះមុនពេលដាក់ស្នើ៖", "Complete these requirements before submitting:")}</p><ul className="mt-2 list-disc space-y-1 pl-5">{validationErrors.map((error) => <li key={error}>{error}</li>)}</ul></section> : null}
+      <Card className="min-w-0 overflow-x-auto rounded-xl border border-slate-300 bg-white p-0 shadow-sm dark:border-slate-700 dark:bg-slate-950">
+        <fieldset disabled={reportPanel === "records" || reportSaveDisabled || viewOnly} className="min-w-0 border-0 p-0 disabled:opacity-90">
         <div className="overflow-hidden">
           <div className="font-khmer-battambang min-w-0 text-slate-950 dark:text-slate-100">
-            {reportSheetHeader}
+            {!viewOnly ? reportSheetHeader : null}
             {activeForm === "summary" ? isBranchManagerReport ? <BranchManagerDashboardReport records={branchManagerRecords} monthRecords={branchManagerMonthRecords} yearRecords={branchManagerYearRecords} accountRecords={branchAccountRecords} monthAccountRecords={branchAccountMonthRecords} yearAccountRecords={branchAccountYearRecords} loans={branchManagerLoans} reportDate={reportDate} /> : <OperationSummaryTable dueCount={dueCustomerCount} paidCount={paidCustomerCount} collectionRate={collectionRate} followUpRows={followUpRows} formalNoticeRows={formalNoticeRows} requestedRows={requestedRows} approvedRows={approvedRows} rejectedRows={rejectedRows} /> : null}
             {activeForm === "collection" ? isBranchManagerReport ? <BranchManagerConsolidatedReport records={branchManagerRecords} accountRecords={branchAccountRecords} loans={branchManagerLoans} /> : <>
               <div className="grid grid-cols-1 lg:grid-cols-2"><CollectionReportTable title={opText("អតិថិជនដែលត្រូវប្រមូលសរុប", "Total Customers Due")} rows={collectionDueRows} onChange={setCollectionDueRows} onRememberField={rememberField} /><CollectionReportTable title={opText("អតិថិជនដែលប្រមូលបានសរុប", "Total Customers Collected")} rows={collectionPaidRows} onChange={setCollectionPaidRows} accent="red" onRememberField={rememberField} /></div>
@@ -5996,7 +6086,18 @@ function OperationReportView({ loans, loading, canViewLoanData, onRefresh, onOpe
         </fieldset>
       </Card>
 
-      {activeForm === "summary" ? <div className="space-y-6 print:hidden">{isBranchManagerReport ? <><BranchManagerWorkflowPanel sourceRecords={branchManagerRecords} sourceReportHistory={branchLoanSpecialistRecords} accountRecords={branchAccountRecords} accountReportHistory={branchAccountReportHistory} submissions={branchManagerReports} reportDate={reportDate} branch={branch} currentUsername={user.username} reviewingAction={reviewingAction} onOpen={(record) => { setReportDate(record.reportDate); setBranch(record.branch); }} onReview={(record, action) => void reviewBranchManagerSubmission(record, action)} onReviewAccount={(record, action) => void reviewAccountReport(record, action)} /><OperationReportRecordsDashboard records={branchLoanSpecialistRecords} loading={reportsLoading} currentUsername={user.username} canManageReports={canManageReports} deletingReportId={deletingReportId} onEdit={editSavedReport} onDelete={deleteSavedReport} /><PaymentDateAlerts loans={branchManagerLoans} canViewLoanData={canViewLoanData} onOpenLoan={onOpenLoan} /></> : <><OperationReportRecordsDashboard records={visibleSavedReports} loading={reportsLoading} currentUsername={user.username} canManageReports={canManageReports} deletingReportId={deletingReportId} onEdit={editSavedReport} onDelete={deleteSavedReport} /><OperationMyWorkToday loans={myDueLoans} report={myReportForDate} reportDate={reportDate} canPrepare={!reviewingAnotherSpecialist && !reportLocked && canViewLoanData} onPrepare={prepareDailyWork} onOpenLoan={onOpenLoan} /><PaymentDateAlerts loans={visibleLoans} canViewLoanData={canViewLoanData} onOpenLoan={onOpenLoan} /></>}</div> : null}
+      {reportPanel === "records" ? (
+        <div className="space-y-6 print:hidden">
+          {isBranchManagerReport ? (
+            <>
+              <BranchManagerWorkflowPanel sourceRecords={branchManagerRecords} sourceReportHistory={branchLoanSpecialistRecords} accountRecords={branchAccountRecords} accountReportHistory={branchAccountReportHistory} submissions={branchManagerReports} reportDate={reportDate} branch={branch} currentUsername={user.username} reviewingAction={reviewingAction} onOpen={(record) => { setReportDate(record.reportDate); setBranch(record.branch); setReportPanel("form"); setViewOnly(true); }} onReview={(record, action) => void reviewBranchManagerSubmission(record, action)} onReviewAccount={(record, action) => void reviewAccountReport(record, action)} />
+              <OperationReportRecordsDashboard records={branchLoanSpecialistRecords} loading={reportsLoading} currentUsername={user.username} canManageReports={canManageReports} deletingReportId={deletingReportId} onCreate={startNewLsReportFromRecords} onView={(record) => openSavedReport(record, true)} onEdit={editSavedReport} onDelete={deleteSavedReport} />
+            </>
+          ) : (
+            <OperationReportRecordsDashboard records={visibleSavedReports} loading={reportsLoading} currentUsername={user.username} canManageReports={canManageReports} deletingReportId={deletingReportId} onCreate={startNewLsReportFromRecords} onView={(record) => openSavedReport(record, true)} onEdit={editSavedReport} onDelete={deleteSavedReport} />
+          )}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -6058,7 +6159,7 @@ function OperationMyWorkToday({ loans, report, reportDate, canPrepare, onPrepare
   );
 }
 
-function OperationReportRecordsDashboard({ records, loading, currentUsername, canManageReports, deletingReportId, onEdit, onDelete }: { records: OperationReportRecord[]; loading: boolean; currentUsername: string; canManageReports: boolean; deletingReportId: string | null; onEdit: (record: OperationReportRecord) => void; onDelete: (record: OperationReportRecord) => void }) {
+function OperationReportRecordsDashboard({ records, loading, currentUsername, canManageReports, deletingReportId, onCreate, onView, onEdit, onDelete }: { records: OperationReportRecord[]; loading: boolean; currentUsername: string; canManageReports: boolean; deletingReportId: string | null; onCreate: () => void; onView: (record: OperationReportRecord) => void; onEdit: (record: OperationReportRecord) => void; onDelete: (record: OperationReportRecord) => void }) {
   const { language } = useLanguage();
   const { success: toastSuccess, error: toastError } = useToast();
   const text = (km: string, en: string) => language === "km" ? km : en;
@@ -6140,7 +6241,10 @@ function OperationReportRecordsDashboard({ records, loading, currentUsername, ca
 
   return (
     <section className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
-      <div className="border-b border-slate-200 px-5 py-4 dark:border-slate-800"><p className="text-sm font-semibold text-emerald-700">{canManageReports ? text("អ្នកឯកទេសផ្ដល់កម្ចីទាំងអស់", "All Loan Specialists") : text("របាយការណ៍របស់ខ្ញុំ", "My LS Reports")}</p><h2 className="mt-1 text-xl font-bold text-slate-900 dark:text-white">{text("កំណត់ត្រារបាយការណ៍ LS ប្រចាំថ្ងៃ / ខែ / ឆ្នាំ", "Daily / Monthly / Yearly LS Report Records")}</h2></div>
+      <div className="flex flex-col gap-3 border-b border-slate-200 px-5 py-4 dark:border-slate-800 sm:flex-row sm:items-center sm:justify-between">
+        <div><p className="text-sm font-semibold text-emerald-700">{canManageReports ? text("អ្នកឯកទេសផ្ដល់កម្ចីទាំងអស់", "All Loan Specialists") : text("របាយការណ៍របស់ខ្ញុំ", "My LS Reports")}</p><h2 className="mt-1 text-xl font-bold text-slate-900 dark:text-white">{text("កំណត់ត្រារបាយការណ៍ LS ប្រចាំថ្ងៃ / ខែ / ឆ្នាំ", "Daily / Monthly / Yearly LS Report Records")}</h2></div>
+        <button type="button" onClick={onCreate} className="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-700"><FilePlus2 className="h-4 w-4" />{text("របាយការណ៍ថ្មី", "New Report")}</button>
+      </div>
       <div className="grid border-b border-slate-200 sm:grid-cols-2 xl:grid-cols-4 dark:border-slate-800">
         {[[text("កំណត់ត្រាសរុប", "Total Records"), filtered.length], [text("បានដាក់ស្នើ", "Submitted"), submitted], [text("អ្នកឯកទេសផ្កល់កម្ចី", "Loan Specialists"), specialists], [text("បានរាយការណ៍ថ្ងៃនេះ", "Reported Today"), todayReports]].map(([label, value]) => <div key={label} className="border-b border-slate-200 px-5 py-4 last:border-b-0 sm:border-r xl:border-b-0 dark:border-slate-800"><p className="text-xs font-semibold text-slate-500">{label}</p><p className="mt-1 text-2xl font-bold text-slate-900 dark:text-white">{value}</p></div>)}
       </div>

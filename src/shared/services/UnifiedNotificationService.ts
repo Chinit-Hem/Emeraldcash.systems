@@ -83,7 +83,7 @@ function auditNotification(row: AuditRow, user: SessionUser): UnifiedNotificatio
       message: isReturned
         ? `${actor} returned your ${reportLabel} Report${branch ? ` for ${branch}` : ""}${reportDate ? ` on ${reportDate}` : ""} for correction.${comment ? ` ${comment}` : ""}`
         : `${actor} submitted ${reportType === "bm" ? "a BM" : "an LS"} Report${branch ? ` for ${branch}` : ""}${reportDate ? ` on ${reportDate}` : ""}.`,
-      readAt: null, createdAt: toIsoDate(row.created_at), href: "/loan?view=operationReport",
+      readAt: null, createdAt: toIsoDate(row.created_at), href: "/loan?view=operationReport&reportPanel=records",
     };
   }
 
@@ -101,7 +101,7 @@ function auditNotification(row: AuditRow, user: SessionUser): UnifiedNotificatio
       message: isReturned
         ? `${actor} returned your Account Report${branch ? ` for ${branch}` : ""}${reportDate ? ` on ${reportDate}` : ""} for correction.${comment ? ` ${comment}` : ""}`
         : `${actor} submitted an Account Report${branch ? ` for ${branch}` : ""}${reportDate ? ` on ${reportDate}` : ""}.`,
-      readAt: null, createdAt: toIsoDate(row.created_at), href: "/loan?view=accounting&accountMode=accountReport",
+      readAt: null, createdAt: toIsoDate(row.created_at), href: "/loan?view=accounting&accountMode=accountReport&reportPanel=records",
     };
   }
 
