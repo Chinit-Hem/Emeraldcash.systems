@@ -4738,7 +4738,10 @@ function AccountReportView() {
         if (typeof storedDraft.reporterName === "string") setReporterName(storedDraft.reporterName);
         if (typeof storedDraft.reporterRole === "string") setReporterRole(storedDraft.reporterRole);
         if (typeof storedDraft.department === "string") setDepartment(storedDraft.department);
-        if (typeof storedDraft.branch === "string") setBranch(storedDraft.branch);
+        // A profile branch change must override an old browser draft. Opened
+        // historical records set their own branch later via applySavedReport.
+        if (user.branch?.trim()) setBranch(user.branch.trim());
+        else if (typeof storedDraft.branch === "string") setBranch(storedDraft.branch);
         if (storedDraft.activeSheet === "summary" || storedDraft.activeSheet === "collection") setActiveSheet(storedDraft.activeSheet);
         if (storedDraft.loadedStatus && ["draft", "submitted", "reviewed", "approved", "returned"].includes(storedDraft.loadedStatus)) setLoadedStatus(storedDraft.loadedStatus);
         if (typeof storedDraft.loadedReporterUsername === "string" && storedDraft.loadedReporterUsername) setLoadedReporterUsername(storedDraft.loadedReporterUsername);
@@ -4751,7 +4754,7 @@ function AccountReportView() {
       }
     } catch { /* Browser storage may be unavailable or contain an older format. */ }
     setLocalDraftHydrated(true);
-  }, [assetTypeStorageKey, localDraftStorageKey]);
+  }, [assetTypeStorageKey, localDraftStorageKey, user.branch]);
 
   useEffect(() => {
     if (!localDraftHydrated) return;
