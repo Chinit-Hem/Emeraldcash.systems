@@ -4685,6 +4685,9 @@ function AccountReportView() {
   const [reportPanel, setReportPanel] = useState<"records" | "form">("records");
   const [viewOnly, setViewOnly] = useState(false);
   const [deletingReportId, setDeletingReportId] = useState<string | null>(null);
+  const [reviewingAction, setReviewingAction] = useState<"reviewed" | "returned" | null>(null);
+  const [reviewComment, setReviewComment] = useState("");
+  const [reviewCommentError, setReviewCommentError] = useState(false);
   const accountReportBranchName = branch.trim().toLocaleLowerCase() === "boeung keng kang" ? "បឹងកេងកង" : branch;
   const restoredLocalDraft = useRef(false);
   const initializedSavedAccountReport = useRef(false);
@@ -4695,6 +4698,8 @@ function AccountReportView() {
   const { fields: rememberedFields, remember: rememberField, forget: forgetField } = useRememberedReportFields(rememberedFieldsStorageKey);
   const reviewingAnotherAccountReport = loadedReporterUsername.trim().toLocaleLowerCase() !== user.username.trim().toLocaleLowerCase();
   const reportLocked = reviewingAnotherAccountReport || !["draft", "returned"].includes(loadedStatus);
+  const canReviewAccount = ["admin", "system administrator", "manager / approver", "branch manager", "bm", "credit manager", "credit / approver"].includes(user.role.trim().toLocaleLowerCase())
+    || ["branch manager", "bm", "credit manager", "credit / approver"].includes((user.position || "").trim().toLocaleLowerCase());
 
   const selectableAssetTypes = useMemo(() => Array.from(new Set([
     ...rememberedAssetTypes,
@@ -4804,6 +4809,7 @@ function AccountReportView() {
     setClosedRows(record.data.closedRows?.length ? record.data.closedRows : createAccountResolutionRows());
     setLoadedStatus(record.status);
     setLoadedReporterUsername(record.reporterUsername);
+    setReviewComment(record.reviewComment || "");
   }, []);
 
   const openSavedAccountReport = useCallback((record: AccountReportRecord, sheet: AccountReportSheet, readOnly = false) => {
@@ -4923,6 +4929,24 @@ function AccountReportView() {
     } finally {
       setDeletingReportId(null);
     }
+  };
+
+  const reviewLoadedAccountReport = async (action: "reviewed" | "returned") => {
+    if (!canReviewAccount) return;
+    const record = savedReports.find((item) => item.id === searchParams.get("accountReportId"))
+      || savedReports.find((item) => item.reporterUsername === loadedReporterUsername && item.reportDate === reportDate);
+    if (!record) return;
+    if (action === "returned" && !reviewComment.trim()) { setReviewCommentError(true); return; }
+    setReviewingAction(action);
+    try {
+      const updated = await api<AccountReportRecord>("/api/loan/account-reports", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: record.id, action, comment: reviewComment.trim() }) });
+      setLoadedStatus(updated.status);
+      setReviewComment(updated.reviewComment || "");
+      setReviewCommentError(false);
+      toastSuccess(action === "reviewed" ? "Account Report marked as reviewed." : "Account Report returned for correction.");
+      await loadAccountReports();
+    } catch (caught) { toastError(caught instanceof Error ? caught.message : "Could not update Account Report review"); }
+    finally { setReviewingAction(null); }
   };
 
   const saveAccountReport = async (status: "draft" | "submitted") => {
@@ -5055,6 +5079,7 @@ function AccountReportView() {
       {reportPanel === "form" && savedValuesOpen ? <RememberedReportValuesManager fields={rememberedFields} onRemove={forgetField} onClose={() => setSavedValuesOpen(false)} /> : null}
       {reportPanel === "form" && loadedStatus === "returned" ? <section className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900 dark:border-red-800 dark:bg-red-950/25 dark:text-red-200"><strong>Returned for correction:</strong> {savedReports.find((record) => record.reporterUsername === loadedReporterUsername && record.reportDate === reportDate)?.reviewComment || "Please update the report and submit it again."}</section> : null}
       {reportPanel === "form" && reviewingAnotherAccountReport ? <section className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950 dark:border-amber-800 dark:bg-amber-950/25 dark:text-amber-100"><strong>{language === "km" ? "សម្រាប់មើលតែប៉ុណ្ណោះ៖" : "View only:"}</strong> {language === "km" ? "របាយការណ៍នេះជារបស់" : "This Account Report belongs to"} {reporterName || loadedReporterUsername}.</section> : null}
+      {reportPanel === "form" && reviewingAnotherAccountReport && canReviewAccount && ["submitted", "reviewed"].includes(loadedStatus) ? <section className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950 dark:border-amber-800 dark:bg-amber-950/25 dark:text-amber-100"><Field label={language === "km" ? "មតិយោបល់របស់អ្នកគ្រប់គ្រង" : "Manager Review Comment"}><textarea rows={2} value={reviewComment} onChange={(event) => { setReviewComment(event.target.value); if (event.target.value.trim()) setReviewCommentError(false); }} placeholder={language === "km" ? "ត្រូវបញ្ចូលពេលបញ្ជូនត្រឡប់" : "Required when returning for correction"} className={inputClass} /></Field>{reviewCommentError ? <p className="mt-2 font-semibold text-red-700">{language === "km" ? "សូមបញ្ចូលមតិយោបល់សម្រាប់ការបញ្ជូនត្រឡប់។" : "Enter a comment before returning the report."}</p> : null}<div className="mt-3 flex flex-wrap gap-2">{loadedStatus === "submitted" ? <button type="button" disabled={Boolean(reviewingAction)} onClick={() => void reviewLoadedAccountReport("reviewed")} className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"><Check className="h-4 w-4" />{language === "km" ? "សម្គាល់ថាបានពិនិត្យ" : "Mark Reviewed"}</button> : null}<button type="button" disabled={Boolean(reviewingAction)} onClick={() => void reviewLoadedAccountReport("returned")} className="inline-flex items-center gap-2 rounded-xl border border-red-300 bg-white px-4 py-2 text-sm font-semibold text-red-700 hover:bg-red-50 disabled:opacity-50"><XCircle className="h-4 w-4" />{language === "km" ? "បញ្ជូនត្រឡប់ឱ្យកែតម្រូវ" : "Return for Correction"}</button></div></section> : null}
       {reportPanel === "form" && duplicateAccountCustomers.length ? <section role="alert" className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/25 dark:text-amber-100"><strong>Duplicate customer warning:</strong> {duplicateAccountCustomers.join(", ")}</section> : null}
       <div ref={accountReportFormRef} className="scroll-mt-20">
       <Card className="min-w-0 overflow-hidden rounded-xl border border-slate-300 bg-white p-0 shadow-sm dark:border-slate-700 dark:bg-slate-950">
