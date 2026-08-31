@@ -314,14 +314,29 @@ export default function TopBar({
     }
   };
 
+  const displayedRole = user && user.role.trim().toLocaleLowerCase() === "staff" && user.position?.trim() ? user.position.trim() : user?.role;
   const roleLabel = user
     ? language === "km"
-      ? user.role === "Admin"
-        ? "អ្នកគ្រប់គ្រង"
-        : user.role === "Finance"
-          ? "ហិរញ្ញវត្ថុ"
-          : "បុគ្គលិក"
-      : user.role
+      ? ({
+          Admin: "អ្នកគ្រប់គ្រង",
+          "System Administrator": "អ្នកគ្រប់គ្រងប្រព័ន្ធ",
+          "Branch Manager": "អ្នកគ្រប់គ្រងសាខា",
+          "Manager / Approver": "អ្នកគ្រប់គ្រង / អ្នកអនុម័ត",
+          "Loan Operations": "ប្រតិបត្តិការឥណទាន",
+          "Loan Specialist": "អ្នកឯកទេសផ្ដល់កម្ចី",
+          Accountant: "គណនេយ្យករ",
+          "Assistant Accountant": "ជំនួយការគណនេយ្យ",
+          "Credit / Approver": "ឥណទាន / អ្នកអនុម័ត",
+          Finance: "ហិរញ្ញវត្ថុ",
+          "Human Resources": "ធនធានមនុស្ស",
+          "IT Support": "ជំនួយ IT",
+          "Risk & Compliance": "ហានិភ័យ និងអនុលោមភាព",
+          Marketing: "ទីផ្សារ",
+          "Intern / Read Only": "ហាត់ការ / អានតែប៉ុណ្ណោះ",
+          "Executive Viewer": "អ្នកគ្រប់គ្រងមើលទិន្នន័យ",
+          Staff: "បុគ្គលិក",
+        } as Record<string, string>)[displayedRole || user.role] || displayedRole || user.role
+      : displayedRole || ""
     : "";
   const displayUserName = user && user.full_name?.trim() && user.full_name.trim().toLocaleLowerCase() !== roleLabel.trim().toLocaleLowerCase() ? user.full_name : user?.username || "";
 
@@ -648,7 +663,7 @@ export default function TopBar({
                     </div>
 
                     <div className="p-2">
-                      {user.role === "Admin" ? (
+                      {["admin", "system administrator"].includes(user.role.trim().toLocaleLowerCase()) ? (
                         <button
                           type="button"
                           onClick={() => goToAccountPage("/admin/users")}
