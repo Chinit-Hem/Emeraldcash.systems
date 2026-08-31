@@ -5185,11 +5185,16 @@ function AccountingDirectory({ onOpenJournalItems }: { onOpenJournalItems: (acco
   const { error: toastError, info: toastInfo } = useToast();
   const user = useAuthUser();
   const searchParams = useSearchParams();
+  const normalizedRole = user.role.trim().toLocaleLowerCase();
+  const normalizedPosition = (user.position || "").trim().toLocaleLowerCase();
+  const canViewAccountReport = ["admin", "manager / approver", "branch manager", "bm", "credit manager", "executive viewer", "finance"].includes(normalizedRole)
+    || normalizedPosition.includes("accountant")
+    || normalizedPosition.includes("finance");
   const [accounts, setAccounts] = useState<LoanBankingAccount[]>([]);
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
   const accountModeStorageKey = `emeraldcash.accounting.mode.${user.username}`;
-  const [mode, setMode] = useState<AccountReportMode>(searchParams.get("accountMode") === "accountReport" ? "accountReport" : "banking");
+  const [mode, setMode] = useState<AccountReportMode>(searchParams.get("accountMode") === "accountReport" && canViewAccountReport ? "accountReport" : "banking");
 
   const selectMode = (nextMode: AccountReportMode) => {
     setMode(nextMode);
@@ -5197,12 +5202,12 @@ function AccountingDirectory({ onOpenJournalItems }: { onOpenJournalItems: (acco
   };
 
   useEffect(() => {
-    if (searchParams.get("accountMode") === "accountReport") {
+    if (searchParams.get("accountMode") === "accountReport" && canViewAccountReport) {
       setMode("accountReport");
       return;
     }
     try { setMode(window.localStorage.getItem(accountModeStorageKey) === "accountReport" ? "accountReport" : "banking"); } catch { /* Browser storage may be unavailable. */ }
-  }, [accountModeStorageKey, searchParams]);
+  }, [accountModeStorageKey, canViewAccountReport, searchParams]);
 
   useEffect(() => {
     let active = true;
@@ -5234,7 +5239,7 @@ function AccountingDirectory({ onOpenJournalItems }: { onOpenJournalItems: (acco
         <div className="mt-4 flex flex-wrap items-center gap-3">
           <div className="inline-flex rounded-xl border border-slate-200 bg-slate-50 p-1 dark:border-slate-700 dark:bg-slate-900">
             <button type="button" onClick={() => selectMode("banking")} className={`rounded-lg px-3 py-2 text-sm font-semibold ${mode === "banking" ? "bg-emerald-600 text-white" : "text-slate-600 hover:bg-white dark:text-slate-300 dark:hover:bg-slate-800"}`}>Banking</button>
-            <button type="button" onClick={() => selectMode("accountReport")} className={`rounded-lg px-3 py-2 text-sm font-semibold ${mode === "accountReport" ? "bg-emerald-600 text-white" : "text-slate-600 hover:bg-white dark:text-slate-300 dark:hover:bg-slate-800"}`}>Account Report</button>
+            {canViewAccountReport ? <button type="button" onClick={() => selectMode("accountReport")} className={`rounded-lg px-3 py-2 text-sm font-semibold ${mode === "accountReport" ? "bg-emerald-600 text-white" : "text-slate-600 hover:bg-white dark:text-slate-300 dark:hover:bg-slate-800"}`}>Account Report</button> : null}
           </div>
           {mode === "banking" ? <><span className="ml-auto text-sm font-semibold text-slate-600 dark:text-slate-300">{visibleAccounts.length ? `1-${visibleAccounts.length}` : "0-0"}</span><span className="text-slate-300">|</span><span className="text-sm font-semibold text-slate-600 dark:text-slate-300">{accounts.length}</span><button type="button" disabled className="rounded-full bg-slate-100 p-2.5 text-slate-400 disabled:opacity-60 dark:bg-slate-800"><ChevronDown className="h-4 w-4 rotate-90" /></button><button type="button" disabled className="rounded-full bg-slate-100 p-2.5 text-slate-400 disabled:opacity-60 dark:bg-slate-800"><ChevronDown className="h-4 w-4 -rotate-90" /></button><span className="flex-1" /><button type="button" onClick={() => toastInfo("Use the search field to filter banking accounts.")} className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-4 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300"><Search className="h-4 w-4" /> Filters <ChevronDown className="h-4 w-4" /></button><button type="button" onClick={() => toastInfo("Accounts are grouped as Bank and Cash.")} className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-4 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300"><List className="h-4 w-4" /> Group By <ChevronDown className="h-4 w-4" /></button></> : null}
         </div>
@@ -6018,6 +6023,14 @@ function OperationReportView({ loans, loading, canViewLoanData, onRefresh, onOpe
         : activeForm === value ? "border-amber-600 bg-amber-500 text-white ring-amber-200 hover:bg-amber-600 dark:ring-amber-900" : "border-amber-200 bg-amber-50 text-amber-800 hover:border-amber-400 hover:bg-amber-100 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200 dark:hover:bg-amber-900/60";
     return `min-h-12 min-w-0 rounded-xl border-2 px-4 py-2 text-center text-base font-bold shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md ${activeForm === value ? "shadow-md ring-2" : ""} ${color}`;
   };
+
+  const canViewBothReports = ["admin", "manager / approver", "branch manager", "bm", "credit manager", "executive viewer"].includes(normalizedUserRole);
+  const accountOnlyUser = !canViewBothReports && (normalizedUserRole === "finance"
+    || (user.position || "").trim().toLocaleLowerCase().includes("accountant")
+    || (user.position || "").trim().toLocaleLowerCase().includes("finance"));
+  if (accountOnlyUser) {
+    return <Card className="border-amber-200 bg-amber-50 p-6 text-amber-950 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-100">{opText("គណនេយ្យអាចមើលបានតែរបាយការណ៍គណនេយ្យប៉ុណ្ណោះ។", "Accounting users can view Account Reports only.")}</Card>;
+  }
 
   return (
     <div className="min-w-0 space-y-4 pb-10 lg:[zoom:0.9]">
