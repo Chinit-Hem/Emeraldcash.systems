@@ -30,7 +30,7 @@ export const staffSchema = z.object({
   fullName: z.string().min(2, "Full name required").max(50),
   email: z.string().email("Valid email").or(z.literal("")).optional(),
   branchLocation: z.string().max(100).optional(),
-  role: z.enum(["Admin", "Staff", "Loan Operations", "Manager / Approver", "Finance", "Human Resources", "IT Support", "Risk & Compliance", "Marketing", "Intern / Read Only", "Executive Viewer"]),
+  role: z.enum(["System Administrator", "Branch Manager", "Loan Operations", "Loan Specialist", "Accountant", "Assistant Accountant", "Credit / Approver", "Admin", "Staff", "Manager / Approver", "Finance", "Human Resources", "IT Support", "Risk & Compliance", "Marketing", "Intern / Read Only", "Executive Viewer"]),
   phone: z.string().max(20).optional(),
   isActive: z.boolean(),
 });

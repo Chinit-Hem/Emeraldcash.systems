@@ -79,15 +79,15 @@ export async function ensureAccountReportsTable() {
 }
 
 function canViewAll(role: string) {
-  return ["admin", "manager / approver", "branch manager", "bm", "credit manager", "executive viewer"].includes(role.trim().toLocaleLowerCase());
+  return ["admin", "system administrator", "manager / approver", "branch manager", "bm", "credit manager", "credit / approver", "executive viewer"].includes(role.trim().toLocaleLowerCase());
 }
 
 function canReview(role: string) {
-  return ["admin", "manager / approver", "branch manager", "bm", "credit manager"].includes(role.trim().toLocaleLowerCase());
+  return ["admin", "system administrator", "manager / approver", "branch manager", "bm", "credit manager", "credit / approver"].includes(role.trim().toLocaleLowerCase());
 }
 
 function canDeleteReport(role: string) {
-  return role.trim().toLocaleLowerCase() === "admin";
+  return ["admin", "system administrator"].includes(role.trim().toLocaleLowerCase());
 }
 
 function hasCustomerActivity(data: Record<string, unknown>) {

@@ -17,7 +17,7 @@
 import type { Role } from "@/shared/types/types";
 
 // Unified role system - same as settings/users
-export const LMS_ROLES: Role[] = ["Admin", "Staff", "Loan Operations", "Manager / Approver", "Finance", "Human Resources", "IT Support", "Risk & Compliance", "Marketing", "Intern / Read Only", "Executive Viewer"];
+export const LMS_ROLES: Role[] = ["System Administrator", "Branch Manager", "Loan Operations", "Loan Specialist", "Accountant", "Assistant Accountant", "Credit / Approver", "Admin", "Staff", "Manager / Approver", "Finance", "Human Resources", "IT Support", "Risk & Compliance", "Marketing", "Intern / Read Only", "Executive Viewer"];
 
 export type LmsRole = Role;
 

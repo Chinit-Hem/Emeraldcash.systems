@@ -5,6 +5,12 @@ import { DEFAULT_ROLE_PERMISSIONS, PERMISSION_LABELS, type Permission } from "@/
 import { useLanguage } from "@/shared/hooks/LanguageContext";
 
 const roleDescriptions: Record<string, string> = {
+  "System Administrator": "IT/Admin manages users, roles, permissions, and system configuration.",
+  "Branch Manager": "Branch performance, report review, and report approval.",
+  "Loan Specialist": "Creates and manages loans and customer follow-up.",
+  Accountant: "Accounting, repayment, disbursement, and account reports.",
+  "Assistant Accountant": "Accounting support with lower-level permissions.",
+  "Credit / Approver": "Credit review and loan approval within the approval limit.",
   Admin: "Full system access and security administration.",
   Staff: "Standard day-to-day system access.",
   "Loan Operations": "Loan preparation, collection, collateral review, and operational reporting.",

@@ -5080,7 +5080,7 @@ function AccountReportView() {
         </fieldset>
       </Card>
       </div>
-      {reportPanel === "records" ? <AccountReportRecordsDashboard records={savedReports} loading={reportsLoading} currentUsername={user.username} language={language} deletingReportId={deletingReportId} canManageReports={["admin", "manager / approver", "branch manager", "bm", "credit manager"].includes(user.role.trim().toLocaleLowerCase())} canDeleteReports={user.role.trim().toLocaleLowerCase() === "admin"} onCreate={startNewAccountReport} onOpen={openSavedAccountReport} onDelete={deleteAccountReport} /> : null}
+      {reportPanel === "records" ? <AccountReportRecordsDashboard records={savedReports} loading={reportsLoading} currentUsername={user.username} language={language} deletingReportId={deletingReportId} canManageReports={["admin", "system administrator", "manager / approver", "branch manager", "bm", "credit manager", "credit / approver"].includes(user.role.trim().toLocaleLowerCase())} canDeleteReports={["admin", "system administrator"].includes(user.role.trim().toLocaleLowerCase())} onCreate={startNewAccountReport} onOpen={openSavedAccountReport} onDelete={deleteAccountReport} /> : null}
       <datalist id="account-report-reasons">{ACCOUNT_REPORT_COLLECTION_REASONS.map((reason) => <option key={reason} value={reason} />)}</datalist>
       <datalist id="account-report-asset-types">{selectableAssetTypes.map((type) => <option key={type} value={type} />)}</datalist>
       {ACCOUNT_REPORT_REUSABLE_FIELDS.map((field) => <datalist key={field} id={`account-report-${field}-options`}>{reusableAccountValues(field).map((value) => <option key={value} value={value} />)}</datalist>)}
@@ -5187,7 +5187,7 @@ function AccountingDirectory({ onOpenJournalItems }: { onOpenJournalItems: (acco
   const searchParams = useSearchParams();
   const normalizedRole = user.role.trim().toLocaleLowerCase();
   const normalizedPosition = (user.position || "").trim().toLocaleLowerCase();
-  const canViewAccountReport = ["admin", "manager / approver", "branch manager", "bm", "credit manager", "executive viewer", "finance"].includes(normalizedRole)
+  const canViewAccountReport = ["admin", "system administrator", "manager / approver", "branch manager", "bm", "credit manager", "credit / approver", "executive viewer", "finance", "accountant", "assistant accountant"].includes(normalizedRole)
     || normalizedPosition.includes("accountant")
     || normalizedPosition.includes("finance");
   const [accounts, setAccounts] = useState<LoanBankingAccount[]>([]);
@@ -5425,8 +5425,8 @@ function OperationReportView({ loans, loading, canViewLoanData, onRefresh, onOpe
   }, [reviewComment]);
 
   const normalizedUserRole = user.role.trim().toLocaleLowerCase();
-  const canManageReports = ["admin", "manager / approver", "branch manager", "bm", "credit manager"].includes(normalizedUserRole);
-  const roleDefaultsToBranchManagerReport = ["manager / approver", "branch manager", "bm", "credit manager"].includes(normalizedUserRole);
+  const canManageReports = ["admin", "system administrator", "manager / approver", "branch manager", "bm", "credit manager", "credit / approver"].includes(normalizedUserRole);
+  const roleDefaultsToBranchManagerReport = ["manager / approver", "branch manager", "bm", "credit manager", "credit / approver"].includes(normalizedUserRole);
   const [reportMode, setReportMode] = useState<"operation" | "branchManager">(roleDefaultsToBranchManagerReport ? "branchManager" : "operation");
   const isBranchManagerReport = reportMode === "branchManager";
   const selectReportMode = (mode: "operation" | "branchManager") => {
@@ -6024,8 +6024,8 @@ function OperationReportView({ loans, loading, canViewLoanData, onRefresh, onOpe
     return `min-h-12 min-w-0 rounded-xl border-2 px-4 py-2 text-center text-base font-bold shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md ${activeForm === value ? "shadow-md ring-2" : ""} ${color}`;
   };
 
-  const canViewBothReports = ["admin", "manager / approver", "branch manager", "bm", "credit manager", "executive viewer"].includes(normalizedUserRole);
-  const accountOnlyUser = !canViewBothReports && (normalizedUserRole === "finance"
+  const canViewBothReports = ["admin", "system administrator", "manager / approver", "branch manager", "bm", "credit manager", "credit / approver", "executive viewer"].includes(normalizedUserRole);
+  const accountOnlyUser = !canViewBothReports && (["finance", "accountant", "assistant accountant"].includes(normalizedUserRole)
     || (user.position || "").trim().toLocaleLowerCase().includes("accountant")
     || (user.position || "").trim().toLocaleLowerCase().includes("finance"));
   if (accountOnlyUser) {
@@ -6109,10 +6109,10 @@ function OperationReportView({ loans, loading, canViewLoanData, onRefresh, onOpe
           {isBranchManagerReport ? (
             <>
               <BranchManagerWorkflowPanel sourceRecords={branchManagerRecords} sourceReportHistory={branchLoanSpecialistRecords} accountRecords={branchAccountRecords} accountReportHistory={branchAccountReportHistory} submissions={branchManagerReports} reportDate={reportDate} branch={branch} currentUsername={user.username} reviewingAction={reviewingAction} onOpen={(record) => { setReportDate(record.reportDate); setBranch(record.branch); setReportPanel("form"); setViewOnly(true); }} onReview={(record, action) => void reviewBranchManagerSubmission(record, action)} onReviewAccount={(record, action) => void reviewAccountReport(record, action)} />
-              <OperationReportRecordsDashboard records={branchLoanSpecialistRecords} loading={reportsLoading} currentUsername={user.username} canManageReports={canManageReports} canDeleteReports={normalizedUserRole === "admin"} deletingReportId={deletingReportId} onCreate={startNewLsReportFromRecords} onView={(record) => openSavedReport(record, true)} onEdit={editSavedReport} onDelete={deleteSavedReport} />
+              <OperationReportRecordsDashboard records={branchLoanSpecialistRecords} loading={reportsLoading} currentUsername={user.username} canManageReports={canManageReports} canDeleteReports={["admin", "system administrator"].includes(normalizedUserRole)} deletingReportId={deletingReportId} onCreate={startNewLsReportFromRecords} onView={(record) => openSavedReport(record, true)} onEdit={editSavedReport} onDelete={deleteSavedReport} />
             </>
           ) : (
-            <OperationReportRecordsDashboard records={visibleSavedReports} loading={reportsLoading} currentUsername={user.username} canManageReports={canManageReports} canDeleteReports={normalizedUserRole === "admin"} deletingReportId={deletingReportId} onCreate={startNewLsReportFromRecords} onView={(record) => openSavedReport(record, true)} onEdit={editSavedReport} onDelete={deleteSavedReport} />
+            <OperationReportRecordsDashboard records={visibleSavedReports} loading={reportsLoading} currentUsername={user.username} canManageReports={canManageReports} canDeleteReports={["admin", "system administrator"].includes(normalizedUserRole)} deletingReportId={deletingReportId} onCreate={startNewLsReportFromRecords} onView={(record) => openSavedReport(record, true)} onEdit={editSavedReport} onDelete={deleteSavedReport} />
           )}
         </div>
       ) : null}

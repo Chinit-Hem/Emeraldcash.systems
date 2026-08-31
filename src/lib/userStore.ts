@@ -80,7 +80,7 @@ function normalizeUsername(username: string): string {
 }
 
 function sanitizeRole(role: unknown): DBRole | null {
-  if (["Admin", "Staff", "Loan Operations", "Manager / Approver", "Finance", "Human Resources", "IT Support", "Risk & Compliance", "Marketing", "Intern / Read Only", "Executive Viewer"].includes(String(role))) return role as DBRole;
+  if (["System Administrator", "Branch Manager", "Loan Operations", "Loan Specialist", "Accountant", "Assistant Accountant", "Credit / Approver", "Admin", "Staff", "Manager / Approver", "Finance", "Human Resources", "IT Support", "Risk & Compliance", "Marketing", "Intern / Read Only", "Executive Viewer"].includes(String(role))) return role as DBRole;
 
   return null;
 }

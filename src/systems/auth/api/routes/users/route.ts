@@ -17,8 +17,8 @@ import { NextRequest, NextResponse } from "next/server";
 
 // Validation constants
 const USERNAME_REGEX = /^[a-z0-9._-]{3,32}$/;
-type SystemRole = "Admin" | "Staff" | "Loan Operations" | "Manager / Approver" | "Finance" | "Human Resources" | "IT Support" | "Risk & Compliance" | "Marketing" | "Intern / Read Only" | "Executive Viewer";
-const VALID_ROLES: SystemRole[] = ["Admin", "Staff", "Loan Operations", "Manager / Approver", "Finance", "Human Resources", "IT Support", "Risk & Compliance", "Marketing", "Intern / Read Only", "Executive Viewer"];
+type SystemRole = "System Administrator" | "Branch Manager" | "Loan Operations" | "Loan Specialist" | "Accountant" | "Assistant Accountant" | "Credit / Approver" | "Admin" | "Staff" | "Manager / Approver" | "Finance" | "Human Resources" | "IT Support" | "Risk & Compliance" | "Marketing" | "Intern / Read Only" | "Executive Viewer";
+const VALID_ROLES: SystemRole[] = ["System Administrator", "Branch Manager", "Loan Operations", "Loan Specialist", "Accountant", "Assistant Accountant", "Credit / Approver", "Admin", "Staff", "Manager / Approver", "Finance", "Human Resources", "IT Support", "Risk & Compliance", "Marketing", "Intern / Read Only", "Executive Viewer"];
 
 // Security headers for all responses
 const securityHeaders = {

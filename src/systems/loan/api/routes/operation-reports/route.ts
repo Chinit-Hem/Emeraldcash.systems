@@ -124,11 +124,11 @@ function timestampValue(value: string | Date) {
 
 function canManageOperationReports(role: string) {
   const normalized = role.trim().toLocaleLowerCase();
-  return ["admin", "manager / approver", "branch manager", "bm", "credit manager"].includes(normalized);
+  return ["admin", "system administrator", "manager / approver", "branch manager", "bm", "credit manager", "credit / approver"].includes(normalized);
 }
 
 function canDeleteOperationReport(role: string) {
-  return role.trim().toLocaleLowerCase() === "admin";
+  return ["admin", "system administrator"].includes(role.trim().toLocaleLowerCase());
 }
 
 function hasCustomerActivity(data: Record<string, unknown>, keys: string[]) {

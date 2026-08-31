@@ -12,7 +12,7 @@ import {
 } from "@/lib/errors";
 import { log } from "@/lib/logger";
 
-export type Role = "Admin" | "Staff" | "Loan Operations" | "Manager / Approver" | "Finance" | "Human Resources" | "IT Support" | "Risk & Compliance" | "Marketing" | "Intern / Read Only" | "Executive Viewer";
+export type Role = "System Administrator" | "Branch Manager" | "Loan Operations" | "Loan Specialist" | "Accountant" | "Assistant Accountant" | "Credit / Approver" | "Admin" | "Staff" | "Manager / Approver" | "Finance" | "Human Resources" | "IT Support" | "Risk & Compliance" | "Marketing" | "Intern / Read Only" | "Executive Viewer";
 
 export interface UserDB {
   username: string;
@@ -35,7 +35,7 @@ export interface UserDB {
 // Validation constants
 const USERNAME_REGEX = /^[a-z0-9._-]{3,32}$/;
 const MAX_PASSWORD_HASH_LENGTH = 255;
-const VALID_ROLES: Role[] = ["Admin", "Staff", "Loan Operations", "Manager / Approver", "Finance", "Human Resources", "IT Support", "Risk & Compliance", "Marketing", "Intern / Read Only", "Executive Viewer"];
+const VALID_ROLES: Role[] = ["System Administrator", "Branch Manager", "Loan Operations", "Loan Specialist", "Accountant", "Assistant Accountant", "Credit / Approver", "Admin", "Staff", "Manager / Approver", "Finance", "Human Resources", "IT Support", "Risk & Compliance", "Marketing", "Intern / Read Only", "Executive Viewer"];
 
 // Input validation functions
 function validateUsername(username: string): void {
@@ -113,7 +113,7 @@ export async function ensureUsersTable(): Promise<void> {
       async () => sql`
         CREATE TABLE IF NOT EXISTS users (
           username VARCHAR(32) PRIMARY KEY,
-          role VARCHAR(40) NOT NULL CHECK (role IN ('Admin', 'Staff', 'Loan Operations', 'Manager / Approver', 'Finance', 'Human Resources', 'IT Support', 'Risk & Compliance', 'Marketing', 'Intern / Read Only', 'Executive Viewer')),
+          role VARCHAR(40) NOT NULL CHECK (role IN ('System Administrator', 'Branch Manager', 'Loan Operations', 'Loan Specialist', 'Accountant', 'Assistant Accountant', 'Credit / Approver', 'Admin', 'Staff', 'Manager / Approver', 'Finance', 'Human Resources', 'IT Support', 'Risk & Compliance', 'Marketing', 'Intern / Read Only', 'Executive Viewer')),
           password_hash VARCHAR(255) NOT NULL,
           created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
           updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
@@ -152,7 +152,7 @@ export async function ensureUsersTable(): Promise<void> {
 
           ALTER TABLE users
           ADD CONSTRAINT users_role_check
-          CHECK (role IN ('Admin', 'Staff', 'Loan Operations', 'Manager / Approver', 'Finance', 'Human Resources', 'IT Support', 'Risk & Compliance', 'Marketing', 'Intern / Read Only', 'Executive Viewer'));
+          CHECK (role IN ('System Administrator', 'Branch Manager', 'Loan Operations', 'Loan Specialist', 'Accountant', 'Assistant Accountant', 'Credit / Approver', 'Admin', 'Staff', 'Manager / Approver', 'Finance', 'Human Resources', 'IT Support', 'Risk & Compliance', 'Marketing', 'Intern / Read Only', 'Executive Viewer'));
         END $$;
       `,
       "ensureUsersTable-role-constraint"

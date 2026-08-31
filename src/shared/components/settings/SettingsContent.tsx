@@ -53,7 +53,7 @@ type ManagedUser = {
 };
 
 type TabType = "profile" | "users" | "system";
-const USER_ROLE_OPTIONS: Role[] = ["Staff", "Loan Operations", "Manager / Approver", "Finance", "Human Resources", "IT Support", "Risk & Compliance", "Marketing", "Intern / Read Only", "Executive Viewer", "Admin"];
+const USER_ROLE_OPTIONS: Role[] = ["System Administrator", "Branch Manager", "Loan Operations", "Loan Specialist", "Accountant", "Assistant Accountant", "Credit / Approver", "Risk & Compliance", "Human Resources", "IT Support", "Marketing", "Intern / Read Only", "Executive Viewer", "Admin", "Staff", "Manager / Approver", "Finance"];
 const USER_POSITION_OPTIONS = ["General Assistant", "Accounting Intern", "Assistant Accountant", "Accountant", "Loan Specialist", "Collection Officer", "Branch Manager", "Finance Manager", "Credit Manager", "Collateral Checker", "Human Resources Intern", "Human Resources Assistant", "Human Resources Officer", "Human Resources Supervisor", "IT Intern", "IT Executive (Support and Systems)", "Risk Officer", "Risk Manager", "Digital Marketing Officer", "Digital Marketing Supervisor", "Chief Executive Officer"];
 const USER_DEPARTMENT_OPTIONS = ["Branch Operations", "Loan Operations", "Finance & Accounting", "Human Resources", "Information Technology", "Risk & Compliance", "Marketing", "Management"];
 const USER_BRANCH_OPTIONS = ["Head Office", "Boeung Keng Kang"];

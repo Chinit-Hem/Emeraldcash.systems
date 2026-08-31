@@ -1,5 +1,11 @@
 
-export type Role = "Admin" | "Staff" | "Finance" | string;
+export type Role = "System Administrator" | "Branch Manager" | "Loan Operations" | "Loan Specialist" | "Accountant" | "Assistant Accountant" | "Credit / Approver" | "Risk & Compliance" | "Human Resources" | "IT Support" | "Marketing" | "Intern / Read Only" | "Executive Viewer" | "Admin" | "Staff" | "Finance" | "Manager / Approver" | string;
+
+export const STANDARD_ROLES = [
+  "System Administrator", "Branch Manager", "Loan Operations", "Loan Specialist",
+  "Accountant", "Assistant Accountant", "Credit / Approver", "Risk & Compliance",
+  "Human Resources", "IT Support", "Marketing", "Intern / Read Only", "Executive Viewer",
+] as const;
 
 // Role definition for custom roles
 export interface RoleDefinition {
@@ -45,6 +51,16 @@ export type Permission =
 
 // Default permissions for system roles
 export const DEFAULT_ROLE_PERMISSIONS: Record<string, Permission[]> = {
+  "System Administrator": [
+    "vehicles:view", "vehicles:create", "vehicles:edit", "vehicles:delete", "sms:view", "sms:create", "sms:edit", "sms:delete", "sms:transfer",
+    "users:view", "users:create", "users:edit", "users:delete", "lms:view", "lms:manage", "loans:view", "loans:create", "loans:edit", "loans:approve", "loans:disburse", "loans:repay", "loans:delete",
+    "settings:view", "settings:manage", "reports:view", "reports:manage", "roles:manage"
+  ],
+  "Branch Manager": ["vehicles:view", "sms:view", "lms:view", "loans:view", "loans:approve", "reports:view", "reports:manage"],
+  "Loan Specialist": ["loans:view", "loans:create", "loans:edit", "reports:view"],
+  Accountant: ["loans:view", "loans:disburse", "loans:repay", "reports:view"],
+  "Assistant Accountant": ["loans:view", "reports:view"],
+  "Credit / Approver": ["loans:view", "loans:approve", "reports:view", "reports:manage"],
   Admin: [
     "vehicles:view", "vehicles:create", "vehicles:edit", "vehicles:delete",
     "sms:view", "sms:create", "sms:edit", "sms:delete", "sms:transfer",

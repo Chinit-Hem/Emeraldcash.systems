@@ -3,6 +3,7 @@ import { queryWithRetry, sql } from "@/lib/db-singleton";
 
 const BRANCH_MANAGER_LABELS = new Set([
   "manager / approver",
+  "credit / approver",
   "branch manager",
   "bm",
   "credit manager",

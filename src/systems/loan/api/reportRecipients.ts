@@ -11,12 +11,12 @@ export async function getReportNotificationRecipients(branch: string, _audience:
     WHERE username <> ${excludeUsername}
       AND (
         (
-          LOWER(BTRIM(role)) IN ('admin', 'executive viewer')
+          LOWER(BTRIM(role)) IN ('admin', 'system administrator', 'executive viewer')
           AND LOWER(BTRIM(COALESCE(position, ''))) NOT IN ('branch manager', 'bm')
         )
         OR (
           (
-            LOWER(BTRIM(role)) IN ('manager / approver', 'branch manager', 'bm', 'credit manager')
+            LOWER(BTRIM(role)) IN ('manager / approver', 'branch manager', 'bm', 'credit manager', 'credit / approver')
             OR LOWER(BTRIM(COALESCE(position, ''))) IN ('branch manager', 'bm')
           )
           AND (
