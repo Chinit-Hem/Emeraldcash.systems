@@ -4851,6 +4851,18 @@ function AccountReportView() {
 
   useEffect(() => { void loadAccountReports(); }, [loadAccountReports]);
 
+  useEffect(() => {
+    const requestedId = searchParams.get("accountReportId");
+    if (!requestedId || !savedReports.length) return;
+    const requestedReport = savedReports.find((record) => record.id === requestedId);
+    if (!requestedReport) return;
+    applySavedReport(requestedReport);
+    setActiveSheet("summary");
+    setViewOnly(false);
+    setReportPanel("form");
+    window.setTimeout(() => accountReportFormRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 80);
+  }, [applySavedReport, savedReports, searchParams]);
+
   const changeAccountReportDate = (date: string) => {
     const saved = savedReports.find((record) => record.reporterUsername === user.username && record.reportDate === date);
     if (saved) applySavedReport(saved);
@@ -6120,7 +6132,7 @@ function OperationReportView({ loans, loading, canViewLoanData, onRefresh, onOpe
         <div className="space-y-6 print:hidden">
           {isBranchManagerReport ? (
             <>
-              <BranchManagerWorkflowPanel sourceRecords={branchManagerRecords} sourceReportHistory={branchLoanSpecialistRecords} accountRecords={branchAccountRecords} accountReportHistory={branchAccountReportHistory} submissions={branchManagerReports} reportDate={reportDate} branch={branch} currentUsername={user.username} reviewingAction={reviewingAction} onOpen={(record) => openSavedReport(record, true)} onOpenAccount={() => router.push("/loan?view=accounting&accountMode=accountReport&reportPanel=records")} onReview={(record, action) => void reviewBranchManagerSubmission(record, action)} onReviewAccount={(record, action) => void reviewAccountReport(record, action)} />
+              <BranchManagerWorkflowPanel sourceRecords={branchManagerRecords} sourceReportHistory={branchLoanSpecialistRecords} accountRecords={branchAccountRecords} accountReportHistory={branchAccountReportHistory} submissions={branchManagerReports} reportDate={reportDate} branch={branch} currentUsername={user.username} reviewingAction={reviewingAction} onOpen={(record) => openSavedReport(record, true)} onOpenAccount={(record) => router.push(`/loan?view=accounting&accountMode=accountReport&reportPanel=form&accountReportId=${encodeURIComponent(record.id)}`)} onReview={(record, action) => void reviewBranchManagerSubmission(record, action)} onReviewAccount={(record, action) => void reviewAccountReport(record, action)} />
               <OperationReportRecordsDashboard records={branchLoanSpecialistRecords} loading={reportsLoading} currentUsername={user.username} canManageReports={canManageReports} canDeleteReports={["admin", "system administrator"].includes(normalizedUserRole)} deletingReportId={deletingReportId} onCreate={startNewLsReportFromRecords} onView={(record) => openSavedReport(record, true)} onEdit={editSavedReport} onDelete={deleteSavedReport} />
             </>
           ) : (
