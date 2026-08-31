@@ -37,11 +37,27 @@ export const smsTextareaClass =
 export const smsSelectClass =
   "h-11 w-full rounded-lg border border-gray-200 bg-white px-4 text-sm text-gray-900 shadow-sm transition-colors focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-500 disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-gray-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white disabled:dark:bg-gray-900 disabled:dark:text-gray-500";
 export const smsPrimaryButtonClass =
-  "inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 disabled:cursor-not-allowed disabled:opacity-50";
-export const smsSecondaryButtonClass =
-  "inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-sm ring-1 ring-gray-200 transition-colors hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-400 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-gray-800 dark:text-gray-200 dark:ring-gray-700 dark:hover:bg-gray-700";
+  "inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:bg-emerald-700 hover:shadow-md active:translate-y-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 disabled:pointer-events-none disabled:opacity-50 motion-reduce:hover:translate-y-0";
+
+const smsSecondaryButtonBaseClass =
+  "inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-sm ring-1 ring-gray-200 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md active:translate-y-0 focus-visible:outline-none focus-visible:ring-2 disabled:pointer-events-none disabled:opacity-50 motion-reduce:hover:translate-y-0 dark:bg-gray-800 dark:text-gray-200 dark:ring-gray-700";
+
+const smsSecondaryButtonToneClasses = {
+  emerald: "hover:bg-emerald-600 hover:text-white hover:ring-emerald-600 focus-visible:ring-emerald-500 dark:hover:bg-emerald-500 dark:hover:text-white dark:hover:ring-emerald-500",
+  blue: "hover:bg-blue-600 hover:text-white hover:ring-blue-600 focus-visible:ring-blue-500 dark:hover:bg-blue-500 dark:hover:text-white dark:hover:ring-blue-500",
+  amber: "hover:bg-amber-600 hover:text-white hover:ring-amber-600 focus-visible:ring-amber-500 dark:hover:bg-amber-500 dark:hover:text-slate-950 dark:hover:ring-amber-500",
+  purple: "hover:bg-purple-600 hover:text-white hover:ring-purple-600 focus-visible:ring-purple-500 dark:hover:bg-purple-500 dark:hover:text-white dark:hover:ring-purple-500",
+} as const;
+
+export type SmsSecondaryButtonTone = keyof typeof smsSecondaryButtonToneClasses;
+
+export function getSmsSecondaryButtonClass(tone: SmsSecondaryButtonTone = "emerald"): string {
+  return `${smsSecondaryButtonBaseClass} ${smsSecondaryButtonToneClasses[tone]}`;
+}
+
+export const smsSecondaryButtonClass = getSmsSecondaryButtonClass();
 export const smsDangerButtonClass =
-  "inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-red-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 disabled:cursor-not-allowed disabled:opacity-50";
+  "inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:bg-red-700 hover:shadow-md active:translate-y-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 disabled:pointer-events-none disabled:opacity-50 motion-reduce:hover:translate-y-0";
 export const smsLabelClass = "mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300";
 export const smsHelperClass = "mt-1.5 text-xs text-gray-500 dark:text-gray-400";
 export const smsErrorTextClass = "mt-1.5 flex items-center gap-1 text-sm font-medium text-red-600 dark:text-red-400";

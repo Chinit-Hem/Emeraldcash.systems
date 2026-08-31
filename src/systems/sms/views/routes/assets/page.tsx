@@ -12,6 +12,7 @@ import AssetFormModal from '@/systems/sms/components/assets/AssetFormModal';
 import {
   SmsPageHeader,
   SmsPageShell,
+  getSmsSecondaryButtonClass,
   smsInputClass,
   smsPanelClass,
   smsPrimaryButtonClass,
@@ -393,23 +394,24 @@ export default function AssetsPage() {
         actions={
           <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-wrap sm:justify-end">
             {canTransferAsset && (
-              <Link href="/sms/transfer" className={smsSecondaryButtonClass}>
+              <Link href="/sms/transfer" className={getSmsSecondaryButtonClass('amber')}>
                 <ArrowLeftRight className="h-4 w-4" />
                 Move
               </Link>
             )}
             {canTransferAsset && (
-              <Link href="/sms/pending" className={smsSecondaryButtonClass}>
+              <Link href="/sms/pending" className={getSmsSecondaryButtonClass('blue')}>
                 <Clock className="h-4 w-4" />
                 Review Requests
               </Link>
             )}
-            <Link href="/sms/history" className={smsSecondaryButtonClass}>
+            <Link href="/sms/history" className={getSmsSecondaryButtonClass('purple')}>
               <History className="h-4 w-4" />
               History
             </Link>
             {canCreateAsset && (
             <button
+              type="button"
               onClick={() => setCreateModalOpen(true)}
               className={`${smsPrimaryButtonClass} w-full sm:w-auto`}
             >
