@@ -109,6 +109,14 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<string, Permission[]> = {
   "Executive Viewer": ["loans:view", "loans:approve", "reports:view", "reports:manage"]
 };
 
+// All roles may access the shared LMS, VMS, and SMS areas in read-only mode.
+// Role-specific create/edit/delete permissions above remain unchanged.
+for (const permissions of Object.values(DEFAULT_ROLE_PERMISSIONS)) {
+  for (const permission of ["lms:view", "vehicles:view", "sms:view"] as const) {
+    if (!permissions.includes(permission)) permissions.push(permission);
+  }
+}
+
 // Permission labels for UI
 export const PERMISSION_LABELS: Record<Permission, string> = {
   "vehicles:view": "View Vehicles",
