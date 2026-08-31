@@ -5080,7 +5080,7 @@ function AccountReportView() {
         </fieldset>
       </Card>
       </div>
-      {reportPanel === "records" ? <AccountReportRecordsDashboard records={savedReports} loading={reportsLoading} currentUsername={user.username} language={language} deletingReportId={deletingReportId} canManageReports={["admin", "system administrator", "manager / approver", "branch manager", "bm", "credit manager", "credit / approver"].includes(user.role.trim().toLocaleLowerCase())} canDeleteReports={["admin", "system administrator"].includes(user.role.trim().toLocaleLowerCase())} onCreate={startNewAccountReport} onOpen={openSavedAccountReport} onDelete={deleteAccountReport} /> : null}
+      {reportPanel === "records" ? <AccountReportRecordsDashboard records={savedReports} loading={reportsLoading} currentUsername={user.username} language={language} deletingReportId={deletingReportId} canManageReports={["admin", "system administrator", "manager / approver", "branch manager", "bm", "credit manager", "credit / approver"].includes(user.role.trim().toLocaleLowerCase()) || ["branch manager", "bm", "credit manager"].includes((user.position || "").trim().toLocaleLowerCase())} canDeleteReports={["admin", "system administrator"].includes(user.role.trim().toLocaleLowerCase())} onCreate={startNewAccountReport} onOpen={openSavedAccountReport} onDelete={deleteAccountReport} /> : null}
       <datalist id="account-report-reasons">{ACCOUNT_REPORT_COLLECTION_REASONS.map((reason) => <option key={reason} value={reason} />)}</datalist>
       <datalist id="account-report-asset-types">{selectableAssetTypes.map((type) => <option key={type} value={type} />)}</datalist>
       {ACCOUNT_REPORT_REUSABLE_FIELDS.map((field) => <datalist key={field} id={`account-report-${field}-options`}>{reusableAccountValues(field).map((value) => <option key={value} value={value} />)}</datalist>)}
@@ -5425,7 +5425,8 @@ function OperationReportView({ loans, loading, canViewLoanData, onRefresh, onOpe
   }, [reviewComment]);
 
   const normalizedUserRole = user.role.trim().toLocaleLowerCase();
-  const canManageReports = ["admin", "system administrator", "manager / approver", "branch manager", "bm", "credit manager", "credit / approver"].includes(normalizedUserRole);
+  const canManageReports = ["admin", "system administrator", "manager / approver", "branch manager", "bm", "credit manager", "credit / approver"].includes(normalizedUserRole)
+    || ["branch manager", "bm", "credit manager", "credit / approver"].includes((user.position || "").trim().toLocaleLowerCase());
   const roleDefaultsToBranchManagerReport = ["manager / approver", "branch manager", "bm", "credit manager", "credit / approver"].includes(normalizedUserRole);
   const [reportMode, setReportMode] = useState<"operation" | "branchManager">(roleDefaultsToBranchManagerReport ? "branchManager" : "operation");
   const isBranchManagerReport = reportMode === "branchManager";
