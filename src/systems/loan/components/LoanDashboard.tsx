@@ -4688,7 +4688,9 @@ function AccountReportView() {
   const [reviewingAction, setReviewingAction] = useState<"reviewed" | "approved" | "returned" | null>(null);
   const [reviewComment, setReviewComment] = useState("");
   const [reviewCommentError, setReviewCommentError] = useState(false);
+  const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const accountReportBranchName = branch.trim().toLocaleLowerCase() === "boeung keng kang" ? "បឹងកេងកង" : branch;
+  const accountFieldInvalid = (value: string) => validationErrors.length > 0 && !value.trim();
   const restoredLocalDraft = useRef(false);
   const initializedSavedAccountReport = useRef(false);
   const accountReportFormRef = useRef<HTMLDivElement>(null);
@@ -4951,6 +4953,19 @@ function AccountReportView() {
     finally { setReviewingAction(null); }
   };
 
+  const validateAccountReport = () => {
+    const errors: string[] = [];
+    if (!reportDate) errors.push(language === "km" ? "ត្រូវបញ្ចូលកាលបរិច្ឆេទរបាយការណ៍" : "Report date is required.");
+    if (!branch.trim()) errors.push(language === "km" ? "ត្រូវបញ្ចូលសាខា" : "Branch is required.");
+    if (!reporterName.trim()) errors.push(language === "km" ? "ត្រូវបញ្ចូលឈ្មោះអ្នករាយការណ៍" : "Reporter name is required.");
+    if (!reporterRole.trim()) errors.push(language === "km" ? "ត្រូវបញ្ចូលមុខតំណែង" : "Position is required.");
+    if (!department.trim()) errors.push(language === "km" ? "ត្រូវបញ្ចូលនាយកដ្ឋាន" : "Department is required.");
+    const rows = [...dueRows, ...paidRows, ...dueNoticeRows, ...promiseRows, ...closedRows];
+    if (!rows.some((row) => row.customer.trim())) errors.push(language === "km" ? "សូមបំពេញអតិថិជនយ៉ាងតិចមួយ" : "Add at least one customer activity.");
+    if ([...dueRows, ...paidRows].some((row) => row.customer.trim() && accountNumber(row.amount) <= 0)) errors.push(language === "km" ? "ចំនួនទឹកប្រាក់ត្រូវធំជាងសូន្យ" : "Every customer amount must be greater than zero.");
+    return errors;
+  };
+
   const saveAccountReport = async (status: "draft" | "submitted") => {
     if (viewOnly) {
       toastError(language === "km" ? "សូមចុច កែ ឬ ធ្វើបច្ចុប្បន្នភាព ដើម្បីកែប្រែរបាយការណ៍នេះ។" : "Choose Edit or Update before changing this report.");
@@ -4964,11 +4979,20 @@ function AccountReportView() {
       toastError(language === "km" ? "របាយការណ៍នេះត្រូវបានចាក់សោសម្រាប់ពិនិត្យ។" : "This Account Report is locked for review.");
       return;
     }
+    if (status === "submitted") {
+      const errors = validateAccountReport();
+      setValidationErrors(errors);
+      if (errors.length) {
+        toastError(language === "km" ? "សូមបំពេញប្រអប់ដែលមានសញ្ញាពណ៌ក្រហមជាមុនសិន។" : "Please complete the fields highlighted in red before submitting.");
+        return;
+      }
+    }
     setSavingReport(status);
     try {
       const saved = await api<AccountReportRecord>("/api/loan/account-reports", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ reportDate, reporterName, reporterPosition: reporterRole, department, branch, status, data: { dueRows, paidRows, dueNoticeRows, promiseRows, closedRows } }) });
       setLoadedStatus(saved.status);
       setLoadedReporterUsername(saved.reporterUsername);
+      setValidationErrors([]);
       toastSuccess(status === "submitted" ? "Account Report submitted to BM. A notification was sent." : "Account Report saved as draft.");
       await loadAccountReports();
     } catch (caught) {
@@ -5081,6 +5105,7 @@ function AccountReportView() {
       {reportPanel === "form" && savedValuesOpen ? <RememberedReportValuesManager fields={rememberedFields} onRemove={forgetField} onClose={() => setSavedValuesOpen(false)} /> : null}
       {reportPanel === "form" && loadedStatus === "returned" ? <section className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900 dark:border-red-800 dark:bg-red-950/25 dark:text-red-200"><strong>Returned for correction:</strong> {savedReports.find((record) => record.reporterUsername === loadedReporterUsername && record.reportDate === reportDate)?.reviewComment || "Please update the report and submit it again."}</section> : null}
       {reportPanel === "form" && reviewingAnotherAccountReport ? <section className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950 dark:border-amber-800 dark:bg-amber-950/25 dark:text-amber-100"><strong>{language === "km" ? "សម្រាប់មើលតែប៉ុណ្ណោះ៖" : "View only:"}</strong> {language === "km" ? "របាយការណ៍នេះជារបស់" : "This Account Report belongs to"} {reporterName || loadedReporterUsername}.</section> : null}
+      {reportPanel === "form" && validationErrors.length ? <section role="alert" className="rounded-lg border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-900 dark:border-red-800 dark:bg-red-950/25 dark:text-red-200"><p className="font-bold">{language === "km" ? "សូមបំពេញព័ត៌មានដែលមានសញ្ញាពណ៌ក្រហម៖" : "Please complete the fields highlighted in red:"}</p><ul className="mt-1 list-disc space-y-1 pl-5">{validationErrors.map((error) => <li key={error}>{error}</li>)}</ul></section> : null}
       {reportPanel === "form" && reviewingAnotherAccountReport && canReviewAccount && ["submitted", "reviewed"].includes(loadedStatus) ? <section className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950 dark:border-amber-800 dark:bg-amber-950/25 dark:text-amber-100"><Field label={language === "km" ? "មតិយោបល់របស់អ្នកគ្រប់គ្រង" : "Manager Review Comment"}><textarea rows={2} value={reviewComment} onChange={(event) => { setReviewComment(event.target.value); if (event.target.value.trim()) setReviewCommentError(false); }} placeholder={language === "km" ? "ត្រូវបញ្ចូលពេលបញ្ជូនត្រឡប់" : "Required when returning for correction"} className={inputClass} /></Field>{reviewCommentError ? <p className="mt-2 font-semibold text-red-700">{language === "km" ? "សូមបញ្ចូលមតិយោបល់សម្រាប់ការបញ្ជូនត្រឡប់។" : "Enter a comment before returning the report."}</p> : null}<div className="mt-3 flex flex-wrap gap-2">{loadedStatus === "submitted" ? <button type="button" disabled={Boolean(reviewingAction)} onClick={() => void reviewLoadedAccountReport("reviewed")} className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"><Check className="h-4 w-4" />{language === "km" ? "សម្គាល់ថាបានពិនិត្យ" : "Mark Reviewed"}</button> : null}{loadedStatus === "reviewed" ? <button type="button" disabled={Boolean(reviewingAction)} onClick={() => void reviewLoadedAccountReport("approved")} className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"><ShieldCheck className="h-4 w-4" />{language === "km" ? "អនុម័ត" : "Approve"}</button> : null}<button type="button" disabled={Boolean(reviewingAction)} onClick={() => void reviewLoadedAccountReport("returned")} className="inline-flex items-center gap-2 rounded-xl border border-red-300 bg-white px-4 py-2 text-sm font-semibold text-red-700 hover:bg-red-50 disabled:opacity-50"><XCircle className="h-4 w-4" />{language === "km" ? "បញ្ជូនត្រឡប់ឱ្យកែតម្រូវ" : "Return for Correction"}</button></div></section> : null}
       {reportPanel === "form" && duplicateAccountCustomers.length ? <section role="alert" className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/25 dark:text-amber-100"><strong>Duplicate customer warning:</strong> {duplicateAccountCustomers.join(", ")}</section> : null}
       <div ref={accountReportFormRef} className="scroll-mt-20">
@@ -5098,13 +5123,13 @@ function AccountReportView() {
               <div className="hidden border-r border-slate-300 dark:border-slate-700 lg:block" />
               <div className="grid grid-cols-[120px_minmax(0,1fr)] sm:grid-cols-[180px_minmax(0,1fr)] lg:col-span-2">
                 <div className="flex min-h-12 items-center justify-end whitespace-nowrap border-b border-slate-300 px-3 py-2 text-right font-semibold dark:border-slate-700">កាលបរិច្ឆេទ៖</div>
-                <DateInput title="Report date" disabled={reportLocked} value={reportDate} onChange={changeAccountReportDate} className="block min-h-12 w-full border-0 border-b border-slate-300 px-3 py-2 outline-none focus:bg-emerald-50 disabled:opacity-70 dark:border-slate-700 dark:bg-transparent dark:focus:bg-emerald-950/30" />
+                <DateInput title="Report date" disabled={reportLocked} value={reportDate} onChange={changeAccountReportDate} className={`block min-h-12 w-full border-0 border-b px-3 py-2 outline-none focus:bg-emerald-50 disabled:opacity-70 ${accountFieldInvalid(reportDate) ? "border-red-500 bg-red-50 text-red-900" : "border-slate-300"} dark:border-slate-700 dark:bg-transparent dark:focus:bg-emerald-950/30`} />
                 <div className="flex min-h-12 items-center justify-end whitespace-nowrap border-b border-slate-300 px-3 py-2 text-right font-semibold dark:border-slate-700">ឈ្មោះ៖</div>
-                <input disabled={reportLocked} {...reusableFieldProps("reporterName")} value={reporterName} onChange={(event) => setReporterName(event.target.value)} className="block min-h-12 w-full border-0 border-b border-slate-300 px-3 py-2 outline-none focus:bg-emerald-50 disabled:opacity-70 dark:border-slate-700 dark:bg-transparent dark:focus:bg-emerald-950/30" />
+                <input disabled={reportLocked} {...reusableFieldProps("reporterName")} value={reporterName} onChange={(event) => setReporterName(event.target.value)} className={`block min-h-12 w-full border-0 border-b px-3 py-2 outline-none focus:bg-emerald-50 disabled:opacity-70 ${accountFieldInvalid(reporterName) ? "border-red-500 bg-red-50" : "border-slate-300"} dark:border-slate-700 dark:bg-transparent dark:focus:bg-emerald-950/30`} />
                 <div className="flex min-h-12 items-center justify-end whitespace-nowrap border-b border-slate-300 px-3 py-2 text-right font-semibold dark:border-slate-700">តួនាទី៖</div>
-                <input disabled={reportLocked} {...reusableFieldProps("reporterRole")} value={reporterRole} onChange={(event) => setReporterRole(event.target.value)} className="block min-h-12 w-full border-0 border-b border-slate-300 px-3 py-2 outline-none focus:bg-emerald-50 disabled:opacity-70 dark:border-slate-700 dark:bg-transparent dark:focus:bg-emerald-950/30" />
+                <input disabled={reportLocked} {...reusableFieldProps("reporterRole")} value={reporterRole} onChange={(event) => setReporterRole(event.target.value)} className={`block min-h-12 w-full border-0 border-b px-3 py-2 outline-none focus:bg-emerald-50 disabled:opacity-70 ${accountFieldInvalid(reporterRole) ? "border-red-500 bg-red-50" : "border-slate-300"} dark:border-slate-700 dark:bg-transparent dark:focus:bg-emerald-950/30`} />
                 <div className="flex min-h-12 items-center justify-end whitespace-nowrap px-3 py-2 text-right font-semibold">នាយកដ្ឋាន៖</div>
-                <input disabled={reportLocked} {...reusableFieldProps("department")} value={department} onChange={(event) => setDepartment(event.target.value)} className="block min-h-12 w-full border-0 px-3 py-2 outline-none focus:bg-emerald-50 disabled:opacity-70 dark:bg-transparent dark:focus:bg-emerald-950/30" />
+                <input disabled={reportLocked} {...reusableFieldProps("department")} value={department} onChange={(event) => setDepartment(event.target.value)} className={`block min-h-12 w-full border-0 px-3 py-2 outline-none focus:bg-emerald-50 disabled:opacity-70 ${accountFieldInvalid(department) ? "border-red-500 bg-red-50" : ""} dark:bg-transparent dark:focus:bg-emerald-950/30`} />
               </div>
               <div aria-hidden="true" className="hidden border-l border-slate-300 dark:border-slate-700 lg:block" />
             </div>
@@ -6000,6 +6025,7 @@ function OperationReportView({ loans, loading, canViewLoanData, onRefresh, onOpe
   const loanTypeDatalist = <datalist id="operation-report-loan-types">{suggestedLoanTypes.map((type) => <option key={type} value={type} />)}</datalist>;
   const assetTypeDatalist = <datalist id="operation-report-asset-types">{selectableAssetTypes.map((type) => <option key={type} value={type} />)}</datalist>;
   const reportFieldClass = "block w-full border-0 bg-transparent px-3 py-2 text-slate-950 outline-none focus:bg-emerald-50 disabled:opacity-100 dark:text-slate-100 dark:focus:bg-emerald-950/30";
+  const operationFieldInvalid = (value: string) => validationErrors.length > 0 && !value.trim();
   const standardReportSheetHeader = (
     <>
       <div className="relative flex min-h-36 items-center justify-center border-b border-slate-300 bg-white dark:border-slate-700 dark:bg-slate-950">
@@ -6011,13 +6037,13 @@ function OperationReportView({ loans, loading, canViewLoanData, onRefresh, onOpe
         <div className="border-r border-slate-300 dark:border-slate-700" />
         <div className="col-span-2 grid grid-cols-[180px_minmax(0,1fr)]">
           <div className="flex min-h-12 items-center justify-end whitespace-nowrap border-b border-slate-300 px-3 py-2 text-right font-semibold dark:border-slate-700">កាលបរិច្ឆេទ៖</div>
-          <DateInput title="Report date" disabled={reviewingAnotherSpecialist || reportLocked} value={reportDate} onChange={changeReportDate} className={`${reportFieldClass} min-h-12 border-b border-slate-300 dark:border-slate-700`} />
+          <DateInput title="Report date" disabled={reviewingAnotherSpecialist || reportLocked} value={reportDate} onChange={changeReportDate} className={`${reportFieldClass} min-h-12 border-b ${operationFieldInvalid(reportDate) ? "border-red-500 bg-red-50 text-red-900" : "border-slate-300"} dark:border-slate-700`} />
           <div className="flex min-h-12 items-center justify-end whitespace-nowrap border-b border-slate-300 px-3 py-2 text-right font-semibold dark:border-slate-700">ឈ្មោះ៖</div>
-          <input disabled={reviewingAnotherSpecialist || reportLocked} {...operationFieldProps("reporterName")} value={reporterName} onChange={(event) => setReporterName(event.target.value)} className={`${reportFieldClass} min-h-12 border-b border-slate-300 dark:border-slate-700`} />
+          <input disabled={reviewingAnotherSpecialist || reportLocked} {...operationFieldProps("reporterName")} value={reporterName} onChange={(event) => setReporterName(event.target.value)} className={`${reportFieldClass} min-h-12 border-b ${operationFieldInvalid(reporterName) ? "border-red-500 bg-red-50" : "border-slate-300"} dark:border-slate-700`} />
           <div className="flex min-h-12 items-center justify-end whitespace-nowrap border-b border-slate-300 px-3 py-2 text-right font-semibold dark:border-slate-700">តួនាទី៖</div>
-          <input disabled={reviewingAnotherSpecialist || reportLocked} {...operationFieldProps("reporterRole")} value={reporterRole} onChange={(event) => setReporterRole(event.target.value)} className={`${reportFieldClass} min-h-12 border-b border-slate-300 dark:border-slate-700`} />
+          <input disabled={reviewingAnotherSpecialist || reportLocked} {...operationFieldProps("reporterRole")} value={reporterRole} onChange={(event) => setReporterRole(event.target.value)} className={`${reportFieldClass} min-h-12 border-b ${operationFieldInvalid(reporterRole) ? "border-red-500 bg-red-50" : "border-slate-300"} dark:border-slate-700`} />
           <div className="flex min-h-12 items-center justify-end whitespace-nowrap px-3 py-2 text-right font-semibold">នាយកដ្ឋាន៖</div>
-          <input disabled={reviewingAnotherSpecialist || reportLocked} {...operationFieldProps("department")} value={department} onChange={(event) => setDepartment(event.target.value)} className={`${reportFieldClass} min-h-12`} />
+          <input disabled={reviewingAnotherSpecialist || reportLocked} {...operationFieldProps("department")} value={department} onChange={(event) => setDepartment(event.target.value)} className={`${reportFieldClass} min-h-12 ${operationFieldInvalid(department) ? "bg-red-50 text-red-900" : ""}`} />
         </div>
         <div aria-hidden="true" className="border-l border-slate-300 dark:border-slate-700" />
       </div>
