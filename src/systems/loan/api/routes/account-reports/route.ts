@@ -86,6 +86,10 @@ function canReview(role: string) {
   return ["admin", "manager / approver", "branch manager", "bm", "credit manager"].includes(role.trim().toLocaleLowerCase());
 }
 
+function canDeleteReport(role: string) {
+  return role.trim().toLocaleLowerCase() === "admin";
+}
+
 function hasCustomerActivity(data: Record<string, unknown>) {
   return ["dueRows", "paidRows", "dueNoticeRows", "promiseRows", "closedRows"].some((key) => Array.isArray(data[key]) && data[key].some((row) => row && typeof row === "object" && typeof (row as { customer?: unknown }).customer === "string" && (row as { customer: string }).customer.trim()));
 }
@@ -228,14 +232,7 @@ export async function DELETE(request: NextRequest) {
     if (!/^[0-9a-f-]{36}$/i.test(id)) return NextResponse.json({ success: false, error: "Invalid report" }, { status: 400 });
     const current = await queryWithRetry(async () => sql<Pick<AccountReportRow, "reporter_username" | "report_date" | "branch">>`SELECT reporter_username, report_date, branch FROM account_reports WHERE id = ${id}::uuid LIMIT 1`, "findAccountReportForDelete");
     if (!current[0]) return NextResponse.json({ success: false, error: "Report not found" }, { status: 404 });
-    const ownsReport = current[0].reporter_username === session.username;
-    if (!ownsReport && !canReview(session.role)) return NextResponse.json({ success: false, error: "You can only delete your own Account Report" }, { status: 403 });
-    if (!ownsReport) {
-      const branchAccess = await getReportBranchAccess(session);
-      if (branchAccess.isBranchManager && (!branchAccess.branch || !branchesMatch(current[0].branch, branchAccess.branch))) {
-        return NextResponse.json({ success: false, error: "Branch Managers can only delete Account Reports from their assigned branch" }, { status: 403 });
-      }
-    }
+    if (!canDeleteReport(session.role)) return NextResponse.json({ success: false, error: "Only Admin System can delete Account Reports" }, { status: 403 });
     await queryWithRetry(async () => sql`DELETE FROM account_reports WHERE id = ${id}::uuid`, "deleteAccountReport");
     await recordAuditEvent(auditEventFromRequest(request, { action: "account_report.delete", actorUsername: session.username, actorRole: session.role, resourceType: "account_report", resourceId: id, status: "success", metadata: { reporterUsername: current[0].reporter_username, reportDate: dateValue(current[0].report_date), branch: current[0].branch } }));
     return NextResponse.json({ success: true, data: { id } });

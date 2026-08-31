@@ -127,6 +127,10 @@ function canManageOperationReports(role: string) {
   return ["admin", "manager / approver", "branch manager", "bm", "credit manager"].includes(normalized);
 }
 
+function canDeleteOperationReport(role: string) {
+  return role.trim().toLocaleLowerCase() === "admin";
+}
+
 function hasCustomerActivity(data: Record<string, unknown>, keys: string[]) {
   return keys.some((key) => Array.isArray(data[key]) && data[key].some((row) => row && typeof row === "object" && typeof (row as { customer?: unknown }).customer === "string" && (row as { customer: string }).customer.trim()));
 }
@@ -380,15 +384,8 @@ export async function DELETE(request: NextRequest) {
     `, "findOperationReportForDelete");
     if (!current[0]) return NextResponse.json({ success: false, error: "Report not found" }, { status: 404 });
 
-    const ownsReport = current[0].reporter_username === session.username;
-    if (!ownsReport && !canManageOperationReports(session.role)) {
-      return NextResponse.json({ success: false, error: "You can only delete your own report" }, { status: 403 });
-    }
-    if (!ownsReport) {
-      const branchAccess = await getReportBranchAccess(session);
-      if (branchAccess.isBranchManager && (!branchAccess.branch || !branchesMatch(current[0].branch, branchAccess.branch))) {
-        return NextResponse.json({ success: false, error: "Branch Managers can only delete reports from their assigned branch" }, { status: 403 });
-      }
+    if (!canDeleteOperationReport(session.role)) {
+      return NextResponse.json({ success: false, error: "Only Admin System can delete Operation Reports" }, { status: 403 });
     }
 
     await queryWithRetry(async () => sql`
