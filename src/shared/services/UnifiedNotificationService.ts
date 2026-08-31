@@ -64,8 +64,10 @@ function auditNotification(row: AuditRow, user: SessionUser): UnifiedNotificatio
   const loanNumber = metadataValue(row.metadata, "loanNumber");
   const metadata = metadataObject(row.metadata);
   const recipients = Array.isArray(metadata.recipientUsernames) ? metadata.recipientUsernames.map(String) : [];
-  if (recipients.length && !recipients.includes(user.username)) return null;
-  if (actor === user.username) return null;
+  const currentUsername = user.username.trim().toLocaleLowerCase();
+  if (recipients.length && !recipients.some((recipient) => recipient.trim().toLocaleLowerCase() === currentUsername)) return null;
+  // Do not show a notification back to the user who performed the action.
+  if (actor.trim().toLocaleLowerCase() === currentUsername) return null;
 
   if (resourceType === "operation_report") {
     const isSubmitted = action.endsWith(".submit");

@@ -122,6 +122,13 @@ export default function TopBar({
     if (!response.ok) await loadNotifications(true);
   }, [canReadNotifications, loadNotifications]);
 
+  const clearNotifications = useCallback(async () => {
+    if (!canReadNotifications || !notifications.length) return;
+    await markNotificationsRead();
+    setNotifications([]);
+    setNotificationUnreadCount(0);
+  }, [canReadNotifications, markNotificationsRead, notifications.length]);
+
   const loadChatUnread = useCallback(async () => {
     if (!user?.username) {
       setChatUnreadCount(0);
@@ -592,7 +599,7 @@ export default function TopBar({
 
             {isNotificationsOpen && (
               <div ref={dropdownRef} style={dropdownStyle}>
-                <NotificationPanel notifications={notifications} unreadCount={notificationUnreadCount} loading={notificationsLoading} onClose={() => setIsNotificationsOpen(false)} onMarkAllRead={() => void markNotificationsRead()} onViewAll={() => { setIsNotificationsOpen(false); router.push("/alerts"); }} onOpen={(notification) => { if (!notification.readAt) void markNotificationsRead(notification); setIsNotificationsOpen(false); router.push(notification.href); }} />
+                <NotificationPanel notifications={notifications} unreadCount={notificationUnreadCount} loading={notificationsLoading} onClose={() => setIsNotificationsOpen(false)} onMarkAllRead={() => void markNotificationsRead()} onClear={() => void clearNotifications()} onViewAll={() => { setIsNotificationsOpen(false); router.push("/alerts"); }} onOpen={(notification) => { if (!notification.readAt) void markNotificationsRead(notification); setIsNotificationsOpen(false); router.push(notification.href); }} />
               </div>
             )}
 
