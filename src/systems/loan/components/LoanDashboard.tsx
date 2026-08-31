@@ -5848,7 +5848,11 @@ function OperationReportView({ loans, loading, canViewLoanData, onRefresh, onOpe
   };
 
   const startNewOperationReport = () => {
-    const nextDate = window.prompt(opText("បញ្ចូលកាលបរិច្ឆេទសម្រាប់របាយការណ៍ថ្មី (YYYY-MM-DD)", "Enter the date for the new report (YYYY-MM-DD)"), operationDateInputValue())?.trim() || "";
+    const today = operationDateInputValue();
+    const todayExists = savedReports.some((record) => record.reporterUsername === user.username && record.reportDate === today);
+    const nextDate = todayExists
+      ? window.prompt(opText("មានរបាយការណ៍សម្រាប់ថ្ងៃនេះរួចហើយ។ បញ្ចូលកាលបរិច្ឆេទថ្មី (YYYY-MM-DD)", "A report already exists for today. Enter a new report date (YYYY-MM-DD)"), today)?.trim() || ""
+      : today;
     if (!isValidReportDateInput(nextDate)) {
       toastError(opText("សូមបញ្ចូលកាលបរិច្ឆេទត្រឹមត្រូវ។", "Enter a valid report date."));
       return;
@@ -5860,6 +5864,7 @@ function OperationReportView({ loans, loading, canViewLoanData, onRefresh, onOpe
     }
     startOwnReport(nextDate);
     setActiveForm("collection");
+    setSavedValuesOpen(false);
     toastSuccess(opText("បានចាប់ផ្ដើមរបាយការណ៍ថ្មី។ កំណត់ត្រាចាស់មិនត្រូវបានលុបទេ។", "New report started. Existing report records were not deleted."));
   };
 
@@ -6004,7 +6009,7 @@ function OperationReportView({ loans, loading, canViewLoanData, onRefresh, onOpe
     branchAccountRecords.some((record) => record.status === "submitted") ? opText("ត្រូវពិនិត្យរបាយការណ៍គណនេយ្យដែលបានដាក់ស្នើ", "Review submitted Account Reports") : "",
   ].filter(Boolean) : [];
   const submitRequirements = isBranchManagerReport ? branchManagerSubmissionRequirements : submissionRequirements;
-  const reportSubmitDisabled = reportSaveDisabled || submitRequirements.length > 0;
+  const reportSubmitDisabled = reportSaveDisabled;
   const reportFormTabClass = (value: "summary" | "collection" | "decisions") => {
     const color = value === "summary"
       ? activeForm === value ? "border-blue-700 bg-blue-600 text-white ring-blue-200 hover:bg-blue-700 dark:ring-blue-900" : "border-blue-200 bg-blue-50 text-blue-800 hover:border-blue-400 hover:bg-blue-100 dark:border-blue-800 dark:bg-blue-950/40 dark:text-blue-200 dark:hover:bg-blue-900/60"
@@ -6035,7 +6040,7 @@ function OperationReportView({ loans, loading, canViewLoanData, onRefresh, onOpe
           <div className="flex flex-wrap gap-2">
             <button type="button" onClick={() => setReportPanel("records")} className="inline-flex items-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-100 dark:border-blue-800 dark:bg-blue-950/30 dark:text-blue-300"><List className="h-4 w-4" />{opText("កំណត់ត្រា", "Records")}</button>
             <button type="button" onClick={() => setSavedValuesOpen((open) => !open)} className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300"><List className="h-4 w-4" />{opText("តម្លៃដែលបានរក្សាទុក", "Saved values")}</button>
-            {!isBranchManagerReport ? <button type="button" disabled={reviewingAnotherSpecialist} onClick={startNewOperationReport} className="inline-flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-700 hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-300"><FilePlus2 className="h-4 w-4" />{opText("របាយការណ៍ថ្មី", "New Report")}</button> : null}
+            {!isBranchManagerReport ? <button type="button" onClick={startNewOperationReport} className="inline-flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-700 hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-300"><FilePlus2 className="h-4 w-4" />{opText("របាយការណ៍ថ្មី", "New Report")}</button> : null}
             <button type="button" disabled={reportSaveDisabled} onClick={() => void (isBranchManagerReport ? saveBranchManagerReport("draft") : saveOperationReport("draft"))} className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300">{(isBranchManagerReport ? savingBranchManagerReport : savingReport) === "draft" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}{opText("រក្សាទុកព្រាង", "Save Draft")}</button>
             <button type="button" disabled={reportSubmitDisabled} title={submitRequirements.length ? submitRequirements.join(" · ") : undefined} onClick={() => void (isBranchManagerReport ? saveBranchManagerReport("submitted") : saveOperationReport("submitted"))} className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50">{(isBranchManagerReport ? savingBranchManagerReport : savingReport) === "submitted" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}{isBranchManagerReport ? opText("ដាក់ស្នើទៅថ្នាក់លើ", "Submit to Management") : opText("ដាក់ស្នើទៅ BM", "Submit to BM")}</button>
             {canViewLoanData ? <button type="button" disabled={loading || reportsLoading} onClick={refreshReportSources} className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-wait disabled:opacity-50 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300"><RefreshCw className={`h-4 w-4 ${loading || reportsLoading ? "animate-spin" : ""}`} />{opText("ផ្ទុកទិន្នន័យឡើងវិញ", "Refresh data")}</button> : null}
