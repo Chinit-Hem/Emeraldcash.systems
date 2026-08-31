@@ -7,6 +7,8 @@ export const STANDARD_ROLES = [
   "Human Resources", "IT Support", "Marketing", "Intern / Read Only", "Executive Viewer",
 ] as const;
 
+export const LEGACY_ROLE_NAMES = ["Admin", "Staff", "Finance", "Manager / Approver"] as const;
+
 // Role definition for custom roles
 export interface RoleDefinition {
   id: string;
