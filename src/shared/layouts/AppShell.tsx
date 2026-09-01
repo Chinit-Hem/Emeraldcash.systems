@@ -230,8 +230,21 @@ function AppShellContent({ children }: AppShellProps) {
     if (!el) return;
 
     let pendingFrame: number | null = null;
+    let restoreTimer: number | null = null;
+    let restoreAttempts = 0;
+    let restored = false;
+    let savedScrollTop = 0;
+
+    try {
+      const saved = sessionStorage.getItem(scrollKey);
+      const parsed = saved === null ? 0 : Number(saved);
+      savedScrollTop = Number.isFinite(parsed) && parsed >= 0 ? parsed : 0;
+    } catch {
+      // Keep the top position when session storage is unavailable.
+    }
 
     const saveScrollPosition = () => {
+      if (!restored) return;
       try {
         sessionStorage.setItem(scrollKey, String(el.scrollTop));
       } catch {
@@ -249,23 +262,36 @@ function AppShellContent({ children }: AppShellProps) {
 
     el.addEventListener("scroll", onScroll, { passive: true });
 
-    // Restore when we mount on this pathname (or return back)
-    // Do it after paint so layout has settled.
-    const restoreTimer = window.setTimeout(() => {
-      try {
-        const saved = sessionStorage.getItem(scrollKey);
-        el.scrollTop = saved != null ? Number(saved) || 0 : 0;
-      } catch {
-        // ignore
+    // Reports and grids load asynchronously. Wait until the nested content is
+    // tall enough before restoring, otherwise the browser clamps scrollTop to 0.
+    const restoreScrollPosition = () => {
+      restoreAttempts += 1;
+      const maximumScrollTop = Math.max(0, el.scrollHeight - el.clientHeight);
+      if (maximumScrollTop < savedScrollTop && restoreAttempts < 150) {
+        restoreTimer = window.setTimeout(restoreScrollPosition, 100);
+        return;
       }
-    }, 0);
+
+      el.scrollTo({
+        top: Math.min(savedScrollTop, maximumScrollTop),
+        behavior: "auto",
+      });
+      restored = true;
+    };
+
+    restoreTimer = window.setTimeout(restoreScrollPosition, 0);
+    window.addEventListener("pagehide", saveScrollPosition);
+    window.addEventListener("beforeunload", saveScrollPosition);
 
     return () => {
-      window.clearTimeout(restoreTimer);
+      saveScrollPosition();
+      if (restoreTimer !== null) window.clearTimeout(restoreTimer);
       if (pendingFrame !== null) {
         window.cancelAnimationFrame(pendingFrame);
       }
       el.removeEventListener("scroll", onScroll);
+      window.removeEventListener("pagehide", saveScrollPosition);
+      window.removeEventListener("beforeunload", saveScrollPosition);
     };
 
   }, [scrollKey]);

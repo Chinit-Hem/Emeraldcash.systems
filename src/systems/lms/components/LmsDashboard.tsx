@@ -499,7 +499,7 @@ function LmsDashboard({ initialData }: LmsDashboardProps) {
     }
 
     const query = nextParams.toString();
-    router.replace(query ? `/lms?${query}` : "/lms", { scroll: false });
+    router.push(query ? `/lms?${query}` : "/lms", { scroll: false });
   }, [rememberDashboardScroll, router, searchParams]);
 
   useLayoutEffect(() => {

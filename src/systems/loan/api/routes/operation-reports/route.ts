@@ -127,6 +127,10 @@ function canManageOperationReports(role: string) {
   return ["admin", "system administrator", "manager / approver", "branch manager", "bm", "credit manager", "credit / approver"].includes(normalized);
 }
 
+function canViewAllOperationReports(role: string) {
+  return canManageOperationReports(role) || role.trim().toLocaleLowerCase() === "human resources";
+}
+
 function canDeleteOperationReport(role: string) {
   return ["admin", "system administrator"].includes(role.trim().toLocaleLowerCase());
 }
@@ -169,10 +173,10 @@ export async function GET(request: NextRequest) {
     const from = searchParams.get("from") || "1900-01-01";
     const to = searchParams.get("to") || "2999-12-31";
     const requestedReporter = searchParams.get("reporter")?.trim() || "";
-    const reporter = canManageOperationReports(session.role) ? requestedReporter : session.username;
+    const reporter = canViewAllOperationReports(session.role) ? requestedReporter : session.username;
     const requestedReportType = searchParams.get("reportType") === "bm" ? "bm" : "ls";
-    if (requestedReportType === "bm" && !canManageOperationReports(session.role)) {
-      return NextResponse.json({ success: false, error: "Only managers can view Branch Manager Reports" }, { status: 403 });
+    if (requestedReportType === "bm" && !canViewAllOperationReports(session.role)) {
+      return NextResponse.json({ success: false, error: "You do not have permission to view Branch Manager Reports" }, { status: 403 });
     }
     const requestedBranch = searchParams.get("branch")?.trim() || "";
     const branchAccess = await getReportBranchAccess(session);

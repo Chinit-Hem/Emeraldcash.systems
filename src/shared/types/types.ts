@@ -101,7 +101,11 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<string, Permission[]> = {
     "loans:view", "loans:create", "loans:edit", "loans:approve",
     "reports:view", "reports:manage",
   ],
-  "Human Resources": ["users:view", "users:create", "users:edit", "lms:view", "settings:view", "reports:view"],
+  "Human Resources": [
+    "users:view", "users:create", "users:edit", "lms:view",
+    "loans:view", "loans:create", "loans:edit", "loans:approve", "loans:disburse", "loans:repay", "loans:delete",
+    "settings:view", "reports:view",
+  ],
   "IT Support": ["vehicles:view", "sms:view", "users:view", "lms:view", "loans:view", "settings:view", "reports:view"],
   "Risk & Compliance": ["loans:view", "reports:view"],
   Marketing: ["lms:view"],

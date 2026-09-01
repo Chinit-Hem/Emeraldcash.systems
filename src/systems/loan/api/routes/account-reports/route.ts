@@ -79,7 +79,7 @@ export async function ensureAccountReportsTable() {
 }
 
 function canViewAll(role: string) {
-  return ["admin", "system administrator", "manager / approver", "branch manager", "bm", "credit manager", "credit / approver", "executive viewer"].includes(role.trim().toLocaleLowerCase());
+  return ["admin", "system administrator", "manager / approver", "branch manager", "bm", "credit manager", "credit / approver", "executive viewer", "human resources"].includes(role.trim().toLocaleLowerCase());
 }
 
 function canReview(role: string) {

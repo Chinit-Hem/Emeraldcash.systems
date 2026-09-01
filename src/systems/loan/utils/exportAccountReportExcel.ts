@@ -137,7 +137,7 @@ function addResolutionTable(sheet: ExcelJS.Worksheet, startRow: number, title: s
   titleCell.font = { name: BODY_FONT, size: 13, bold: true, color: { argb: RED } };
   titleCell.alignment = { vertical: "middle" };
 
-  ["ល.រ", "ឈ្មោះអតិថិជន", "ប្រភេទទ្រព្យ", "ការប្រាក់ ($)", "ពិន័យ ($)", "ប្រាក់ដើម ($)", "មូលហេតុ", ""].forEach((header, index) => {
+  ["ល.រ", "ឈ្មោះអតិថិជន", "ប្រភេទទ្រព្យ", "ពិន័យ ($)", "ប្រាក់ដើម ($)", "ការប្រាក់ ($)", "មូលហេតុ", ""].forEach((header, index) => {
     setHeaderCell(sheet.getCell(startRow + 1, index + 1), header);
   });
 
@@ -147,9 +147,9 @@ function addResolutionTable(sheet: ExcelJS.Worksheet, startRow: number, title: s
     sheet.getCell(excelRow, 1).alignment = { horizontal: "center", vertical: "middle" };
     sheet.getCell(excelRow, 2).value = row.customer;
     sheet.getCell(excelRow, 3).value = row.assetType;
-    sheet.getCell(excelRow, 4).value = row.interest.trim() ? numberValue(row.interest) : null;
-    sheet.getCell(excelRow, 5).value = row.penalty.trim() ? numberValue(row.penalty) : null;
-    sheet.getCell(excelRow, 6).value = row.principal.trim() ? numberValue(row.principal) : null;
+    sheet.getCell(excelRow, 4).value = row.penalty.trim() ? numberValue(row.penalty) : null;
+    sheet.getCell(excelRow, 5).value = row.principal.trim() ? numberValue(row.principal) : null;
+    sheet.getCell(excelRow, 6).value = row.interest.trim() ? numberValue(row.interest) : null;
     sheet.getCell(excelRow, 7).value = row.note;
     [4, 5, 6].forEach((column) => currencyCell(sheet.getCell(excelRow, column)));
     sheet.getRow(excelRow).height = 24;

@@ -465,11 +465,11 @@ export async function buildBranchManagerOperationReportWorkbook(data: BranchMana
   const accountFollowUpRows = dayAccountRecords.flatMap((record) => record.data.promiseRows || []);
   const accountFormalRows = dayAccountRecords.flatMap((record) => record.data.closedRows || []);
   const accountSummaryStart = consolidatedRow;
-  consolidatedRow = addBmTable(consolidated, consolidatedRow, "2. សង្ខេបលទ្ធផលរបស់គណនេយ្យ (Summary of account results)", ["ល.រ", "ប្រភេទសកម្មភាព", "អតិថិជនទាក់ទង/ដោះស្រាយ", "ការប្រាក់ ($)", "ពិន័យ ($)", "ប្រាក់ដើម ($)", "អតិថិជនសរុប/ដោះស្រាយ (នាក់)"], [
+  consolidatedRow = addBmTable(consolidated, consolidatedRow, "2. សង្ខេបលទ្ធផលរបស់គណនេយ្យ (Summary of account results)", ["ល.រ", "ប្រភេទសកម្មភាព", "អតិថិជនទាក់ទង/ដោះស្រាយ", "ពិន័យ ($)", "ប្រាក់ដើម ($)", "ការប្រាក់ ($)", "អតិថិជនសរុប/ដោះស្រាយ (នាក់)"], [
     [1, "សរុបបំណុលដែលមាននៅសល់ (Total outstanding debt)", "", "", "", outstanding, activeLoans.length],
     [2, "ជូនដំណឹងទៅអតិថិជន ដល់ថ្ងៃកំណត់ត្រូវបង់", nonEmpty(accountDueNoticeRows).length, "", "", "", nonEmpty(accountDueNoticeRows).length],
-    [3, "អតិថិជនដែលយឺតចាប់ពី ១ថ្ងៃ ដល់ ៣ថ្ងៃ", "", moneySum(accountFollowUpRows, "interest"), moneySum(accountFollowUpRows, "penalty"), moneySum(accountFollowUpRows, "principal"), nonEmpty(accountFollowUpRows).length],
-    [4, "អតិថិជនដែលយឺតចាប់ពី ៤ថ្ងៃឡើងទៅ", "", moneySum(accountFormalRows, "interest"), moneySum(accountFormalRows, "penalty"), moneySum(accountFormalRows, "principal"), nonEmpty(accountFormalRows).length],
+    [3, "អតិថិជនដែលយឺតចាប់ពី ១ថ្ងៃ ដល់ ៣ថ្ងៃ", "", moneySum(accountFollowUpRows, "penalty"), moneySum(accountFollowUpRows, "principal"), moneySum(accountFollowUpRows, "interest"), nonEmpty(accountFollowUpRows).length],
+    [4, "អតិថិជនដែលយឺតចាប់ពី ៤ថ្ងៃឡើងទៅ", "", moneySum(accountFormalRows, "penalty"), moneySum(accountFormalRows, "principal"), moneySum(accountFormalRows, "interest"), nonEmpty(accountFormalRows).length],
   ], [4, 5, 6], [4, 5, 6], [3, 7]);
   const accountSummaryTotalRow = accountSummaryStart + 6;
   const accountSummaryActionStart = accountSummaryStart + 4;
@@ -598,7 +598,7 @@ export async function exportOperationReportExcel(data: OperationReportExcelData)
   let row = 11;
   row = addTable(collection, row, "អតិថិជនដែលត្រូវប្រមូលសរុប", ["ល.រ", "ឈ្មោះអតិថិជន", "ជាសាច់ប្រាក់ ($)", "មូលហេតុ", "រូបភាព"], nonEmpty(data.collectionDueRows).map((item, index) => [index + 1, item.customer, numberValue(item.amount), item.reason, photoLink(item)]), [3], [3]);
   row = addTable(collection, row, "អតិថិជនដែលប្រមូលបានសរុប", ["ល.រ", "ឈ្មោះអតិថិជន", "ជាសាច់ប្រាក់ ($)", "មូលហេតុ", "រូបភាព"], nonEmpty(data.collectionPaidRows).map((item, index) => [index + 1, item.customer, numberValue(item.amount), item.reason, photoLink(item)]), [3], [3], RED);
-  const addResolution = (title: string, rows: ResolutionRow[]) => addTable(collection, row, title, ["ល.រ", "ឈ្មោះអតិថិជន", "ប្រភេទទ្រព្យ", "ការប្រាក់ ($)", "ពិន័យ ($)", "ប្រាក់ដើម ($)", "មូលហេតុ / ដំណោះស្រាយ", "រូបភាព"], nonEmpty(rows).map((item, index) => [index + 1, item.customer, item.assetType, numberValue(item.interest), numberValue(item.penalty), numberValue(item.principal), item.solution, photoLink(item)]), [4, 5, 6], [4, 5, 6]);
+  const addResolution = (title: string, rows: ResolutionRow[]) => addTable(collection, row, title, ["ល.រ", "ឈ្មោះអតិថិជន", "ប្រភេទទ្រព្យ", "ពិន័យ ($)", "ប្រាក់ដើម ($)", "ការប្រាក់ ($)", "មូលហេតុ / ដំណោះស្រាយ", "រូបភាព"], nonEmpty(rows).map((item, index) => [index + 1, item.customer, item.assetType, numberValue(item.penalty), numberValue(item.principal), numberValue(item.interest), item.solution, photoLink(item)]), [4, 5, 6], [4, 5, 6]);
   row = addResolution("អតិថិជនដែលដោះស្រាយសរុប", data.followUpRows);
   addResolution("អតិថិជនដែលដោះស្រាយបានសរុប", data.formalNoticeRows);
 

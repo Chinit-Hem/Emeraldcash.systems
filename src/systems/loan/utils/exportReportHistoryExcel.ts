@@ -136,10 +136,10 @@ export async function exportAccountReportHistoryExcel(records: AccountHistoryRec
   const details = workbook.addWorksheet("Account Activities", { views: [{ state: "frozen", ySplit: 4 }] });
   addTitle(details, "Account Report Activities", periodLabel, 12);
   details.addRow([]);
-  const detailsHeader = details.addRow(["Date", "Reporter", "Branch", "Category", "Customer", "Asset Type", "Amount", "Interest", "Penalty", "Principal", "Reason / Note", "Status"]);
+  const detailsHeader = details.addRow(["Date", "Reporter", "Branch", "Category", "Customer", "Asset Type", "Amount", "Penalty", "Principal", "Interest", "Reason / Note", "Status"]);
   styleHeader(detailsHeader);
   const categories: Array<[keyof AccountHistoryRecord["data"], string]> = [["dueRows", "Collection Due"], ["paidRows", "Collection Paid"], ["dueNoticeRows", "Due Notice"], ["promiseRows", "Follow-up / Promise"], ["closedRows", "Formal Notice / Closed"]];
-  records.forEach((record) => categories.forEach(([key, label]) => filled(record.data[key]).forEach((row) => details.addRow([record.reportDate, record.reporterName, record.branch, label, row.customer, row.assetType || "", amount(row.amount), amount(row.interest), amount(row.penalty), amount(row.principal), row.reason || row.note || "", record.status]))));
+  records.forEach((record) => categories.forEach(([key, label]) => filled(record.data[key]).forEach((row) => details.addRow([record.reportDate, record.reporterName, record.branch, label, row.customer, row.assetType || "", amount(row.amount), amount(row.penalty), amount(row.principal), amount(row.interest), row.reason || row.note || "", record.status]))));
   details.columns = [{ width: 14 }, { width: 24 }, { width: 20 }, { width: 22 }, { width: 28 }, { width: 20 }, { width: 14 }, { width: 14 }, { width: 14 }, { width: 14 }, { width: 36 }, { width: 14 }];
   [7, 8, 9, 10].forEach((column) => { details.getColumn(column).numFmt = "$#,##0.00;[Red]-$#,##0.00"; });
   styleBody(details, 5);
@@ -164,10 +164,10 @@ export async function exportLsReportHistoryExcel(records: LsHistoryRecord[], per
   const details = workbook.addWorksheet("LS Activities", { views: [{ state: "frozen", ySplit: 4 }] });
   addTitle(details, "Loan Specialist Report Activities", periodLabel, 12);
   details.addRow([]);
-  const detailsHeader = details.addRow(["Date", "Loan Specialist", "Branch", "Category", "Customer", "Asset / Loan Type", "Amount", "Interest", "Penalty", "Principal", "Reason / Solution", "Status"]);
+  const detailsHeader = details.addRow(["Date", "Loan Specialist", "Branch", "Category", "Customer", "Asset / Loan Type", "Amount", "Penalty", "Principal", "Interest", "Reason / Solution", "Status"]);
   styleHeader(detailsHeader);
   const categories: Array<[keyof LsHistoryRecord["data"], string]> = [["collectionDueRows", "Collection Due"], ["collectionPaidRows", "Collection Paid"], ["dueNoticeRows", "Due Notice"], ["followUpRows", "Follow-up"], ["formalNoticeRows", "Formal Notice"], ["requestedRows", "Loan Requested"], ["approvedRows", "Loan Approved"], ["rejectedRows", "Loan Rejected"]];
-  records.forEach((record) => categories.forEach(([key, label]) => filled(record.data[key]).forEach((row) => details.addRow([record.reportDate, record.reporterName, record.branch, label, row.customer, row.assetType || row.type || "", amount(row.amount), amount(row.interest), amount(row.penalty), amount(row.principal), row.reason || row.solution || "", record.status]))));
+  records.forEach((record) => categories.forEach(([key, label]) => filled(record.data[key]).forEach((row) => details.addRow([record.reportDate, record.reporterName, record.branch, label, row.customer, row.assetType || row.type || "", amount(row.amount), amount(row.penalty), amount(row.principal), amount(row.interest), row.reason || row.solution || "", record.status]))));
   details.columns = [{ width: 14 }, { width: 24 }, { width: 20 }, { width: 20 }, { width: 28 }, { width: 22 }, { width: 14 }, { width: 14 }, { width: 14 }, { width: 14 }, { width: 36 }, { width: 14 }];
   [7, 8, 9, 10].forEach((column) => { details.getColumn(column).numFmt = "$#,##0.00;[Red]-$#,##0.00"; });
   styleBody(details, 5);

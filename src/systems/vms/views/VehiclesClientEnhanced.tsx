@@ -2703,7 +2703,7 @@ export default function VehiclesClientEnhanced() {
       viewMode: nextViewMode,
     });
     const nextHref = getVehicleListUrl(nextParams);
-    navigateVehicleListInPlace(nextHref, "replace");
+    navigateVehicleListInPlace(nextHref, "push");
   }, [buildVehicleListParams, getVehicleListUrl, navigateVehicleListInPlace, preserveVehicleListScrollForUpdate]);
 
   const handleBrandSelect = useCallback((brand: string) => {
@@ -2879,7 +2879,7 @@ export default function VehiclesClientEnhanced() {
     nextParams.delete(VEHICLE_LIST_FOCUS_PARAM);
     resetVisibleVehicleBatch();
     const nextHref = getVehicleListUrl(nextParams);
-    navigateVehicleListInPlace(nextHref, "replace");
+    navigateVehicleListInPlace(nextHref, "push");
   }, [effectiveVehicleListSearchParams, getVehicleListUrl, navigateVehicleListInPlace, preserveVehicleListScrollForUpdate, resetVisibleVehicleBatch]);
 
   const cacheVehicleForDetail = useCallback((id: string) => {
