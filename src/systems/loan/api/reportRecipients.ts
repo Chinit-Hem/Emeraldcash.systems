@@ -1,34 +1,25 @@
 import { queryWithRetry, sql } from "@/lib/db-singleton";
-import { normalizeReportBranch } from "@/systems/loan/api/reportBranchAccess";
+import { branchesMatch, parseAssignedReportBranches } from "@/systems/loan/api/reportBranchAccess";
 
-type RecipientRow = { username: string };
+type RecipientRow = { username: string; role: string; position: string | null; branch: string | null };
 
-export async function getReportNotificationRecipients(branch: string, _audience: "branch" | "management", excludeUsername: string) {
-  const normalizedBranch = branch.trim();
-  const branchKey = normalizeReportBranch(normalizedBranch);
+export async function getReportNotificationRecipients(branch: string, audience: "branch" | "management" | "director", excludeUsername: string) {
   const rows = await queryWithRetry(async () => sql<RecipientRow>`
-    SELECT username FROM users
+    SELECT username, role, position, branch FROM users
     WHERE username <> ${excludeUsername}
-      AND (
-        (
-          LOWER(BTRIM(role)) IN ('admin', 'system administrator', 'executive viewer')
-          AND LOWER(BTRIM(COALESCE(position, ''))) NOT IN ('branch manager', 'bm')
-        )
-        OR (
-          (
-            LOWER(BTRIM(role)) IN ('manager / approver', 'branch manager', 'bm', 'credit manager', 'credit / approver')
-            OR LOWER(BTRIM(COALESCE(position, ''))) IN ('branch manager', 'bm')
-          )
-          AND (
-            ${branchKey} = ''
-            OR CASE
-              WHEN REGEXP_REPLACE(LOWER(COALESCE(branch, '')), '[[:space:]​_-]+', '', 'g') LIKE '%sensok%' OR REGEXP_REPLACE(LOWER(COALESCE(branch, '')), '[[:space:]​_-]+', '', 'g') LIKE '%សែនសុខ%' THEN 'sen-sok'
-              WHEN REGEXP_REPLACE(LOWER(COALESCE(branch, '')), '[[:space:]​_-]+', '', 'g') LIKE '%boeungkengkang%' OR REGEXP_REPLACE(LOWER(COALESCE(branch, '')), '[[:space:]​_-]+', '', 'g') LIKE '%bkk%' OR REGEXP_REPLACE(LOWER(COALESCE(branch, '')), '[[:space:]​_-]+', '', 'g') LIKE '%បឹងកេងកង%' THEN 'bkk'
-              ELSE REGEXP_REPLACE(LOWER(COALESCE(branch, '')), '[[:space:]​_-]+', '', 'g')
-            END = ${branchKey}
-          )
-        )
-      )
   `, "reportNotificationRecipients");
-  return rows.map((row) => row.username);
+  return rows.filter((row) => {
+    const role = row.role.trim().toLocaleLowerCase();
+    const position = (row.position || "").trim().toLocaleLowerCase();
+    const isAdminOrDirector = ["admin", "system administrator", "executive viewer", "director"].includes(role)
+      || ["director", "managing director", "chief executive officer", "ceo"].includes(position);
+    if (audience === "director") return isAdminOrDirector;
+    if (audience === "management") {
+      if (isAdminOrDirector) return false;
+      return role === "human resources" && parseAssignedReportBranches(row.branch).some((assigned) => branchesMatch(assigned, branch));
+    }
+    const isBranchManager = ["manager / approver", "branch manager", "bm", "credit manager", "credit / approver"].includes(role)
+      || ["branch manager", "bm", "credit manager", "credit / approver"].includes(position);
+    return isBranchManager && parseAssignedReportBranches(row.branch).some((assigned) => branchesMatch(assigned, branch));
+  }).map((row) => row.username);
 }

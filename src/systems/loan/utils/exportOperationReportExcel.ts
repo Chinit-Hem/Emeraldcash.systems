@@ -1,4 +1,5 @@
 import ExcelJS from "exceljs";
+import { companyBranchName } from "@/shared/utils/branchNames";
 
 type Attachment = { imageUrl?: string; imageName?: string };
 type CollectionRow = Attachment & { id: number; customer: string; amount: string; reason: string };
@@ -101,7 +102,7 @@ async function addBrandHeader(workbook: ExcelJS.Workbook, sheet: ExcelJS.Workshe
   sheet.getCell("C1").value = "ក្រុមហ៊ុន អេមើរ៉ល ឃែស ឯ.ក";
   sheet.getCell("C1").font = { name: "Khmer OS Muol Light", size: 20, color: { argb: RED } };
   sheet.getCell("C1").alignment = { horizontal: "center", vertical: "middle", wrapText: false, shrinkToFit: true };
-  sheet.getCell("C3").value = "របាយការណ៍លទ្ធផលប្រចាំថ្ងៃ សាខា បឹងកេងកង";
+  sheet.getCell("C3").value = `របាយការណ៍លទ្ធផលប្រចាំថ្ងៃ ${companyBranchName(data.branch, "km")}`;
   sheet.getCell("C3").font = { name: "Khmer OS Muol Light", size: 14, color: { argb: GREEN } };
   sheet.getCell("C3").alignment = { horizontal: "center", vertical: "middle", wrapText: false, shrinkToFit: true };
   sheet.getRow(1).height = 36;

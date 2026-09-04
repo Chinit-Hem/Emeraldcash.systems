@@ -4,7 +4,7 @@ import { auditEventFromRequest, recordAuditEvent } from "@/lib/audit-log";
 import { getSession } from "@/lib/auth-helpers";
 import { queryWithRetry, sql } from "@/lib/db-singleton";
 import { getReportNotificationRecipients } from "@/systems/loan/api/reportRecipients";
-import { branchesMatch, getReportBranchAccess, normalizeReportBranch } from "@/systems/loan/api/reportBranchAccess";
+import { branchesMatch, canAccessReportBranch, getReportBranchAccess, normalizeReportBranch } from "@/systems/loan/api/reportBranchAccess";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -116,14 +116,17 @@ export async function GET(request: NextRequest) {
   try {
     await ensureAccountReportsTable();
     const { searchParams } = new URL(request.url);
-    const requestedReporter = searchParams.get("reporter")?.trim() || "";
-    const reporter = canViewAll(session.role) ? requestedReporter : session.username;
-    const requestedBranch = searchParams.get("branch")?.trim() || "";
     const branchAccess = await getReportBranchAccess(session);
-    if (branchAccess.isBranchManager && !branchAccess.branch) {
-      return NextResponse.json({ success: false, error: "Your Branch Manager account must be assigned to a branch" }, { status: 403 });
+    const requestedReporter = searchParams.get("reporter")?.trim() || "";
+    const reporter = canViewAll(session.role) || branchAccess.isDirector ? requestedReporter : session.username;
+    const requestedBranch = searchParams.get("branch")?.trim() || "";
+    if ((branchAccess.isBranchManager || branchAccess.isHumanResources) && !branchAccess.branches.length) {
+      return NextResponse.json({ success: false, error: "Your account must be assigned to at least one branch" }, { status: 403 });
     }
-    const branch = branchAccess.branch || requestedBranch;
+    if (requestedBranch && !canAccessReportBranch(branchAccess, requestedBranch)) {
+      return NextResponse.json({ success: false, error: "You can only view reports from your assigned branches" }, { status: 403 });
+    }
+    const branch = branchAccess.isBranchManager ? branchAccess.branch || "" : requestedBranch;
     const branchKey = normalizeReportBranch(branch);
     const requestedLimit = Number.parseInt(searchParams.get("limit") || "200", 10);
     const limit = Math.min(500, Math.max(1, Number.isFinite(requestedLimit) ? requestedLimit : 200));
@@ -131,14 +134,17 @@ export async function GET(request: NextRequest) {
       SELECT * FROM account_reports
       WHERE (${reporter} = '' OR reporter_username = ${reporter})
         AND (${branchKey} = '' OR CASE
-          WHEN REGEXP_REPLACE(LOWER(branch), '[[:space:]​_-]+', '', 'g') LIKE '%sensok%' OR REGEXP_REPLACE(LOWER(branch), '[[:space:]​_-]+', '', 'g') LIKE '%សែនសុខ%' THEN 'sen-sok'
+          WHEN REGEXP_REPLACE(LOWER(branch), '[[:space:]​_-]+', '', 'g') = 'ss' OR REGEXP_REPLACE(LOWER(branch), '[[:space:]​_-]+', '', 'g') LIKE '%sensok%' OR REGEXP_REPLACE(LOWER(branch), '[[:space:]​_-]+', '', 'g') LIKE '%សែនសុខ%' THEN 'sen-sok'
           WHEN REGEXP_REPLACE(LOWER(branch), '[[:space:]​_-]+', '', 'g') LIKE '%boeungkengkang%' OR REGEXP_REPLACE(LOWER(branch), '[[:space:]​_-]+', '', 'g') LIKE '%bkk%' OR REGEXP_REPLACE(LOWER(branch), '[[:space:]​_-]+', '', 'g') LIKE '%បឹងកេងកង%' THEN 'bkk'
           ELSE REGEXP_REPLACE(LOWER(branch), '[[:space:]​_-]+', '', 'g')
         END = ${branchKey})
       ORDER BY report_date DESC, updated_at DESC
       LIMIT ${limit}
     `, "listAccountReports");
-    return NextResponse.json({ success: true, data: rows.map(mapReport) }, { headers: { "Cache-Control": "no-store" } });
+    const visibleRows = branchAccess.isHumanResources
+      ? rows.filter((row) => canAccessReportBranch(branchAccess, row.branch))
+      : rows;
+    return NextResponse.json({ success: true, data: visibleRows.map(mapReport) }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
     return NextResponse.json({ success: false, error: error instanceof Error ? error.message : "Could not load account reports" }, { status: 500 });
   }

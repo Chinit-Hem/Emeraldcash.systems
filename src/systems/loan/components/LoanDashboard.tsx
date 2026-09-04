@@ -53,6 +53,7 @@ import { useAuthUser } from "@/shared/hooks/AuthContext";
 import { useLanguage } from "@/shared/hooks/LanguageContext";
 import { hasAppPermission } from "@/shared/utils/permissions";
 import type { Language } from "@/shared/utils/i18n";
+import { companyBranchName, normalizeCompanyBranch } from "@/shared/utils/branchNames";
 import EmeraldCashLogo from "@/shared/components/EmeraldCashLogo";
 import dynamic from "next/dynamic";
 
@@ -62,10 +63,7 @@ type ApiResponse<T> = { success: boolean; data?: T; error?: string };
 type RememberedReportFields = Record<string, string[]>;
 
 function normalizeReportBranchLabel(value: string) {
-  const normalized = value.normalize("NFKC").toLocaleLowerCase().replace(/[\s\u200B-\u200D\uFEFF_-]+/gu, "");
-  if (normalized.includes("sensok") || normalized.includes("សែនសុខ")) return "sen-sok";
-  if (normalized.includes("boeungkengkang") || normalized.includes("bkk") || normalized.includes("បឹងកេងកង")) return "bkk";
-  return normalized;
+  return normalizeCompanyBranch(value);
 }
 
 function useRememberedReportFields(storageKey: string) {
@@ -645,12 +643,12 @@ function DashboardMetricCard({ label, value, onClick, className = "", wide = fal
   const cardClass = `group flex w-full overflow-hidden rounded-xl border border-emerald-300 bg-white text-left shadow-md transition dark:border-emerald-700/50 dark:bg-slate-900 ${onClick ? "cursor-pointer hover:-translate-y-0.5 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-emerald-500" : ""} ${className}`;
   const content = (
     <>
-      <div className={`flex shrink-0 items-center justify-center bg-emerald-700 text-white dark:bg-emerald-800 ${wide ? "w-[22%] min-w-32 2xl:min-w-40" : "w-[42.5%]"}`}>
-        <BarChart3 aria-hidden="true" className="h-[4.75rem] w-[4.75rem] stroke-[1.55] 2xl:h-24 2xl:w-24" />
+      <div className={`flex shrink-0 items-center justify-center bg-emerald-700 text-white dark:bg-emerald-800 ${wide ? "w-24 sm:w-[22%] sm:min-w-28 2xl:min-w-36" : "w-24 xl:w-[36%]"}`}>
+        <BarChart3 aria-hidden="true" className="h-16 w-16 stroke-[1.55] 2xl:h-20 2xl:w-20" />
       </div>
-      <div className="flex min-w-0 flex-1 flex-col justify-center px-5 py-4 2xl:px-6">
-        <p className="truncate text-[clamp(2rem,2.45vw,3rem)] font-medium leading-none tracking-normal text-slate-800 dark:text-white">{value}</p>
-        <p className="mt-4 truncate text-[clamp(1rem,1.05vw,1.25rem)] font-bold leading-tight text-slate-800 dark:text-slate-200" title={label}>{label}</p>
+      <div className="flex min-w-0 flex-1 flex-col justify-center px-4 py-4 2xl:px-5">
+        <p className="break-words text-[clamp(1.65rem,2.1vw,2.5rem)] font-medium leading-none tracking-normal text-slate-800 dark:text-white">{value}</p>
+        <p className="mt-3 line-clamp-2 text-sm font-bold leading-snug text-slate-800 dark:text-slate-200 2xl:text-base" title={label}>{label}</p>
       </div>
     </>
   );
@@ -2829,7 +2827,7 @@ function LoanFormPanel({ loan, onClose, onSaved, onOpenJournalItems }: { loan: L
       ) : null}
       <div className="border-b border-slate-200 px-5 py-5 dark:border-slate-800 sm:px-7">
         <div className="flex flex-wrap items-center gap-2 text-2xl font-medium tracking-tight text-slate-800 dark:text-slate-100">
-          <button type="button" onClick={onClose} className="hover:text-emerald-700 dark:hover:text-emerald-300">Dashboard Action</button><span className="text-slate-400">/</span><button type="button" onClick={onClose} className="hover:text-emerald-700 dark:hover:text-emerald-300">Loans</button><span className="text-slate-400">/</span><span>{loan?.loanNumber || "New"}</span>
+            <button type="button" onClick={onClose} className="hover:text-emerald-700 dark:hover:text-emerald-300">Dashboard</button><span className="text-slate-400">/</span><button type="button" onClick={onClose} className="hover:text-emerald-700 dark:hover:text-emerald-300">Loans</button><span className="text-slate-400">/</span><span>{loan?.loanNumber || "New"}</span>
         </div>
         <div className="mt-4 flex flex-wrap items-center gap-2">
           <button type="submit" form="loan-form" disabled={saving} className="inline-flex min-h-11 items-center gap-2 rounded-full bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700 disabled:opacity-60">{saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Save</button>
@@ -2891,7 +2889,7 @@ function LoanFormPanel({ loan, onClose, onSaved, onOpenJournalItems }: { loan: L
                   </div>
                   <p className="mt-1.5 text-xs text-slate-500">Type by hand or choose a remembered customer. Selecting one reuses their saved customer record.</p>
                 </Field>
-                <Field label="Transection No" className="loan-form-row"><input className={inputClass} value={form.transactionNo} onChange={set("transactionNo")} placeholder="Transection No" /></Field>
+                    <Field label="Loan Number" className="loan-form-row"><input className={`${inputClass} cursor-not-allowed bg-slate-100 text-slate-500 dark:bg-slate-900 dark:text-slate-400`} value={form.transactionNo} readOnly placeholder="Generated after submission" /></Field>
                 <Field label="Loan Type" className="loan-form-row">
                   <div className="flex items-start gap-2">
                     <div className="relative min-w-0 flex-1">
@@ -2989,7 +2987,7 @@ function LoanFormPanel({ loan, onClose, onSaved, onOpenJournalItems }: { loan: L
                 <div className="overflow-x-auto">
                   <table className="min-w-[860px] w-full table-fixed text-left">
                     <thead className="bg-slate-100 font-semibold text-slate-600 dark:bg-slate-900 dark:text-slate-300">
-                      <tr><th className="px-4 py-4">Date</th><th className="px-4 py-4">Number Of Days</th><th className="px-4 py-4 text-right">Outstanding</th><th className="px-4 py-4 text-right">Principle</th><th className="px-4 py-4 text-right">Interest</th><th className="px-4 py-4 text-right">Amount To Pay</th><th className="px-4 py-4 text-right">Balance</th><th className="w-10 px-3 py-4"><MoreVertical className="h-4 w-4" /></th></tr>
+                          <tr><th className="px-4 py-4">Date</th><th className="px-4 py-4">Number Of Days</th><th className="px-4 py-4 text-right">Outstanding</th><th className="px-4 py-4 text-right">Principal</th><th className="px-4 py-4 text-right">Interest</th><th className="px-4 py-4 text-right">Amount To Pay</th><th className="px-4 py-4 text-right">Balance</th><th className="w-10 px-3 py-4"><MoreVertical className="h-4 w-4" /></th></tr>
                     </thead>
                     <tbody>
                       {Array.from({ length: 4 }, (_, index) => <tr key={index} className="h-11 border-t border-slate-100 dark:border-slate-800"><td colSpan={8} /></tr>)}
@@ -4204,7 +4202,7 @@ function LoanDetailPanel({
         <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2 text-2xl font-medium tracking-tight text-slate-800 dark:text-slate-100">
-              <button type="button" onClick={onClose} className="hover:text-emerald-700 dark:hover:text-emerald-300">Dashboard Action</button>
+            <button type="button" onClick={onClose} className="hover:text-emerald-700 dark:hover:text-emerald-300">Dashboard</button>
               <span className="text-slate-400">/</span>
               <button type="button" onClick={onClose} className="hover:text-emerald-700 dark:hover:text-emerald-300">Loans</button>
               <span className="text-slate-400">/</span>
@@ -4273,7 +4271,7 @@ function LoanDetailPanel({
           <div className="mt-10 grid gap-x-16 gap-y-4 lg:grid-cols-2">
             <dl className="grid grid-cols-[minmax(9rem,0.7fr)_1fr] gap-x-6 gap-y-5 text-sm sm:text-base">
               <dt className={detailLabelClass}>Customer</dt><dd className="font-medium text-emerald-700 dark:text-emerald-300">{detail.loan.borrower.fullName}</dd>
-              <dt className={detailLabelClass}>Transection No</dt><dd className={detailValueClass}>{detail.loan.loanNumber || "—"}</dd>
+                  <dt className={detailLabelClass}>Loan Number</dt><dd className={detailValueClass}>{detail.loan.loanNumber || "—"}</dd>
               <dt className={detailLabelClass}>Loan Type</dt><dd className="font-medium text-emerald-700 dark:text-emerald-300">{detail.loan.loanType}</dd>
               <dt className={detailLabelClass}>Date</dt><dd className={detailValueClass}>{formatLoanListDate(detail.loan.startDate, detail.loan.createdAt)}</dd>
               <dt className={detailLabelClass}>Contract Date</dt><dd className={detailValueClass}>{formatDate(detail.loan.contractDate)}</dd>
@@ -4296,7 +4294,7 @@ function LoanDetailPanel({
           </div>
         </> : null}
         {!loading && !error && detail && tab === "information" ? <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3"><Field label="Loan amount"><p className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-semibold text-slate-900 dark:border-slate-700 dark:bg-slate-950 dark:text-white">{formatCurrency(detail.loan.principal)}</p></Field><Field label="Total payable"><p className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-semibold text-slate-900 dark:border-slate-700 dark:bg-slate-950 dark:text-white">{formatCurrency(detail.loan.totalPayable)}</p></Field><Field label="Payment amount"><p className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-semibold text-slate-900 dark:border-slate-700 dark:bg-slate-950 dark:text-white">{formatCurrency(detail.loan.paymentAmount)} / {detail.loan.repaymentFrequency}</p></Field><Field label="Loan type"><p className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-900 dark:border-slate-700 dark:bg-slate-950 dark:text-white">{detail.loan.loanType}</p></Field><Field label="Interest rate"><p className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-900 dark:border-slate-700 dark:bg-slate-950 dark:text-white">{detail.loan.interestRate}% · {detail.loan.interestModel.replace("_", " ")}</p></Field><Field label="Loan term"><p className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-900 dark:border-slate-700 dark:bg-slate-950 dark:text-white">{detail.loan.termMonths} months</p></Field><Field label="Start date"><p className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-900 dark:border-slate-700 dark:bg-slate-950 dark:text-white">{formatDate(detail.loan.startDate)}</p></Field><Field label="First payment date"><p className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-900 dark:border-slate-700 dark:bg-slate-950 dark:text-white">{formatDate(detail.loan.firstPaymentDate)}</p></Field><Field label="Branch"><p className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-900 dark:border-slate-700 dark:bg-slate-950 dark:text-white">{detail.loan.branchLocation || "—"}</p></Field><Field label="Purpose" className="sm:col-span-2 xl:col-span-3"><p className="min-h-11 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-900 dark:border-slate-700 dark:bg-slate-950 dark:text-white">{detail.loan.purpose || "—"}</p></Field></div> : null}
-        {!loading && !error && detail && tab === "schedule" ? <div className="overflow-x-auto rounded-b-2xl border border-t-0 border-slate-200 dark:border-slate-800"><table className="min-w-[980px] w-full text-left text-sm"><thead className="bg-slate-100 text-slate-600 dark:bg-slate-900 dark:text-slate-300"><tr><th className="px-4 py-4 font-semibold">Date</th><th className="px-4 py-4 text-right font-semibold">Number Of Days</th><th className="px-4 py-4 text-right font-semibold">Outstanding</th><th className="px-4 py-4 text-right font-semibold">Principle</th><th className="px-4 py-4 text-right font-semibold">Interest</th><th className="px-4 py-4 text-right font-semibold">Amount To Pay</th><th className="px-4 py-4 text-right font-semibold">Balance</th><th className="w-10 px-3 py-4 text-center"><MoreVertical className="h-4 w-4" /></th></tr></thead><tbody>{detail.schedule.length ? detail.schedule.map((item, index) => {
+              {!loading && !error && detail && tab === "schedule" ? <div className="overflow-x-auto rounded-b-2xl border border-t-0 border-slate-200 dark:border-slate-800"><table className="min-w-[980px] w-full text-left text-sm"><thead className="bg-slate-100 text-slate-600 dark:bg-slate-900 dark:text-slate-300"><tr><th className="px-4 py-4 font-semibold">Date</th><th className="px-4 py-4 text-right font-semibold">Number Of Days</th><th className="px-4 py-4 text-right font-semibold">Outstanding</th><th className="px-4 py-4 text-right font-semibold">Principal</th><th className="px-4 py-4 text-right font-semibold">Interest</th><th className="px-4 py-4 text-right font-semibold">Amount To Pay</th><th className="px-4 py-4 text-right font-semibold">Balance</th><th className="w-10 px-3 py-4 text-center"><MoreVertical className="h-4 w-4" /></th></tr></thead><tbody>{detail.schedule.length ? detail.schedule.map((item, index) => {
           const previousDate = index > 0 ? new Date(detail.schedule[index - 1].dueDate).getTime() : new Date(item.dueDate).getTime();
           const days = index === 0 ? 0 : Math.max(0, Math.round((new Date(item.dueDate).getTime() - previousDate) / 86_400_000));
           const principalBefore = detail.schedule.slice(0, index).reduce((total, row) => total + row.principalDue, 0);
@@ -4730,7 +4728,8 @@ function AccountReportView() {
   const [reporterName, setReporterName] = useState(user.full_name || user.username || "");
   const [reporterRole, setReporterRole] = useState(user.position || "Assistant Accountant");
   const [department, setDepartment] = useState(user.department || "Accountant");
-  const [branch, setBranch] = useState(user.branch || "Boeung Keng Kang");
+  const assignedReportBranches = useMemo(() => String(user.branch || "").split(/[,;|\n]+/u).map((value) => value.trim()).filter(Boolean), [user.branch]);
+  const [branch, setBranch] = useState(assignedReportBranches[0] || "Boeung Keng Kang");
   const [dueRows, setDueRows] = useState<AccountCollectionRow[]>(createAccountCollectionRows);
   const [paidRows, setPaidRows] = useState<AccountCollectionRow[]>(createAccountCollectionRows);
   const [dueNoticeRows, setDueNoticeRows] = useState<AccountResolutionRow[]>(createAccountResolutionRows);
@@ -4753,7 +4752,6 @@ function AccountReportView() {
   const [reviewComment, setReviewComment] = useState("");
   const [reviewCommentError, setReviewCommentError] = useState(false);
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
-  const accountReportBranchName = branch.trim().toLocaleLowerCase() === "boeung keng kang" ? "បឹងកេងកង" : branch;
   const accountFieldInvalid = (value: string) => validationErrors.length > 0 && !value.trim();
   const restoredLocalDraft = useRef(false);
   const initializedSavedAccountReport = useRef(false);
@@ -4949,7 +4947,7 @@ function AccountReportView() {
     setReportsLoading(true);
     try {
       const records = await api<AccountReportRecord[]>("/api/loan/account-reports?limit=500");
-      setSavedReports(records);
+      setSavedReports(records.map((record) => ({ ...record, branch: companyBranchName(record.branch, language) })));
       if (!initializedSavedAccountReport.current) {
         initializedSavedAccountReport.current = true;
         const current = records.find((record) => record.reporterUsername === user.username && record.reportDate === reportDate);
@@ -4960,7 +4958,7 @@ function AccountReportView() {
     } finally {
       setReportsLoading(false);
     }
-  }, [applySavedReport, reportDate, toastError, user.username]);
+  }, [applySavedReport, language, reportDate, toastError, user.username]);
 
   useEffect(() => { void loadAccountReports(); }, [loadAccountReports]);
 
@@ -4971,7 +4969,7 @@ function AccountReportView() {
     if (!requestedReport) return;
     applySavedReport(requestedReport);
     setActiveSheet(searchParams.get("accountSheet") === "collection" ? "collection" : "summary");
-    setViewOnly(false);
+    setViewOnly(searchParams.get("accountReadOnly") === "1");
     setReportPanel("form");
     window.setTimeout(() => accountReportFormRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 80);
   }, [applySavedReport, savedReports, searchParams]);
@@ -5131,7 +5129,7 @@ function AccountReportView() {
   const exportAccountReport = async () => {
     try {
       const { exportAccountReportExcel } = await import("@/systems/loan/utils/exportAccountReportExcel");
-      await exportAccountReportExcel({ reportDate, reportDateDisplay: accountReportDisplayDate(reportDate), reporterName, reporterRole, department, dueRows, paidRows, dueNoticeRows, promiseRows, closedRows });
+      await exportAccountReportExcel({ reportDate, reportDateDisplay: accountReportDisplayDate(reportDate), reporterName, reporterRole, department, branch, dueRows, paidRows, dueNoticeRows, promiseRows, closedRows });
       toastSuccess("Account report exported to Excel.");
     } catch (caught) {
       toastError(caught instanceof Error ? caught.message : "Could not export account report");
@@ -5226,7 +5224,7 @@ function AccountReportView() {
               <div className="absolute inset-y-0 left-0 flex items-center justify-center p-3 sm:p-4"><EmeraldCashLogo className="h-auto w-28 object-contain sm:w-44" /></div>
               <div className="font-khmer-muol-light w-full px-20 text-center text-xl text-red-700 sm:px-32 sm:text-3xl">ក្រុមហ៊ុន អេមើរ៉ល ឃែស ឯ.ក</div>
             </div>
-            <div className="font-khmer-muol-light border-b border-slate-300 py-3 text-center text-2xl text-emerald-700 dark:border-slate-700">របាយការណ៍លទ្ធផលប្រចាំថ្ងៃ សាខា {accountReportBranchName}</div>
+            <div className="font-khmer-muol-light border-b border-slate-300 py-3 text-center text-2xl text-emerald-700 dark:border-slate-700">{language === "km" ? `របាយការណ៍គណនេយ្យប្រចាំថ្ងៃ ${companyBranchName(branch, "km")}` : `Daily Account Report — ${companyBranchName(branch, "en")}`}</div>
             <div className="grid grid-cols-1 border-b border-slate-300 dark:border-slate-700 lg:grid-cols-[1fr_180px_1.4fr_1fr]">
               <div className="hidden border-r border-slate-300 dark:border-slate-700 lg:block" />
               <div className="grid grid-cols-[120px_minmax(0,1fr)] sm:grid-cols-[180px_minmax(0,1fr)] lg:col-span-2">
@@ -5608,13 +5606,14 @@ function OperationReportView({ loans, loading, canViewLoanData, onRefresh, onOpe
   const { language } = useLanguage();
   const opText = (km: string, en: string) => language === "km" ? km : en;
   const user = useAuthUser();
+  const assignedReportBranches = useMemo(() => String(user.branch || "").split(/[,;|\n]+/u).map((value) => value.trim()).filter(Boolean), [user.branch]);
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [reportPanel, setReportPanel] = useState<"records" | "form">("records");
   const [viewOnly, setViewOnly] = useState(false);
   const [reportDate, setReportDate] = useState(operationDateInputValue());
-  const [branch, setBranch] = useState(user.branch || "Boeung Keng Kang");
+  const [branch, setBranch] = useState(assignedReportBranches[0] || "Boeung Keng Kang");
   const [reporterName, setReporterName] = useState(user.full_name || user.username || "");
   const [reporterRole, setReporterRole] = useState(user.position || user.role || "Loan Specialist");
   const [department, setDepartment] = useState(user.department || "Loan Operations");
@@ -5657,10 +5656,15 @@ function OperationReportView({ loans, loading, canViewLoanData, onRefresh, onOpe
   }, [reviewComment]);
 
   const normalizedUserRole = user.role.trim().toLocaleLowerCase();
+  const normalizedUserPosition = (user.position || "").trim().toLocaleLowerCase();
+  const isHumanResources = normalizedUserRole === "human resources";
+  const isDirector = ["admin", "system administrator", "executive viewer", "director"].includes(normalizedUserRole)
+    || ["director", "managing director", "chief executive officer", "ceo"].includes(normalizedUserPosition);
   const canManageReports = ["admin", "system administrator", "manager / approver", "branch manager", "bm", "credit manager", "credit / approver"].includes(normalizedUserRole)
     || ["branch manager", "bm", "credit manager", "credit / approver"].includes((user.position || "").trim().toLocaleLowerCase());
-  const canViewAllReports = canManageReports || normalizedUserRole === "human resources";
-  const roleDefaultsToBranchManagerReport = ["manager / approver", "branch manager", "bm", "credit manager", "credit / approver"].includes(normalizedUserRole);
+  const canAccessBranchManagerWorkspace = canManageReports || isHumanResources || isDirector;
+  const canViewAllReports = canAccessBranchManagerWorkspace;
+  const roleDefaultsToBranchManagerReport = ["manager / approver", "branch manager", "bm", "credit manager", "credit / approver"].includes(normalizedUserRole) || isHumanResources || isDirector;
   const [reportMode, setReportMode] = useState<"operation" | "branchManager">(roleDefaultsToBranchManagerReport ? "branchManager" : "operation");
   const isBranchManagerReport = reportMode === "branchManager";
   const pushOperationReportLocation = useCallback((options: { panel: "records" | "form"; mode?: "operation" | "branchManager"; form?: OperationReportForm; recordId?: string; readOnly?: boolean }) => {
@@ -5685,7 +5689,7 @@ function OperationReportView({ loans, loading, canViewLoanData, onRefresh, onOpe
       setReporterName(user.full_name || user.username);
       setReporterRole(user.position || user.role);
       setDepartment(user.department || "Loan Operations");
-      setBranch(user.branch || branch);
+      setBranch(assignedReportBranches[0] || branch);
       setReviewComment("");
     }
   };
@@ -5731,6 +5735,7 @@ function OperationReportView({ loans, loading, canViewLoanData, onRefresh, onOpe
   const branchManagerYearRecords = useMemo(() => visibleSavedReports.filter((record) => record.reportDate.startsWith(reportDate.slice(0, 4)) && (!branch.trim() || normalizeReportBranchLabel(record.branch) === normalizeReportBranchLabel(branch)) && ["submitted", "reviewed", "approved"].includes(record.status)), [branch, reportDate, visibleSavedReports]);
   const branchAccountRecords = useMemo(() => accountReports.filter((record) => record.reportDate === reportDate && (!branch.trim() || normalizeReportBranchLabel(record.branch) === normalizeReportBranchLabel(branch)) && ["submitted", "reviewed", "approved"].includes(record.status)), [accountReports, branch, reportDate]);
   const branchAccountReportHistory = useMemo(() => accountReports.filter((record) => !branch.trim() || normalizeReportBranchLabel(record.branch) === normalizeReportBranchLabel(branch)), [accountReports, branch]);
+  const workspaceBranchOptions = useMemo(() => Array.from(new Set((isHumanResources ? assignedReportBranches : [...savedReports, ...branchManagerReports, ...accountReports].map((record) => record.branch)).filter(Boolean))), [accountReports, assignedReportBranches, branchManagerReports, isHumanResources, savedReports]);
   const branchAccountMonthRecords = useMemo(() => accountReports.filter((record) => record.reportDate.startsWith(reportDate.slice(0, 7)) && (!branch.trim() || normalizeReportBranchLabel(record.branch) === normalizeReportBranchLabel(branch)) && ["submitted", "reviewed", "approved"].includes(record.status)), [accountReports, branch, reportDate]);
   const branchAccountYearRecords = useMemo(() => accountReports.filter((record) => record.reportDate.startsWith(reportDate.slice(0, 4)) && (!branch.trim() || normalizeReportBranchLabel(record.branch) === normalizeReportBranchLabel(branch)) && ["submitted", "reviewed", "approved"].includes(record.status)), [accountReports, branch, reportDate]);
   const branchLoanSpecialistRecords = useMemo(() => visibleSavedReports.filter((record) => !branch.trim() || normalizeReportBranchLabel(record.branch) === normalizeReportBranchLabel(branch)), [branch, visibleSavedReports]);
@@ -5755,23 +5760,23 @@ function OperationReportView({ loans, loading, canViewLoanData, onRefresh, onOpe
     try {
       const [records, bmRecords, accountingRecords] = await Promise.all([
         api<OperationReportRecord[]>("/api/loan/operation-reports?limit=500"),
-        canManageReports ? api<OperationReportRecord[]>("/api/loan/operation-reports?reportType=bm&limit=500") : Promise.resolve([]),
-        canManageReports ? api<AccountReportRecord[]>("/api/loan/account-reports?limit=500") : Promise.resolve([]),
+        canAccessBranchManagerWorkspace ? api<OperationReportRecord[]>("/api/loan/operation-reports?reportType=bm&limit=500") : Promise.resolve([]),
+        canAccessBranchManagerWorkspace ? api<AccountReportRecord[]>("/api/loan/account-reports?limit=500") : Promise.resolve([]),
       ]);
-      setSavedReports(records);
-      setBranchManagerReports(bmRecords);
-      setAccountReports(accountingRecords);
+      setSavedReports(records.map((record) => ({ ...record, branch: companyBranchName(record.branch, language) })));
+      setBranchManagerReports(bmRecords.map((record) => ({ ...record, branch: companyBranchName(record.branch, language) })));
+      setAccountReports(accountingRecords.map((record) => ({ ...record, branch: companyBranchName(record.branch, language) })));
     } catch (caught) {
       if (!silent) toastError(caught instanceof Error ? caught.message : opText("មិនអាចផ្ទុករបាយការណ៍ដែលបានរក្សាទុក", "Could not load saved reports"));
     } finally {
       if (!silent) setReportsLoading(false);
     }
-  }, [canManageReports, toastError]);
+  }, [canAccessBranchManagerWorkspace, language, toastError]);
 
   useEffect(() => { void loadSavedReports(); }, [loadSavedReports]);
 
   useEffect(() => {
-    if (!isBranchManagerReport || !canManageReports) return;
+    if (!isBranchManagerReport || !canAccessBranchManagerWorkspace) return;
     const refreshSources = () => {
       if (document.visibilityState === "visible") void loadSavedReports({ silent: true });
     };
@@ -5783,7 +5788,7 @@ function OperationReportView({ loans, loading, canViewLoanData, onRefresh, onOpe
       window.removeEventListener("focus", refreshSources);
       document.removeEventListener("visibilitychange", refreshSources);
     };
-  }, [canManageReports, isBranchManagerReport, loadSavedReports]);
+  }, [canAccessBranchManagerWorkspace, isBranchManagerReport, loadSavedReports]);
 
   useEffect(() => {
     try {
@@ -5974,7 +5979,7 @@ function OperationReportView({ loans, loading, canViewLoanData, onRefresh, onOpe
   };
 
   const reviewBranchManagerSubmission = async (record: OperationReportRecord, action: "reviewed" | "approved" | "returned") => {
-    if (!canManageReports || record.reporterUsername === user.username) return;
+    if ((!isHumanResources && !isDirector) || record.reporterUsername === user.username) return;
     const comment = action === "returned" ? window.prompt(opText("បញ្ចូលមូលហេតុដែលត្រូវកែតម្រូវ", "Enter the correction required"), "")?.trim() || "" : "";
     if (action === "returned" && !comment) return;
     setReviewingAction(action);
@@ -5984,7 +5989,7 @@ function OperationReportView({ loans, loading, canViewLoanData, onRefresh, onOpe
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id: record.id, action, comment }),
       });
-      toastSuccess(action === "approved" ? opText("បានអនុម័តរបាយការណ៍ BM", "BM Report approved.") : action === "reviewed" ? opText("បានពិនិត្យរបាយការណ៍ BM", "BM Report marked reviewed.") : opText("បានបញ្ជូនរបាយការណ៍ BM ត្រឡប់ឱ្យកែតម្រូវ", "BM Report returned for correction."));
+      toastSuccess(action === "approved" ? opText("Director បានអនុម័តរបាយការណ៍ BM", "BM Report approved by Director.") : action === "reviewed" ? opText("HR បានពិនិត្យ និងបញ្ជូនរបាយការណ៍ BM ទៅ Director", "BM Report reviewed by HR and sent to Director.") : opText("បានបញ្ជូនរបាយការណ៍ BM ត្រឡប់ឱ្យកែតម្រូវ", "BM Report returned for correction."));
       await loadSavedReports();
     } catch (caught) {
       toastError(caught instanceof Error ? caught.message : opText("មិនអាចធ្វើបច្ចុប្បន្នភាពរបាយការណ៍ BM", "Could not update BM Report"));
@@ -6012,7 +6017,7 @@ function OperationReportView({ loans, loading, canViewLoanData, onRefresh, onOpe
     const requestedPanel = searchParams.get("reportPanel");
     const requestedMode = searchParams.get("operationMode");
     const requestedForm = searchParams.get("operationForm");
-    if (requestedMode === "operation" || (requestedMode === "branchManager" && canManageReports)) setReportMode(requestedMode);
+    if (requestedMode === "operation" || (requestedMode === "branchManager" && canAccessBranchManagerWorkspace)) setReportMode(requestedMode);
     if (requestedForm && ["summary", "collection", "decisions"].includes(requestedForm)) {
       const nextMode = requestedMode === "operation" || requestedMode === "branchManager" ? requestedMode : reportMode;
       setActiveForm(nextMode === "branchManager" && requestedForm === "decisions" ? "summary" : requestedForm as OperationReportForm);
@@ -6024,7 +6029,7 @@ function OperationReportView({ loans, loading, canViewLoanData, onRefresh, onOpe
       setReportPanel("form");
       if (!searchParams.get("operationReportId")) setViewOnly(false);
     }
-  }, [canManageReports, reportMode, searchParams]);
+  }, [canAccessBranchManagerWorkspace, reportMode, searchParams]);
 
   useEffect(() => {
     if (reportPanel === "records") {
@@ -6248,7 +6253,7 @@ function OperationReportView({ loans, loading, canViewLoanData, onRefresh, onOpe
         <div className="absolute inset-y-0 left-0 flex items-center justify-center p-4"><EmeraldCashLogo className="h-auto w-44 object-contain" /></div>
         <div className="font-khmer-muol-light w-full px-32 text-center text-3xl text-red-700">ក្រុមហ៊ុន អេមើរ៉ល ឃែស ឯ.ក</div>
       </div>
-      <div className="font-khmer-muol-light flex items-center justify-center border-b border-slate-300 py-3 text-center text-2xl text-emerald-700 dark:border-slate-700">របាយការណ៍លទ្ធផលប្រចាំថ្ងៃ សាខា បឹងកេងកង</div>
+      <div className="font-khmer-muol-light flex items-center justify-center border-b border-slate-300 py-3 text-center text-2xl text-emerald-700 dark:border-slate-700">{opText(`របាយការណ៍លទ្ធផលប្រចាំថ្ងៃ ${companyBranchName(branch, "km")}`, `Daily Performance Report — ${companyBranchName(branch, "en")}`)}</div>
       <div className="grid grid-cols-[1fr_180px_1.4fr_1fr] border-b border-slate-300 dark:border-slate-700">
         <div className="border-r border-slate-300 dark:border-slate-700" />
         <div className="col-span-2 grid grid-cols-[180px_minmax(0,1fr)]">
@@ -6295,7 +6300,7 @@ function OperationReportView({ loans, loading, canViewLoanData, onRefresh, onOpe
   );
   const reportSheetHeader = isBranchManagerReport ? branchManagerReportSheetHeader : standardReportSheetHeader;
   const displayedReportStatus = isBranchManagerReport ? branchManagerReportStatus : effectiveReportStatus;
-  const reportSaveDisabled = isBranchManagerReport ? Boolean(savingBranchManagerReport) || branchManagerReportLocked : Boolean(savingReport) || reviewingAnotherSpecialist || reportLocked;
+  const reportSaveDisabled = isHumanResources || isDirector || (isBranchManagerReport ? Boolean(savingBranchManagerReport) || branchManagerReportLocked : Boolean(savingReport) || reviewingAnotherSpecialist || reportLocked);
   const ownSavedReport = !isBranchManagerReport ? savedReports.find((record) => record.reporterUsername === user.username && record.reportDate === reportDate) : undefined;
   const hasEnteredOperationData = !isBranchManagerReport && [...collectionDueRows, ...collectionPaidRows, ...dueNoticeRows, ...followUpRows, ...formalNoticeRows, ...requestedRows, ...approvedRows, ...rejectedRows].some((row) => row.customer.trim());
   const hasUnsavedChanges = hasEnteredOperationData && (!ownSavedReport || JSON.stringify(currentReportData()) !== JSON.stringify(ownSavedReport.data));
@@ -6343,14 +6348,15 @@ function OperationReportView({ loans, loading, canViewLoanData, onRefresh, onOpe
       <section className="rounded-lg border border-slate-200 bg-white px-3 py-2 shadow-sm dark:border-slate-800 dark:bg-slate-900 print:hidden">
         <div className="flex flex-wrap items-center gap-2">
           <div className="flex shrink-0 items-center gap-2">
-            {canManageReports ? <div className="inline-flex overflow-hidden rounded-xl border border-slate-300 bg-slate-50 p-1 dark:border-slate-700 dark:bg-slate-950"><button type="button" onClick={() => selectReportMode("operation")} className={`rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${reportMode === "operation" ? "bg-white text-emerald-700 shadow-sm hover:bg-emerald-50 dark:bg-slate-800 dark:text-emerald-300 dark:hover:bg-emerald-950/40" : "text-slate-500 hover:bg-emerald-100 hover:text-emerald-800 dark:text-slate-400 dark:hover:bg-emerald-950/50 dark:hover:text-emerald-200"}`}>{opText("របាយការណ៍ LS", "LS Report")}</button><button type="button" onClick={() => selectReportMode("branchManager")} className={`rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${reportMode === "branchManager" ? "bg-emerald-600 text-white shadow-sm hover:bg-emerald-700" : "text-slate-500 hover:bg-blue-100 hover:text-blue-800 dark:text-slate-400 dark:hover:bg-blue-950/50 dark:hover:text-blue-200"}`}>{opText("របាយការណ៍ BM", "BM Report")}</button></div> : null}
+            {canAccessBranchManagerWorkspace ? <div className="inline-flex overflow-hidden rounded-xl border border-slate-300 bg-slate-50 p-1 dark:border-slate-700 dark:bg-slate-950"><button type="button" onClick={() => selectReportMode("operation")} className={`rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${reportMode === "operation" ? "bg-white text-emerald-700 shadow-sm hover:bg-emerald-50 dark:bg-slate-800 dark:text-emerald-300 dark:hover:bg-emerald-950/40" : "text-slate-500 hover:bg-emerald-100 hover:text-emerald-800 dark:text-slate-400 dark:hover:bg-emerald-950/50 dark:hover:text-emerald-200"}`}>{opText("របាយការណ៍ LS", "LS Report")}</button><button type="button" onClick={() => selectReportMode("branchManager")} className={`rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${reportMode === "branchManager" ? "bg-emerald-600 text-white shadow-sm hover:bg-emerald-700" : "text-slate-500 hover:bg-blue-100 hover:text-blue-800 dark:text-slate-400 dark:hover:bg-blue-950/50 dark:hover:text-blue-200"}`}>{opText("របាយការណ៍ BM", "BM Report")}</button></div> : null}
+            {(isHumanResources || isDirector) && workspaceBranchOptions.length > 1 ? <select aria-label={opText("ជ្រើសរើសសាខា", "Select branch")} value={branch} onChange={(event) => setBranch(event.target.value)} className="min-h-10 rounded-xl border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-700 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200">{workspaceBranchOptions.map((assignedBranch) => <option key={assignedBranch} value={assignedBranch}>{companyBranchName(assignedBranch, language)}</option>)}</select> : null}
             <span className={`inline-flex items-center rounded-lg px-3 py-2 text-sm font-semibold ${operationReportStatusClass(displayedReportStatus)}`}>{operationReportStatusLabel(displayedReportStatus, language)}</span>
             {!isBranchManagerReport && reviewingAnotherSpecialist ? <button type="button" onClick={openMyReport} className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300"><FilePlus2 className="h-4 w-4" />{opText("របាយការណ៍ខ្ញុំ", "My Report")}</button> : null}
           </div>
           <div className="flex flex-wrap gap-2">
             <button type="button" onClick={() => { setReportPanel("records"); pushOperationReportLocation({ panel: "records" }); }} className="inline-flex items-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-100 dark:border-blue-800 dark:bg-blue-950/30 dark:text-blue-300"><List className="h-4 w-4" />{opText("កំណត់ត្រា", "Records")}</button>
             <button type="button" onClick={() => setSavedValuesOpen((open) => !open)} className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300"><List className="h-4 w-4" />{opText("តម្លៃដែលបានរក្សាទុក", "Saved values")}</button>
-            {!isBranchManagerReport ? <button type="button" onClick={startNewOperationReport} className="inline-flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-700 hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-300"><FilePlus2 className="h-4 w-4" />{opText("របាយការណ៍ថ្មី", "New Report")}</button> : null}
+            {!isBranchManagerReport && !isHumanResources && !isDirector ? <button type="button" onClick={startNewOperationReport} className="inline-flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-700 hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-300"><FilePlus2 className="h-4 w-4" />{opText("របាយការណ៍ថ្មី", "New Report")}</button> : null}
             <button type="button" disabled={reportSaveDisabled} onClick={() => void (isBranchManagerReport ? saveBranchManagerReport("draft") : saveOperationReport("draft"))} className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300">{(isBranchManagerReport ? savingBranchManagerReport : savingReport) === "draft" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}{opText("រក្សាទុកព្រាង", "Save Draft")}</button>
             <button type="button" disabled={reportSubmitDisabled} title={submitRequirements.length ? submitRequirements.join(" · ") : undefined} onClick={() => void (isBranchManagerReport ? saveBranchManagerReport("submitted") : saveOperationReport("submitted"))} className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50">{(isBranchManagerReport ? savingBranchManagerReport : savingReport) === "submitted" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}{isBranchManagerReport ? opText("ដាក់ស្នើទៅថ្នាក់លើ", "Submit to Management") : opText("ដាក់ស្នើទៅ BM", "Submit to BM")}</button>
             {canViewLoanData ? <button type="button" disabled={loading || reportsLoading} onClick={refreshReportSources} className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-wait disabled:opacity-50 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300"><RefreshCw className={`h-4 w-4 ${loading || reportsLoading ? "animate-spin" : ""}`} />{opText("ផ្ទុកទិន្នន័យឡើងវិញ", "Refresh data")}</button> : null}
@@ -6406,7 +6412,7 @@ function OperationReportView({ loans, loading, canViewLoanData, onRefresh, onOpe
         <div className="space-y-6 print:hidden">
           {isBranchManagerReport ? (
             <>
-              <BranchManagerWorkflowPanel sourceRecords={branchManagerRecords} sourceReportHistory={branchLoanSpecialistRecords} accountRecords={branchAccountRecords} accountReportHistory={branchAccountReportHistory} submissions={branchManagerReports} reportDate={reportDate} branch={branch} currentUsername={user.username} reviewingAction={reviewingAction} onOpen={(record) => openSavedReport(record, true)} onOpenAccount={(record) => router.push(`/loan?view=accounting&accountMode=accountReport&reportPanel=form&accountReportId=${encodeURIComponent(record.id)}`)} onReview={(record, action) => void reviewBranchManagerSubmission(record, action)} onReviewAccount={(record, action) => void reviewAccountReport(record, action)} />
+              <BranchManagerWorkflowPanel sourceRecords={branchManagerRecords} sourceReportHistory={branchLoanSpecialistRecords} accountRecords={branchAccountRecords} accountReportHistory={branchAccountReportHistory} submissions={branchManagerReports} reportDate={reportDate} branch={branch} currentUsername={user.username} reviewingAction={reviewingAction} canReviewSources={canManageReports && !isHumanResources && !isDirector} canReviewAsHr={isHumanResources} canApproveAsDirector={isDirector} onOpen={(record) => openSavedReport(record, true)} onOpenAccount={(record) => router.push(`/loan?view=accounting&accountMode=accountReport&reportPanel=form&accountReportId=${encodeURIComponent(record.id)}&accountReadOnly=1`)} onReview={(record, action) => void reviewBranchManagerSubmission(record, action)} onReviewAccount={(record, action) => void reviewAccountReport(record, action)} />
               <OperationReportRecordsDashboard records={branchLoanSpecialistRecords} loading={reportsLoading} currentUsername={user.username} canViewAllReports={canViewAllReports} canManageReports={canManageReports} canDeleteReports={["admin", "system administrator"].includes(normalizedUserRole)} deletingReportId={deletingReportId} onCreate={startNewLsReportFromRecords} onView={(record) => { setReportMode("operation"); openSavedReport(record, true); }} onEdit={(record) => { setReportMode("operation"); editSavedReport(record); }} onDelete={deleteSavedReport} />
             </>
           ) : (
@@ -6418,7 +6424,7 @@ function OperationReportView({ loans, loading, canViewLoanData, onRefresh, onOpe
   );
 }
 
-function BranchManagerWorkflowPanel({ sourceRecords, sourceReportHistory, accountRecords, accountReportHistory, submissions, reportDate, branch, currentUsername, reviewingAction, onOpen, onOpenAccount, onReview, onReviewAccount }: { sourceRecords: OperationReportRecord[]; sourceReportHistory: OperationReportRecord[]; accountRecords: AccountReportRecord[]; accountReportHistory: AccountReportRecord[]; submissions: OperationReportRecord[]; reportDate: string; branch: string; currentUsername: string; reviewingAction: "reviewed" | "approved" | "returned" | null; onOpen: (record: OperationReportRecord) => void; onOpenAccount: (record: AccountReportRecord) => void; onReview: (record: OperationReportRecord, action: "reviewed" | "approved" | "returned") => void; onReviewAccount: (record: AccountReportRecord, action: "reviewed" | "approved" | "returned") => void }) {
+function BranchManagerWorkflowPanel({ sourceRecords, sourceReportHistory, accountRecords, accountReportHistory, submissions, reportDate, branch, currentUsername, reviewingAction, canReviewSources, canReviewAsHr, canApproveAsDirector, onOpen, onOpenAccount, onReview, onReviewAccount }: { sourceRecords: OperationReportRecord[]; sourceReportHistory: OperationReportRecord[]; accountRecords: AccountReportRecord[]; accountReportHistory: AccountReportRecord[]; submissions: OperationReportRecord[]; reportDate: string; branch: string; currentUsername: string; reviewingAction: "reviewed" | "approved" | "returned" | null; canReviewSources: boolean; canReviewAsHr: boolean; canApproveAsDirector: boolean; onOpen: (record: OperationReportRecord) => void; onOpenAccount: (record: AccountReportRecord) => void; onReview: (record: OperationReportRecord, action: "reviewed" | "approved" | "returned") => void; onReviewAccount: (record: AccountReportRecord, action: "reviewed" | "approved" | "returned") => void }) {
   const { language } = useLanguage();
   const text = (km: string, en: string) => language === "km" ? km : en;
   const [showAdvancedFilter, setShowAdvancedFilter] = useState(false);
@@ -6426,7 +6432,7 @@ function BranchManagerWorkflowPanel({ sourceRecords, sourceReportHistory, accoun
   const [toDate, setToDate] = useState("");
   const [reporterFilter, setReporterFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState<"" | OperationReportRecord["status"]>("");
-  const branchSubmissions = submissions.filter((record) => !branch.trim() || record.branch.trim().toLocaleLowerCase() === branch.trim().toLocaleLowerCase());
+  const branchSubmissions = submissions.filter((record) => !branch.trim() || normalizeReportBranchLabel(record.branch) === normalizeReportBranchLabel(branch));
   const reporterOptions = useMemo(() => Array.from(new Map([...accountReportHistory, ...branchSubmissions].map((record) => [record.reporterUsername, record.reporterName || record.reporterUsername])).entries()).sort((left, right) => left[1].localeCompare(right[1])), [accountReportHistory, branchSubmissions]);
   const matchesReviewFilter = (record: Pick<OperationReportRecord, "reportDate" | "reporterUsername" | "status">) => (!fromDate || record.reportDate >= fromDate) && (!toDate || record.reportDate <= toDate) && (!reporterFilter || record.reporterUsername === reporterFilter) && (!statusFilter || record.status === statusFilter);
   const filteredAccountRecords = accountReportHistory.filter(matchesReviewFilter);
@@ -6441,15 +6447,16 @@ function BranchManagerWorkflowPanel({ sourceRecords, sourceReportHistory, accoun
   const accountAwaitingReview = accountRecords.filter((record) => record.status === "submitted").length;
   return (
     <section className="overflow-hidden rounded-xl border border-emerald-200 bg-white shadow-sm dark:border-emerald-900 dark:bg-slate-900">
-      <div className="border-b border-emerald-200 bg-emerald-50 px-5 py-4 dark:border-emerald-900 dark:bg-emerald-950/30"><p className="text-sm font-semibold text-emerald-700 dark:text-emerald-300">{text("លំហូររបាយការណ៍ LS + គណនេយ្យ → BM → ថ្នាក់លើ", "LS + Account Reports → BM → Management")}</p><h2 className="mt-1 text-xl font-bold text-slate-900 dark:text-white">{text("ការដាក់ស្នើរបាយការណ៍ប្រចាំសាខា", "Branch Report Submission")}</h2></div>
+      <div className="border-b border-emerald-200 bg-emerald-50 px-5 py-4 dark:border-emerald-900 dark:bg-emerald-950/30"><p className="text-sm font-semibold text-emerald-700 dark:text-emerald-300">{text("លំហូរ៖ LS + គណនេយ្យ → BM → HR → Director", "Workflow: LS + Account → BM → HR → Director")}</p><h2 className="mt-1 text-xl font-bold text-slate-900 dark:text-white">{text("ការដាក់ស្នើ និងពិនិត្យរបាយការណ៍ប្រចាំសាខា", "Branch Report Submission & Review")}</h2></div>
       <div className="grid border-b border-slate-200 sm:grid-cols-4 dark:border-slate-800">
         {[[text("របាយការណ៍ LS បានទទួល", "LS Reports Received"), sourceRecords.length], [text("របាយការណ៍គណនេយ្យ", "Account Reports"), accountRecords.length], [text("រង់ចាំ BM ពិនិត្យ", "Awaiting BM Review"), awaitingReview + accountAwaitingReview], [text("ស្ថានភាព BM", "BM Status"), operationReportStatusLabel(currentSubmission?.status || "draft", language)]].map(([label, value]) => <div key={label} className="border-b border-slate-200 px-5 py-4 sm:border-b-0 sm:border-r dark:border-slate-800"><p className="text-xs font-semibold text-slate-500">{label}</p><p className="mt-1 text-lg font-bold text-slate-900 dark:text-white">{value}</p></div>)}
       </div>
       <div className="border-b border-slate-200 bg-slate-50/70 px-5 py-4 dark:border-slate-800 dark:bg-slate-950/30"><div className="flex flex-col justify-between gap-2 sm:flex-row sm:items-center"><div><p className="text-sm font-bold text-slate-800 dark:text-slate-100">{text("ស្ថានភាពទិន្នន័យសម្រាប់ BM", "BM Data Readiness")}</p><p className="text-xs text-slate-500">{text(`កាលបរិច្ឆេទ ${reportDate} · សាខា ${branch || "-"}`, `Date ${reportDate} · Branch ${branch || "-"}`)}</p></div><p className={`text-sm font-semibold ${sourceRecords.length ? "text-emerald-700 dark:text-emerald-300" : "text-amber-700 dark:text-amber-300"}`}>{sourceRecords.length ? text("របាយការណ៍ LS រួចរាល់សម្រាប់សង្ខេប", "Eligible LS reports are ready for consolidation") : text("មិនទាន់មានរបាយការណ៍ LS ដែលអាចសង្ខេបបាន", "No eligible LS reports for consolidation")}</p></div><div className="mt-3 grid gap-3 sm:grid-cols-2"><div className="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900"><p className="text-xs font-bold text-slate-700 dark:text-slate-200">{text("របាយការណ៍អ្នកឯកទេសផ្ដល់កម្ចី", "Loan Specialist Reports")}</p><div className="mt-2 flex flex-wrap gap-2">{reportStatuses.map((status) => <span key={`ls-${status}`} className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold ${operationReportStatusClass(status)}`}>{operationReportStatusLabel(status, language)}: {statusCount(currentLsReports, status)}</span>)}</div></div><div className="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900"><p className="text-xs font-bold text-slate-700 dark:text-slate-200">{text("របាយការណ៍គណនេយ្យ", "Account Reports")}</p><div className="mt-2 flex flex-wrap gap-2">{reportStatuses.map((status) => <span key={`account-${status}`} className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold ${operationReportStatusClass(status)}`}>{operationReportStatusLabel(status, language)}: {statusCount(currentAccountReports, status)}</span>)}</div></div></div></div>
       <div className="px-5 py-4 text-sm text-slate-600 dark:text-slate-300">{awaitingReview || accountAwaitingReview ? text(`ត្រូវពិនិត្យរបាយការណ៍ LS ${awaitingReview} និងគណនេយ្យ ${accountAwaitingReview} មុនពេលដាក់ស្នើ BM Report ទៅថ្នាក់លើ។`, `Review ${awaitingReview} LS and ${accountAwaitingReview} Account Report(s) before submitting the BM Report.`) : sourceRecords.length && accountRecords.length ? text("របាយការណ៍ LS និងគណនេយ្យទាំងអស់បានត្រៀមរួចរាល់សម្រាប់ BM Report។", "All LS and Account Reports are ready for consolidation.") : text(`មិនមានរបាយការណ៍ LS ដែលបានដាក់ស្នើ/ពិនិត្យ/អនុម័តសម្រាប់ ${reportDate} នៅសាខា ${branch || "នេះ"} ទេ។`, `No submitted, reviewed, or approved LS report exists for ${reportDate} at ${branch || "this branch"}.`)}</div>
       {accountReportHistory.length || branchSubmissions.length ? <div className="border-t border-slate-200 dark:border-slate-800"><div className="flex flex-col gap-3 bg-slate-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between dark:bg-slate-950"><div><p className="text-sm font-bold text-slate-700 dark:text-slate-200">{text("តម្រងសម្រាប់ពិនិត្យ", "Review Filters")}</p><p className="text-xs text-slate-500">{text("របាយការណ៍គណនេយ្យសម្រាប់សាខានេះអាចត្រូវបានស្វែងរកតាមថ្ងៃ អ្នករាយការណ៍ និងស្ថានភាព។ តម្រងមិនប្ដូរប្រភព BM Report ទេ។", "Account Reports for this branch can be searched by date, reporter, and status. Filters never change BM Report sources.")}</p></div><button type="button" aria-expanded={showAdvancedFilter} onClick={() => setShowAdvancedFilter((current) => !current)} className={`inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border px-3 py-2 text-sm font-semibold ${showAdvancedFilter || activeFilterCount ? "border-emerald-600 bg-emerald-50 text-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-300" : "border-slate-300 bg-white text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"}`}><Filter className="h-4 w-4" />{text("តម្រងកម្រិតខ្ពស់", "Advanced Filter")}{activeFilterCount ? <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-emerald-700 px-1.5 text-xs text-white">{activeFilterCount}</span> : null}<ChevronDown className={`h-4 w-4 transition ${showAdvancedFilter ? "rotate-180" : ""}`} /></button></div>{showAdvancedFilter ? <div className="grid gap-3 border-t border-slate-200 p-4 sm:grid-cols-2 lg:grid-cols-3 dark:border-slate-800"><Field label={text("ចាប់ពីថ្ងៃ", "From Date")}><DateInput title={text("ចាប់ពីថ្ងៃ", "From Date")} value={fromDate} max={toDate || undefined} onChange={setFromDate} className={inputClass} /></Field><Field label={text("ដល់ថ្ងៃ", "To Date")}><DateInput title={text("ដល់ថ្ងៃ", "To Date")} value={toDate} min={fromDate || undefined} onChange={setToDate} className={inputClass} /></Field><Field label={text("អ្នករាយការណ៍", "Reporter")}><select value={reporterFilter} onChange={(event) => setReporterFilter(event.target.value)} className={inputClass}><option value="">{text("អ្នករាយការណ៍ទាំងអស់", "All Reporters")}</option>{reporterOptions.map(([username, name]) => <option key={username} value={username}>{name}{name !== username ? ` (${username})` : ""}</option>)}</select></Field><Field label={text("ស្ថានភាព", "Status")}><select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as "" | OperationReportRecord["status"])} className={inputClass}><option value="">{text("ស្ថានភាពទាំងអស់", "All Statuses")}</option><option value="draft">{operationReportStatusLabel("draft", language)}</option><option value="submitted">{operationReportStatusLabel("submitted", language)}</option><option value="reviewed">{operationReportStatusLabel("reviewed", language)}</option><option value="approved">{operationReportStatusLabel("approved", language)}</option><option value="returned">{operationReportStatusLabel("returned", language)}</option></select></Field><div className="flex items-end"><button type="button" disabled={!activeFilterCount} onClick={() => { setFromDate(""); setToDate(""); setReporterFilter(""); setStatusFilter(""); }} className="inline-flex min-h-11 items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-40 dark:text-slate-300 dark:hover:bg-slate-800"><X className="h-4 w-4" />{text("សម្អាតតម្រង", "Clear Filters")}</button></div></div> : null}</div> : null}
-      {accountReportHistory.length ? <div className="max-h-64 overflow-auto border-t border-slate-200 dark:border-slate-800"><div className="bg-slate-50 px-4 py-2 text-sm font-bold text-slate-700 dark:bg-slate-950 dark:text-slate-200">{text("កំណត់ត្រារបាយការណ៍គណនេយ្យសាខា", "Branch Account Report Records")}</div><table className="min-w-[720px] w-full text-left text-sm"><thead className="bg-slate-100 text-slate-600 dark:bg-slate-950 dark:text-slate-300"><tr><th className="px-4 py-3">{text("ថ្ងៃ", "Date")}</th><th className="px-4 py-3">{text("អ្នករាយការណ៍", "Reporter")}</th><th className="px-4 py-3">{text("សាខា", "Branch")}</th><th className="px-4 py-3">{text("ស្ថានភាព", "Status")}</th><th className="px-4 py-3 text-right">{text("សកម្មភាព", "Actions")}</th></tr></thead><tbody>{filteredAccountRecords.length ? filteredAccountRecords.map((record) => <tr key={record.id} className="border-t border-slate-200 dark:border-slate-800"><td className="px-4 py-3 font-semibold">{record.reportDate}</td><td className="px-4 py-3">{record.reporterName || record.reporterUsername}</td><td className="px-4 py-3">{record.branch}</td><td className="px-4 py-3"><span className={`inline-flex rounded-md px-2 py-1 text-xs font-semibold ${operationReportStatusClass(record.status)}`}>{operationReportStatusLabel(record.status, language)}</span></td><td className="px-4 py-3"><div className="flex justify-end gap-2"><button type="button" disabled={Boolean(reviewingAction)} onClick={() => onOpenAccount(record)} className="rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white disabled:opacity-50">{text("ពិនិត្យ", "Review")}</button>{record.status === "reviewed" ? <button type="button" disabled={Boolean(reviewingAction)} onClick={() => onReviewAccount(record, "approved")} className="rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white disabled:opacity-50">{text("អនុម័ត", "Approve")}</button> : null}</div></td></tr>) : <tr><td colSpan={5} className="px-4 py-8 text-center text-sm text-slate-500">{text("មិនមានរបាយការណ៍គណនេយ្យត្រូវនឹងតម្រង", "No Account Reports match the filters.")}</td></tr>}</tbody></table></div> : null}
-      {branchSubmissions.length ? <div className="max-h-72 overflow-auto border-t border-slate-200 dark:border-slate-800"><table className="min-w-[820px] w-full text-left text-sm"><thead className="bg-slate-100 text-slate-600 dark:bg-slate-950 dark:text-slate-300"><tr><th className="px-4 py-3">{text("ថ្ងៃ", "Date")}</th><th className="px-4 py-3">{text("អ្នករាយការណ៍ BM", "BM Reporter")}</th><th className="px-4 py-3">{text("សាខា", "Branch")}</th><th className="px-4 py-3 text-center">{text("ប្រភពដែលបានភ្ជាប់", "Linked Sources")}</th><th className="px-4 py-3">{text("ស្ថានភាព", "Status")}</th><th className="px-4 py-3 text-right">{text("សកម្មភាព", "Actions")}</th></tr></thead><tbody>{filteredBranchSubmissions.length ? filteredBranchSubmissions.map((record) => { const ownsRecord = record.reporterUsername === currentUsername; return <tr key={record.id} className="border-t border-slate-200 dark:border-slate-800"><td className="px-4 py-3 font-semibold">{record.reportDate}</td><td className="px-4 py-3">{record.reporterName || record.reporterUsername}</td><td className="px-4 py-3">{record.branch || "-"}</td><td className="px-4 py-3 text-center font-semibold">LS {record.data.sourceReportIds?.length || 0} / Account {record.data.sourceAccountReportIds?.length || 0}</td><td className="px-4 py-3"><span className={`inline-flex rounded-md px-2 py-1 text-xs font-semibold ${operationReportStatusClass(record.status)}`}>{operationReportStatusLabel(record.status, language)}</span></td><td className="px-4 py-3"><div className="flex justify-end gap-2"><button type="button" onClick={() => onOpen(record)} className="inline-flex min-h-9 items-center gap-2 rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200"><Eye className="h-3.5 w-3.5" />{text("មើល", "View")}</button>{!ownsRecord && record.status === "submitted" ? <button type="button" disabled={Boolean(reviewingAction)} onClick={() => onOpen(record)} className="inline-flex min-h-9 items-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white disabled:opacity-50"><Check className="h-3.5 w-3.5" />{text("ពិនិត្យ", "Review")}</button> : null}{!ownsRecord && record.status === "reviewed" ? <button type="button" disabled={Boolean(reviewingAction)} onClick={() => onReview(record, "approved")} className="inline-flex min-h-9 items-center gap-2 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white disabled:opacity-50"><ShieldCheck className="h-3.5 w-3.5" />{text("អនុម័ត", "Approve")}</button> : null}</div></td></tr>; }) : <tr><td colSpan={6} className="px-4 py-8 text-center text-sm text-slate-500">{text("មិនមានរបាយការណ៍ BM ត្រូវនឹងតម្រង", "No BM Reports match the filters.")}</td></tr>}</tbody></table></div> : null}
+      {accountReportHistory.length ? <div className="max-h-64 overflow-auto border-t border-slate-200 dark:border-slate-800"><div className="bg-slate-50 px-4 py-2 text-sm font-bold text-slate-700 dark:bg-slate-950 dark:text-slate-200">{text("កំណត់ត្រារបាយការណ៍គណនេយ្យសាខា", "Branch Account Report Records")}</div><table className="min-w-[720px] w-full text-left text-sm"><thead className="bg-slate-100 text-slate-600 dark:bg-slate-950 dark:text-slate-300"><tr><th className="px-4 py-3">{text("ថ្ងៃ", "Date")}</th><th className="px-4 py-3">{text("អ្នករាយការណ៍", "Reporter")}</th><th className="px-4 py-3">{text("សាខា", "Branch")}</th><th className="px-4 py-3">{text("ស្ថានភាព", "Status")}</th><th className="px-4 py-3 text-right">{text("សកម្មភាព", "Actions")}</th></tr></thead><tbody>{filteredAccountRecords.length ? filteredAccountRecords.map((record) => <tr key={record.id} className="border-t border-slate-200 dark:border-slate-800"><td className="px-4 py-3 font-semibold">{record.reportDate}</td><td className="px-4 py-3">{record.reporterName || record.reporterUsername}</td><td className="px-4 py-3">{record.branch}</td><td className="px-4 py-3"><span className={`inline-flex rounded-md px-2 py-1 text-xs font-semibold ${operationReportStatusClass(record.status)}`}>{operationReportStatusLabel(record.status, language)}</span></td><td className="px-4 py-3"><div className="flex justify-end gap-2"><button type="button" disabled={Boolean(reviewingAction)} onClick={() => onOpenAccount(record)} className="rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white disabled:opacity-50">{text(canReviewSources ? "ពិនិត្យ" : "មើល", canReviewSources ? "Review" : "View")}</button>{canReviewSources && record.status === "reviewed" ? <button type="button" disabled={Boolean(reviewingAction)} onClick={() => onReviewAccount(record, "approved")} className="rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white disabled:opacity-50">{text("អនុម័ត", "Approve")}</button> : null}</div></td></tr>) : <tr><td colSpan={5} className="px-4 py-8 text-center text-sm text-slate-500">{text("មិនមានរបាយការណ៍គណនេយ្យត្រូវនឹងតម្រង", "No Account Reports match the filters.")}</td></tr>}</tbody></table></div> : null}
+      {(canReviewAsHr || canApproveAsDirector) && filteredBranchSubmissions.some((record) => canReviewAsHr ? record.status === "submitted" : record.status === "reviewed") ? <div className="border-t border-slate-200 bg-blue-50/70 p-4 dark:border-slate-800 dark:bg-blue-950/20"><p className="mb-3 text-sm font-bold text-blue-900 dark:text-blue-200">{canReviewAsHr ? text("របាយការណ៍ BM រង់ចាំ HR ពិនិត្យ", "BM Reports Awaiting HR Review") : text("របាយការណ៍ BM រង់ចាំ Director អនុម័ត", "BM Reports Awaiting Director Approval")}</p><div className="grid gap-3 md:grid-cols-2">{filteredBranchSubmissions.filter((record) => canReviewAsHr ? record.status === "submitted" : record.status === "reviewed").map((record) => <div key={`approval-${record.id}`} className="rounded-xl border border-blue-200 bg-white p-4 dark:border-blue-900 dark:bg-slate-900"><div className="flex items-start justify-between gap-3"><div><p className="font-bold text-slate-900 dark:text-white">{record.reporterName || record.reporterUsername}</p><p className="text-sm text-slate-500">{record.branch} · {record.reportDate}</p></div><span className={`rounded-md px-2 py-1 text-xs font-semibold ${operationReportStatusClass(record.status)}`}>{operationReportStatusLabel(record.status, language)}</span></div><div className="mt-3 flex flex-wrap gap-2"><button type="button" onClick={() => onOpen(record)} className="rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold">{text("មើលលម្អិត", "View Details")}</button><button type="button" disabled={Boolean(reviewingAction)} onClick={() => onReview(record, canReviewAsHr ? "reviewed" : "approved")} className="rounded-lg bg-emerald-600 px-3 py-2 text-xs font-bold text-white disabled:opacity-50">{canReviewAsHr ? text("HR ពិនិត្យ និងបញ្ជូនទៅ Director", "HR Review & Send to Director") : text("Director អនុម័ត", "Director Approve")}</button><button type="button" disabled={Boolean(reviewingAction)} onClick={() => onReview(record, "returned")} className="rounded-lg border border-red-300 px-3 py-2 text-xs font-semibold text-red-700 disabled:opacity-50">{text("បញ្ជូនត្រឡប់", "Return")}</button></div></div>)}</div></div> : null}
+      {branchSubmissions.length ? <div className="max-h-72 overflow-auto border-t border-slate-200 dark:border-slate-800"><table className="min-w-[820px] w-full text-left text-sm"><thead className="bg-slate-100 text-slate-600 dark:bg-slate-950 dark:text-slate-300"><tr><th className="px-4 py-3">{text("ថ្ងៃ", "Date")}</th><th className="px-4 py-3">{text("អ្នករាយការណ៍ BM", "BM Reporter")}</th><th className="px-4 py-3">{text("សាខា", "Branch")}</th><th className="px-4 py-3 text-center">{text("ប្រភពដែលបានភ្ជាប់", "Linked Sources")}</th><th className="px-4 py-3">{text("ស្ថានភាព", "Status")}</th><th className="px-4 py-3 text-right">{text("សកម្មភាព", "Actions")}</th></tr></thead><tbody>{filteredBranchSubmissions.length ? filteredBranchSubmissions.map((record) => <tr key={record.id} className="border-t border-slate-200 dark:border-slate-800"><td className="px-4 py-3 font-semibold">{record.reportDate}</td><td className="px-4 py-3">{record.reporterName || record.reporterUsername}</td><td className="px-4 py-3">{record.branch || "-"}</td><td className="px-4 py-3 text-center font-semibold">LS {record.data.sourceReportIds?.length || 0} / Account {record.data.sourceAccountReportIds?.length || 0}</td><td className="px-4 py-3"><span className={`inline-flex rounded-md px-2 py-1 text-xs font-semibold ${operationReportStatusClass(record.status)}`}>{operationReportStatusLabel(record.status, language)}</span></td><td className="px-4 py-3"><div className="flex justify-end"><button type="button" onClick={() => onOpen(record)} className="inline-flex min-h-9 items-center gap-2 rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200"><Eye className="h-3.5 w-3.5" />{text("មើល", "View")}</button></div></td></tr>) : <tr><td colSpan={6} className="px-4 py-8 text-center text-sm text-slate-500">{text("មិនមានរបាយការណ៍ BM ត្រូវនឹងតម្រង", "No BM Reports match the filters.")}</td></tr>}</tbody></table></div> : null}
     </section>
   );
 }
@@ -6607,7 +6614,7 @@ function OperationReportRecordsDashboard({ records, loading, currentUsername, ca
           <Field label={text("ដល់ថ្ងៃ", "To Date")}><DateInput title={text("ដល់ថ្ងៃ", "To Date")} value={toDate} min={fromDate || undefined} onChange={setToDate} className={inputClass} /></Field>
           <Field label={text("អ្នកឯកទេសផ្កល់កម្ចី", "Loan Specialist")}><select value={specialist} onChange={(event) => setSpecialist(event.target.value)} className={inputClass}><option value="">{text("អ្នកឯកទេសទាំងអស់", "All Specialists")}</option>{specialistOptions.map(([username, name]) => <option key={username} value={username}>{name}{name !== username ? ` (${username})` : ""}</option>)}</select></Field>
           <Field label={text("ស្ថានភាព", "Status")}><select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as "" | OperationReportRecord["status"])} className={inputClass}><option value="">{text("ស្ថានភាពទាំងអស់", "All Statuses")}</option><option value="draft">{operationReportStatusLabel("draft", language)}</option><option value="submitted">{operationReportStatusLabel("submitted", language)}</option><option value="reviewed">{operationReportStatusLabel("reviewed", language)}</option><option value="approved">{operationReportStatusLabel("approved", language)}</option><option value="returned">{operationReportStatusLabel("returned", language)}</option></select></Field>
-          <Field label={text("សាខា", "Branch")}><select value={branchFilter} onChange={(event) => setBranchFilter(event.target.value)} className={inputClass}><option value="">{text("សាខាទាំងអស់", "All Branches")}</option>{branchOptions.map((branch) => <option key={branch} value={branch}>{branch}</option>)}</select></Field>
+          <Field label={text("សាខា", "Branch")}><select value={branchFilter} onChange={(event) => setBranchFilter(event.target.value)} className={inputClass}><option value="">{text("សាខាទាំងអស់", "All Branches")}</option>{branchOptions.map((branch) => <option key={branch} value={branch}>{companyBranchName(branch, language)}</option>)}</select></Field>
           <Field label={text("នាយកដ្ឋាន", "Department")}><select value={departmentFilter} onChange={(event) => setDepartmentFilter(event.target.value)} className={inputClass}><option value="">{text("នាយកដ្ឋានទាំងអស់", "All Departments")}</option>{departmentOptions.map((department) => <option key={department} value={department}>{department}</option>)}</select></Field>
           <Field label={text("មុខតំណែង", "Position")}><select value={positionFilter} onChange={(event) => setPositionFilter(event.target.value)} className={inputClass}><option value="">{text("មុខតំណែងទាំងអស់", "All Positions")}</option>{positionOptions.map((position) => <option key={position} value={position}>{position}</option>)}</select></Field>
           <div className="flex items-end justify-between gap-3"><p className="pb-3 text-sm text-slate-500"><strong className="text-slate-900 dark:text-white">{filtered.length}</strong> {text(`ក្នុងចំណោម ${records.length} កំណត់ត្រា`, `of ${records.length} records`)}</p><button type="button" disabled={!advancedFilterCount} onClick={clearAdvancedSearch} className="mb-0.5 inline-flex min-h-11 items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-40 dark:text-slate-300 dark:hover:bg-slate-800"><X className="h-4 w-4" />{text("សម្អាត", "Clear")}</button></div>
@@ -6635,7 +6642,7 @@ function OperationReportRecordsDashboard({ records, loading, currentUsername, ca
         const openLabel = canEdit ? text("កែ/ធ្វើបច្ចុប្បន្នភាព", "Edit / Update") : reviewing ? text("ពិនិត្យ/ធ្វើបច្ចុប្បន្នភាព", "Review / Update") : text("មើល", "View");
         return <article key={record.id} className="flex min-h-64 flex-col rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:border-emerald-300 hover:shadow-md dark:border-slate-800 dark:bg-slate-900 dark:hover:border-emerald-700">
           <div className="flex items-start justify-between gap-3"><div><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{text("កាលបរិច្ឆេទរបាយការណ៍", "Report date")}</p><p className="mt-1 text-lg font-bold text-slate-900 dark:text-white">{record.reportDate}</p></div><span className={`inline-flex rounded-md px-2 py-1 text-xs font-semibold ${operationReportStatusClass(record.status)}`}>{operationReportStatusLabel(record.status, language)}</span></div>
-          <div className="mt-4 border-t border-slate-100 pt-4 dark:border-slate-800"><p className="font-bold text-slate-900 dark:text-white">{record.reporterName || record.reporterUsername}</p><p className="mt-1 text-sm text-slate-500">{record.reporterPosition || "-"}</p><p className="mt-2 text-sm font-semibold text-emerald-700 dark:text-emerald-300">{record.branch || "-"}</p><p className="mt-1 text-xs text-slate-500">{record.department || "-"}</p></div>
+          <div className="mt-4 border-t border-slate-100 pt-4 dark:border-slate-800"><p className="font-bold text-slate-900 dark:text-white">{record.reporterName || record.reporterUsername}</p><p className="mt-1 text-sm text-slate-500">{record.reporterPosition || "-"}</p><p className="mt-2 text-sm font-semibold text-emerald-700 dark:text-emerald-300">{companyBranchName(record.branch, language) || "-"}</p><p className="mt-1 text-xs text-slate-500">{record.department || "-"}</p></div>
           <div className="mt-4 grid grid-cols-3 gap-2"><div className="rounded-xl bg-amber-50 px-3 py-2 text-center dark:bg-amber-950/25"><p className="text-xs text-amber-700 dark:text-amber-300">{text("ត្រូវបង់", "Due")}</p><p className="mt-1 font-bold text-amber-900 dark:text-amber-100">{rowCount(record, "collectionDueRows")}</p></div><div className="rounded-xl bg-emerald-50 px-3 py-2 text-center dark:bg-emerald-950/25"><p className="text-xs text-emerald-700 dark:text-emerald-300">{text("បានបង់", "Paid")}</p><p className="mt-1 font-bold text-emerald-900 dark:text-emerald-100">{rowCount(record, "collectionPaidRows")}</p></div><div className="rounded-xl bg-blue-50 px-3 py-2 text-center dark:bg-blue-950/25"><p className="text-xs text-blue-700 dark:text-blue-300">{text("សំណើ", "Requests")}</p><p className="mt-1 font-bold text-blue-900 dark:text-blue-100">{rowCount(record, "requestedRows")}</p></div></div>
           <div className="mt-auto flex gap-2 pt-5"><button type="button" disabled={!canOpen} onClick={() => canEdit || reviewing ? onEdit(record) : onView(record)} className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-3 py-2 text-sm font-bold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-40">{canEdit || reviewing ? <Pencil className="h-4 w-4" /> : <Eye className="h-4 w-4" />}{openLabel}</button><button type="button" disabled={!canDeleteReports || deletingReportId === record.id} onClick={() => onDelete(record)} title={text("លុបរបាយការណ៍", "Delete report")} aria-label={text("លុបរបាយការណ៍", "Delete report")} className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-xl border border-red-200 text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-red-900 dark:text-red-300 dark:hover:bg-red-950/30">{deletingReportId === record.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}</button></div>
         </article>;
@@ -7109,7 +7116,6 @@ export default function LoanDashboard() {
   const loanGroupMenuRef = useRef<HTMLDivElement | null>(null);
   const loanBookmarksRef = useRef<HTMLDivElement | null>(null);
   // Drilldown state: optional filters applied when a KPI or revenue card is clicked
-  const [drilldownFilters, setDrilldownFilters] = useState<{ status?: LoanEntity["repaymentStatus"]; loanType?: string } | null>(null);
   const [page, setPage] = useState(1);
   const pageSize = 80;
   const [selectedLoanIds, setSelectedLoanIds] = useState<Set<string>>(() => new Set());
@@ -7213,7 +7219,6 @@ export default function LoanDashboard() {
 
   // Apply drilldown filters and open loans view
   const openDrilldown = (filters: { status?: LoanEntity["repaymentStatus"]; loanType?: string }) => {
-    setDrilldownFilters(filters);
     if (filters.status) setStatusFilter(filters.status);
     if (filters.loanType) setLoanTypeFilter(filters.loanType);
     setActiveView("loans");
@@ -7696,17 +7701,17 @@ export default function LoanDashboard() {
       {error ? <div className="rounded-2xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-300">{error}</div> : null}
 
       {showSummary ? (
-        <Card className="flex overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900 xl:h-[calc(100vh-7rem)] xl:min-h-[42rem] xl:flex-col">
-          <div className="flex min-h-[5.5rem] shrink-0 flex-wrap items-center justify-between gap-4 border-b border-slate-300 px-6 py-4 dark:border-slate-800">
-            <h1 className="text-3xl font-medium leading-none tracking-normal text-slate-700 dark:text-slate-100">Dashboard</h1>
+        <Card className="flex flex-col overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900 xl:h-[calc(100vh-7rem)] xl:min-h-[42rem]">
+          <div className="flex min-h-[5.5rem] shrink-0 flex-wrap items-center justify-between gap-4 border-b border-slate-300 px-4 py-4 dark:border-slate-800 sm:px-6">
+            <h1 className="text-2xl font-medium leading-none tracking-normal text-slate-700 dark:text-slate-100 sm:text-3xl">Dashboard</h1>
             <div className="relative" ref={dateFilterRef}>
-              <button type="button" onClick={() => setShowDateFilter((current) => !current)} className="inline-flex min-h-12 items-center gap-3 rounded-full bg-emerald-600 px-5 py-2.5 text-lg font-bold text-white shadow-sm transition hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 dark:focus:ring-offset-slate-950">
-                <CalendarDays className="h-6 w-6" />
+              <button type="button" onClick={() => setShowDateFilter((current) => !current)} className="inline-flex min-h-11 items-center gap-2 rounded-full bg-emerald-600 px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 dark:focus:ring-offset-slate-950 sm:min-h-12 sm:gap-3 sm:px-5 sm:text-lg">
+                <CalendarDays className="h-5 w-5 sm:h-6 sm:w-6" />
                 Date Filter
                 <ChevronDown className={`h-5 w-5 transition ${showDateFilter ? "rotate-180" : ""}`} />
               </button>
               {showDateFilter ? (
-                <div className="absolute right-0 top-full z-30 mt-2 w-72 overflow-visible rounded-sm border border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-950">
+                <div className="absolute right-0 top-full z-30 mt-2 w-[min(18rem,calc(100vw-2rem))] overflow-visible rounded-sm border border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-950">
                   <div className="max-h-[28rem] overflow-y-auto py-2">
                     {DATE_FILTER_OPTIONS.map((option) => (
                       <button
@@ -7796,7 +7801,7 @@ export default function LoanDashboard() {
                 <div className="grid gap-5 border-b border-slate-200 px-5 py-5 dark:border-slate-800 lg:grid-cols-[1fr_1.1fr] lg:px-7">
                   <div className="flex flex-col justify-between gap-5">
                     <div className="flex items-center gap-2 text-2xl font-medium tracking-tight text-slate-800 dark:text-slate-100">
-                      <button type="button" onClick={openSummaryDashboard} className="transition hover:text-emerald-700 dark:hover:text-emerald-300">Dashboard Action</button>
+                      <button type="button" onClick={openSummaryDashboard} className="transition hover:text-emerald-700 dark:hover:text-emerald-300">Dashboard</button>
                       <span className="text-slate-400">/</span>
                       <span>Loans</span>
                     </div>

@@ -1,4 +1,5 @@
 import ExcelJS from "exceljs";
+import { companyBranchName } from "@/shared/utils/branchNames";
 
 export type AccountReportCollectionRow = { id: number; customer: string; amount: string; reason: string };
 export type AccountReportResolutionRow = { id: number; customer: string; assetType: string; interest: string; penalty: string; principal: string; note: string };
@@ -9,6 +10,7 @@ export type AccountReportExcelData = {
   reporterName: string;
   reporterRole: string;
   department: string;
+  branch: string;
   dueRows: AccountReportCollectionRow[];
   paidRows: AccountReportCollectionRow[];
   dueNoticeRows: AccountReportResolutionRow[];
@@ -196,7 +198,7 @@ async function addReportHeader(workbook: ExcelJS.Workbook, sheet: ExcelJS.Worksh
   sheet.getCell("C1").value = "ក្រុមហ៊ុន អេមើរ៉ល ឃែស ឯ.ក";
   sheet.getCell("C1").font = { name: TITLE_FONT, size: 20, color: { argb: RED } };
   sheet.getCell("C1").alignment = { horizontal: "center", vertical: "middle" };
-  sheet.getCell("C3").value = "របាយការណ៍គណនេយ្យប្រចាំថ្ងៃ សាខា បឹងកេងកង";
+  sheet.getCell("C3").value = `របាយការណ៍គណនេយ្យប្រចាំថ្ងៃ ${companyBranchName(data.branch, "km")}`;
   sheet.getCell("C3").font = { name: TITLE_FONT, size: 14, color: { argb: GREEN } };
   sheet.getCell("C3").alignment = { horizontal: "center", vertical: "middle" };
   sheet.getRow(1).height = 36;

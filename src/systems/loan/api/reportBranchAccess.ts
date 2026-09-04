@@ -1,5 +1,6 @@
 import type { SessionPayload } from "@/lib/auth";
 import { queryWithRetry, sql } from "@/lib/db-singleton";
+import { normalizeCompanyBranch } from "@/shared/utils/branchNames";
 
 const BRANCH_MANAGER_LABELS = new Set([
   "manager / approver",
@@ -13,7 +14,10 @@ type UserBranchRow = { role: string; position: string | null; branch: string | n
 
 export type ReportBranchAccess = {
   isBranchManager: boolean;
+  isHumanResources: boolean;
+  isDirector: boolean;
   branch: string | null;
+  branches: string[];
 };
 
 export function isBranchManagerRole(role: string) {
@@ -25,14 +29,19 @@ export function branchesMatch(left: string, right: string) {
 }
 
 export function normalizeReportBranch(branch: string) {
-  const normalized = branch
-    .normalize("NFKC")
-    .toLocaleLowerCase()
-    .replace(/[\s\u200B-\u200D\uFEFF_-]+/gu, "");
+  return normalizeCompanyBranch(branch);
+}
 
-  if (normalized.includes("sensok") || normalized.includes("សែនសុខ")) return "sen-sok";
-  if (normalized.includes("boeungkengkang") || normalized.includes("bkk") || normalized.includes("បឹងកេងកង")) return "bkk";
-  return normalized;
+export function parseAssignedReportBranches(value: string | null | undefined) {
+  return Array.from(new Set(String(value || "")
+    .split(/[,;|\n]+/u)
+    .map((branch) => branch.trim())
+    .filter(Boolean)));
+}
+
+export function canAccessReportBranch(access: ReportBranchAccess, branch: string) {
+  if (!access.isBranchManager && !access.isHumanResources) return true;
+  return access.branches.some((assignedBranch) => branchesMatch(branch, assignedBranch));
 }
 
 /**
@@ -50,9 +59,18 @@ export async function getReportBranchAccess(session: SessionPayload): Promise<Re
   const user = rows[0];
   const isBranchManager = isBranchManagerRole(user?.role || session.role)
     || isBranchManagerRole(user?.position || "");
+  const isHumanResources = (user?.role || session.role).trim().toLocaleLowerCase() === "human resources";
+  const normalizedRole = (user?.role || session.role).trim().toLocaleLowerCase();
+  const normalizedPosition = (user?.position || "").trim().toLocaleLowerCase();
+  const isDirector = ["admin", "system administrator", "executive viewer", "director"].includes(normalizedRole)
+    || ["director", "managing director", "chief executive officer", "ceo"].includes(normalizedPosition);
+  const branches = parseAssignedReportBranches(user?.branch);
 
   return {
     isBranchManager,
-    branch: isBranchManager ? user?.branch?.trim() || null : null,
+    isHumanResources,
+    isDirector,
+    branch: isBranchManager ? branches[0] || null : null,
+    branches: isBranchManager || isHumanResources ? branches : [],
   };
 }
