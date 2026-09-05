@@ -4660,6 +4660,14 @@ type AccountResolutionRow = OperationReportAttachment & { id: number; customer: 
 type AccountResolutionTextField = "customer" | "assetType" | "interest" | "penalty" | "principal" | "note";
 type AccountReportSavedData = { dueRows: AccountCollectionRow[]; paidRows: AccountCollectionRow[]; dueNoticeRows: AccountResolutionRow[]; promiseRows: AccountResolutionRow[]; closedRows: AccountResolutionRow[] };
 type AccountReportLocalDraft = AccountReportSavedData & { reportDate: string; reporterName: string; reporterRole: string; department: string; branch: string; activeSheet: AccountReportSheet; reportPanel: "records" | "form"; loadedStatus: OperationReportStatus; loadedReporterUsername: string };
+
+function scrollLoanWorkspaceToTop(behavior: ScrollBehavior = "smooth") {
+  window.requestAnimationFrame(() => {
+    const appScroller = document.querySelector<HTMLElement>("[data-app-scroll-container='true']");
+    if (appScroller) appScroller.scrollTo({ top: 0, behavior });
+    else window.scrollTo({ top: 0, behavior });
+  });
+}
 type AccountReportRecord = { id: string; reportDate: string; reporterUsername: string; reporterName: string; reporterPosition: string; department: string; branch: string; status: OperationReportStatus; data: Partial<AccountReportSavedData>; reviewedBy: string | null; reviewedAt: string | null; reviewComment: string; createdAt: string; updatedAt: string };
 
 const ACCOUNT_REPORT_COLLECTION_REASONS = ["យឺត ៣ថ្ងៃ", "យឺត ៧ថ្ងៃ", "យឺត ១៥ថ្ងៃ", "ប្រភពចំណូលមិនច្បាស់លាស់", "កូនមិនទទួលជួយបង់ជំនួស", "បញ្ហាសុខភាពឈឺចូលពេទ្យ"];
@@ -4942,6 +4950,7 @@ function AccountReportView() {
       setActiveSheet("summary");
       setViewOnly(false);
     }
+    if (localDraftHydrated) scrollLoanWorkspaceToTop("auto");
   }, [localDraftHydrated, reportPanel]);
 
   const loadAccountReports = useCallback(async () => {
@@ -5215,9 +5224,9 @@ function AccountReportView() {
       {reportPanel === "form" && validationErrors.length ? <section role="alert" className="rounded-lg border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-900 dark:border-red-800 dark:bg-red-950/25 dark:text-red-200"><p className="font-bold">{language === "km" ? "សូមបំពេញព័ត៌មានដែលមានសញ្ញាពណ៌ក្រហម៖" : "Please complete the fields highlighted in red:"}</p><ul className="mt-1 list-disc space-y-1 pl-5">{validationErrors.map((error) => <li key={error}>{error}</li>)}</ul></section> : null}
       {reportPanel === "form" && reviewingAnotherAccountReport && canReviewAccount && ["submitted", "reviewed"].includes(loadedStatus) ? <section className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950 dark:border-amber-800 dark:bg-amber-950/25 dark:text-amber-100"><Field label={language === "km" ? "មតិយោបល់របស់អ្នកគ្រប់គ្រង" : "Manager Review Comment"}><textarea rows={2} value={reviewComment} onChange={(event) => { setReviewComment(event.target.value); if (event.target.value.trim()) setReviewCommentError(false); }} placeholder={language === "km" ? "ត្រូវបញ្ចូលពេលបញ្ជូនត្រឡប់" : "Required when returning for correction"} className={inputClass} /></Field>{reviewCommentError ? <p className="mt-2 font-semibold text-red-700">{language === "km" ? "សូមបញ្ចូលមតិយោបល់សម្រាប់ការបញ្ជូនត្រឡប់។" : "Enter a comment before returning the report."}</p> : null}<div className="mt-3 flex flex-wrap gap-2">{loadedStatus === "submitted" ? <button type="button" disabled={Boolean(reviewingAction)} onClick={() => void reviewLoadedAccountReport("reviewed")} className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"><Check className="h-4 w-4" />{language === "km" ? "សម្គាល់ថាបានពិនិត្យ" : "Mark Reviewed"}</button> : null}{loadedStatus === "reviewed" ? <button type="button" disabled={Boolean(reviewingAction)} onClick={() => void reviewLoadedAccountReport("approved")} className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"><ShieldCheck className="h-4 w-4" />{language === "km" ? "អនុម័ត" : "Approve"}</button> : null}<button type="button" disabled={Boolean(reviewingAction)} onClick={() => void reviewLoadedAccountReport("returned")} className="inline-flex items-center gap-2 rounded-xl border border-red-300 bg-white px-4 py-2 text-sm font-semibold text-red-700 hover:bg-red-50 disabled:opacity-50"><XCircle className="h-4 w-4" />{language === "km" ? "បញ្ជូនត្រឡប់ឱ្យកែតម្រូវ" : "Return for Correction"}</button></div></section> : null}
       {reportPanel === "form" && duplicateAccountCustomers.length ? <section role="alert" className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/25 dark:text-amber-100"><strong>Duplicate customer warning:</strong> {duplicateAccountCustomers.join(", ")}</section> : null}
-      <div ref={accountReportFormRef} className="scroll-mt-20">
+      {reportPanel === "form" ? <div ref={accountReportFormRef} className="scroll-mt-20">
       <Card className="min-w-0 overflow-hidden rounded-xl border border-slate-300 bg-white p-0 shadow-sm dark:border-slate-700 dark:bg-slate-950">
-        <fieldset disabled={reportPanel === "records" || reportLocked || viewOnly} className="min-w-0 border-0 p-0 disabled:opacity-90">
+        <fieldset disabled={reportLocked || viewOnly} className="min-w-0 border-0 p-0 disabled:opacity-90">
         <div className="overflow-visible">
           <div className="min-w-0 p-0 text-slate-950 dark:text-slate-100">
             {!viewOnly ? <>
@@ -5260,7 +5269,7 @@ function AccountReportView() {
         </div>
         </fieldset>
       </Card>
-      </div>
+      </div> : null}
       {reportPanel === "records" ? <AccountReportRecordsDashboard records={savedReports} loading={reportsLoading} currentUsername={user.username} language={language} deletingReportId={deletingReportId} canViewAllReports={user.role.trim().toLocaleLowerCase() === "human resources"} canManageReports={["admin", "system administrator", "manager / approver", "branch manager", "bm", "credit manager", "credit / approver"].includes(user.role.trim().toLocaleLowerCase()) || ["branch manager", "bm", "credit manager"].includes((user.position || "").trim().toLocaleLowerCase())} canDeleteReports={["admin", "system administrator"].includes(user.role.trim().toLocaleLowerCase())} onCreate={startNewAccountReport} onOpen={openSavedAccountReport} onDelete={deleteAccountReport} /> : null}
       <datalist id="account-report-reasons">{ACCOUNT_REPORT_COLLECTION_REASONS.map((reason) => <option key={reason} value={reason} />)}</datalist>
       <datalist id="account-report-asset-types">{selectableAssetTypes.map((type) => <option key={type} value={type} />)}</datalist>
@@ -6041,6 +6050,7 @@ function OperationReportView({ loans, loading, canViewLoanData, onRefresh, onOpe
       setActiveForm("summary");
       setViewOnly(false);
     }
+    if (localDraftHydrated) scrollLoanWorkspaceToTop("auto");
   }, [localDraftHydrated, reportPanel]);
 
   const openSavedReport = (record: OperationReportRecord, readOnly = false, requestedForm?: OperationReportForm, syncLocation = true) => {
@@ -6066,7 +6076,7 @@ function OperationReportView({ loans, loading, canViewLoanData, onRefresh, onOpe
     setViewOnly(readOnly);
     setReportPanel("form");
     if (syncLocation) pushOperationReportLocation({ panel: "form", mode: record.reportType === "bm" ? "branchManager" : "operation", form: nextForm, recordId: record.id, readOnly });
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    scrollLoanWorkspaceToTop();
     toastSuccess(record.reporterUsername === user.username ? opText("បានផ្ទុករបាយការណ៍របស់អ្នក", "Your saved report was loaded.") : opText(`កំពុងពិនិត្យរបាយការណ៍របស់ ${record.reporterName}`, `Reviewing ${record.reporterName}'s report.`));
   };
 
@@ -6396,9 +6406,9 @@ function OperationReportView({ loans, loading, canViewLoanData, onRefresh, onOpe
       </section> : loadedReportStatus === "returned" && loadedReportRecord?.reviewComment ? <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900 dark:border-red-800 dark:bg-red-950/25 dark:text-red-200"><strong>{opText("បានបញ្ជូនត្រឡប់ឱ្យកែតម្រូវ៖", "Returned for correction:")}</strong> {loadedReportRecord.reviewComment}</div> : null}
 
       {reportPanel === "form" && validationErrors.length ? <section role="alert" className="rounded-lg border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-900 dark:border-red-800 dark:bg-red-950/25 dark:text-red-200"><p className="font-bold">{opText("សូមបំពេញតម្រូវការទាំងនេះមុនពេលដាក់ស្នើ៖", "Complete these requirements before submitting:")}</p><ul className="mt-2 list-disc space-y-1 pl-5">{validationErrors.map((error) => <li key={error}>{error}</li>)}</ul></section> : null}
-      <Card className="min-w-0 overflow-x-auto rounded-xl border border-slate-300 bg-white p-0 shadow-sm dark:border-slate-700 dark:bg-slate-950">
+      {reportPanel === "form" ? <Card className="min-w-0 overflow-x-auto rounded-xl border border-slate-300 bg-white p-0 shadow-sm dark:border-slate-700 dark:bg-slate-950">
         {activeForm === "summary" && isBranchManagerReport ? <BranchManagerDashboardReport records={branchManagerRecords} monthRecords={branchManagerMonthRecords} yearRecords={branchManagerYearRecords} accountRecords={branchAccountRecords} monthAccountRecords={branchAccountMonthRecords} yearAccountRecords={branchAccountYearRecords} loans={branchManagerLoans} reportDate={reportDate} /> : null}
-        <fieldset disabled={reportPanel === "records" || reportSaveDisabled || viewOnly} className="min-w-0 border-0 p-0 disabled:opacity-90">
+        <fieldset disabled={reportSaveDisabled || viewOnly} className="min-w-0 border-0 p-0 disabled:opacity-90">
         <div className="min-w-0 overflow-visible">
           <div className="font-khmer-battambang min-w-0 text-slate-950 dark:text-slate-100">
             {!viewOnly ? reportSheetHeader : null}
@@ -6411,7 +6421,7 @@ function OperationReportView({ loans, loading, canViewLoanData, onRefresh, onOpe
           </div>
         </div>
         </fieldset>
-      </Card>
+      </Card> : null}
 
       {reportPanel === "records" ? (
         <div className="space-y-6 print:hidden">
