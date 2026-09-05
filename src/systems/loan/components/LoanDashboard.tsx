@@ -5171,9 +5171,9 @@ function AccountReportView() {
 
   return (
     <div className="min-w-0 space-y-4 lg:[zoom:0.9]">
-      <div className={`${reportPanel === "records" ? "hidden" : "sticky"} top-0 z-40 space-y-2 border-b border-slate-200 bg-slate-50/95 pb-2 backdrop-blur-md dark:border-slate-800 dark:bg-slate-950/95 print:static print:border-0 print:bg-transparent print:pb-0`}>
+      <div className={`${reportPanel === "records" ? "hidden" : "sm:sticky"} top-0 z-40 space-y-2 border-b border-slate-200 bg-slate-50/95 pb-2 backdrop-blur-md dark:border-slate-800 dark:bg-slate-950/95 print:static print:border-0 print:bg-transparent print:pb-0`}>
       <div className="rounded-lg border border-slate-200 bg-white px-3 py-2 shadow-sm dark:border-slate-800 dark:bg-slate-900 print:hidden">
-      <div className="flex flex-nowrap items-center justify-start gap-2 overflow-x-auto pb-1 overscroll-x-contain [scrollbar-width:none] [-webkit-overflow-scrolling:touch] [&::-webkit-scrollbar]:hidden [&>button]:min-h-11 [&>button]:shrink-0 [&>span]:shrink-0 sm:flex-wrap sm:justify-end sm:overflow-visible sm:pb-0">
+      <div className="grid grid-cols-2 items-stretch gap-2 [&>button]:min-h-11 [&>span]:min-h-11 sm:flex sm:flex-wrap sm:items-center sm:justify-end">
         <button type="button" onClick={() => { setReportPanel("records"); replaceAccountReportLocation("records"); }} className="inline-flex items-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-100 dark:border-blue-800 dark:bg-blue-950/30 dark:text-blue-300"><List className="h-4 w-4" />{language === "km" ? "កំណត់ត្រា" : "Records"}</button>
         <button type="button" onClick={() => setSavedValuesOpen((open) => !open)} className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300"><List className="h-4 w-4" />Saved values</button>
         <button type="button" disabled={Boolean(savingReport) || loadingLoans} onClick={startNewAccountReport} className="inline-flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-700 hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-300"><FilePlus2 className="h-4 w-4" />{language === "km" ? "របាយការណ៍ថ្មី" : "New Report"}</button>
@@ -5221,11 +5221,11 @@ function AccountReportView() {
         <div className="overflow-visible">
           <div className="min-w-0 p-0 text-slate-950 dark:text-slate-100">
             {!viewOnly ? <>
-            <div className="relative flex min-h-28 items-center justify-center border-b border-slate-300 bg-white dark:border-slate-700 dark:bg-slate-950 sm:min-h-36">
-              <div className="absolute inset-y-0 left-0 flex items-center justify-center p-3 sm:p-4"><EmeraldCashLogo className="h-auto w-28 object-contain sm:w-44" /></div>
-              <div className="font-khmer-muol-light w-full px-20 text-center text-xl text-red-700 sm:px-32 sm:text-3xl">ក្រុមហ៊ុន អេមើរ៉ល ឃែស ឯ.ក</div>
+            <div className="relative flex min-h-28 flex-col items-center justify-center gap-2 border-b border-slate-300 bg-white px-4 py-4 dark:border-slate-700 dark:bg-slate-950 sm:min-h-36 sm:px-0 sm:py-0">
+              <div className="flex items-center justify-center sm:absolute sm:inset-y-0 sm:left-0 sm:p-4"><EmeraldCashLogo className="h-auto w-28 object-contain sm:w-44" /></div>
+              <div className="font-khmer-muol-light w-full px-2 text-center text-xl leading-relaxed text-red-700 sm:px-32 sm:text-3xl">ក្រុមហ៊ុន អេមើរ៉ល ឃែស ឯ.ក</div>
             </div>
-            <div className="font-khmer-muol-light border-b border-slate-300 py-3 text-center text-2xl text-emerald-700 dark:border-slate-700">{language === "km" ? `របាយការណ៍គណនេយ្យប្រចាំថ្ងៃ ${companyBranchName(branch, "km")}` : `Daily Account Report — ${companyBranchName(branch, "en")}`}</div>
+            <div className="font-khmer-muol-light border-b border-slate-300 px-3 py-3 text-center text-lg leading-relaxed text-emerald-700 dark:border-slate-700 sm:text-2xl">{language === "km" ? `របាយការណ៍គណនេយ្យប្រចាំថ្ងៃ ${companyBranchName(branch, "km")}` : `Daily Account Report — ${companyBranchName(branch, "en")}`}</div>
             <div className="grid grid-cols-1 border-b border-slate-300 dark:border-slate-700 lg:grid-cols-[1fr_180px_1.4fr_1fr]">
               <div className="hidden border-r border-slate-300 dark:border-slate-700 lg:block" />
               <div className="grid grid-cols-[120px_minmax(0,1fr)] sm:grid-cols-[180px_minmax(0,1fr)] lg:col-span-2">
@@ -6254,14 +6254,14 @@ function OperationReportView({ loans, loading, canViewLoanData, onRefresh, onOpe
   const operationFieldInvalid = (value: string) => validationErrors.length > 0 && !value.trim();
   const standardReportSheetHeader = (
     <>
-      <div className="relative flex min-h-36 items-center justify-center border-b border-slate-300 bg-white dark:border-slate-700 dark:bg-slate-950">
-        <div className="absolute inset-y-0 left-0 flex items-center justify-center p-4"><EmeraldCashLogo className="h-auto w-44 object-contain" /></div>
-        <div className="font-khmer-muol-light w-full px-32 text-center text-3xl text-red-700">ក្រុមហ៊ុន អេមើរ៉ល ឃែស ឯ.ក</div>
+      <div className="relative flex min-h-28 flex-col items-center justify-center gap-2 border-b border-slate-300 bg-white px-4 py-4 dark:border-slate-700 dark:bg-slate-950 sm:min-h-36 sm:px-0 sm:py-0">
+        <div className="flex items-center justify-center sm:absolute sm:inset-y-0 sm:left-0 sm:p-4"><EmeraldCashLogo className="h-auto w-28 object-contain sm:w-44" /></div>
+        <div className="font-khmer-muol-light w-full px-2 text-center text-xl leading-relaxed text-red-700 sm:px-32 sm:text-3xl">ក្រុមហ៊ុន អេមើរ៉ល ឃែស ឯ.ក</div>
       </div>
-      <div className="font-khmer-muol-light flex items-center justify-center border-b border-slate-300 py-3 text-center text-2xl text-emerald-700 dark:border-slate-700">{opText(`របាយការណ៍លទ្ធផលប្រចាំថ្ងៃ ${companyBranchName(branch, "km")}`, `Daily Performance Report — ${companyBranchName(branch, "en")}`)}</div>
-      <div className="grid grid-cols-[1fr_180px_1.4fr_1fr] border-b border-slate-300 dark:border-slate-700">
-        <div className="border-r border-slate-300 dark:border-slate-700" />
-        <div className="col-span-2 grid grid-cols-[180px_minmax(0,1fr)]">
+      <div className="font-khmer-muol-light flex items-center justify-center border-b border-slate-300 px-3 py-3 text-center text-lg leading-relaxed text-emerald-700 dark:border-slate-700 sm:text-2xl">{opText(`របាយការណ៍លទ្ធផលប្រចាំថ្ងៃ ${companyBranchName(branch, "km")}`, `Daily Performance Report — ${companyBranchName(branch, "en")}`)}</div>
+      <div className="grid grid-cols-1 border-b border-slate-300 dark:border-slate-700 lg:grid-cols-[1fr_180px_1.4fr_1fr]">
+        <div className="hidden border-r border-slate-300 dark:border-slate-700 lg:block" />
+        <div className="grid grid-cols-[108px_minmax(0,1fr)] sm:grid-cols-[150px_minmax(0,1fr)] lg:col-span-2 lg:grid-cols-[180px_minmax(0,1fr)]">
           <div className="flex min-h-12 items-center justify-end whitespace-nowrap border-b border-slate-300 px-3 py-2 text-right font-semibold dark:border-slate-700">កាលបរិច្ឆេទ៖</div>
           <DateInput title="Report date" disabled={reviewingAnotherSpecialist || reportLocked} value={reportDate} onChange={changeReportDate} className={`${reportFieldClass} min-h-12 border-b ${operationFieldInvalid(reportDate) ? "border-red-500 bg-red-50 text-red-900" : "border-slate-300"} dark:border-slate-700`} />
           <div className="flex min-h-12 items-center justify-end whitespace-nowrap border-b border-slate-300 px-3 py-2 text-right font-semibold dark:border-slate-700">ឈ្មោះ៖</div>
@@ -6271,33 +6271,33 @@ function OperationReportView({ loans, loading, canViewLoanData, onRefresh, onOpe
           <div className="flex min-h-12 items-center justify-end whitespace-nowrap px-3 py-2 text-right font-semibold">នាយកដ្ឋាន៖</div>
           <input disabled={reviewingAnotherSpecialist || reportLocked} {...operationFieldProps("department")} value={department} onChange={(event) => setDepartment(event.target.value)} className={`${reportFieldClass} min-h-12 ${operationFieldInvalid(department) ? "bg-red-50 text-red-900" : ""}`} />
         </div>
-        <div aria-hidden="true" className="border-l border-slate-300 dark:border-slate-700" />
+        <div aria-hidden="true" className="hidden border-l border-slate-300 dark:border-slate-700 lg:block" />
       </div>
       <div className="h-10 border-b border-slate-300 dark:border-slate-700" />
     </>
   );
   const branchManagerBrandHeader = (
-    <div className="grid min-h-28 grid-cols-[220px_1fr] border-b border-slate-300 bg-white dark:border-slate-700 dark:bg-slate-950">
-      <div className="flex items-center justify-center p-4"><EmeraldCashLogo className="h-auto w-44 object-contain" /></div>
-      <div className="font-khmer-muol-light flex items-center justify-center px-5 text-center text-3xl text-emerald-800 dark:text-emerald-300">ក្រុមហ៊ុន អេមើរ៉ល ឃែស ឯ.ក</div>
+    <div className="grid min-h-28 grid-cols-1 border-b border-slate-300 bg-white px-4 py-4 dark:border-slate-700 dark:bg-slate-950 sm:grid-cols-[220px_1fr] sm:px-0 sm:py-0">
+      <div className="flex items-center justify-center sm:p-4"><EmeraldCashLogo className="h-auto w-28 object-contain sm:w-44" /></div>
+      <div className="font-khmer-muol-light flex items-center justify-center px-3 text-center text-xl leading-relaxed text-emerald-800 dark:text-emerald-300 sm:px-5 sm:text-3xl">ក្រុមហ៊ុន អេមើរ៉ល ឃែស ឯ.ក</div>
     </div>
   );
   const branchManagerReportSheetHeader = activeForm === "collection" ? (
     <>
       {branchManagerBrandHeader}
-      <div className="font-khmer-muol-light flex min-h-14 items-center justify-center border-b border-slate-300 px-5 text-center text-2xl text-emerald-800 dark:border-slate-700 dark:text-emerald-300">ទិន្នន័យប្រកាសសរុបពីមន្ត្រីឥណទានទាំងអស់ប្រចាំថ្ងៃ</div>
+      <div className="font-khmer-muol-light flex min-h-14 items-center justify-center border-b border-slate-300 px-3 py-3 text-center text-lg leading-relaxed text-emerald-800 dark:border-slate-700 dark:text-emerald-300 sm:px-5 sm:text-2xl">ទិន្នន័យប្រកាសសរុបពីមន្ត្រីឥណទានទាំងអស់ប្រចាំថ្ងៃ</div>
     </>
   ) : (
     <>
       {branchManagerBrandHeader}
-      <div className="font-khmer-muol-light flex items-center justify-center border-b border-slate-300 py-3 text-center text-2xl text-emerald-800 dark:border-slate-700 dark:text-emerald-300">របាយការណ៍សង្ខេបលទ្ធផលប្រចាំថ្ងៃ - ថ្នាក់ប្រធានសាខា (Branch Manager Daily Report)</div>
-      <div className="grid grid-cols-[150px_minmax(0,1fr)_180px_minmax(0,1fr)] border-b border-slate-300 dark:border-slate-700">
+      <div className="font-khmer-muol-light flex items-center justify-center border-b border-slate-300 px-3 py-3 text-center text-lg leading-relaxed text-emerald-800 dark:border-slate-700 dark:text-emerald-300 sm:text-2xl">របាយការណ៍សង្ខេបលទ្ធផលប្រចាំថ្ងៃ - ថ្នាក់ប្រធានសាខា (Branch Manager Daily Report)</div>
+      <div className="grid grid-cols-[112px_minmax(0,1fr)] border-b border-slate-300 dark:border-slate-700 lg:grid-cols-[150px_minmax(0,1fr)_180px_minmax(0,1fr)]">
         <div className="flex min-h-12 items-center justify-end whitespace-nowrap border-b border-r border-slate-300 px-3 py-2 font-semibold dark:border-slate-700">សាខា៖</div>
         <input disabled={reviewingAnotherSpecialist || reportLocked} {...operationFieldProps("branch")} value={branch} onChange={(event) => setBranch(event.target.value)} className={`${reportFieldClass} min-h-12 border-b border-r border-slate-300 dark:border-slate-700`} />
         <div className="flex min-h-12 items-center justify-end whitespace-nowrap border-b border-r border-slate-300 px-3 py-2 font-semibold dark:border-slate-700">កាលបរិច្ឆេទ៖</div>
                   <DateInput title="Report date" disabled={reviewingAnotherSpecialist || reportLocked} value={reportDate} onChange={changeReportDate} className={`${reportFieldClass} min-h-12 border-b border-slate-300 dark:border-slate-700`} />
-        <div className="flex min-h-12 items-center justify-end whitespace-nowrap border-r border-slate-300 px-3 py-2 font-semibold dark:border-slate-700">ឈ្មោះប្រធានសាខា៖</div>
-        <input disabled={reviewingAnotherSpecialist || reportLocked} {...operationFieldProps("reporterName")} value={reporterName} onChange={(event) => setReporterName(event.target.value)} className={`${reportFieldClass} min-h-12 border-r border-slate-300 dark:border-slate-700`} />
+        <div className="flex min-h-12 items-center justify-end whitespace-nowrap border-b border-r border-slate-300 px-3 py-2 font-semibold dark:border-slate-700 lg:border-b-0">ឈ្មោះប្រធានសាខា៖</div>
+        <input disabled={reviewingAnotherSpecialist || reportLocked} {...operationFieldProps("reporterName")} value={reporterName} onChange={(event) => setReporterName(event.target.value)} className={`${reportFieldClass} min-h-12 border-b border-r border-slate-300 dark:border-slate-700 lg:border-b-0`} />
         <div className="flex min-h-12 items-center justify-end whitespace-nowrap border-r border-slate-300 px-3 py-2 font-semibold dark:border-slate-700">នាយកដ្ឋាន៖</div>
         <input disabled={reviewingAnotherSpecialist || reportLocked} {...operationFieldProps("department")} value={department} onChange={(event) => setDepartment(event.target.value)} className={`${reportFieldClass} min-h-12`} />
       </div>
@@ -6349,16 +6349,16 @@ function OperationReportView({ loans, loading, canViewLoanData, onRefresh, onOpe
       <datalist id="operation-report-solutions">{OPERATION_RESOLUTION_OPTIONS.map((solution) => <option key={solution} value={solution} />)}</datalist>
       <datalist id="operation-report-rejection-reasons">{OPERATION_REJECTION_REASONS.map((reason) => <option key={reason} value={reason} />)}</datalist>
 
-      <div className={`${reportPanel === "records" ? "hidden" : "sticky"} top-0 z-40 space-y-2 border-b border-slate-200 bg-slate-50/95 pb-2 backdrop-blur-md dark:border-slate-800 dark:bg-slate-950/95 print:static print:border-0 print:bg-transparent print:pb-0`}>
+      <div className={`${reportPanel === "records" ? "hidden" : "sm:sticky"} top-0 z-40 space-y-2 border-b border-slate-200 bg-slate-50/95 pb-2 backdrop-blur-md dark:border-slate-800 dark:bg-slate-950/95 print:static print:border-0 print:bg-transparent print:pb-0`}>
       <section className="rounded-lg border border-slate-200 bg-white px-3 py-2 shadow-sm dark:border-slate-800 dark:bg-slate-900 print:hidden">
-        <div className="flex flex-nowrap items-center gap-2 overflow-x-auto pb-1 overscroll-x-contain [scrollbar-width:none] [-webkit-overflow-scrolling:touch] [&::-webkit-scrollbar]:hidden sm:flex-wrap sm:overflow-visible sm:pb-0">
-          <div className="flex shrink-0 items-center gap-2 [&_button]:min-h-11">
+        <div className="flex flex-col items-stretch gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+          <div className="flex flex-wrap items-center gap-2 [&_button]:min-h-11">
             {canAccessBranchManagerWorkspace ? <div className="inline-flex overflow-hidden rounded-xl border border-slate-300 bg-slate-50 p-1 dark:border-slate-700 dark:bg-slate-950"><button type="button" onClick={() => selectReportMode("operation")} className={`rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${reportMode === "operation" ? "bg-white text-emerald-700 shadow-sm hover:bg-emerald-50 dark:bg-slate-800 dark:text-emerald-300 dark:hover:bg-emerald-950/40" : "text-slate-500 hover:bg-emerald-100 hover:text-emerald-800 dark:text-slate-400 dark:hover:bg-emerald-950/50 dark:hover:text-emerald-200"}`}>{opText("របាយការណ៍ LS", "LS Report")}</button><button type="button" onClick={() => selectReportMode("branchManager")} className={`rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${reportMode === "branchManager" ? "bg-emerald-600 text-white shadow-sm hover:bg-emerald-700" : "text-slate-500 hover:bg-blue-100 hover:text-blue-800 dark:text-slate-400 dark:hover:bg-blue-950/50 dark:hover:text-blue-200"}`}>{opText("របាយការណ៍ BM", "BM Report")}</button></div> : null}
             {(isHumanResources || isDirector) && workspaceBranchOptions.length > 1 ? <select aria-label={opText("ជ្រើសរើសសាខា", "Select branch")} value={branch} onChange={(event) => setBranch(event.target.value)} className="min-h-10 rounded-xl border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-700 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200">{workspaceBranchOptions.map((assignedBranch) => <option key={assignedBranch} value={assignedBranch}>{companyBranchName(assignedBranch, language)}</option>)}</select> : null}
             <span className={`inline-flex items-center rounded-lg px-3 py-2 text-sm font-semibold ${operationReportStatusClass(displayedReportStatus)}`}>{operationReportStatusLabel(displayedReportStatus, language)}</span>
             {!isBranchManagerReport && reviewingAnotherSpecialist ? <button type="button" onClick={openMyReport} className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300"><FilePlus2 className="h-4 w-4" />{opText("របាយការណ៍ខ្ញុំ", "My Report")}</button> : null}
           </div>
-          <div className="flex shrink-0 flex-nowrap gap-2 [&>button]:min-h-11 [&>button]:shrink-0">
+          <div className="grid grid-cols-2 gap-2 [&>button]:min-h-11 sm:flex sm:flex-wrap">
             <button type="button" onClick={() => { setReportPanel("records"); pushOperationReportLocation({ panel: "records" }); }} className="inline-flex items-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-100 dark:border-blue-800 dark:bg-blue-950/30 dark:text-blue-300"><List className="h-4 w-4" />{opText("កំណត់ត្រា", "Records")}</button>
             <button type="button" onClick={() => setSavedValuesOpen((open) => !open)} className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300"><List className="h-4 w-4" />{opText("តម្លៃដែលបានរក្សាទុក", "Saved values")}</button>
             {!isBranchManagerReport && !isHumanResources && !isDirector ? <button type="button" onClick={startNewOperationReport} className="inline-flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-700 hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-300"><FilePlus2 className="h-4 w-4" />{opText("របាយការណ៍ថ្មី", "New Report")}</button> : null}
@@ -6399,7 +6399,7 @@ function OperationReportView({ loans, loading, canViewLoanData, onRefresh, onOpe
       <Card className="min-w-0 overflow-x-auto rounded-xl border border-slate-300 bg-white p-0 shadow-sm dark:border-slate-700 dark:bg-slate-950">
         {activeForm === "summary" && isBranchManagerReport ? <BranchManagerDashboardReport records={branchManagerRecords} monthRecords={branchManagerMonthRecords} yearRecords={branchManagerYearRecords} accountRecords={branchAccountRecords} monthAccountRecords={branchAccountMonthRecords} yearAccountRecords={branchAccountYearRecords} loans={branchManagerLoans} reportDate={reportDate} /> : null}
         <fieldset disabled={reportPanel === "records" || reportSaveDisabled || viewOnly} className="min-w-0 border-0 p-0 disabled:opacity-90">
-        <div className="overflow-hidden">
+        <div className="min-w-0 overflow-visible">
           <div className="font-khmer-battambang min-w-0 text-slate-950 dark:text-slate-100">
             {!viewOnly ? reportSheetHeader : null}
             {activeForm === "summary" && !isBranchManagerReport ? <OperationSummaryTable dueCount={dueCustomerCount} paidCount={paidCustomerCount} collectionRate={collectionRate} followUpRows={followUpRows} formalNoticeRows={formalNoticeRows} requestedRows={requestedRows} approvedRows={approvedRows} rejectedRows={rejectedRows} /> : null}
@@ -6893,9 +6893,11 @@ function ReportTable({ title, count, total, children, titleTone = "green", onRem
   void total;
   const titleColor = titleTone === "red" ? "text-red-700 dark:text-red-300" : "text-emerald-800 dark:text-emerald-300";
   return (
-    <section>
+    <section className="min-w-0">
       <h2 className={`flex items-center justify-between gap-3 border-b border-slate-300 px-3 py-2 text-sm font-bold dark:border-slate-700 ${titleColor}`}><span>{title}</span>{onRemoveLast ? <button type="button" onClick={onRemoveLast} className="inline-flex items-center gap-1 rounded px-2 py-1 text-xs hover:bg-red-50 hover:text-red-700"><X className="h-3.5 w-3.5" />Remove last row</button> : null}</h2>
-      <table className="w-full table-fixed border-collapse text-left text-sm [&_td]:border [&_td]:border-slate-300 [&_th]:border [&_th]:border-slate-300 dark:[&_td]:border-slate-700 dark:[&_th]:border-slate-700">{children}</table>
+      <div className="max-w-full overflow-x-auto overscroll-x-contain [-webkit-overflow-scrolling:touch]">
+        <table className="min-w-[720px] w-full table-fixed border-collapse text-left text-sm [&_td]:border [&_td]:border-slate-300 [&_th]:border [&_th]:border-slate-300 dark:[&_td]:border-slate-700 dark:[&_th]:border-slate-700">{children}</table>
+      </div>
     </section>
   );
 }
