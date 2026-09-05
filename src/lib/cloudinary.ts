@@ -159,6 +159,7 @@ export async function uploadImage(
     compress?: boolean; // Whether to compress image before upload (default: true)
     maxWidth?: number; // Max width for compression (default: 1280)
     quality?: number; // JPEG quality for compression (default: 0.8)
+    maxFileSize?: number; // Maximum original file size in bytes (default: 10 MB)
   } = {}
 ): Promise<{
   success: boolean;
@@ -264,12 +265,12 @@ export async function uploadImage(
       if (imageData instanceof File || imageData instanceof Blob) {
         // Check file size before uploading
         const fileSize = imageData.size;
-        const maxSize = 10 * 1024 * 1024; // 10MB limit
+        const maxSize = options.maxFileSize ?? 10 * 1024 * 1024;
 
         if (fileSize > maxSize) {
           return {
             success: false,
-            error: `File size (${(fileSize / 1024 / 1024).toFixed(2)}MB) exceeds maximum allowed size (10MB). Please compress the image or use a smaller file.`,
+            error: `File size (${(fileSize / 1024 / 1024).toFixed(2)}MB) exceeds maximum allowed size (${(maxSize / 1024 / 1024).toFixed(0)}MB). Please compress the image or use a smaller file.`,
             attempts,
           };
         }

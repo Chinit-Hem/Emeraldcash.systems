@@ -106,6 +106,8 @@ export default function TopBar({
   const [isSystemsMenuOpen, setIsSystemsMenuOpen] = useState(false);
   const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false);
   const [isDateMenuOpen, setIsDateMenuOpen] = useState(false);
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
   const [workingDate, setWorkingDate] = useState("");
   const canReadNotifications = Boolean(user?.username);
   const displayDate = useMemo(() => workingDate ? new Intl.DateTimeFormat(language === "km" ? "km-KH" : "en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "Asia/Phnom_Penh" }).format(new Date(`${workingDate}T12:00:00+07:00`)) : "—", [language, workingDate]);
@@ -120,6 +122,8 @@ export default function TopBar({
   const dateButtonRef = useRef<HTMLButtonElement | null>(null);
   const chatButtonRef = useRef<HTMLButtonElement | null>(null);
   const chatMenuRef = useRef<HTMLDivElement | null>(null);
+  const searchButtonRef = useRef<HTMLButtonElement | null>(null);
+  const searchMenuRef = useRef<HTMLDivElement | null>(null);
   const notificationsRequestRef = useRef<Promise<void> | null>(null);
   const notificationsLoadedRef = useRef(false);
   const notificationsLoadedAtRef = useRef(0);
@@ -314,6 +318,37 @@ export default function TopBar({
     return () => { window.removeEventListener("pointerdown", onPointerDown); window.removeEventListener("keydown", onKeyDown); };
   }, [isChatOpen]);
 
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLocaleLowerCase() === "k") {
+        event.preventDefault();
+        setIsSearchOpen((current) => !current);
+        setIsSystemsMenuOpen(false);
+        setIsDateMenuOpen(false);
+        setIsChatOpen(false);
+        setIsNotificationsOpen(false);
+        setIsAccountMenuOpen(false);
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
+
+  useEffect(() => {
+    if (!isSearchOpen) return;
+    const onPointerDown = (event: PointerEvent) => {
+      const target = event.target as Node | null;
+      if (target && !searchButtonRef.current?.contains(target) && !searchMenuRef.current?.contains(target)) setIsSearchOpen(false);
+    };
+    const onKeyDown = (event: KeyboardEvent) => { if (event.key === "Escape") setIsSearchOpen(false); };
+    window.addEventListener("pointerdown", onPointerDown);
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      window.removeEventListener("pointerdown", onPointerDown);
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [isSearchOpen]);
+
   const handleBack = () => {
     if (onBack) onBack();
     else router.back();
@@ -401,12 +436,35 @@ export default function TopBar({
     },
   ].filter((system) => system.visible);
 
+  const searchItems = [
+    { label: language === "km" ? "ទំព័រដើម" : "Home", description: language === "km" ? "ទិដ្ឋភាពទូទៅនៃប្រព័ន្ធ" : "System overview", href: "/home", icon: Grid2X2, visible: Boolean(user) },
+    ...systems.map((system) => ({ ...system, description: language === "km" ? "បើកប្រព័ន្ធ" : "Open system", visible: true })),
+    { label: language === "km" ? "កម្ចី" : "Loans", description: language === "km" ? "បញ្ជី និងគ្រប់គ្រងកម្ចី" : "Loan list and management", href: "/loan?view=loans", icon: Landmark, visible: hasAppPermission(user?.role, "loans:view") },
+    { label: language === "km" ? "អតិថិជនកម្ចី" : "Loan customers", description: language === "km" ? "ស្វែងរកអ្នកខ្ចី" : "Find borrowers", href: "/loan?view=borrowers", icon: UsersRound, visible: hasAppPermission(user?.role, "loans:view") },
+    { label: language === "km" ? "របាយការណ៍ប្រតិបត្តិការ" : "Operation reports", description: language === "km" ? "របាយការណ៍ប្រចាំថ្ងៃ" : "Daily loan reports", href: "/loan?view=operationReport", icon: Landmark, visible: hasAppPermission(user?.role, "loans:view") },
+    { label: language === "km" ? "ការជូនដំណឹង" : "Notifications", description: language === "km" ? "មើលការជូនដំណឹងទាំងអស់" : "View all notifications", href: "/alerts", icon: Bell, visible: Boolean(user) },
+    { label: language === "km" ? "ការកំណត់" : "Settings", description: language === "km" ? "គ្រប់គ្រងការកំណត់គណនី" : "Manage account settings", href: "/settings", icon: Settings2, visible: Boolean(user) },
+    { label: language === "km" ? "គ្រប់គ្រងគណនី" : "Manage accounts", description: language === "km" ? "អ្នកប្រើ និងសិទ្ធិ" : "Users and access", href: "/admin/users", icon: UsersRound, visible: hasAppPermission(user?.role, "users:view") },
+  ].filter((item) => item.visible);
+  const normalizedSearchQuery = searchQuery.trim().toLocaleLowerCase();
+  const filteredSearchItems = searchItems.filter((item, index, items) =>
+    items.findIndex((candidate) => candidate.href === item.href) === index
+      && (!normalizedSearchQuery || `${item.label} ${item.description}`.toLocaleLowerCase().includes(normalizedSearchQuery))
+  );
+
   const goToSystem = (href: string) => {
     setIsSystemsMenuOpen(false);
     router.push(href);
   };
 
-  const toggleTopBarMenu = (menu: "systems" | "date" | "chat" | "notifications" | "account") => {
+  const goToSearchResult = (href: string) => {
+    setIsSearchOpen(false);
+    setSearchQuery("");
+    router.push(href);
+  };
+
+  const toggleTopBarMenu = (menu: "search" | "systems" | "date" | "chat" | "notifications" | "account") => {
+    setIsSearchOpen(menu === "search" ? !isSearchOpen : false);
     setIsSystemsMenuOpen(menu === "systems" ? !isSystemsMenuOpen : false);
     setIsDateMenuOpen(menu === "date" ? !isDateMenuOpen : false);
     setIsChatOpen(menu === "chat" ? !isChatOpen : false);
@@ -482,22 +540,49 @@ export default function TopBar({
             ) : null}
           </div>
 
-          <div className="mx-auto hidden min-w-[280px] max-w-xl flex-1 items-center justify-center 2xl:flex">
-            <label className="relative flex h-9 w-full max-w-[460px] items-center">
-              <Search className="pointer-events-none absolute left-3 h-4 w-4 text-slate-400" />
-              <input
-                type="search"
-                placeholder={language === "km" ? "ស្វែងរក..." : "Search anything..."}
-                className="h-full w-full rounded-lg border border-slate-200 bg-slate-50 pl-9 pr-16 text-sm text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-emerald-300 focus:bg-white focus:ring-2 focus:ring-emerald-100 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 dark:focus:border-emerald-500/60 dark:focus:ring-emerald-500/10"
-              />
-              <span className="pointer-events-none absolute right-2 hidden rounded border border-slate-200 bg-white px-2 py-0.5 text-[10px] font-medium text-slate-400 shadow-sm lg:inline dark:border-slate-700 dark:bg-slate-950">
-                Ctrl + K
-              </span>
-            </label>
-          </div>
+          <div className="min-w-0 flex-1" />
 
           <div className="ml-auto flex min-w-0 shrink-0 items-center justify-end gap-1 sm:gap-2">
             {actions}
+
+            <div className="relative">
+              <button
+                ref={searchButtonRef}
+                type="button"
+                onClick={() => toggleTopBarMenu("search")}
+                className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 transition hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-700 sm:h-9 sm:w-9 sm:rounded-lg dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:border-emerald-700 dark:hover:bg-emerald-950/30"
+                aria-label={language === "km" ? "ស្វែងរកក្នុងប្រព័ន្ធ" : "Search the system"}
+                aria-expanded={isSearchOpen}
+                aria-haspopup="dialog"
+                title={language === "km" ? "ស្វែងរក (Ctrl/⌘ + K)" : "Search (Ctrl/⌘ + K)"}
+              >
+                <Search className="h-4.5 w-4.5" />
+              </button>
+              <FloatingTopBarMenu open={isSearchOpen} anchorRef={searchButtonRef} menuRef={searchMenuRef}>
+                <div role="dialog" aria-label={language === "km" ? "ស្វែងរកក្នុងប្រព័ន្ធ" : "Search the system"} className="w-[min(30rem,calc(100vw-1rem))] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl shadow-slate-900/15 dark:border-slate-700 dark:bg-slate-900 dark:shadow-black/40">
+                  <div className="border-b border-slate-100 p-3 dark:border-slate-800">
+                    <label className="relative flex min-h-11 items-center">
+                      <Search className="pointer-events-none absolute left-3 h-4.5 w-4.5 text-slate-400" />
+                      <input
+                        autoFocus
+                        type="search"
+                        value={searchQuery}
+                        onChange={(event) => setSearchQuery(event.target.value)}
+                        onKeyDown={(event) => { if (event.key === "Enter" && filteredSearchItems[0]) goToSearchResult(filteredSearchItems[0].href); }}
+                        placeholder={language === "km" ? "ស្វែងរកទំព័រ ឬប្រព័ន្ធ..." : "Search pages and systems..."}
+                        className="min-h-11 w-full rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-3 text-base text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-100 sm:text-sm dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-emerald-600 dark:focus:ring-emerald-900/40"
+                      />
+                    </label>
+                  </div>
+                  <div className="max-h-[min(26rem,calc(100dvh-9rem))] overflow-y-auto overscroll-contain p-2">
+                    {filteredSearchItems.length ? filteredSearchItems.map((item) => {
+                      const Icon = item.icon;
+                      return <button key={item.href} type="button" onClick={() => goToSearchResult(item.href)} className="flex min-h-14 w-full items-center gap-3 rounded-xl px-3 py-2 text-left transition hover:bg-slate-50 focus:bg-emerald-50 focus:outline-none dark:hover:bg-slate-800 dark:focus:bg-emerald-950/30"><span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300"><Icon className="h-4.5 w-4.5" /></span><span className="min-w-0"><span className="block truncate text-sm font-semibold text-slate-800 dark:text-slate-100">{item.label}</span><span className="block truncate text-xs text-slate-500 dark:text-slate-400">{item.description}</span></span></button>;
+                    }) : <p className="px-4 py-8 text-center text-sm text-slate-500">{language === "km" ? "រកមិនឃើញលទ្ធផល" : "No matching pages found."}</p>}
+                  </div>
+                </div>
+              </FloatingTopBarMenu>
+            </div>
 
             {hasAppPermission(user?.role, "loans:create") ? <button type="button" onClick={() => router.push("/loan?view=loans&newLoan=1")} className="hidden h-9 items-center gap-1.5 rounded-lg bg-emerald-600 px-2.5 text-xs font-semibold text-white transition hover:bg-emerald-700 sm:inline-flex sm:px-3" title={language === "km" ? "បង្កើតកម្ចីថ្មី" : "Quick create loan"}><Plus className="h-4 w-4" /><span className="hidden xl:inline">{language === "km" ? "បង្កើតថ្មី" : "Create"}</span></button> : null}
 

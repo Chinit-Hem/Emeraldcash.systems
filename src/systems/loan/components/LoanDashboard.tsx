@@ -5489,6 +5489,10 @@ type OperationReportAttachment = {
   imageUrl?: string;
   imageName?: string;
 };
+const OPERATION_REPORT_MAX_IMAGES = 20;
+const OPERATION_REPORT_MAX_IMAGE_SIZE = 12 * 1024 * 1024;
+const OPERATION_REPORT_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/gif", "image/heic", "image/heif"]);
+const OPERATION_REPORT_IMAGE_EXTENSIONS = /\.(?:jpe?g|png|webp|gif|heic|heif)$/i;
 type OperationReportCollectionRow = OperationReportAttachment & { id: number; customer: string; amount: string; reason: string };
 type OperationReportResolutionRow = OperationReportAttachment & { id: number; customer: string; assetType: string; interest: string; penalty: string; principal: string; solution: string };
 type OperationReportLoanDecisionRow = OperationReportAttachment & { id: number; customer: string; type: string; amount: string; reason: string };
@@ -6906,23 +6910,54 @@ function OperationReportImageCell({ images, imageUrl, imageName, onChange, compa
   const attachments = images?.length ? images : imageUrl ? [{ imageUrl, imageName }] : [];
 
   const upload = async (event: ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(event.target.files || []);
+    const selectedFiles = Array.from(event.target.files || []);
     event.target.value = "";
-    if (!files.length) return;
+    if (!selectedFiles.length) return;
+
+    const remainingSlots = Math.max(0, OPERATION_REPORT_MAX_IMAGES - attachments.length);
+    if (!remainingSlots) {
+      toastError(text(`អាចភ្ជាប់រូបភាពបានអតិបរមា ${OPERATION_REPORT_MAX_IMAGES} ក្នុងមួយជួរ`, `You can attach up to ${OPERATION_REPORT_MAX_IMAGES} photos per row.`));
+      return;
+    }
+
+    const files = selectedFiles.slice(0, remainingSlots);
+    const rejected: string[] = selectedFiles.length > remainingSlots
+      ? [text(`រូបភាព ${selectedFiles.length - remainingSlots} លើសចំនួនកំណត់`, `${selectedFiles.length - remainingSlots} photo${selectedFiles.length - remainingSlots === 1 ? " was" : "s were"} over the limit`)]
+      : [];
     setUploading(true);
     try {
-      const uploaded = await Promise.all(files.map(async (file): Promise<OperationReportImage> => {
+      const uploaded: OperationReportImage[] = [];
+      for (const file of files) {
+        const type = file.type.toLocaleLowerCase();
+        if ((!OPERATION_REPORT_IMAGE_TYPES.has(type) && !OPERATION_REPORT_IMAGE_EXTENSIONS.test(file.name)) || file.size > OPERATION_REPORT_MAX_IMAGE_SIZE) {
+          rejected.push(file.size > OPERATION_REPORT_MAX_IMAGE_SIZE
+            ? `${file.name}: ${text("ទំហំត្រូវតែ 12 MB ឬតូចជាងនេះ", "must be 12 MB or smaller")}`
+            : `${file.name}: ${text("ប្រភេទឯកសារមិនត្រូវបានគាំទ្រ", "unsupported image format")}`);
+          continue;
+        }
+
         const data = new FormData();
         data.append("file", file);
-        const response = await fetch("/api/loan/operation-report-image", { method: "POST", credentials: "include", body: data });
-        const payload = await response.json().catch(() => null) as ApiResponse<{ name: string; url: string }> | null;
-        if (!response.ok || !payload?.success || !payload.data) throw new Error(payload?.error || text("មិនអាចបង្ហោះរូបភាព", "Could not upload image"));
-        return { imageUrl: payload.data.url, imageName: payload.data.name };
-      }));
-      onChange({ images: [...attachments, ...uploaded], imageUrl: undefined, imageName: undefined });
-      toastSuccess(text(`បានបង្ហោះរូបភាព ${uploaded.length}`, `${uploaded.length} photo${uploaded.length === 1 ? "" : "s"} uploaded.`));
-    } catch (caught) {
-      toastError(caught instanceof Error ? caught.message : text("មិនអាចបង្ហោះរូបភាព", "Could not upload image"));
+        try {
+          // Upload sequentially so a large mobile selection does not overwhelm the API,
+          // and keep successful photos when another file fails.
+          const response = await fetch("/api/loan/operation-report-image", { method: "POST", credentials: "include", body: data });
+          const payload = await response.json().catch(() => null) as ApiResponse<{ name: string; url: string }> | null;
+          if (!response.ok || !payload?.success || !payload.data) throw new Error(payload?.error || text("មិនអាចបង្ហោះរូបភាព", "Could not upload image"));
+          uploaded.push({ imageUrl: payload.data.url, imageName: payload.data.name });
+        } catch (caught) {
+          rejected.push(`${file.name}: ${caught instanceof Error ? caught.message : text("មិនអាចបង្ហោះរូបភាព", "upload failed")}`);
+        }
+      }
+
+      if (uploaded.length) {
+        onChange({ images: [...attachments, ...uploaded], imageUrl: undefined, imageName: undefined });
+        toastSuccess(text(`បានបង្ហោះរូបភាព ${uploaded.length}`, `${uploaded.length} photo${uploaded.length === 1 ? "" : "s"} uploaded.`));
+      }
+      if (rejected.length) {
+        const firstFailure = rejected[0];
+        toastError(text(`រូបភាព ${rejected.length} មិនបានបង្ហោះ។ ${firstFailure}`, `${rejected.length} photo${rejected.length === 1 ? "" : "s"} could not be uploaded. ${firstFailure}`));
+      }
     } finally {
       setUploading(false);
     }
@@ -6946,9 +6981,9 @@ function OperationReportImageCell({ images, imageUrl, imageName, onChange, compa
         <span role="button" tabIndex={0} onClick={() => openViewer(index)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); openViewer(index); } }} title={text("បើកកម្មវិធីមើលរូបភាព", "Open photo viewer")}><img src={image.imageUrl} alt={image.imageName || text("ឯកសារភ្ជាប់ជួរ", "Row attachment")} className="h-12 w-12 cursor-pointer rounded-md border border-slate-200 object-cover transition hover:border-emerald-400 dark:border-slate-700" /></span>
         <button type="button" onClick={() => removeImage(index)} title={text("លុបរូបភាព", "Remove photo")} aria-label={text("លុបរូបភាព", "Remove photo")} className="absolute -right-1.5 -top-1.5 inline-flex h-5 w-5 items-center justify-center rounded-full bg-red-600 text-white shadow hover:bg-red-700"><X className="h-3 w-3" /></button>
       </span>)}
-      <label title={text("បន្ថែមរូបភាព", "Add photos")} className="inline-flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-lg border border-slate-300 bg-white text-slate-600 hover:border-emerald-400 hover:text-emerald-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
+      <label title={text(`បន្ថែមរូបភាព (${attachments.length}/${OPERATION_REPORT_MAX_IMAGES})`, `Add photos (${attachments.length}/${OPERATION_REPORT_MAX_IMAGES})`)} className={`inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-slate-300 bg-white text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 ${uploading || attachments.length >= OPERATION_REPORT_MAX_IMAGES ? "cursor-not-allowed opacity-50" : "cursor-pointer hover:border-emerald-400 hover:text-emerald-700"}`}>
         {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />}
-        <input type="file" multiple accept="image/jpeg,image/png,image/webp,image/gif" onChange={(event) => void upload(event)} disabled={uploading} className="sr-only" />
+        <input type="file" multiple accept="image/jpeg,image/png,image/webp,image/gif,image/heic,image/heif,.heic,.heif" onChange={(event) => void upload(event)} disabled={uploading || attachments.length >= OPERATION_REPORT_MAX_IMAGES} className="sr-only" />
       </label>
       {viewedImage ? createPortal(
         <div role="dialog" aria-modal="true" aria-label={text("កម្មវិធីមើលរូបភាព", "Photo viewer")} onClick={() => setViewerIndex(null)} className="fixed inset-0 z-[100] flex flex-col bg-slate-950/95 p-3 sm:p-5">
