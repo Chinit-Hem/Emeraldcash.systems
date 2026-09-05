@@ -1070,6 +1070,24 @@ button:not(:disabled):active,
   padding-top: env(safe-area-inset-top);
 }
 
+/* Keep editable loan fields readable without Safari zooming the page on focus. */
+@supports (-webkit-touch-callout: none) {
+  @media (max-width: 767px) {
+    .loan-system-flat-fields input:not([type="checkbox"]):not([type="radio"]),
+    .loan-system-flat-fields select,
+    .loan-system-flat-fields textarea {
+      font-size: 16px !important;
+    }
+
+    .loan-system-flat-fields [role="dialog"][aria-modal="true"][class~="fixed"] {
+      padding-top: max(0.5rem, env(safe-area-inset-top));
+      padding-bottom: max(0.5rem, env(safe-area-inset-bottom));
+      padding-left: max(0.5rem, env(safe-area-inset-left));
+      padding-right: max(0.5rem, env(safe-area-inset-right));
+    }
+  }
+}
+
 .touch-target {
   min-width: 44px;
   min-height: 44px;

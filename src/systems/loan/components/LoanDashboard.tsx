@@ -51,6 +51,7 @@ import type { CreateLoanActivityInput, CreateLoanInput, CustomerProfile, LoanAct
 import { useToast } from "@/shared/components/ui/glass/GlassToast";
 import { useAuthUser } from "@/shared/hooks/AuthContext";
 import { useLanguage } from "@/shared/hooks/LanguageContext";
+import { useStandaloneDisplayMode } from "@/shared/hooks/useStandaloneDisplayMode";
 import { hasAppPermission } from "@/shared/utils/permissions";
 import type { Language } from "@/shared/utils/i18n";
 import { companyBranchName, normalizeCompanyBranch } from "@/shared/utils/branchNames";
@@ -640,15 +641,15 @@ function StatusBadge({ status }: { status: string }) {
 }
 
 function DashboardMetricCard({ label, value, onClick, className = "", wide = false }: { label: string; value: string; onClick?: () => void; className?: string; wide?: boolean }) {
-  const cardClass = `group flex w-full overflow-hidden rounded-xl border border-emerald-300 bg-white text-left shadow-md transition dark:border-emerald-700/50 dark:bg-slate-900 ${onClick ? "cursor-pointer hover:-translate-y-0.5 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-emerald-500" : ""} ${className}`;
+  const cardClass = `group flex min-w-0 w-full overflow-hidden rounded-xl border border-emerald-300 bg-white text-left shadow-md transition dark:border-emerald-700/50 dark:bg-slate-900 ${onClick ? "cursor-pointer hover:-translate-y-0.5 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-emerald-500" : ""} ${className}`;
   const content = (
     <>
-      <div className={`flex shrink-0 items-center justify-center bg-emerald-700 text-white dark:bg-emerald-800 ${wide ? "w-24 sm:w-[22%] sm:min-w-28 2xl:min-w-36" : "w-24 xl:w-[36%]"}`}>
-        <BarChart3 aria-hidden="true" className="h-16 w-16 stroke-[1.55] 2xl:h-20 2xl:w-20" />
+      <div className={`flex w-16 shrink-0 items-center justify-center bg-emerald-700 text-white dark:bg-emerald-800 sm:w-24 ${wide ? "sm:w-[22%] sm:min-w-28 2xl:min-w-36" : "xl:w-[36%]"}`}>
+        <BarChart3 aria-hidden="true" className="h-10 w-10 stroke-[1.55] sm:h-16 sm:w-16 2xl:h-20 2xl:w-20" />
       </div>
-      <div className="flex min-w-0 flex-1 flex-col justify-center px-4 py-4 2xl:px-5">
-        <p className="break-words text-[clamp(1.65rem,2.1vw,2.5rem)] font-medium leading-none tracking-normal text-slate-800 dark:text-white">{value}</p>
-        <p className="mt-3 line-clamp-2 text-sm font-bold leading-snug text-slate-800 dark:text-slate-200 2xl:text-base" title={label}>{label}</p>
+      <div className="flex min-w-0 flex-1 flex-col justify-center px-2.5 py-3 sm:px-4 sm:py-4 2xl:px-5">
+        <p className="break-words text-[clamp(1.05rem,5vw,1.5rem)] font-medium leading-none tracking-normal text-slate-800 sm:text-[clamp(1.65rem,2.1vw,2.5rem)] dark:text-white">{value}</p>
+        <p className="mt-2 line-clamp-2 text-xs font-bold leading-snug text-slate-800 sm:mt-3 sm:text-sm dark:text-slate-200 2xl:text-base" title={label}>{label}</p>
       </div>
     </>
   );
@@ -671,7 +672,7 @@ function Field({ label, children, className }: { label: string; children: ReactN
   );
 }
 
-const inputClass = "w-full rounded-none border-0 border-b border-slate-300 bg-transparent px-2 py-2.5 text-sm text-slate-900 shadow-none outline-none transition placeholder:text-slate-400 focus:border-slate-300 focus:ring-0 dark:border-slate-700 dark:bg-transparent dark:text-white dark:focus:border-slate-700";
+const inputClass = "w-full rounded-none border-0 border-b border-slate-300 bg-transparent px-2 py-2.5 text-base text-slate-900 shadow-none outline-none transition placeholder:text-slate-400 focus:border-slate-300 focus:ring-0 sm:text-sm dark:border-slate-700 dark:bg-transparent dark:text-white dark:focus:border-slate-700";
 
 const PAYMENT_TERM_OPTIONS = [
   "Immediate Payment",
@@ -2825,8 +2826,8 @@ function LoanFormPanel({ loan, onClose, onSaved, onOpenJournalItems }: { loan: L
           </div>
         </div>
       ) : null}
-      <div className="border-b border-slate-200 px-5 py-5 dark:border-slate-800 sm:px-7">
-        <div className="flex flex-wrap items-center gap-2 text-2xl font-medium tracking-tight text-slate-800 dark:text-slate-100">
+      <div className="border-b border-slate-200 px-4 py-4 dark:border-slate-800 sm:px-7 sm:py-5">
+        <div className="flex flex-wrap items-center gap-2 text-xl font-medium tracking-tight text-slate-800 dark:text-slate-100 sm:text-2xl">
             <button type="button" onClick={onClose} className="hover:text-emerald-700 dark:hover:text-emerald-300">Dashboard</button><span className="text-slate-400">/</span><button type="button" onClick={onClose} className="hover:text-emerald-700 dark:hover:text-emerald-300">Loans</button><span className="text-slate-400">/</span><span>{loan?.loanNumber || "New"}</span>
         </div>
         <div className="mt-4 flex flex-wrap items-center gap-2">
@@ -2835,14 +2836,14 @@ function LoanFormPanel({ loan, onClose, onSaved, onOpenJournalItems }: { loan: L
         </div>
       </div>
 
-      <div className="p-5 sm:p-7">
-        <div className="mb-12 flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+      <div className="p-4 sm:p-7">
+        <div className="mb-7 flex flex-col gap-4 sm:mb-12 sm:gap-5 lg:flex-row lg:items-start lg:justify-between">
           <button type="submit" form="loan-form" disabled={saving} className="inline-flex min-h-11 self-start items-center rounded-full bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-emerald-700 disabled:opacity-60">Submit</button>
-          <div className="inline-flex self-start overflow-hidden rounded-full border border-slate-200 bg-white p-0.5 dark:border-slate-700 dark:bg-slate-950" aria-label={`Loan status: ${currentFormStatus}`}>
+          <div className="inline-flex max-w-full self-start overflow-x-auto rounded-full border border-slate-200 bg-white p-0.5 overscroll-x-contain [-webkit-overflow-scrolling:touch] dark:border-slate-700 dark:bg-slate-950" aria-label={`Loan status: ${currentFormStatus}`}>
             {formStatusSteps.map((status) => <div key={status} className={`rounded-full px-5 py-2.5 text-sm font-semibold ${currentFormStatus === status ? "bg-emerald-600 text-white" : "text-slate-600 dark:text-slate-300"}`}>{status}</div>)}
           </div>
         </div>
-        <h1 className="mb-8 text-3xl font-medium tracking-tight text-slate-900 dark:text-white">{loan ? loan.loanNumber || "Draft Loan" : "Draft Loan"}</h1>
+        <h1 className="mb-6 text-2xl font-medium tracking-tight text-slate-900 dark:text-white sm:mb-8 sm:text-3xl">{loan ? loan.loanNumber || "Draft Loan" : "Draft Loan"}</h1>
         <form id="loan-form" onSubmit={submit} onFocusCapture={(event) => selectPopulatedField(event.target)} className="space-y-6">
           {error ? <p role="alert" className="rounded-xl bg-rose-50 px-3 py-2.5 text-sm text-rose-700 dark:bg-rose-500/10 dark:text-rose-300">{error}</p> : null}
 
@@ -5172,7 +5173,7 @@ function AccountReportView() {
     <div className="min-w-0 space-y-4 lg:[zoom:0.9]">
       <div className={`${reportPanel === "records" ? "hidden" : "sticky"} top-0 z-40 space-y-2 border-b border-slate-200 bg-slate-50/95 pb-2 backdrop-blur-md dark:border-slate-800 dark:bg-slate-950/95 print:static print:border-0 print:bg-transparent print:pb-0`}>
       <div className="rounded-lg border border-slate-200 bg-white px-3 py-2 shadow-sm dark:border-slate-800 dark:bg-slate-900 print:hidden">
-      <div className="flex flex-wrap items-center justify-end gap-2">
+      <div className="flex flex-nowrap items-center justify-start gap-2 overflow-x-auto pb-1 overscroll-x-contain [scrollbar-width:none] [-webkit-overflow-scrolling:touch] [&::-webkit-scrollbar]:hidden [&>button]:min-h-11 [&>button]:shrink-0 [&>span]:shrink-0 sm:flex-wrap sm:justify-end sm:overflow-visible sm:pb-0">
         <button type="button" onClick={() => { setReportPanel("records"); replaceAccountReportLocation("records"); }} className="inline-flex items-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-100 dark:border-blue-800 dark:bg-blue-950/30 dark:text-blue-300"><List className="h-4 w-4" />{language === "km" ? "កំណត់ត្រា" : "Records"}</button>
         <button type="button" onClick={() => setSavedValuesOpen((open) => !open)} className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300"><List className="h-4 w-4" />Saved values</button>
         <button type="button" disabled={Boolean(savingReport) || loadingLoans} onClick={startNewAccountReport} className="inline-flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-700 hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-300"><FilePlus2 className="h-4 w-4" />{language === "km" ? "របាយការណ៍ថ្មី" : "New Report"}</button>
@@ -6346,14 +6347,14 @@ function OperationReportView({ loans, loading, canViewLoanData, onRefresh, onOpe
 
       <div className={`${reportPanel === "records" ? "hidden" : "sticky"} top-0 z-40 space-y-2 border-b border-slate-200 bg-slate-50/95 pb-2 backdrop-blur-md dark:border-slate-800 dark:bg-slate-950/95 print:static print:border-0 print:bg-transparent print:pb-0`}>
       <section className="rounded-lg border border-slate-200 bg-white px-3 py-2 shadow-sm dark:border-slate-800 dark:bg-slate-900 print:hidden">
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="flex shrink-0 items-center gap-2">
+        <div className="flex flex-nowrap items-center gap-2 overflow-x-auto pb-1 overscroll-x-contain [scrollbar-width:none] [-webkit-overflow-scrolling:touch] [&::-webkit-scrollbar]:hidden sm:flex-wrap sm:overflow-visible sm:pb-0">
+          <div className="flex shrink-0 items-center gap-2 [&_button]:min-h-11">
             {canAccessBranchManagerWorkspace ? <div className="inline-flex overflow-hidden rounded-xl border border-slate-300 bg-slate-50 p-1 dark:border-slate-700 dark:bg-slate-950"><button type="button" onClick={() => selectReportMode("operation")} className={`rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${reportMode === "operation" ? "bg-white text-emerald-700 shadow-sm hover:bg-emerald-50 dark:bg-slate-800 dark:text-emerald-300 dark:hover:bg-emerald-950/40" : "text-slate-500 hover:bg-emerald-100 hover:text-emerald-800 dark:text-slate-400 dark:hover:bg-emerald-950/50 dark:hover:text-emerald-200"}`}>{opText("របាយការណ៍ LS", "LS Report")}</button><button type="button" onClick={() => selectReportMode("branchManager")} className={`rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${reportMode === "branchManager" ? "bg-emerald-600 text-white shadow-sm hover:bg-emerald-700" : "text-slate-500 hover:bg-blue-100 hover:text-blue-800 dark:text-slate-400 dark:hover:bg-blue-950/50 dark:hover:text-blue-200"}`}>{opText("របាយការណ៍ BM", "BM Report")}</button></div> : null}
             {(isHumanResources || isDirector) && workspaceBranchOptions.length > 1 ? <select aria-label={opText("ជ្រើសរើសសាខា", "Select branch")} value={branch} onChange={(event) => setBranch(event.target.value)} className="min-h-10 rounded-xl border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-700 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200">{workspaceBranchOptions.map((assignedBranch) => <option key={assignedBranch} value={assignedBranch}>{companyBranchName(assignedBranch, language)}</option>)}</select> : null}
             <span className={`inline-flex items-center rounded-lg px-3 py-2 text-sm font-semibold ${operationReportStatusClass(displayedReportStatus)}`}>{operationReportStatusLabel(displayedReportStatus, language)}</span>
             {!isBranchManagerReport && reviewingAnotherSpecialist ? <button type="button" onClick={openMyReport} className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300"><FilePlus2 className="h-4 w-4" />{opText("របាយការណ៍ខ្ញុំ", "My Report")}</button> : null}
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex shrink-0 flex-nowrap gap-2 [&>button]:min-h-11 [&>button]:shrink-0">
             <button type="button" onClick={() => { setReportPanel("records"); pushOperationReportLocation({ panel: "records" }); }} className="inline-flex items-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-100 dark:border-blue-800 dark:bg-blue-950/30 dark:text-blue-300"><List className="h-4 w-4" />{opText("កំណត់ត្រា", "Records")}</button>
             <button type="button" onClick={() => setSavedValuesOpen((open) => !open)} className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300"><List className="h-4 w-4" />{opText("តម្លៃដែលបានរក្សាទុក", "Saved values")}</button>
             {!isBranchManagerReport && !isHumanResources && !isDirector ? <button type="button" onClick={startNewOperationReport} className="inline-flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-700 hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-300"><FilePlus2 className="h-4 w-4" />{opText("របាយការណ៍ថ្មី", "New Report")}</button> : null}
@@ -7070,6 +7071,7 @@ export default function LoanDashboard() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const isStandaloneApp = useStandaloneDisplayMode();
   const [dashboard, setDashboard] = useState<LoanDashboardData | null>(null);
   const [loanList, setLoanList] = useState<LoanEntity[]>([]);
   const [loanListLoading, setLoanListLoading] = useState(false);
@@ -7624,7 +7626,7 @@ export default function LoanDashboard() {
   }, [dashboard]);
 
   return (
-    <div className="loan-system-flat-fields space-y-6 bg-slate-50/70 p-4 dark:bg-slate-950 sm:p-6">
+    <div className={`loan-system-flat-fields space-y-4 bg-slate-50/70 px-3 pt-3 dark:bg-slate-950 sm:space-y-6 sm:px-6 sm:pt-6 xl:pb-6 ${isStandaloneApp ? "pb-[calc(5.75rem+env(safe-area-inset-bottom))] sm:pb-[calc(5.75rem+env(safe-area-inset-bottom))]" : "pb-[max(1rem,env(safe-area-inset-bottom))] sm:pb-6"}`}>
       {!showSummary && !showLoans && !showJournalItems && !showContacts && !showAccounting && !showOperationReport ? (
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
@@ -7701,9 +7703,9 @@ export default function LoanDashboard() {
       {error ? <div className="rounded-2xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-300">{error}</div> : null}
 
       {showSummary ? (
-        <Card className="flex flex-col overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900 xl:h-[calc(100vh-7rem)] xl:min-h-[42rem]">
-          <div className="flex min-h-[5.5rem] shrink-0 flex-wrap items-center justify-between gap-4 border-b border-slate-300 px-4 py-4 dark:border-slate-800 sm:px-6">
-            <h1 className="text-2xl font-medium leading-none tracking-normal text-slate-700 dark:text-slate-100 sm:text-3xl">Dashboard</h1>
+        <Card className="flex flex-col overflow-visible rounded-2xl border border-slate-200/80 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900 xl:h-[calc(100vh-7rem)] xl:min-h-[42rem]">
+          <div className="flex min-h-[4.75rem] shrink-0 flex-wrap items-center justify-between gap-3 border-b border-slate-300 px-3 py-3 dark:border-slate-800 sm:min-h-[5.5rem] sm:gap-4 sm:px-6 sm:py-4">
+            <h1 className="text-xl font-medium leading-none tracking-normal text-slate-700 dark:text-slate-100 sm:text-3xl">Dashboard</h1>
             <div className="relative" ref={dateFilterRef}>
               <button type="button" onClick={() => setShowDateFilter((current) => !current)} className="inline-flex min-h-11 items-center gap-2 rounded-full bg-emerald-600 px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 dark:focus:ring-offset-slate-950 sm:min-h-12 sm:gap-3 sm:px-5 sm:text-lg">
                 <CalendarDays className="h-5 w-5 sm:h-6 sm:w-6" />
@@ -7761,25 +7763,25 @@ export default function LoanDashboard() {
             </div>
           </div>
 
-          <div className="flex min-h-0 flex-1 flex-col gap-5 bg-white p-5 dark:bg-slate-950/40">
-            <div className="grid shrink-0 grid-cols-1 gap-5 lg:grid-cols-2 xl:h-[clamp(8rem,16vh,10rem)] xl:grid-cols-5">
-              <DashboardMetricCard className="h-36 xl:h-full" label="Loans" value={shortNumber(totals.loans)} onClick={() => openDrilldown({})} />
-              <DashboardMetricCard className="h-36 xl:h-full" label="Disbursements" value={shortCurrency(totals.disbursed)} onClick={() => openDrilldown({})} />
-              <DashboardMetricCard className="h-36 xl:h-full" label="Repayments" value={shortCurrency(totals.repayments)} onClick={() => openDrilldown({})} />
-              <DashboardMetricCard className="h-36 xl:h-full" label="Residual" value={shortCurrency(totals.residual)} onClick={() => openDrilldown({})} />
-              <DashboardMetricCard className="h-36 xl:h-full" label="ARREARS" value={shortNumber(totals.arrears)} onClick={() => openDrilldown({ status: "Overdue" as LoanEntity["repaymentStatus"] })} />
+          <div className="flex min-h-0 flex-1 flex-col gap-3 bg-white p-3 dark:bg-slate-950/40 sm:gap-5 sm:p-5">
+            <div className="grid shrink-0 grid-cols-2 gap-3 sm:gap-5 lg:grid-cols-2 xl:h-[clamp(8rem,16vh,10rem)] xl:grid-cols-5">
+              <DashboardMetricCard className="h-28 sm:h-36 xl:h-full" label="Loans" value={shortNumber(totals.loans)} onClick={() => openDrilldown({})} />
+              <DashboardMetricCard className="h-28 sm:h-36 xl:h-full" label="Disbursements" value={shortCurrency(totals.disbursed)} onClick={() => openDrilldown({})} />
+              <DashboardMetricCard className="h-28 sm:h-36 xl:h-full" label="Repayments" value={shortCurrency(totals.repayments)} onClick={() => openDrilldown({})} />
+              <DashboardMetricCard className="h-28 sm:h-36 xl:h-full" label="Residual" value={shortCurrency(totals.residual)} onClick={() => openDrilldown({})} />
+              <DashboardMetricCard className="col-span-2 h-28 sm:col-span-1 sm:h-36 xl:h-full" label="ARREARS" value={shortNumber(totals.arrears)} onClick={() => openDrilldown({ status: "Overdue" as LoanEntity["repaymentStatus"] })} />
             </div>
 
             <div className="grid min-h-0 w-full flex-1 grid-cols-1 gap-5 xl:grid-cols-5">
-              <div className="grid min-h-0 gap-5 xl:col-span-2 xl:grid-rows-3">
-                <DashboardMetricCard wide className="h-36 xl:h-full" label="Collaterals Count" value={shortNumber(totals.collateralCount)} onClick={openLoansDashboard} />
-                <DashboardMetricCard wide className="h-36 xl:h-full" label="Collaterals" value={shortCurrency(totals.collateralValue)} onClick={openLoansDashboard} />
-                <DashboardMetricCard wide className="h-36 xl:h-full" label="Collaterals Market Value" value={shortCurrency(totals.collateralMarketValue)} onClick={openLoansDashboard} />
+              <div className="grid min-h-0 gap-3 sm:gap-5 xl:col-span-2 xl:grid-rows-3">
+                <DashboardMetricCard wide className="h-28 sm:h-36 xl:h-full" label="Collaterals Count" value={shortNumber(totals.collateralCount)} onClick={openLoansDashboard} />
+                <DashboardMetricCard wide className="h-28 sm:h-36 xl:h-full" label="Collaterals" value={shortCurrency(totals.collateralValue)} onClick={openLoansDashboard} />
+                <DashboardMetricCard wide className="h-28 sm:h-36 xl:h-full" label="Collaterals Market Value" value={shortCurrency(totals.collateralMarketValue)} onClick={openLoansDashboard} />
               </div>
 
-              <Card className="flex min-h-[28rem] flex-col rounded-xl border border-slate-200 bg-white p-5 shadow-xl shadow-slate-200/70 dark:border-slate-800 dark:bg-slate-900 dark:shadow-none xl:col-span-3 xl:min-h-0">
+              <Card className="flex min-h-[22rem] flex-col rounded-xl border border-slate-200 bg-white p-3 shadow-xl shadow-slate-200/70 dark:border-slate-800 dark:bg-slate-900 dark:shadow-none sm:min-h-[28rem] sm:p-5 xl:col-span-3 xl:min-h-0">
                 <div className="flex items-center gap-3">
-                  <h2 className="text-2xl font-bold tracking-normal text-slate-900 dark:text-white">Revenue Performance</h2>
+                  <h2 className="text-xl font-bold tracking-normal text-slate-900 dark:text-white sm:text-2xl">Revenue Performance</h2>
                 </div>
                 <div className="mt-5 min-h-0 flex-1 rounded-sm bg-slate-50/40 p-4 dark:bg-slate-950/30">
                   <div className="mb-2 flex items-center justify-center gap-2 text-sm font-semibold text-slate-600 dark:text-slate-300">
@@ -7798,9 +7800,9 @@ export default function LoanDashboard() {
         <div ref={loansRef}>
           {!showForm && !selectedLoan ? (
             <div className="overflow-visible rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-950 xl:flex xl:h-[calc(100vh-7rem)] xl:min-h-[42rem] xl:flex-col">
-                <div className="grid gap-5 border-b border-slate-200 px-5 py-5 dark:border-slate-800 lg:grid-cols-[1fr_1.1fr] lg:px-7">
+                <div className="grid gap-4 border-b border-slate-200 px-3 py-4 dark:border-slate-800 sm:gap-5 sm:px-5 sm:py-5 lg:grid-cols-[1fr_1.1fr] lg:px-7">
                   <div className="flex flex-col justify-between gap-5">
-                    <div className="flex items-center gap-2 text-2xl font-medium tracking-tight text-slate-800 dark:text-slate-100">
+                    <div className="flex items-center gap-2 text-xl font-medium tracking-tight text-slate-800 dark:text-slate-100 sm:text-2xl">
                       <button type="button" onClick={openSummaryDashboard} className="transition hover:text-emerald-700 dark:hover:text-emerald-300">Dashboard</button>
                       <span className="text-slate-400">/</span>
                       <span>Loans</span>
@@ -7822,7 +7824,7 @@ export default function LoanDashboard() {
                       <button type="button" onClick={() => setShowLoanBookmarks((current) => !current)} className="inline-flex min-h-11 items-center gap-2 rounded-full bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-emerald-700">
                         <CalendarDays className="h-4 w-4" /> Bookmarks <ChevronDown className={`h-4 w-4 transition ${showLoanBookmarks ? "rotate-180" : ""}`} />
                       </button>
-                      {showLoanBookmarks ? <div className="absolute right-0 top-full z-50 mt-2 w-56 overflow-hidden rounded-xl border border-slate-200 bg-white py-2 shadow-xl dark:border-slate-700 dark:bg-slate-950"><button type="button" onClick={applyLoanBookmark} className="block w-full px-4 py-2.5 text-left text-sm font-semibold text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-900">Apply saved view</button><button type="button" onClick={saveLoanBookmark} className="block w-full px-4 py-2.5 text-left text-sm font-semibold text-emerald-700 hover:bg-emerald-50 dark:text-emerald-300 dark:hover:bg-emerald-950/30">Save current view</button><button type="button" onClick={clearLoanBookmark} className="block w-full border-t border-slate-100 px-4 py-2.5 text-left text-sm font-semibold text-rose-600 hover:bg-rose-50 dark:border-slate-800 dark:text-rose-300 dark:hover:bg-rose-950/20">Clear bookmark</button></div> : null}
+                      {showLoanBookmarks ? <div className="absolute left-0 top-full z-50 mt-2 w-56 max-w-[calc(100vw-1.5rem)] overflow-hidden rounded-xl border border-slate-200 bg-white py-2 shadow-xl sm:left-auto sm:right-0 dark:border-slate-700 dark:bg-slate-950"><button type="button" onClick={applyLoanBookmark} className="block w-full px-4 py-2.5 text-left text-sm font-semibold text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-900">Apply saved view</button><button type="button" onClick={saveLoanBookmark} className="block w-full px-4 py-2.5 text-left text-sm font-semibold text-emerald-700 hover:bg-emerald-50 dark:text-emerald-300 dark:hover:bg-emerald-950/30">Save current view</button><button type="button" onClick={clearLoanBookmark} className="block w-full border-t border-slate-100 px-4 py-2.5 text-left text-sm font-semibold text-rose-600 hover:bg-rose-50 dark:border-slate-800 dark:text-rose-300 dark:hover:bg-rose-950/20">Clear bookmark</button></div> : null}
                     </div>
                       <div className="min-w-0 flex-1 border-b border-slate-300 px-1 transition focus-within:border-emerald-500 dark:border-slate-700">
                         <input value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} placeholder="Type to search" aria-label="Search loans" className="w-full appearance-none !rounded-none !border-0 !bg-transparent py-2.5 text-base font-medium text-slate-800 !shadow-none !outline-none placeholder:text-slate-400 focus:!border-0 focus:!shadow-none focus:!ring-0 dark:text-white" />
@@ -7847,7 +7849,7 @@ export default function LoanDashboard() {
                           <ChevronDown className={`h-4 w-4 transition ${showLoanFilterMenu ? "rotate-180" : ""}`} />
                         </button>
                         {showLoanFilterMenu ? (
-                          <div role="menu" className="absolute right-0 top-full z-[100] mt-2 max-h-[calc(100vh-14rem)] w-80 overflow-y-auto overscroll-contain rounded-2xl border border-slate-200 bg-white py-2 shadow-2xl dark:border-slate-700 dark:bg-slate-950">
+                          <div role="menu" className="absolute right-0 top-full z-[100] mt-2 max-h-[calc(100dvh-14rem)] w-[min(20rem,calc(100vw-1.5rem))] overflow-y-auto overscroll-contain rounded-2xl border border-slate-200 bg-white py-2 shadow-2xl dark:border-slate-700 dark:bg-slate-950">
                             <button type="button" role="menuitemcheckbox" aria-checked={myLoansOnly} onClick={() => setMyLoansOnly((current) => !current)} className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left text-sm font-medium text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-900"><span>My Loans</span>{myLoansOnly ? <Check className="h-4 w-4 text-emerald-600" /> : null}</button>
                             <div className="border-t border-slate-100 dark:border-slate-800" />
                             {(["Draft", "Pending", "Waiting", "Approved", "Progress", "Due Soon", "Overdue", "Closed", "Rejected", "Defaulted"] as LoanEntity["repaymentStatus"][]).map((status) => (
@@ -7875,7 +7877,7 @@ export default function LoanDashboard() {
                       <div ref={loanGroupMenuRef} className="relative">
                         <button type="button" aria-haspopup="menu" aria-expanded={showLoanGroupMenu} onClick={() => { setShowLoanGroupMenu((current) => !current); setShowLoanFilterMenu(false); }} className={`inline-flex min-h-11 items-center gap-2 rounded-full px-4 py-2.5 text-sm font-semibold transition ${showLoanGroupMenu || groupBy !== "none" ? "bg-emerald-600 text-white shadow-sm hover:bg-emerald-700" : "bg-slate-100 text-slate-700 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"}`}><FolderOpen className="h-4 w-4" /> {activeGroupLabel}<ChevronDown className={`h-4 w-4 transition ${showLoanGroupMenu ? "rotate-180" : ""}`} /></button>
                         {showLoanGroupMenu ? (
-                          <div role="menu" className="absolute right-0 top-full z-50 mt-2 w-72 overflow-hidden rounded-2xl border border-slate-200 bg-white py-2 shadow-2xl dark:border-slate-700 dark:bg-slate-950">
+                          <div role="menu" className="absolute right-0 top-full z-50 mt-2 w-[min(18rem,calc(100vw-1.5rem))] overflow-hidden rounded-2xl border border-slate-200 bg-white py-2 shadow-2xl dark:border-slate-700 dark:bg-slate-950">
                             {([['loanType', 'Type'], ['customer', 'Customer'], ['creditOfficer', 'Credit Officer'], ['repaymentFrequency', 'Method'], ['repaymentStatus', 'State'], ['term', 'Term']] as [LoanListGroupBy, string][]).map(([value, label]) => <button key={value} type="button" role="menuitemradio" aria-checked={groupBy === value} onClick={() => { setGroupBy((current) => current === value ? "none" : value); setShowLoanGroupMenu(false); }} className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left text-sm font-medium text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-900"><span>{label}</span>{groupBy === value ? <Check className="h-4 w-4 text-emerald-600" /> : null}</button>)}
                             <button type="button" onClick={() => setShowCustomLoanGroup((current) => !current)} className="flex w-full items-center justify-between gap-3 border-t border-slate-100 px-4 py-3 text-left text-sm font-semibold text-emerald-700 hover:bg-emerald-50 dark:border-slate-800 dark:text-emerald-300 dark:hover:bg-emerald-950/30"><span>Add Custom Group</span><ChevronDown className={`h-4 w-4 transition ${showCustomLoanGroup ? "rotate-180" : "-rotate-90"}`} /></button>
                             {showCustomLoanGroup ? <div className="bg-slate-50 px-2 py-1 dark:bg-slate-900/70">{([['createdBy', 'Created By'], ['startMonth', 'Start Month'], ['amountBand', 'Amount Range']] as [LoanListGroupBy, string][]).map(([value, label]) => <button key={value} type="button" onClick={() => { setGroupBy(value); setShowLoanGroupMenu(false); setShowCustomLoanGroup(false); }} className="flex w-full items-center justify-between rounded-xl px-4 py-2.5 text-left text-sm text-slate-700 hover:bg-white dark:text-slate-200 dark:hover:bg-slate-800"><span>{label}</span>{groupBy === value ? <Check className="h-4 w-4 text-emerald-600" /> : null}</button>)}</div> : null}
@@ -7886,14 +7888,37 @@ export default function LoanDashboard() {
                     </div>
                   </div>
                 </div>
-                <div className="min-h-0 p-4 lg:px-7 lg:pb-6 xl:flex-1">
+                <div className="min-h-0 p-3 sm:p-4 lg:px-7 lg:pb-6 xl:flex-1">
                   {loading || loanListLoading ? (
                     <div className="mt-6 flex items-center justify-center rounded-2xl border border-dashed border-slate-300 p-8 text-sm text-slate-500 dark:border-slate-700 dark:text-slate-400">
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading loans...
                     </div>
                   ) : (
                     <>
-                      <div className="overflow-auto rounded-xl border border-slate-200 dark:border-slate-800 xl:h-full">
+                      <div className="space-y-3 lg:hidden">
+                        {paginatedRows.length ? paginatedRows.map((row, index) => row.type === "header" ? (
+                          <div key={`mobile-header-${index}`} className="rounded-xl bg-slate-200/70 px-3 py-2 text-sm font-bold text-slate-700 dark:bg-slate-800 dark:text-slate-200">{row.label}</div>
+                        ) : (
+                          <article key={row.loan.id} className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                            <div className="flex items-center gap-3 border-b border-slate-100 px-4 py-3 dark:border-slate-800">
+                              <input type="checkbox" aria-label={`Select ${row.loan.loanNumber || row.loan.borrower.fullName}`} checked={selectedLoanIds.has(row.loan.id)} onChange={(event) => { const checked = event.target.checked; setSelectedLoanIds((current) => { const next = new Set(current); if (checked) next.add(row.loan.id); else next.delete(row.loan.id); return next; }); }} className="h-5 w-5 shrink-0 rounded border-2 border-slate-400 text-emerald-600 focus:ring-emerald-500" />
+                              <span className="min-w-0 flex-1 truncate text-xs font-semibold text-slate-500 dark:text-slate-400">{row.loan.loanNumber || "No loan number"}</span>
+                              <StatusBadge status={row.loan.repaymentStatus} />
+                              {canDeleteLoans ? <button type="button" disabled={deletingLoanId === row.loan.id} onClick={() => void deleteLoan(row.loan)} title="Delete loan" aria-label={`Delete ${row.loan.loanNumber || row.loan.borrower.fullName}`} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-slate-400 hover:bg-rose-50 hover:text-rose-600 disabled:opacity-40 dark:hover:bg-rose-950/20"><Trash2 className="h-4 w-4" /></button> : null}
+                            </div>
+                            <button type="button" onClick={() => openLoanRecord(row.loan)} className="block w-full px-4 py-4 text-left transition active:bg-emerald-50 dark:active:bg-emerald-950/20">
+                              <span className="block truncate text-base font-bold text-slate-900 dark:text-white">{row.loan.borrower.fullName}</span>
+                              <span className="mt-1 block text-xs text-slate-500 dark:text-slate-400">{formatLoanListDate(row.loan.startDate, row.loan.createdAt)} · {row.loan.loanType}</span>
+                              <span className="mt-4 grid grid-cols-2 gap-3">
+                                <span className="rounded-xl bg-slate-50 px-3 py-2.5 dark:bg-slate-800/70"><span className="block text-[11px] font-semibold uppercase tracking-wide text-slate-400">Loan amount</span><span className="mt-1 block font-bold text-slate-900 dark:text-white">{formatLoanListCurrency(row.loan.principal)}</span></span>
+                                <span className="rounded-xl bg-slate-50 px-3 py-2.5 dark:bg-slate-800/70"><span className="block text-[11px] font-semibold uppercase tracking-wide text-slate-400">Loan term</span><span className="mt-1 block font-bold text-slate-900 dark:text-white">{row.loan.termMonths} months</span></span>
+                              </span>
+                              <span className="mt-4 flex min-h-11 items-center justify-center gap-2 rounded-xl bg-emerald-50 text-sm font-bold text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300">View loan <ArrowRight className="h-4 w-4" /></span>
+                            </button>
+                          </article>
+                        )) : <div className="rounded-2xl border border-dashed border-slate-300 px-4 py-10 text-center text-sm text-slate-500 dark:border-slate-700 dark:text-slate-400">No loans found yet.</div>}
+                      </div>
+                      <div className="hidden overflow-auto rounded-xl border border-slate-200 [-webkit-overflow-scrolling:touch] dark:border-slate-800 lg:block xl:h-full">
                         <table className="min-w-full border-collapse text-left text-sm">
                           <thead className="sticky top-0 z-10 border-b border-slate-200 bg-slate-100 text-slate-600 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300">
                             <tr>
@@ -7937,7 +7962,7 @@ export default function LoanDashboard() {
                                   <td className={`px-4 py-4 whitespace-nowrap ${row.loan.repaymentStatus === "Draft" ? "text-emerald-600 dark:text-emerald-300" : "text-slate-900 dark:text-slate-100"}`}>{row.loan.termMonths}</td>
                                   <td className={`px-4 py-4 whitespace-nowrap ${row.loan.repaymentStatus === "Draft" ? "text-emerald-600 dark:text-emerald-300" : "text-slate-500 dark:text-slate-400"}`}>Months</td>
                                   <td className={`px-4 py-4 whitespace-nowrap font-medium ${row.loan.repaymentStatus === "Draft" ? "text-emerald-600 dark:text-emerald-300" : "text-slate-600 dark:text-slate-300"}`}>{row.loan.repaymentStatus}</td>
-                                  <td className="px-4 py-4 text-center">{canDeleteLoans ? <button type="button" disabled={deletingLoanId === row.loan.id} onClick={(event) => { event.stopPropagation(); void deleteLoan(row.loan); }} title="Delete loan" aria-label={`Delete ${row.loan.loanNumber || row.loan.borrower.fullName}`} className="rounded-lg p-2 text-slate-400 opacity-0 transition hover:bg-rose-50 hover:text-rose-600 group-hover:opacity-100 focus:opacity-100 disabled:opacity-40 dark:hover:bg-rose-950/20"><MoreVertical className="h-4 w-4" /></button> : null}</td>
+                                  <td className="px-4 py-4 text-center">{canDeleteLoans ? <button type="button" disabled={deletingLoanId === row.loan.id} onClick={(event) => { event.stopPropagation(); void deleteLoan(row.loan); }} title="Delete loan" aria-label={`Delete ${row.loan.loanNumber || row.loan.borrower.fullName}`} className="rounded-lg p-2 text-slate-400 transition hover:bg-rose-50 hover:text-rose-600 disabled:opacity-40 dark:hover:bg-rose-950/20"><MoreVertical className="h-4 w-4" /></button> : null}</td>
                                 </tr>
                               )
                             )) : (
