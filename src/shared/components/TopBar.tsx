@@ -20,7 +20,7 @@ import {
   UserRound,
   UsersRound,
 } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { NotificationPanel, type AppNotification } from "./NotificationPanel";
@@ -95,6 +95,7 @@ export default function TopBar({
   onBack,
 }: TopBarProps) {
   const router = useRouter();
+  const pathname = usePathname();
   const { language, toggleLanguage } = useLanguage();
 
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
@@ -109,6 +110,7 @@ export default function TopBar({
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [workingDate, setWorkingDate] = useState("");
+  const [isCompactViewport, setIsCompactViewport] = useState(false);
   const canReadNotifications = Boolean(user?.username);
   const displayDate = useMemo(() => workingDate ? new Intl.DateTimeFormat(language === "km" ? "km-KH" : "en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "Asia/Phnom_Penh" }).format(new Date(`${workingDate}T12:00:00+07:00`)) : "—", [language, workingDate]);
 
@@ -188,6 +190,14 @@ export default function TopBar({
       // The chat button remains usable if the service is temporarily unavailable.
     }
   }, [user?.username]);
+
+  useEffect(() => {
+    const media = window.matchMedia("(max-width: 639px)");
+    const updateViewport = () => setIsCompactViewport(media.matches);
+    updateViewport();
+    media.addEventListener("change", updateViewport);
+    return () => media.removeEventListener("change", updateViewport);
+  }, []);
 
   useEffect(() => {
     const savedDate = window.localStorage.getItem("emerald-cash.working-date");
@@ -309,6 +319,7 @@ export default function TopBar({
   useEffect(() => {
     if (!isChatOpen) return;
     const onPointerDown = (event: PointerEvent) => {
+      if (isCompactViewport) return;
       const target = event.target as Node | null;
       if (target && !chatButtonRef.current?.contains(target) && !chatMenuRef.current?.contains(target)) setIsChatOpen(false);
     };
@@ -316,7 +327,7 @@ export default function TopBar({
     window.addEventListener("pointerdown", onPointerDown);
     window.addEventListener("keydown", onKeyDown);
     return () => { window.removeEventListener("pointerdown", onPointerDown); window.removeEventListener("keydown", onKeyDown); };
-  }, [isChatOpen]);
+  }, [isChatOpen, isCompactViewport]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -435,6 +446,12 @@ export default function TopBar({
       tone: "bg-rose-50 text-rose-600 dark:bg-rose-500/10 dark:text-rose-300",
     },
   ].filter((system) => system.visible);
+  const currentSystem = systems.find((system) =>
+    system.href === "/sms/dashboard"
+      ? pathname.startsWith("/sms")
+      : pathname === system.href || pathname.startsWith(`${system.href}/`)
+  );
+  const resolvedTitle = title || currentSystem?.label;
 
   const searchItems = [
     { label: language === "km" ? "ទំព័រដើម" : "Home", description: language === "km" ? "ទិដ្ឋភាពទូទៅនៃប្រព័ន្ធ" : "System overview", href: "/home", icon: Grid2X2, visible: Boolean(user) },
@@ -474,7 +491,7 @@ export default function TopBar({
 
   return (
     <header className="sticky left-0 right-0 top-0 z-40 h-[calc(4rem+env(safe-area-inset-top))] border-b border-slate-200 bg-white/95 pt-[env(safe-area-inset-top)] backdrop-blur-xl transition-colors duration-200 dark:border-slate-800 dark:bg-slate-950/95 print:hidden">
-      <div className="mx-auto flex h-full max-w-[1920px] items-center gap-3 pl-[max(0.5rem,env(safe-area-inset-left))] pr-[max(0.5rem,env(safe-area-inset-right))] sm:px-5">
+      <div className="flex h-full w-full items-center gap-3 pl-[max(0.5rem,env(safe-area-inset-left))] pr-[max(0.5rem,env(safe-area-inset-right))] sm:px-5">
           <div className="flex min-w-0 items-center gap-3">
             {showBack ? (
               <button
@@ -526,10 +543,10 @@ export default function TopBar({
           </div>
 
           <div className="hidden min-w-0 xl:block">
-            {title ? (
+            {resolvedTitle ? (
               <div className="space-y-1">
                 <h1 className="truncate text-lg font-semibold text-slate-900 dark:text-white">
-                  {title}
+                  {resolvedTitle}
                 </h1>
                 {subtitle ? (
                   <p className="truncate text-sm text-slate-500 dark:text-slate-400">
@@ -550,13 +567,15 @@ export default function TopBar({
                 ref={searchButtonRef}
                 type="button"
                 onClick={() => toggleTopBarMenu("search")}
-                className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 transition hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-700 sm:h-9 sm:w-9 sm:rounded-lg dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:border-emerald-700 dark:hover:bg-emerald-950/30"
+                className="inline-flex h-11 w-11 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white text-slate-600 transition hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40 sm:h-9 sm:w-9 sm:rounded-lg xl:w-44 xl:justify-start xl:px-3 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:border-emerald-700 dark:hover:bg-emerald-950/30"
                 aria-label={language === "km" ? "ស្វែងរកក្នុងប្រព័ន្ធ" : "Search the system"}
                 aria-expanded={isSearchOpen}
                 aria-haspopup="dialog"
                 title={language === "km" ? "ស្វែងរក (Ctrl/⌘ + K)" : "Search (Ctrl/⌘ + K)"}
               >
                 <Search className="h-4.5 w-4.5" />
+                <span className="hidden flex-1 text-left text-xs font-medium xl:block">{language === "km" ? "ស្វែងរក..." : "Search..."}</span>
+                <kbd className="hidden rounded border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[10px] font-medium text-slate-400 xl:inline dark:border-slate-700 dark:bg-slate-800">⌘K</kbd>
               </button>
               <FloatingTopBarMenu open={isSearchOpen} anchorRef={searchButtonRef} menuRef={searchMenuRef}>
                 <div role="dialog" aria-label={language === "km" ? "ស្វែងរកក្នុងប្រព័ន្ធ" : "Search the system"} className="w-[min(30rem,calc(100vw-1rem))] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl shadow-slate-900/15 dark:border-slate-700 dark:bg-slate-900 dark:shadow-black/40">
@@ -584,7 +603,7 @@ export default function TopBar({
               </FloatingTopBarMenu>
             </div>
 
-            {hasAppPermission(user?.role, "loans:create") ? <button type="button" onClick={() => router.push("/loan?view=loans&newLoan=1")} className="hidden h-9 items-center gap-1.5 rounded-lg bg-emerald-600 px-2.5 text-xs font-semibold text-white transition hover:bg-emerald-700 sm:inline-flex sm:px-3" title={language === "km" ? "បង្កើតកម្ចីថ្មី" : "Quick create loan"}><Plus className="h-4 w-4" /><span className="hidden xl:inline">{language === "km" ? "បង្កើតថ្មី" : "Create"}</span></button> : null}
+            {hasAppPermission(user?.role, "loans:create") ? <button type="button" onClick={() => router.push("/loan?view=loans&newLoan=1")} className="hidden h-11 w-11 items-center justify-center gap-1.5 rounded-xl bg-emerald-600 text-xs font-semibold text-white transition hover:bg-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40 focus-visible:ring-offset-2 min-[360px]:inline-flex sm:h-9 sm:w-auto sm:rounded-lg sm:px-3" title={language === "km" ? "បង្កើតកម្ចីថ្មី" : "Quick create loan"} aria-label={language === "km" ? "បង្កើតកម្ចីថ្មី" : "Quick create loan"}><Plus className="h-4 w-4" /><span className="hidden xl:inline">{language === "km" ? "បង្កើតថ្មី" : "Create"}</span></button> : null}
 
             {systems.length > 0 ? (
               <div className="relative">
@@ -592,13 +611,14 @@ export default function TopBar({
                   ref={systemsButtonRef}
                   type="button"
                   onClick={() => toggleTopBarMenu("systems")}
-                  className="inline-flex h-11 items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-600 transition hover:border-slate-300 hover:bg-slate-50 sm:h-9 sm:gap-2 sm:rounded-lg sm:px-3 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+                  className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-600 transition hover:border-slate-300 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40 sm:h-9 sm:w-auto sm:gap-2 sm:rounded-lg sm:px-3 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
                   aria-label={language === "km" ? "ម៉ឺនុយប្រព័ន្ធ" : "Systems menu"}
                   aria-expanded={isSystemsMenuOpen}
                   aria-haspopup="menu"
                 >
                   <Grid2X2 className="h-4 w-4 text-emerald-600 dark:text-emerald-300" aria-hidden="true" />
-                  <ChevronDown className={`h-3.5 w-3.5 text-slate-400 transition-transform ${isSystemsMenuOpen ? "rotate-180" : ""}`} aria-hidden="true" />
+                  <span className="hidden max-w-36 truncate xl:inline">{currentSystem?.label || (language === "km" ? "ប្រព័ន្ធ" : "Systems")}</span>
+                  <ChevronDown className={`hidden h-3.5 w-3.5 text-slate-400 transition-transform sm:block ${isSystemsMenuOpen ? "rotate-180" : ""}`} aria-hidden="true" />
                 </button>
 
                 <FloatingTopBarMenu open={isSystemsMenuOpen} anchorRef={systemsButtonRef} menuRef={systemsMenuRef}>
@@ -649,10 +669,12 @@ export default function TopBar({
             <button
               type="button"
               onClick={toggleLanguage}
-              className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 transition hover:border-slate-300 hover:bg-slate-50 sm:h-9 sm:w-9 sm:rounded-lg dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
-              aria-label={language === "km" ? "ប្ដូរភាសា" : "Toggle language"}
+              className="inline-flex h-11 w-11 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white text-slate-600 transition hover:border-slate-300 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40 sm:h-9 sm:w-9 sm:rounded-lg xl:w-auto xl:px-3 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+              aria-label={language === "km" ? "Switch to English" : "ប្ដូរទៅភាសាខ្មែរ"}
+              title={language === "km" ? "Switch to English" : "ប្ដូរទៅភាសាខ្មែរ"}
             >
               <Languages className="h-4 w-4" />
+              <span className="hidden text-xs font-semibold xl:inline">{language === "km" ? "ខ្មែរ" : "EN"}</span>
             </button>
 
             <div className="relative hidden sm:block">
@@ -668,7 +690,7 @@ export default function TopBar({
                 <MessageSquare className="h-4 w-4" />
                 {chatUnreadCount > 0 ? <span className="absolute -right-1 -top-1 min-w-4 rounded-full bg-rose-500 px-1 text-[10px] font-bold leading-4 text-white">{chatUnreadCount > 9 ? "9+" : chatUnreadCount}</span> : null}
               </button>
-              {user ? <FloatingTopBarMenu open={isChatOpen} anchorRef={chatButtonRef} menuRef={chatMenuRef}><ChatPanel currentUsername={user.username} onClose={() => setIsChatOpen(false)} onUnreadCountChange={setChatUnreadCount} /></FloatingTopBarMenu> : null}
+              {user && !isCompactViewport ? <FloatingTopBarMenu open={isChatOpen} anchorRef={chatButtonRef} menuRef={chatMenuRef}><ChatPanel currentUsername={user.username} onClose={() => setIsChatOpen(false)} onUnreadCountChange={setChatUnreadCount} /></FloatingTopBarMenu> : null}
             </div>
 
             <button
@@ -695,7 +717,7 @@ export default function TopBar({
                   ref={accountButtonRef}
                   type="button"
                   onClick={() => toggleTopBarMenu("account")}
-                  className="inline-flex h-11 min-w-11 items-center justify-center gap-2 rounded-xl px-1.5 py-1 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 sm:h-10 sm:min-w-0 sm:rounded-lg lg:justify-start dark:text-slate-200 dark:hover:bg-slate-800"
+                  className="relative inline-flex h-11 min-w-11 items-center justify-center gap-2 rounded-xl px-1.5 py-1 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 sm:h-10 sm:min-w-0 sm:rounded-lg lg:justify-start dark:text-slate-200 dark:hover:bg-slate-800"
                   aria-label={language === "km" ? "ប្រវត្តិរូប" : "Profile menu"}
                   aria-expanded={isAccountMenuOpen}
                   aria-haspopup="menu"
@@ -719,6 +741,7 @@ export default function TopBar({
                     </span>
                   </div>
                   <ChevronDown className={`hidden h-3.5 w-3.5 text-slate-400 transition-transform lg:block ${isAccountMenuOpen ? "rotate-180" : ""}`} />
+                  {chatUnreadCount > 0 ? <span className="absolute -right-0.5 top-0 min-w-4 rounded-full bg-rose-500 px-1 text-center text-[10px] font-bold leading-4 text-white sm:hidden">{chatUnreadCount > 9 ? "9+" : chatUnreadCount}</span> : null}
                 </button>
 
                 <FloatingTopBarMenu open={isAccountMenuOpen} anchorRef={accountButtonRef} menuRef={accountMenuRef}>
@@ -755,6 +778,17 @@ export default function TopBar({
                     </div>
 
                     <div className="p-2">
+                      <button
+                        type="button"
+                        onClick={() => { setIsAccountMenuOpen(false); setIsChatOpen(true); void loadChatUnread(); }}
+                        className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-medium text-slate-700 transition hover:bg-slate-50 sm:hidden dark:text-slate-200 dark:hover:bg-slate-800"
+                        role="menuitem"
+                      >
+                        <MessageSquare className="h-5 w-5 text-slate-400" aria-hidden="true" />
+                        <span className="flex-1">{language === "km" ? "សារ" : "Messages"}</span>
+                        {chatUnreadCount > 0 ? <span className="min-w-5 rounded-full bg-rose-500 px-1.5 text-center text-[10px] font-bold leading-5 text-white">{chatUnreadCount > 9 ? "9+" : chatUnreadCount}</span> : null}
+                      </button>
+
                       {["admin", "system administrator"].includes(user.role.trim().toLocaleLowerCase()) ? (
                         <button
                           type="button"
@@ -804,6 +838,15 @@ export default function TopBar({
               </button>
             )}
           </div>
+          {user && isCompactViewport && isChatOpen && typeof document !== "undefined" ? createPortal(
+            <div
+              className="fixed inset-0 z-[1000] flex items-start justify-center bg-slate-950/35 px-2 pt-[calc(4rem+env(safe-area-inset-top)+0.5rem)] backdrop-blur-sm"
+              onPointerDown={(event) => { if (event.target === event.currentTarget) setIsChatOpen(false); }}
+            >
+              <ChatPanel currentUsername={user.username} onClose={() => setIsChatOpen(false)} onUnreadCountChange={setChatUnreadCount} />
+            </div>,
+            document.body
+          ) : null}
       </div>
     </header>
   );
