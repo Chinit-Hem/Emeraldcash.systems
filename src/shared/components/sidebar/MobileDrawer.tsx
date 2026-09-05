@@ -79,9 +79,9 @@ export function MobileDrawer({ open, onClose, children, labelledBy = "mobile-nav
               animate={{ x: 0 }}
               exit={{ x: "-100%" }}
               transition={{ duration: 0.25, ease: "easeInOut" }}
-              className="relative h-dvh w-[min(280px,88vw)] overflow-hidden bg-white shadow-2xl outline-none dark:bg-slate-950"
+              className="relative h-dvh w-[min(280px,88vw)] overflow-hidden bg-white pb-[env(safe-area-inset-bottom)] pt-[env(safe-area-inset-top)] shadow-2xl outline-none dark:bg-slate-950"
             >
-              <div className="absolute right-3 top-3 z-10">
+              <div className="absolute right-[max(0.75rem,env(safe-area-inset-right))] top-[calc(env(safe-area-inset-top)+0.75rem)] z-10">
                 <Button type="button" variant="ghost" size="icon" onClick={onClose} className="h-9 w-9 rounded-lg text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800" aria-label="Close navigation menu">
                   <X className="h-5 w-5" aria-hidden="true" />
                 </Button>

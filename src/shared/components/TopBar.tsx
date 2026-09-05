@@ -64,6 +64,8 @@ function FloatingTopBarMenu({ open, anchorRef, menuRef, children }: FloatingTopB
         right: Math.max(viewportPadding, window.innerWidth - bounds.right),
         maxWidth: `calc(100vw - ${viewportPadding * 2}px)`,
         maxHeight: `calc(100dvh - ${bounds.bottom + 20}px)`,
+        overflowY: "auto",
+        overscrollBehavior: "contain",
         zIndex: 1000,
         visibility: "visible",
       });
@@ -413,14 +415,14 @@ export default function TopBar({
   };
 
   return (
-    <header className="sticky left-0 right-0 top-0 z-40 h-16 border-b border-slate-200 bg-white/95 backdrop-blur-xl transition-colors duration-200 dark:border-slate-800 dark:bg-slate-950/95 print:hidden">
-      <div className="mx-auto flex h-full max-w-[1920px] items-center gap-3 px-4 sm:px-5">
+    <header className="sticky left-0 right-0 top-0 z-40 h-[calc(4rem+env(safe-area-inset-top))] border-b border-slate-200 bg-white/95 pt-[env(safe-area-inset-top)] backdrop-blur-xl transition-colors duration-200 dark:border-slate-800 dark:bg-slate-950/95 print:hidden">
+      <div className="mx-auto flex h-full max-w-[1920px] items-center gap-3 pl-[max(0.5rem,env(safe-area-inset-left))] pr-[max(0.5rem,env(safe-area-inset-right))] sm:px-5">
           <div className="flex min-w-0 items-center gap-3">
             {showBack ? (
               <button
                 type="button"
                 onClick={handleBack}
-                className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+                className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 sm:h-9 sm:w-9 sm:rounded-lg dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
                 aria-label={language === "km" ? "ត្រឡប់ក្រោយ" : "Go back"}
               >
                 <svg
@@ -441,7 +443,7 @@ export default function TopBar({
                 <button
                   type="button"
                   onClick={onMenuClick}
-                  className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+                  className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 sm:h-9 sm:w-9 sm:rounded-lg dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
                   aria-label={language === "km" ? "បើក ឬបិទម៉ឺនុយ" : "Toggle navigation"}
                 >
                   <svg
@@ -463,29 +465,6 @@ export default function TopBar({
               </>
             ) : null}
 
-            <div className="flex min-w-0 items-center gap-3 xl:hidden">
-              <div className="relative flex h-9 w-24 items-center justify-center overflow-hidden rounded-lg border border-slate-200 bg-white px-2 text-slate-900 shadow-sm dark:border-slate-800 dark:bg-white dark:text-white">
-                <Image
-                  src="/logo-horizontal.png"
-                  alt="Emerald Cash logo"
-                  width={86}
-                  height={36}
-                  className="h-auto w-full object-contain"
-                  priority
-                />
-              </div>
-
-              <div className="min-w-0">
-                <div className="flex flex-col gap-0.5">
-                  <p className="truncate text-sm font-semibold text-slate-900 dark:text-white">
-                    Emerald Cash
-                  </p>
-                  <p className="truncate text-xs font-semibold uppercase tracking-[0.2em] text-emerald-700 dark:text-emerald-300">
-                    Systems
-                  </p>
-                </div>
-              </div>
-            </div>
           </div>
 
           <div className="hidden min-w-0 xl:block">
@@ -503,7 +482,7 @@ export default function TopBar({
             ) : null}
           </div>
 
-          <div className="mx-auto hidden min-w-[280px] max-w-xl flex-1 items-center justify-center md:flex">
+          <div className="mx-auto hidden min-w-[280px] max-w-xl flex-1 items-center justify-center 2xl:flex">
             <label className="relative flex h-9 w-full max-w-[460px] items-center">
               <Search className="pointer-events-none absolute left-3 h-4 w-4 text-slate-400" />
               <input
@@ -517,10 +496,10 @@ export default function TopBar({
             </label>
           </div>
 
-          <div className="ml-auto flex shrink-0 items-center justify-end gap-2">
+          <div className="ml-auto flex min-w-0 shrink-0 items-center justify-end gap-1 sm:gap-2">
             {actions}
 
-            {hasAppPermission(user?.role, "loans:create") ? <button type="button" onClick={() => router.push("/loan?view=loans&newLoan=1")} className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-emerald-600 px-2.5 text-xs font-semibold text-white transition hover:bg-emerald-700 sm:px-3" title={language === "km" ? "បង្កើតកម្ចីថ្មី" : "Quick create loan"}><Plus className="h-4 w-4" /><span className="hidden xl:inline">{language === "km" ? "បង្កើតថ្មី" : "Create"}</span></button> : null}
+            {hasAppPermission(user?.role, "loans:create") ? <button type="button" onClick={() => router.push("/loan?view=loans&newLoan=1")} className="hidden h-9 items-center gap-1.5 rounded-lg bg-emerald-600 px-2.5 text-xs font-semibold text-white transition hover:bg-emerald-700 sm:inline-flex sm:px-3" title={language === "km" ? "បង្កើតកម្ចីថ្មី" : "Quick create loan"}><Plus className="h-4 w-4" /><span className="hidden xl:inline">{language === "km" ? "បង្កើតថ្មី" : "Create"}</span></button> : null}
 
             {systems.length > 0 ? (
               <div className="relative">
@@ -528,7 +507,7 @@ export default function TopBar({
                   ref={systemsButtonRef}
                   type="button"
                   onClick={() => toggleTopBarMenu("systems")}
-                  className="inline-flex h-9 items-center gap-2 rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-600 transition hover:border-slate-300 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 sm:px-3"
+                  className="inline-flex h-11 items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-600 transition hover:border-slate-300 hover:bg-slate-50 sm:h-9 sm:gap-2 sm:rounded-lg sm:px-3 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
                   aria-label={language === "km" ? "ម៉ឺនុយប្រព័ន្ធ" : "Systems menu"}
                   aria-expanded={isSystemsMenuOpen}
                   aria-haspopup="menu"
@@ -585,7 +564,7 @@ export default function TopBar({
             <button
               type="button"
               onClick={toggleLanguage}
-              className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition hover:border-slate-300 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+              className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 transition hover:border-slate-300 hover:bg-slate-50 sm:h-9 sm:w-9 sm:rounded-lg dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
               aria-label={language === "km" ? "ប្ដូរភាសា" : "Toggle language"}
             >
               <Languages className="h-4 w-4" />
@@ -596,7 +575,7 @@ export default function TopBar({
                 ref={chatButtonRef}
                 type="button"
                 onClick={() => { toggleTopBarMenu("chat"); void loadChatUnread(); }}
-                className="relative inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition hover:border-slate-300 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+                className="relative inline-flex h-11 w-11 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 transition hover:border-slate-300 hover:bg-slate-50 sm:h-9 sm:w-9 sm:rounded-lg dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
                 aria-label={language === "km" ? "សារ" : "Messages"}
                 aria-expanded={isChatOpen}
                 aria-haspopup="dialog"
@@ -611,7 +590,7 @@ export default function TopBar({
               type="button"
               ref={bellButtonRef}
               onClick={() => { toggleTopBarMenu("notifications"); void loadNotifications(); }}
-              className="relative inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition hover:border-slate-300 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+              className="relative inline-flex h-11 w-11 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 transition hover:border-slate-300 hover:bg-slate-50 sm:h-9 sm:w-9 sm:rounded-lg dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
               aria-label={`${language === "km" ? "ការជូនដំណឹង" : "Notifications"}${notificationUnreadCount ? ` (${notificationUnreadCount})` : ""}`}
               aria-expanded={isNotificationsOpen}
               aria-haspopup="dialog"
@@ -631,7 +610,7 @@ export default function TopBar({
                   ref={accountButtonRef}
                   type="button"
                   onClick={() => toggleTopBarMenu("account")}
-                  className="inline-flex h-10 items-center gap-2 rounded-lg px-1.5 py-1 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800"
+                  className="inline-flex h-11 min-w-11 items-center justify-center gap-2 rounded-xl px-1.5 py-1 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 sm:h-10 sm:min-w-0 sm:rounded-lg lg:justify-start dark:text-slate-200 dark:hover:bg-slate-800"
                   aria-label={language === "km" ? "ប្រវត្តិរូប" : "Profile menu"}
                   aria-expanded={isAccountMenuOpen}
                   aria-haspopup="menu"
@@ -646,7 +625,7 @@ export default function TopBar({
                       priority
                     />
                   </div>
-                  <div className="hidden min-w-0 max-w-[130px] flex-col truncate sm:flex">
+                  <div className="hidden min-w-0 max-w-[130px] flex-col truncate lg:flex">
                     <span className="truncate text-xs font-semibold leading-4 text-slate-900 dark:text-white">
                       {displayUserName}
                     </span>
@@ -654,7 +633,7 @@ export default function TopBar({
                       {roleLabel}
                     </span>
                   </div>
-                  <ChevronDown className={`hidden h-3.5 w-3.5 text-slate-400 transition-transform sm:block ${isAccountMenuOpen ? "rotate-180" : ""}`} />
+                  <ChevronDown className={`hidden h-3.5 w-3.5 text-slate-400 transition-transform lg:block ${isAccountMenuOpen ? "rotate-180" : ""}`} />
                 </button>
 
                 <FloatingTopBarMenu open={isAccountMenuOpen} anchorRef={accountButtonRef} menuRef={accountMenuRef}>

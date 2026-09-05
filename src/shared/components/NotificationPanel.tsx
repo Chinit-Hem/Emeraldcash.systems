@@ -81,7 +81,7 @@ export function NotificationPanel({
   const unreadTotal = unreadCount ?? notifications.filter((notification) => !notification.readAt).length;
 
   return (
-    <div className="flex max-h-[70vh] w-80 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl dark:border-slate-700 dark:bg-slate-900 sm:w-96">
+    <div className="flex max-h-[70dvh] w-[min(24rem,calc(100vw-1rem))] flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl dark:border-slate-700 dark:bg-slate-900">
       <header className="flex items-center justify-between gap-3 border-b border-slate-200 p-4 dark:border-slate-700">
         <div><h3 className="font-semibold text-slate-800 dark:text-slate-100">{language === "km" ? "ការជូនដំណឹង" : "Notifications"}</h3>{unreadTotal ? <p className="mt-0.5 text-xs text-emerald-700 dark:text-emerald-300">{unreadTotal} {language === "km" ? "មិនទាន់អាន" : "unread"}</p> : null}</div>
         <div className="flex items-center gap-1"><button type="button" onClick={onMarkAllRead} disabled={!unreadTotal} className="rounded-lg px-2 py-1 text-xs font-semibold text-emerald-700 hover:bg-emerald-50 disabled:opacity-40 dark:text-emerald-300 dark:hover:bg-emerald-950/30">{language === "km" ? "អានទាំងអស់" : "Mark all read"}</button><button type="button" onClick={onClear} disabled={!notifications.length} className="rounded-lg px-2 py-1 text-xs font-semibold text-rose-600 hover:bg-rose-50 disabled:opacity-40 dark:text-rose-300 dark:hover:bg-rose-950/30">{language === "km" ? "សម្អាត" : "Clear"}</button><button type="button" onClick={onClose} className="rounded-full p-1 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800" aria-label={language === "km" ? "បិទ" : "Close"}><X className="h-5 w-5" /></button></div>
