@@ -2,6 +2,7 @@
 
 import { CalendarDays, Check, Clock } from "lucide-react";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 
 type DateInputMode = "date" | "datetime-local" | "month";
 
@@ -88,8 +89,10 @@ export function DateInput({ value, onChange, type = "date", className = "", id, 
   const generatedId = useId();
   const inputId = id || `date-input-${generatedId.replace(/:/g, "")}`;
   const rootRef = useRef<HTMLDivElement>(null);
+  const calendarRef = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
   const [openAbove, setOpenAbove] = useState(false);
+  const [calendarStyle, setCalendarStyle] = useState<React.CSSProperties>({ visibility: "hidden" });
   const [invalid, setInvalid] = useState(false);
   const [text, setText] = useState(() => displayValue(value, type));
   const initialDate = datePart(value);
@@ -105,11 +108,63 @@ export function DateInput({ value, onChange, type = "date", className = "", id, 
   useEffect(() => {
     if (!open) return;
     const close = (event: PointerEvent) => {
-      if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
+      const target = event.target as Node;
+      if (!rootRef.current?.contains(target) && !calendarRef.current?.contains(target)) setOpen(false);
+    };
+    const closeWithKeyboard = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setOpen(false);
     };
     document.addEventListener("pointerdown", close);
-    return () => document.removeEventListener("pointerdown", close);
+    document.addEventListener("keydown", closeWithKeyboard);
+    return () => {
+      document.removeEventListener("pointerdown", close);
+      document.removeEventListener("keydown", closeWithKeyboard);
+    };
   }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+
+    let animationFrame = 0;
+    const updatePosition = () => {
+      const bounds = rootRef.current?.getBoundingClientRect();
+      if (!bounds) return;
+
+      const viewportPadding = 8;
+      const gap = 8;
+      const width = Math.min(352, window.innerWidth - viewportPadding * 2);
+      const measuredHeight = calendarRef.current?.getBoundingClientRect().height;
+      const estimatedHeight = type === "datetime-local" ? 386 : type === "month" ? 248 : 334;
+      const height = measuredHeight && measuredHeight > 0 ? measuredHeight : estimatedHeight;
+      const spaceBelow = window.innerHeight - bounds.bottom - viewportPadding;
+      const spaceAbove = bounds.top - viewportPadding;
+      const placeAbove = spaceBelow < height + gap && spaceAbove > spaceBelow;
+      const desiredTop = placeAbove ? bounds.top - height - gap : bounds.bottom + gap;
+      const top = Math.max(viewportPadding, Math.min(desiredTop, window.innerHeight - height - viewportPadding));
+      const left = Math.max(viewportPadding, Math.min(bounds.right - width, window.innerWidth - width - viewportPadding));
+
+      setOpenAbove(placeAbove);
+      setCalendarStyle({
+        position: "fixed",
+        top,
+        left,
+        width,
+        maxHeight: `calc(100dvh - ${viewportPadding * 2}px)`,
+        zIndex: 1000,
+        visibility: "visible",
+      });
+    };
+
+    updatePosition();
+    animationFrame = window.requestAnimationFrame(updatePosition);
+    window.addEventListener("resize", updatePosition);
+    window.addEventListener("scroll", updatePosition, true);
+    return () => {
+      window.cancelAnimationFrame(animationFrame);
+      window.removeEventListener("resize", updatePosition);
+      window.removeEventListener("scroll", updatePosition, true);
+    };
+  }, [open, type]);
 
   const weeks = useMemo(() => {
     const first = new Date(month.getFullYear(), month.getMonth(), 1);
@@ -124,13 +179,12 @@ export function DateInput({ value, onChange, type = "date", className = "", id, 
     setMonth(next);
     setDraftDate(next);
     setDraftTime(timePart(value).slice(0, 5));
-    setOpen((current) => {
-      if (!current) {
-        const bounds = rootRef.current?.getBoundingClientRect();
-        if (bounds) setOpenAbove(window.innerHeight - bounds.bottom < 370 && bounds.top > window.innerHeight - bounds.bottom);
-      }
-      return !current;
-    });
+    if (!open) {
+      setCalendarStyle({ visibility: "hidden" });
+      const bounds = rootRef.current?.getBoundingClientRect();
+      if (bounds) setOpenAbove(window.innerHeight - bounds.bottom < 370 && bounds.top > window.innerHeight - bounds.bottom);
+    }
+    setOpen((current) => !current);
   };
   const commitTyped = () => {
     const parsed = parseTypedValue(text, type);
@@ -181,7 +235,7 @@ export function DateInput({ value, onChange, type = "date", className = "", id, 
         onChange={(event) => { setText(event.target.value); setInvalid(false); }}
         onClick={() => { if (!open) openPicker(); }}
         onBlur={(event) => {
-          if (rootRef.current?.contains(event.relatedTarget as Node)) return;
+          if (rootRef.current?.contains(event.relatedTarget as Node) || calendarRef.current?.contains(event.relatedTarget as Node)) return;
           commitTyped();
         }}
         onKeyDown={(event) => {
@@ -194,8 +248,8 @@ export function DateInput({ value, onChange, type = "date", className = "", id, 
         <CalendarDays className="h-4 w-4" aria-hidden="true" />
       </button>
       {invalid ? <span id={`${inputId}-error`} role="alert" className="absolute left-0 top-full z-10 mt-1 text-xs font-medium text-rose-600">Use {type === "month" ? "MM/YYYY" : type === "datetime-local" ? "DD/MM/YYYY HH:mm" : "DD/MM/YYYY"}</span> : null}
-      {open ? (
-        <div id={`${inputId}-calendar`} role="dialog" aria-label={title || "Date picker"} className={`absolute right-0 z-[280] w-[22rem] max-w-[calc(100vw-2rem)] rounded-xl border border-slate-200 bg-white p-1.5 shadow-2xl dark:border-slate-700 dark:bg-slate-950 ${openAbove ? "bottom-[calc(100%+0.5rem)]" : "top-[calc(100%+0.5rem)]"}`}>
+      {open && typeof document !== "undefined" ? createPortal(
+        <div ref={calendarRef} id={`${inputId}-calendar`} role="dialog" aria-label={title || "Date picker"} data-date-input-calendar="true" data-placement={openAbove ? "top" : "bottom"} style={calendarStyle} className="max-w-[calc(100vw-1rem)] overflow-y-auto rounded-xl border border-slate-200 bg-white p-1.5 shadow-2xl dark:border-slate-700 dark:bg-slate-950">
           <div className="flex h-10 items-center justify-between border-b border-slate-200 px-2 dark:border-slate-800">
             <button type="button" onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() + (type === "month" ? -12 : -1), 1))} className="rounded-lg p-1.5 text-2xl font-semibold leading-none text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800" aria-label={type === "month" ? "Previous year" : "Previous month"}>‹</button>
             <p className="text-lg font-bold text-slate-900 dark:text-white">{month.toLocaleDateString("en-US", type === "month" ? { year: "numeric" } : { month: "long", year: "numeric" })}</p>
@@ -210,7 +264,8 @@ export function DateInput({ value, onChange, type = "date", className = "", id, 
               {type === "datetime-local" ? <div className="mt-1 flex items-center gap-2 border-t border-slate-200 p-2 dark:border-slate-800"><Clock className="h-4 w-4 text-slate-400" /><input type="time" step="60" value={draftTime} onChange={(event) => setDraftTime(event.target.value)} className="min-w-0 flex-1 rounded-lg border border-slate-200 bg-transparent px-2 py-1.5 text-sm outline-none focus:border-emerald-500 dark:border-slate-700" /><button type="button" onClick={applyDateTime} className="flex h-9 w-10 items-center justify-center rounded-lg bg-emerald-600 text-white hover:bg-emerald-700" aria-label="Apply date and time"><Check className="h-4 w-4" /></button></div> : null}
             </>
           )}
-        </div>
+        </div>,
+        document.body,
       ) : null}
     </div>
   );

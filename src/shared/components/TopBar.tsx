@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { NotificationPanel, type AppNotification } from "./NotificationPanel";
 import { ChatPanel } from "./ChatPanel";
 import { useLanguage } from "@/shared/hooks/LanguageContext";
@@ -39,6 +40,47 @@ type TopBarProps = {
   showBack?: boolean;
   onBack?: () => void;
 };
+
+type FloatingTopBarMenuProps = {
+  open: boolean;
+  anchorRef: React.RefObject<HTMLElement>;
+  menuRef: React.RefObject<HTMLDivElement>;
+  children: React.ReactNode;
+};
+
+function FloatingTopBarMenu({ open, anchorRef, menuRef, children }: FloatingTopBarMenuProps) {
+  const [style, setStyle] = useState<React.CSSProperties>({ visibility: "hidden" });
+
+  useEffect(() => {
+    if (!open) return;
+
+    const updatePosition = () => {
+      const bounds = anchorRef.current?.getBoundingClientRect();
+      if (!bounds) return;
+      const viewportPadding = 8;
+      setStyle({
+        position: "fixed",
+        top: bounds.bottom + 12,
+        right: Math.max(viewportPadding, window.innerWidth - bounds.right),
+        maxWidth: `calc(100vw - ${viewportPadding * 2}px)`,
+        maxHeight: `calc(100dvh - ${bounds.bottom + 20}px)`,
+        zIndex: 1000,
+        visibility: "visible",
+      });
+    };
+
+    updatePosition();
+    window.addEventListener("resize", updatePosition);
+    window.addEventListener("scroll", updatePosition, true);
+    return () => {
+      window.removeEventListener("resize", updatePosition);
+      window.removeEventListener("scroll", updatePosition, true);
+    };
+  }, [anchorRef, open]);
+
+  if (!open || typeof document === "undefined") return null;
+  return createPortal(<div ref={menuRef} style={style}>{children}</div>, document.body);
+}
 
 export default function TopBar({
   user,
@@ -79,8 +121,6 @@ export default function TopBar({
   const notificationsRequestRef = useRef<Promise<void> | null>(null);
   const notificationsLoadedRef = useRef(false);
   const notificationsLoadedAtRef = useRef(0);
-
-  const [dropdownStyle, setDropdownStyle] = useState<React.CSSProperties>({});
 
   const loadNotifications = useCallback((force = false): Promise<void> => {
     if (!canReadNotifications) {
@@ -253,7 +293,8 @@ export default function TopBar({
     if (!isDateMenuOpen) return;
     const onPointerDown = (event: PointerEvent) => {
       const target = event.target as Node | null;
-      if (target && !dateButtonRef.current?.contains(target) && !dateMenuRef.current?.contains(target)) setIsDateMenuOpen(false);
+      const withinCalendar = target instanceof Element && Boolean(target.closest("[data-date-input-calendar='true']"));
+      if (target && !withinCalendar && !dateButtonRef.current?.contains(target) && !dateMenuRef.current?.contains(target)) setIsDateMenuOpen(false);
     };
     window.addEventListener("pointerdown", onPointerDown);
     return () => window.removeEventListener("pointerdown", onPointerDown);
@@ -270,33 +311,6 @@ export default function TopBar({
     window.addEventListener("keydown", onKeyDown);
     return () => { window.removeEventListener("pointerdown", onPointerDown); window.removeEventListener("keydown", onKeyDown); };
   }, [isChatOpen]);
-
-  useEffect(() => {
-    if (!isNotificationsOpen) return;
-
-    const update = () => {
-      const btn = bellButtonRef.current;
-      if (!btn) return;
-
-      const r = btn.getBoundingClientRect();
-      setDropdownStyle({
-        position: "fixed",
-        top: r.bottom + 8,
-        left: r.right,
-        transform: "translateX(-100%)",
-        zIndex: 250,
-      });
-    };
-
-    update();
-    window.addEventListener("resize", update);
-    window.addEventListener("scroll", update, true);
-
-    return () => {
-      window.removeEventListener("resize", update);
-      window.removeEventListener("scroll", update, true);
-    };
-  }, [isNotificationsOpen]);
 
   const handleBack = () => {
     if (onBack) onBack();
@@ -388,6 +402,14 @@ export default function TopBar({
   const goToSystem = (href: string) => {
     setIsSystemsMenuOpen(false);
     router.push(href);
+  };
+
+  const toggleTopBarMenu = (menu: "systems" | "date" | "chat" | "notifications" | "account") => {
+    setIsSystemsMenuOpen(menu === "systems" ? !isSystemsMenuOpen : false);
+    setIsDateMenuOpen(menu === "date" ? !isDateMenuOpen : false);
+    setIsChatOpen(menu === "chat" ? !isChatOpen : false);
+    setIsNotificationsOpen(menu === "notifications" ? !isNotificationsOpen : false);
+    setIsAccountMenuOpen(menu === "account" ? !isAccountMenuOpen : false);
   };
 
   return (
@@ -505,7 +527,7 @@ export default function TopBar({
                 <button
                   ref={systemsButtonRef}
                   type="button"
-                  onClick={() => setIsSystemsMenuOpen((current) => !current)}
+                  onClick={() => toggleTopBarMenu("systems")}
                   className="inline-flex h-9 items-center gap-2 rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-600 transition hover:border-slate-300 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 sm:px-3"
                   aria-label={language === "km" ? "ម៉ឺនុយប្រព័ន្ធ" : "Systems menu"}
                   aria-expanded={isSystemsMenuOpen}
@@ -515,12 +537,11 @@ export default function TopBar({
                   <ChevronDown className={`h-3.5 w-3.5 text-slate-400 transition-transform ${isSystemsMenuOpen ? "rotate-180" : ""}`} aria-hidden="true" />
                 </button>
 
-                {isSystemsMenuOpen ? (
+                <FloatingTopBarMenu open={isSystemsMenuOpen} anchorRef={systemsButtonRef} menuRef={systemsMenuRef}>
                   <div
-                    ref={systemsMenuRef}
                     role="menu"
                     aria-label={language === "km" ? "ជ្រើសរើសប្រព័ន្ធ" : "Choose a system"}
-                    className="absolute right-0 top-[calc(100%+0.75rem)] z-[260] w-[min(22rem,calc(100vw-2rem))] overflow-hidden rounded-2xl border border-slate-200 bg-white p-2 shadow-2xl shadow-slate-900/15 dark:border-slate-700 dark:bg-slate-900 dark:shadow-black/40"
+                    className="w-[min(22rem,calc(100vw-1rem))] overflow-hidden rounded-2xl border border-slate-200 bg-white p-2 shadow-2xl shadow-slate-900/15 dark:border-slate-700 dark:bg-slate-900 dark:shadow-black/40"
                   >
                     {systems.map((system) => {
                       const Icon = system.icon;
@@ -540,7 +561,7 @@ export default function TopBar({
                       );
                     })}
                   </div>
-                ) : null}
+                </FloatingTopBarMenu>
               </div>
             ) : null}
 
@@ -548,16 +569,17 @@ export default function TopBar({
               <button
                 ref={dateButtonRef}
                 type="button"
-                onClick={() => setIsDateMenuOpen((current) => !current)}
+                onClick={() => toggleTopBarMenu("date")}
                 className="inline-flex h-9 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-xs font-medium text-slate-600 transition hover:border-slate-300 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
                 aria-label={language === "km" ? "កាលបរិច្ឆេទការងារ" : "Working date"}
                 aria-expanded={isDateMenuOpen}
+                aria-haspopup="dialog"
               >
                 <CalendarDays className="h-4 w-4 text-slate-400" />
                 <span className="hidden xl:inline text-slate-400">{language === "km" ? "ថ្ងៃធ្វើការ" : "Business Date"}</span><span>{displayDate}</span>
                 <ChevronDown className={`h-3.5 w-3.5 text-slate-400 transition-transform ${isDateMenuOpen ? "rotate-180" : ""}`} />
               </button>
-              {isDateMenuOpen ? <div ref={dateMenuRef} className="absolute right-0 top-[calc(100%+0.75rem)] z-[260] w-64 rounded-2xl border border-slate-200 bg-white p-4 shadow-2xl shadow-slate-900/15 dark:border-slate-700 dark:bg-slate-900 dark:shadow-black/40"><p className="text-sm font-semibold text-slate-800 dark:text-slate-100">{language === "km" ? "កាលបរិច្ឆេទការងារ" : "Working date"}</p><p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{language === "km" ? "ជ្រើសរើសកាលបរិច្ឆេទសម្រាប់ការងារ" : "Choose the date you are working with."}</p><DateInput title={language === "km" ? "កាលបរិច្ឆេទការងារ" : "Working date"} value={workingDate} onChange={setWorkingDate} className="mt-4 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100" /><button type="button" onClick={() => { const now = new Date(); const parts = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Phnom_Penh", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(now); const year = parts.find((part) => part.type === "year")?.value; const month = parts.find((part) => part.type === "month")?.value; const day = parts.find((part) => part.type === "day")?.value; if (year && month && day) setWorkingDate(`${year}-${month}-${day}`); }} className="mt-3 text-sm font-semibold text-emerald-700 hover:text-emerald-800 dark:text-emerald-300">{language === "km" ? "ប្រើថ្ងៃនេះ" : "Use today"}</button></div> : null}
+              <FloatingTopBarMenu open={isDateMenuOpen} anchorRef={dateButtonRef} menuRef={dateMenuRef}><div role="dialog" aria-label={language === "km" ? "កាលបរិច្ឆេទការងារ" : "Working date"} className="w-64 rounded-2xl border border-slate-200 bg-white p-4 shadow-2xl shadow-slate-900/15 dark:border-slate-700 dark:bg-slate-900 dark:shadow-black/40"><p className="text-sm font-semibold text-slate-800 dark:text-slate-100">{language === "km" ? "កាលបរិច្ឆេទការងារ" : "Working date"}</p><p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{language === "km" ? "ជ្រើសរើសកាលបរិច្ឆេទសម្រាប់ការងារ" : "Choose the date you are working with."}</p><DateInput title={language === "km" ? "កាលបរិច្ឆេទការងារ" : "Working date"} value={workingDate} onChange={setWorkingDate} className="mt-4 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100" /><button type="button" onClick={() => { const now = new Date(); const parts = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Phnom_Penh", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(now); const year = parts.find((part) => part.type === "year")?.value; const month = parts.find((part) => part.type === "month")?.value; const day = parts.find((part) => part.type === "day")?.value; if (year && month && day) setWorkingDate(`${year}-${month}-${day}`); }} className="mt-3 text-sm font-semibold text-emerald-700 hover:text-emerald-800 dark:text-emerald-300">{language === "km" ? "ប្រើថ្ងៃនេះ" : "Use today"}</button></div></FloatingTopBarMenu>
             </div>
 
             <button
@@ -573,42 +595,42 @@ export default function TopBar({
               <button
                 ref={chatButtonRef}
                 type="button"
-                onClick={() => { setIsChatOpen((current) => !current); void loadChatUnread(); }}
+                onClick={() => { toggleTopBarMenu("chat"); void loadChatUnread(); }}
                 className="relative inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition hover:border-slate-300 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
                 aria-label={language === "km" ? "សារ" : "Messages"}
                 aria-expanded={isChatOpen}
+                aria-haspopup="dialog"
               >
                 <MessageSquare className="h-4 w-4" />
                 {chatUnreadCount > 0 ? <span className="absolute -right-1 -top-1 min-w-4 rounded-full bg-rose-500 px-1 text-[10px] font-bold leading-4 text-white">{chatUnreadCount > 9 ? "9+" : chatUnreadCount}</span> : null}
               </button>
-              {isChatOpen && user ? <div ref={chatMenuRef} className="absolute right-0 top-[calc(100%+0.75rem)] z-[260]"><ChatPanel currentUsername={user.username} onClose={() => setIsChatOpen(false)} onUnreadCountChange={setChatUnreadCount} /></div> : null}
+              {user ? <FloatingTopBarMenu open={isChatOpen} anchorRef={chatButtonRef} menuRef={chatMenuRef}><ChatPanel currentUsername={user.username} onClose={() => setIsChatOpen(false)} onUnreadCountChange={setChatUnreadCount} /></FloatingTopBarMenu> : null}
             </div>
 
             <button
               type="button"
               ref={bellButtonRef}
-              onClick={() => { setIsNotificationsOpen((value) => !value); void loadNotifications(); }}
+              onClick={() => { toggleTopBarMenu("notifications"); void loadNotifications(); }}
               className="relative inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition hover:border-slate-300 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
               aria-label={`${language === "km" ? "ការជូនដំណឹង" : "Notifications"}${notificationUnreadCount ? ` (${notificationUnreadCount})` : ""}`}
               aria-expanded={isNotificationsOpen}
+              aria-haspopup="dialog"
             >
               <Bell className="h-4 w-4" />
 
               {notificationUnreadCount > 0 ? <span className="absolute -right-1.5 -top-1.5 min-w-4 rounded-full bg-red-500 px-1 text-center text-[10px] font-bold leading-4 text-white ring-2 ring-white dark:ring-slate-900">{notificationUnreadCount > 99 ? "99+" : notificationUnreadCount}</span> : null}
             </button>
 
-            {isNotificationsOpen && (
-              <div ref={dropdownRef} style={dropdownStyle}>
+            <FloatingTopBarMenu open={isNotificationsOpen} anchorRef={bellButtonRef} menuRef={dropdownRef}>
                 <NotificationPanel notifications={notifications} unreadCount={notificationUnreadCount} loading={notificationsLoading} onClose={() => setIsNotificationsOpen(false)} onMarkAllRead={() => void markNotificationsRead()} onClear={() => void clearNotifications()} onViewAll={() => { setIsNotificationsOpen(false); router.push("/alerts"); }} onOpen={(notification) => { if (!notification.readAt) void markNotificationsRead(notification); setIsNotificationsOpen(false); router.push(notification.href); }} />
-              </div>
-            )}
+            </FloatingTopBarMenu>
 
             {user ? (
               <div className="relative">
                 <button
                   ref={accountButtonRef}
                   type="button"
-                  onClick={() => setIsAccountMenuOpen((current) => !current)}
+                  onClick={() => toggleTopBarMenu("account")}
                   className="inline-flex h-10 items-center gap-2 rounded-lg px-1.5 py-1 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800"
                   aria-label={language === "km" ? "ប្រវត្តិរូប" : "Profile menu"}
                   aria-expanded={isAccountMenuOpen}
@@ -635,12 +657,11 @@ export default function TopBar({
                   <ChevronDown className={`hidden h-3.5 w-3.5 text-slate-400 transition-transform sm:block ${isAccountMenuOpen ? "rotate-180" : ""}`} />
                 </button>
 
-                {isAccountMenuOpen ? (
+                <FloatingTopBarMenu open={isAccountMenuOpen} anchorRef={accountButtonRef} menuRef={accountMenuRef}>
                   <div
-                    ref={accountMenuRef}
                     role="menu"
                     aria-label={language === "km" ? "ម៉ឺនុយគណនី" : "Account menu"}
-                    className="absolute right-0 top-[calc(100%+0.75rem)] z-[260] w-[min(22rem,calc(100vw-2rem))] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl shadow-slate-900/15 dark:border-slate-700 dark:bg-slate-900 dark:shadow-black/40"
+                    className="w-[min(22rem,calc(100vw-1rem))] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl shadow-slate-900/15 dark:border-slate-700 dark:bg-slate-900 dark:shadow-black/40"
                   >
                     <span aria-hidden="true" className="absolute -top-2 right-6 h-4 w-4 rotate-45 border-l border-t border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900" />
 
@@ -707,7 +728,7 @@ export default function TopBar({
                       </button>
                     </div>
                   </div>
-                ) : null}
+                </FloatingTopBarMenu>
               </div>
             ) : (
               <button
