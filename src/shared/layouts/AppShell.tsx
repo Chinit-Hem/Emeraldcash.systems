@@ -10,7 +10,7 @@ import { AppSidebar, MobileDrawer } from "@/shared/components/sidebar/index";
 import TopBar from "@/shared/components/TopBar";
 import { AuthUserProvider } from "@/shared/hooks/AuthContext";
 import { UIProvider } from "@/shared/hooks/UIContext";
-import { clearCachedUser, getCachedUser, setCachedUser } from "@/shared/utils/authCache";
+import { AUTH_USER_SYNC_EVENT, clearCachedUser, getCachedUser, setCachedUser } from "@/shared/utils/authCache";
 
 type AppShellProps = {
   children: ReactNode;
@@ -207,6 +207,60 @@ function AppShellContent({ children }: AppShellProps) {
       controller.abort();
     };
   }, [router]);
+
+  useEffect(() => {
+    const onUserSync = (event: Event) => {
+      const nextUser = (event as CustomEvent<User>).detail;
+      if (nextUser?.username) setUser(nextUser);
+    };
+    window.addEventListener(AUTH_USER_SYNC_EVENT, onUserSync);
+    return () => window.removeEventListener(AUTH_USER_SYNC_EVENT, onUserSync);
+  }, []);
+
+  useEffect(() => {
+    if (!user) return;
+    let active = true;
+    let refreshing = false;
+
+    const refreshSessionUser = async () => {
+      if (refreshing) return;
+      refreshing = true;
+      try {
+        const response = await fetch("/api/auth/me", { credentials: "include", cache: "no-store" });
+        const payload = await response.json().catch(() => null) as { ok?: boolean; user?: User } | null;
+        if (!active) return;
+        if (response.ok && payload?.ok && payload.user) {
+          setCachedUser(payload.user);
+          setUser(payload.user);
+          return;
+        }
+        if (response.status === 401) {
+          clearCachedUser();
+          setUser(null);
+          if (!hasRedirected.current) {
+            hasRedirected.current = true;
+            router.replace(`/login?redirect=${encodeURIComponent(currentLocationRef.current || "/")}`);
+          }
+        }
+      } catch {
+        // Keep the current session usable during a temporary network failure.
+      } finally {
+        refreshing = false;
+      }
+    };
+
+    const onFocus = () => void refreshSessionUser();
+    const onVisibilityChange = () => { if (document.visibilityState === "visible") void refreshSessionUser(); };
+    const interval = window.setInterval(() => void refreshSessionUser(), 60_000);
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => {
+      active = false;
+      window.clearInterval(interval);
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
+  }, [router, user?.username]);
 
   const mainRef = useRef<HTMLElement | null>(null);
 

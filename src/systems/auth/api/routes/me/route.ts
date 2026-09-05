@@ -1,4 +1,5 @@
 import {
+  createSessionCookie,
   getClientIp,
   getClientUserAgent,
   getSessionFromRequest,
@@ -56,11 +57,12 @@ export async function GET(req: NextRequest) {
       return response;
     }
 
-    return NextResponse.json({
+    const latestRole = userProfile.role || session.role;
+    const response = NextResponse.json({
       ok: true,
       user: {
         username: session.username,
-        role: session.role,
+        role: latestRole,
         full_name: userProfile.full_name || null,
         position: userProfile.position || null,
         department: userProfile.department || null,
@@ -74,6 +76,23 @@ export async function GET(req: NextRequest) {
         updated_at: userProfile.updated_at || null,
       },
     }, { headers: noStoreHeaders });
+
+    if (latestRole !== session.role) {
+      response.cookies.set("session", createSessionCookie({
+        username: session.username,
+        role: latestRole,
+        ...(session.staffId ? { staffId: session.staffId } : {}),
+        ...(session.userId ? { userId: session.userId } : {}),
+      }, userAgent, ip), {
+        httpOnly: true,
+        sameSite: "lax",
+        secure: (isProduction || isHttps) && !allowInsecureCookies,
+        path: "/",
+        maxAge: 60 * 60 * 8,
+      });
+    }
+
+    return response;
   } catch (err) {
     void err;
     return NextResponse.json(

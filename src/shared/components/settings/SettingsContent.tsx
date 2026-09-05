@@ -542,18 +542,18 @@ export default function SettingsContent() {
       if (!res.ok) throw new Error(data.error || t.saveError);
 
       setSuccess(t.updateSuccess);
-      cancelEdit();
-      loadUsers();
-      if (editingUser.username === user.username && (nextUsername !== user.username || editRole !== user.role)) {
-        clearCachedUser();
-        router.refresh();
+      if (data.user) {
+        setUsers((current) => current.map((managedUser) => managedUser.username === editingUser.username ? { ...managedUser, ...data.user } : managedUser));
       }
+      cancelEdit();
+      await loadUsers();
+      if (editingUser.username === user.username) await refreshUser();
     } catch (err) {
       setError(err instanceof Error ? err.message : t.saveError);
     } finally {
       setIsUpdating(false);
     }
-  }, [editingUser, editUsername, editPassword, editConfirmPassword, editRole, editFullName, editPosition, editDepartment, editBranch, editEmail, editPhone, editProfilePicture, t, cancelEdit, loadUsers, user.username, user.role, router]);
+  }, [editingUser, editUsername, editPassword, editConfirmPassword, editRole, editFullName, editPosition, editDepartment, editBranch, editEmail, editPhone, editProfilePicture, t, cancelEdit, loadUsers, refreshUser, user.username]);
 
   return (
     <div className="min-h-screen bg-slate-50 pb-20 dark:bg-slate-950 sm:pb-8">

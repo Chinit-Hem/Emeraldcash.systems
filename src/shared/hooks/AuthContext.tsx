@@ -3,6 +3,7 @@
 import type { User } from "@/shared/types/types";
 import type { ReactNode } from "react";
 import { createContext, useContext, useState, useCallback, useEffect } from "react";
+import { syncCachedUser } from "@/shared/utils/authCache";
 
 interface AuthContextType {
   user: User | null;
@@ -45,7 +46,9 @@ export function AuthUserProvider({ user: initialUser, children }: { user: User; 
       }
 
       // Update local user state
-      setUser((prev) => prev ? { ...prev, ...result.user } : prev);
+      const nextUser = { ...user, ...result.user } as User;
+      setUser(nextUser);
+      syncCachedUser(nextUser);
       return { success: true };
     } catch (error) {
       console.error("[AuthContext] Error updating profile:", error);
@@ -55,11 +58,12 @@ export function AuthUserProvider({ user: initialUser, children }: { user: User; 
 
   const refreshUser = useCallback(async () => {
     try {
-      const response = await fetch("/api/auth/me");
+      const response = await fetch("/api/auth/me", { credentials: "include", cache: "no-store" });
       const result = await response.json();
       
       if (result.ok && result.user) {
         setUser(result.user);
+        syncCachedUser(result.user as User);
       }
     } catch (error) {
       console.error("[AuthContext] Error refreshing user:", error);
