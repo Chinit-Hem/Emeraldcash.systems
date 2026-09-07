@@ -1,14 +1,14 @@
 import type { SessionPayload } from "@/lib/auth";
 import { queryWithRetry, sql } from "@/lib/db-singleton";
 import { normalizeCompanyBranch } from "@/shared/utils/branchNames";
-
-const BRANCH_MANAGER_LABELS = new Set([
-  "manager / approver",
-  "credit / approver",
-  "branch manager",
-  "bm",
-  "credit manager",
-]);
+import {
+  canPrepareAccountReport,
+  canPrepareLoanSpecialistReport,
+  isBranchManagerReportActor,
+  isDirectorReportActor,
+  isHumanResourcesReportActor,
+  isReportAdministrator,
+} from "@/systems/loan/utils/reportWorkflowRoles";
 
 type UserBranchRow = { role: string; position: string | null; branch: string | null };
 
@@ -16,12 +16,15 @@ export type ReportBranchAccess = {
   isBranchManager: boolean;
   isHumanResources: boolean;
   isDirector: boolean;
+  isAdministrator: boolean;
+  canPrepareAccountReport: boolean;
+  canPrepareLoanSpecialistReport: boolean;
   branch: string | null;
   branches: string[];
 };
 
 export function isBranchManagerRole(role: string) {
-  return BRANCH_MANAGER_LABELS.has(role.trim().toLocaleLowerCase());
+  return isBranchManagerReportActor(role);
 }
 
 export function branchesMatch(left: string, right: string) {
@@ -57,20 +60,22 @@ export async function getReportBranchAccess(session: SessionPayload): Promise<Re
   `, "getBranchManagerReportBranch");
 
   const user = rows[0];
-  const isBranchManager = isBranchManagerRole(user?.role || session.role)
-    || isBranchManagerRole(user?.position || "");
-  const isHumanResources = (user?.role || session.role).trim().toLocaleLowerCase() === "human resources";
-  const normalizedRole = (user?.role || session.role).trim().toLocaleLowerCase();
-  const normalizedPosition = (user?.position || "").trim().toLocaleLowerCase();
-  const isDirector = ["admin", "system administrator", "executive viewer", "director"].includes(normalizedRole)
-    || ["director", "managing director", "chief executive officer", "ceo"].includes(normalizedPosition);
+  const role = user?.role || session.role;
+  const position = user?.position || "";
+  const isBranchManager = isBranchManagerReportActor(role, position);
+  const isHumanResources = isHumanResourcesReportActor(role, position);
+  const isDirector = isDirectorReportActor(role, position);
+  const isAdministrator = isReportAdministrator(role);
   const branches = parseAssignedReportBranches(user?.branch);
 
   return {
     isBranchManager,
     isHumanResources,
     isDirector,
+    isAdministrator,
+    canPrepareAccountReport: canPrepareAccountReport(role, position),
+    canPrepareLoanSpecialistReport: canPrepareLoanSpecialistReport(role, position),
     branch: isBranchManager ? branches[0] || null : null,
-    branches: isBranchManager || isHumanResources ? branches : [],
+    branches,
   };
 }

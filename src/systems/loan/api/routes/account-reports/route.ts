@@ -5,6 +5,7 @@ import { getSession } from "@/lib/auth-helpers";
 import { queryWithRetry, sql } from "@/lib/db-singleton";
 import { getReportNotificationRecipients } from "@/systems/loan/api/reportRecipients";
 import { branchesMatch, canAccessReportBranch, getReportBranchAccess, normalizeReportBranch } from "@/systems/loan/api/reportBranchAccess";
+import { isReportWorkflowTransitionAllowed } from "@/systems/loan/utils/reportWorkflowRoles";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -82,10 +83,6 @@ function canViewAll(role: string) {
   return ["admin", "system administrator", "manager / approver", "branch manager", "bm", "credit manager", "credit / approver", "executive viewer", "human resources"].includes(role.trim().toLocaleLowerCase());
 }
 
-function canReview(role: string) {
-  return ["admin", "system administrator", "manager / approver", "branch manager", "bm", "credit manager", "credit / approver"].includes(role.trim().toLocaleLowerCase());
-}
-
 function canDeleteReport(role: string) {
   return ["admin", "system administrator"].includes(role.trim().toLocaleLowerCase());
 }
@@ -118,7 +115,7 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const branchAccess = await getReportBranchAccess(session);
     const requestedReporter = searchParams.get("reporter")?.trim() || "";
-    const reporter = canViewAll(session.role) || branchAccess.isDirector ? requestedReporter : session.username;
+    const reporter = canViewAll(session.role) || branchAccess.isBranchManager || branchAccess.isHumanResources || branchAccess.isDirector ? requestedReporter : session.username;
     const requestedBranch = searchParams.get("branch")?.trim() || "";
     if ((branchAccess.isBranchManager || branchAccess.isHumanResources) && !branchAccess.branches.length) {
       return NextResponse.json({ success: false, error: "Your account must be assigned to at least one branch" }, { status: 403 });
@@ -155,6 +152,10 @@ export async function POST(request: NextRequest) {
   if (!session) return NextResponse.json({ success: false, error: "Unauthorized - Please log in" }, { status: 401 });
   try {
     await ensureAccountReportsTable();
+    const branchAccess = await getReportBranchAccess(session);
+    if (!branchAccess.canPrepareAccountReport) {
+      return NextResponse.json({ success: false, error: "Only Accounting staff can prepare Account Reports" }, { status: 403 });
+    }
     const body = await request.json() as Record<string, unknown>;
     const reportDate = String(body.reportDate || "");
     if (!/^\d{4}-\d{2}-\d{2}$/.test(reportDate)) return NextResponse.json({ success: false, error: "Choose a valid report date" }, { status: 400 });
@@ -167,6 +168,9 @@ export async function POST(request: NextRequest) {
     const department = String(body.department || "").trim().slice(0, 100);
     const branch = String(body.branch || "").trim().slice(0, 100);
     if (!branch) return NextResponse.json({ success: false, error: "A branch is required for an Account Report" }, { status: 400 });
+    if (!branchAccess.isAdministrator && (!branchAccess.branches.length || !branchAccess.branches.some((assigned) => branchesMatch(branch, assigned)))) {
+      return NextResponse.json({ success: false, error: branchAccess.branches.length ? "Account Reports must use your assigned branch" : "Your Accounting account must be assigned to a branch" }, { status: 403 });
+    }
     if (status === "submitted" && !hasCustomerActivity(reportData)) return NextResponse.json({ success: false, error: "Add at least one customer activity before submitting an Account Report" }, { status: 400 });
     const existing = await queryWithRetry(async () => sql<Pick<AccountReportRow, "status">>`SELECT status FROM account_reports WHERE report_date = ${reportDate}::date AND reporter_username = ${session.username} LIMIT 1`, "findAccountReportForSave");
     if (existing[0] && !["draft", "returned"].includes(existing[0].status)) return NextResponse.json({ success: false, error: "This report is locked for review" }, { status: 409 });
@@ -188,23 +192,23 @@ export async function POST(request: NextRequest) {
 export async function PATCH(request: NextRequest) {
   const session = getSession(request);
   if (!session) return NextResponse.json({ success: false, error: "Unauthorized - Please log in" }, { status: 401 });
-  if (!canReview(session.role)) return NextResponse.json({ success: false, error: "Only managers can review Account Reports" }, { status: 403 });
   try {
     await ensureAccountReportsTable();
+    const branchAccess = await getReportBranchAccess(session);
+    if (!branchAccess.isBranchManager && !branchAccess.isAdministrator) return NextResponse.json({ success: false, error: "Only Branch Managers can review Account Reports" }, { status: 403 });
     const body = await request.json() as Record<string, unknown>;
     const id = String(body.id || "");
     const action = String(body.action || "");
     const comment = String(body.comment || "").trim().slice(0, 2000);
-    if (!/^[0-9a-f-]{36}$/i.test(id) || !["reviewed", "approved", "returned"].includes(action)) return NextResponse.json({ success: false, error: "Invalid review request" }, { status: 400 });
+    if (!/^[0-9a-f-]{36}$/i.test(id) || !["reviewed", "returned"].includes(action)) return NextResponse.json({ success: false, error: "Account Reports require BM review, not a separate approval" }, { status: 400 });
     if (action === "returned" && !comment) return NextResponse.json({ success: false, error: "Add a correction comment" }, { status: 400 });
     const current = await queryWithRetry(async () => sql<Pick<AccountReportRow, "status" | "reporter_username" | "report_date" | "branch">>`SELECT status, reporter_username, report_date, branch FROM account_reports WHERE id = ${id}::uuid LIMIT 1`, "findAccountReportForReview");
     if (!current[0]) return NextResponse.json({ success: false, error: "Report not found" }, { status: 404 });
-    const branchAccess = await getReportBranchAccess(session);
     if (branchAccess.isBranchManager && (!branchAccess.branch || !branchesMatch(current[0].branch, branchAccess.branch))) {
       return NextResponse.json({ success: false, error: "Branch Managers can only review Account Reports from their assigned branch" }, { status: 403 });
     }
     if (current[0].reporter_username === session.username) return NextResponse.json({ success: false, error: "You cannot review your own report" }, { status: 409 });
-    const allowed = action === "reviewed" ? current[0].status === "submitted" : action === "approved" ? current[0].status === "reviewed" : ["submitted", "reviewed"].includes(current[0].status);
+    const allowed = isReportWorkflowTransitionAllowed("source", "branchManager", current[0].status, action as "reviewed" | "returned");
     if (!allowed) return NextResponse.json({ success: false, error: "Invalid status transition" }, { status: 409 });
     const rows = await queryWithRetry(async () => sql<AccountReportRow>`UPDATE account_reports SET status = ${action}, reviewed_by = ${session.username}, reviewed_at = CURRENT_TIMESTAMP, review_comment = ${comment}, updated_at = CURRENT_TIMESTAMP WHERE id = ${id}::uuid RETURNING *`, "reviewAccountReport");
     const report = mapReport(rows[0]);

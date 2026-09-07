@@ -6,6 +6,7 @@ import { queryWithRetry, sql } from "@/lib/db-singleton";
 import { getReportNotificationRecipients } from "@/systems/loan/api/reportRecipients";
 import { branchesMatch, canAccessReportBranch, getReportBranchAccess, normalizeReportBranch } from "@/systems/loan/api/reportBranchAccess";
 import { ensureAccountReportsTable } from "@/systems/loan/api/routes/account-reports/route";
+import { isReportWorkflowTransitionAllowed } from "@/systems/loan/utils/reportWorkflowRoles";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -174,9 +175,10 @@ export async function GET(request: NextRequest) {
     const to = searchParams.get("to") || "2999-12-31";
     const branchAccess = await getReportBranchAccess(session);
     const requestedReporter = searchParams.get("reporter")?.trim() || "";
-    const reporter = canViewAllOperationReports(session.role) || branchAccess.isDirector ? requestedReporter : session.username;
+    const canViewWorkflowReports = canViewAllOperationReports(session.role) || branchAccess.isBranchManager || branchAccess.isHumanResources || branchAccess.isDirector;
+    const reporter = canViewWorkflowReports ? requestedReporter : session.username;
     const requestedReportType = searchParams.get("reportType") === "bm" ? "bm" : "ls";
-    if (requestedReportType === "bm" && !canViewAllOperationReports(session.role) && !branchAccess.isDirector) {
+    if (requestedReportType === "bm" && !canViewWorkflowReports) {
       return NextResponse.json({ success: false, error: "You do not have permission to view Branch Manager Reports" }, { status: 403 });
     }
     const requestedBranch = searchParams.get("branch")?.trim() || "";
@@ -223,8 +225,12 @@ export async function POST(request: NextRequest) {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(reportDate)) return NextResponse.json({ success: false, error: "Choose a valid report date" }, { status: 400 });
     const status = body.status === "submitted" ? "submitted" : "draft";
     const reportType = body.reportType === "bm" ? "bm" : "ls";
-    if (reportType === "bm" && !canManageOperationReports(session.role)) {
+    const branchAccess = await getReportBranchAccess(session);
+    if (reportType === "bm" && !branchAccess.isBranchManager && !branchAccess.isAdministrator) {
       return NextResponse.json({ success: false, error: "Only managers can prepare Branch Manager Reports" }, { status: 403 });
+    }
+    if (reportType === "ls" && !branchAccess.canPrepareLoanSpecialistReport) {
+      return NextResponse.json({ success: false, error: "Only Loan Specialist or Loan Operations staff can prepare LS Reports" }, { status: 403 });
     }
     const reportData = body.data && typeof body.data === "object" && !Array.isArray(body.data) ? body.data as Record<string, unknown> : {};
     const serializedData = JSON.stringify(reportData);
@@ -235,9 +241,11 @@ export async function POST(request: NextRequest) {
     const department = String(body.department || "").trim().slice(0, 100);
     const branch = String(body.branch || "").trim().slice(0, 100);
     if (!branch) return NextResponse.json({ success: false, error: "A branch is required for a report" }, { status: 400 });
-    const branchAccess = await getReportBranchAccess(session);
     if (branchAccess.isBranchManager && (!branchAccess.branch || !branchesMatch(branch, branchAccess.branch))) {
       return NextResponse.json({ success: false, error: branchAccess.branch ? `Branch Managers can only prepare reports for ${branchAccess.branch}` : "Your Branch Manager account must be assigned to a branch" }, { status: 403 });
+    }
+    if (reportType === "ls" && !branchAccess.isAdministrator && (!branchAccess.branches.length || !branchAccess.branches.some((assigned) => branchesMatch(branch, assigned)))) {
+      return NextResponse.json({ success: false, error: branchAccess.branches.length ? "LS Reports must use your assigned branch" : "Your account must be assigned to a branch" }, { status: 403 });
     }
     if (reportType === "ls" && status === "submitted" && !hasCustomerActivity(reportData, ["collectionDueRows", "collectionPaidRows", "dueNoticeRows", "followUpRows", "formalNoticeRows", "requestedRows", "approvedRows", "rejectedRows"])) {
       return NextResponse.json({ success: false, error: "Add at least one customer activity before submitting an LS report" }, { status: 400 });
@@ -346,12 +354,11 @@ export async function PATCH(request: NextRequest) {
     const humanResources = branchAccess.isHumanResources;
     if (current[0].report_type === "bm") {
       if (!humanResources && !director) return NextResponse.json({ success: false, error: "BM Reports must be reviewed by HR and approved by Director" }, { status: 403 });
-      if (humanResources && action === "approved") return NextResponse.json({ success: false, error: "HR reviews BM Reports; final approval belongs to Director" }, { status: 403 });
-      if (director && action === "reviewed") return NextResponse.json({ success: false, error: "A BM Report must be reviewed by HR before Director approval" }, { status: 403 });
-    } else if (!canManageOperationReports(session.role) || humanResources || director && !["admin", "system administrator"].includes(session.role.trim().toLocaleLowerCase())) {
+    } else if ((!branchAccess.isBranchManager && !branchAccess.isAdministrator) || humanResources || director && !branchAccess.isAdministrator) {
       return NextResponse.json({ success: false, error: "Only the assigned Branch Manager can review LS Reports" }, { status: 403 });
     }
-    const allowed = action === "reviewed" ? current[0].status === "submitted" : action === "approved" ? current[0].status === "reviewed" : ["submitted", "reviewed"].includes(current[0].status);
+    const actor = current[0].report_type === "ls" ? "branchManager" : director ? "director" : "humanResources";
+    const allowed = isReportWorkflowTransitionAllowed(current[0].report_type === "bm" ? "branchManager" : "source", actor, current[0].status, action as "reviewed" | "approved" | "returned");
     if (!allowed) return NextResponse.json({ success: false, error: `This report cannot be marked ${action} from its current status` }, { status: 409 });
 
     const rows = await queryWithRetry(async () => sql<ReportRow>`
