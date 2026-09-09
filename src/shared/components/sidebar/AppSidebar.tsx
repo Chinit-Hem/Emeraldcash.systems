@@ -48,8 +48,10 @@ import { SidebarSystemItem } from "./SidebarSystemItem";
 import { SidebarTooltip } from "./SidebarTooltip";
 import type { SidebarMode, SidebarNavigationItem } from "./types";
 
+import { ERP_SYSTEM_IDS, useSelectedSystem } from "@/shared/hooks/useSelectedSystem";
+
 const SIDEBAR_RECENT_KEY = "emerald-cash.sidebar.recent.v1";
-const FAVORITE_HREFS = ["/home", "/vms", "/lms", "/sms/dashboard", "/loan", "/hr"];
+const FAVORITE_IDS = ["home", ...ERP_SYSTEM_IDS, "loan-operation-report"];
 
 export type AppSidebarProps = {
   user: User;
@@ -282,9 +284,16 @@ export function AppSidebar({ user, collapsed = false, onToggleCollapse, onNaviga
   const isDrawer = mode === "drawer";
   const isCollapsed = isDrawer ? false : collapsed;
   const vehicleCounts = useVehicleShortcutCounts(user);
+  const selectedSystem = useSelectedSystem();
   const workspaceModules = useMemo(
-    () => getNavigationItems(user, pathname, searchParams, language, vehicleCounts),
-    [language, pathname, searchParams, user, vehicleCounts]
+    () => getNavigationItems(user, pathname, searchParams, language, vehicleCounts)
+      .filter((item) => !selectedSystem || ["home", "monitoring", "administration"].includes(item.id) || item.id === selectedSystem || (selectedSystem === "loan-management" && item.id === "loan-operation-report"))
+      .map((item) => item.id === "home"
+        ? { ...item, label: language === "km" ? "ទំព័រដើម" : "Home", children: undefined }
+        : !selectedSystem && ERP_SYSTEM_IDS.includes(item.id)
+          ? { ...item, href: `/home?system=${item.id}`, children: undefined }
+          : item),
+    [language, pathname, searchParams, user, vehicleCounts, selectedSystem]
   );
   const allItems = useMemo(() => flattenNavigationItems(workspaceModules), [workspaceModules]);
   const currentRoute = `${pathname}${searchParams.toString() ? `?${searchParams.toString()}` : ""}`;
@@ -313,11 +322,10 @@ export function AppSidebar({ user, collapsed = false, onToggleCollapse, onNaviga
     }
   }, [allItems, currentRoute, recentHrefs]);
 
-  const topLevelItemByHref = useMemo(() => new Map(workspaceModules.map((item) => [item.href, item])), [workspaceModules]);
   const itemByHref = useMemo(() => new Map(allItems.map((item) => [item.href, item])), [allItems]);
   const favoriteItems = useMemo(
-    () => FAVORITE_HREFS.map((href) => topLevelItemByHref.get(href)).filter((item): item is SidebarNavigationItem => Boolean(item)),
-    [topLevelItemByHref]
+    () => workspaceModules.filter((item) => FAVORITE_IDS.includes(item.id)),
+    [workspaceModules]
   );
   const recentItems = useMemo(
     () => {

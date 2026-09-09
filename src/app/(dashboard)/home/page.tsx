@@ -2,7 +2,9 @@
 
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
-import { useMemo, useRef, useState } from "react";
+import { useMemo } from "react";
+import { useRouter } from "next/navigation";
+import { ERP_SYSTEM_IDS, useSelectedSystem } from "@/shared/hooks/useSelectedSystem";
 import { getNavigationItems } from "@/shared/components/sidebar/AppSidebar";
 import type { SidebarNavigationItem } from "@/shared/components/sidebar/types";
 import { TukTukIcon } from "@/shared/components/icons/TukTukIcon";
@@ -87,7 +89,6 @@ function MenuFunctionTile({ item, index }: { item: SidebarNavigationItem; index:
   );
 }
 
-const ERP_SYSTEM_IDS = ["vehicle-management", "learning-center", "asset-inventory", "loan-management", "human-resources"];
 
 const systemThemes: Record<string, { shortName: string; icon: string; selected: string; hover: string; button: string; description: { en: string; km: string } }> = {
   "vehicle-management": {
@@ -134,19 +135,16 @@ const systemThemes: Record<string, { shortName: string; icon: string; selected: 
 
 function SystemHub({ systems, language }: { systems: SidebarNavigationItem[]; language: string }) {
   const isKhmer = language === "km";
-  const [selectedSystemId, setSelectedSystemId] = useState<string | null>(null);
-  const selectedSystemSectionRef = useRef<HTMLElement>(null);
-  const selectedSystem = systems.find((system) => system.id === selectedSystemId) ?? systems[0];
+  const router = useRouter();
+  const selectedSystemId = useSelectedSystem();
+  const selectedSystem = systems.find((system) => system.id === selectedSystemId);
   const selectedItems = selectedSystem ? getUniqueMenuItems(selectedSystem) : [];
   const SelectedSystemIcon = selectedSystem?.icon;
-  const selectSystem = (systemId: string) => {
-    setSelectedSystemId(systemId);
-    requestAnimationFrame(() => selectedSystemSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }));
-  };
+  const selectSystem = (systemId: string) => router.push(`/home?system=${systemId}`);
 
   return (
     <>
-      <section className="rounded-[24px] bg-white p-5 shadow-sm ring-1 ring-slate-200/70 dark:bg-slate-900 dark:ring-slate-800 sm:p-6" aria-labelledby="systems-heading">
+      {!selectedSystem ? <section className="rounded-[24px] bg-white p-5 shadow-sm ring-1 ring-slate-200/70 dark:bg-slate-900 dark:ring-slate-800 sm:p-6" aria-labelledby="systems-heading">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h2 id="systems-heading" className="text-xl font-bold text-[#1a1a2e] dark:text-slate-100 sm:text-2xl">
@@ -165,7 +163,7 @@ function SystemHub({ systems, language }: { systems: SidebarNavigationItem[]; la
           {systems.map((system) => {
             const Icon = system.icon;
             const theme = systemThemes[system.id] ?? systemThemes["vehicle-management"];
-            const isSelected = system.id === selectedSystem?.id;
+            const isSelected = system.id === selectedSystemId;
             const functionCount = getUniqueMenuItems(system).length;
 
             return (
@@ -199,10 +197,11 @@ function SystemHub({ systems, language }: { systems: SidebarNavigationItem[]; la
             );
           })}
         </div>
-      </section>
+      </section> : null}
 
       {selectedSystem ? (
-        <section ref={selectedSystemSectionRef} className="scroll-mt-24 rounded-[24px] bg-white p-5 shadow-sm ring-1 ring-slate-200/70 dark:bg-slate-900 dark:ring-slate-800 sm:p-6" aria-labelledby="system-functions-heading">
+        <section className="scroll-mt-24 rounded-[24px] bg-white p-5 shadow-sm ring-1 ring-slate-200/70 dark:bg-slate-900 dark:ring-slate-800 sm:p-6" aria-labelledby="system-functions-heading">
+          <Link href="/home" className="mb-4 inline-flex text-sm font-semibold text-emerald-600 hover:underline dark:text-emerald-300">{isKhmer ? "ទំព័រដើម" : "Home"}</Link>
           <div className="flex items-center gap-3 border-b border-slate-100 pb-4 dark:border-slate-800">
             <span className={cn("flex h-10 w-10 items-center justify-center rounded-xl ring-1", (systemThemes[selectedSystem.id] ?? systemThemes["vehicle-management"]).icon)}>
               {SelectedSystemIcon ? <SelectedSystemIcon className="h-5 w-5" aria-hidden="true" /> : null}
@@ -224,6 +223,7 @@ function SystemHub({ systems, language }: { systems: SidebarNavigationItem[]; la
 export default function HomePage() {
   const { language } = useLanguage();
   const user = useAuthUser();
+  const selectedSystemId = useSelectedSystem();
   const navigationItems = useMemo(
     () => getNavigationItems(user, "/home", new URLSearchParams(), language, {}),
     [language, user]
@@ -233,7 +233,7 @@ export default function HomePage() {
   return (
     <div className="min-h-screen bg-[#f8fafc] p-4 dark:bg-slate-950 sm:p-6">
       <div className="mx-auto max-w-[1600px] space-y-6">
-        <header className="rounded-[24px] bg-white p-6 shadow-sm ring-1 ring-slate-200/70 dark:bg-slate-900 dark:ring-slate-800 sm:p-8">
+        {!systems.some((system) => system.id === selectedSystemId) ? <header className="rounded-[24px] bg-white p-6 shadow-sm ring-1 ring-slate-200/70 dark:bg-slate-900 dark:ring-slate-800 sm:p-8">
           <span className="inline-flex rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-100 dark:bg-emerald-500/10 dark:text-emerald-300 dark:ring-emerald-500/20">
             {language === "km" ? "មជ្ឈមណ្ឌលប្រព័ន្ធ" : "System Hub"}
           </span>
@@ -243,7 +243,7 @@ export default function HomePage() {
           <p className="mt-2 max-w-2xl text-base text-slate-600 dark:text-slate-300">
             {language === "km" ? "ចាប់ផ្តើមដោយជ្រើសរើសប្រព័ន្ធ ERP មួយ។ យើងនឹងបង្ហាញតែមុខងារដែលអ្នកត្រូវការ។" : "Start by choosing an ERP system. We will show only the functions you need."}
           </p>
-        </header>
+        </header> : null}
 
         <SystemHub systems={systems} language={language} />
       </div>

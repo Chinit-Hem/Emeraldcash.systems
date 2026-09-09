@@ -1,5 +1,7 @@
 "use client";
 
+import { getSystemForPath, useSelectedSystem } from "@/shared/hooks/useSelectedSystem";
+
 import type { User } from "@/shared/types/types";
 import Image from "next/image";
 import {
@@ -409,6 +411,7 @@ export default function TopBar({
     : "";
   const displayUserName = user && user.full_name?.trim() && user.full_name.trim().toLocaleLowerCase() !== roleLabel.trim().toLocaleLowerCase() ? user.full_name : user?.username || "";
 
+  const selectedSystem = useSelectedSystem();
   const systems = [
     {
       label: language === "km" ? "គ្រប់គ្រងយានយន្ត" : "Vehicle Management",
@@ -445,7 +448,7 @@ export default function TopBar({
       visible: hasAppPermission(user?.role, "settings:view"),
       tone: "bg-rose-50 text-rose-600 dark:bg-rose-500/10 dark:text-rose-300",
     },
-  ].filter((system) => system.visible);
+  ].filter((system) => system.visible && (!selectedSystem || getSystemForPath(system.href) === selectedSystem));
   const currentSystem = systems.find((system) =>
     system.href === "/sms/dashboard"
       ? pathname.startsWith("/sms")
@@ -462,7 +465,7 @@ export default function TopBar({
     { label: language === "km" ? "ការជូនដំណឹង" : "Notifications", description: language === "km" ? "មើលការជូនដំណឹងទាំងអស់" : "View all notifications", href: "/alerts", icon: Bell, visible: Boolean(user) },
     { label: language === "km" ? "ការកំណត់" : "Settings", description: language === "km" ? "គ្រប់គ្រងការកំណត់គណនី" : "Manage account settings", href: "/settings", icon: Settings2, visible: Boolean(user) },
     { label: language === "km" ? "គ្រប់គ្រងគណនី" : "Manage accounts", description: language === "km" ? "អ្នកប្រើ និងសិទ្ធិ" : "Users and access", href: "/admin/users", icon: UsersRound, visible: hasAppPermission(user?.role, "users:view") },
-  ].filter((item) => item.visible);
+  ].filter((item) => item.visible && (!selectedSystem || !getSystemForPath(item.href.split("?")[0]) || getSystemForPath(item.href.split("?")[0]) === selectedSystem));
   const normalizedSearchQuery = searchQuery.trim().toLocaleLowerCase();
   const filteredSearchItems = searchItems.filter((item, index, items) =>
     items.findIndex((candidate) => candidate.href === item.href) === index
@@ -603,7 +606,7 @@ export default function TopBar({
               </FloatingTopBarMenu>
             </div>
 
-            {hasAppPermission(user?.role, "loans:create") ? <button type="button" onClick={() => router.push("/loan?view=loans&newLoan=1")} className="hidden h-11 w-11 items-center justify-center gap-1.5 rounded-xl bg-emerald-600 text-xs font-semibold text-white transition hover:bg-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40 focus-visible:ring-offset-2 min-[360px]:inline-flex sm:h-9 sm:w-auto sm:rounded-lg sm:px-3" title={language === "km" ? "បង្កើតកម្ចីថ្មី" : "Quick create loan"} aria-label={language === "km" ? "បង្កើតកម្ចីថ្មី" : "Quick create loan"}><Plus className="h-4 w-4" /><span className="hidden xl:inline">{language === "km" ? "បង្កើតថ្មី" : "Create"}</span></button> : null}
+            {(!selectedSystem || selectedSystem === "loan-management") && hasAppPermission(user?.role, "loans:create") ? <button type="button" onClick={() => router.push("/loan?view=loans&newLoan=1")} className="hidden h-11 w-11 items-center justify-center gap-1.5 rounded-xl bg-emerald-600 text-xs font-semibold text-white transition hover:bg-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40 focus-visible:ring-offset-2 min-[360px]:inline-flex sm:h-9 sm:w-auto sm:rounded-lg sm:px-3" title={language === "km" ? "បង្កើតកម្ចីថ្មី" : "Quick create loan"} aria-label={language === "km" ? "បង្កើតកម្ចីថ្មី" : "Quick create loan"}><Plus className="h-4 w-4" /><span className="hidden xl:inline">{language === "km" ? "បង្កើតថ្មី" : "Create"}</span></button> : null}
 
             {systems.length > 0 ? (
               <div className="relative">

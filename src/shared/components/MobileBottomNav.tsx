@@ -1,7 +1,8 @@
 "use client";
 
+import { getSystemForPath, useSelectedSystem } from "@/shared/hooks/useSelectedSystem";
 import type { User } from "@/shared/types/types";
-import { BookOpen, Boxes, Car, Menu, Settings } from "lucide-react";
+import { BookOpen, Boxes, Car, Home, Landmark, Users, Menu, Settings } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { flushSync } from "react-dom";
@@ -14,7 +15,7 @@ import { OptimizedLink } from "@/shared/components/OptimizedLink";
 import { hasAppPermission } from "@/shared/utils/permissions";
 
 type NavLinkItem = {
-  id: "vms" | "lms" | "sms" | "settings";
+  id: "home" | "vms" | "lms" | "sms" | "loan" | "hr" | "settings";
   label: string;
   labelKm: string;
   href: string;
@@ -71,11 +72,12 @@ export default function MobileBottomNav({
   const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
   const [pendingItemId, setPendingItemId] = useState<NavLinkItem["id"] | null>(null);
 
+  const selectedSystem = useSelectedSystem();
   const translatedNavItems = useMemo(() => {
-    const navItems: NavLinkItem[] = [];
+    const navItems: NavLinkItem[] = [{ id: "home", label: "Home", labelKm: "ទំព័រដើម", href: "/home", icon: Home }];
 
     if (hasAppPermission(user.role, "vehicles:view")) {
-      navItems.push({ id: "vms", label: "VMS", labelKm: "VMS", href: "/", icon: Car });
+      navItems.push({ id: "vms", label: "VMS", labelKm: "VMS", href: "/vms", icon: Car });
     }
 
     if (hasAppPermission(user.role, "lms:view")) {
@@ -94,11 +96,13 @@ export default function MobileBottomNav({
       icon: Settings,
     });
 
-    return navItems.map((item) => ({
+    if (selectedSystem === "loan-management" && hasAppPermission(user.role, "loans:view")) navItems.push({ id: "loan", label: "Loan", labelKm: "កម្ចី", href: "/loan", icon: Landmark });
+    if (selectedSystem === "human-resources" && hasAppPermission(user.role, "settings:view")) navItems.push({ id: "hr", label: "HR", labelKm: "ធនធានមនុស្ស", href: "/hr", icon: Users });
+    return navItems.filter((item) => !selectedSystem || item.id === "home" || getSystemForPath(item.href) === selectedSystem).map((item) => ({
       ...item,
       displayLabel: language === "km" ? item.labelKm : item.label,
     }));
-  }, [language, user.role]);
+  }, [language, user.role, selectedSystem]);
 
   useEffect(() => {
     if (!isStandaloneApp) return;
@@ -176,6 +180,9 @@ export default function MobileBottomNav({
     }
     if (item.id === "lms") return pathname.startsWith("/lms") || pathname.startsWith("/admin/lms");
     if (item.id === "sms") return pathname.startsWith("/sms");
+    if (item.id === "home") return pathname === "/home" && !selectedSystem;
+    if (item.id === "loan") return selectedSystem === "loan-management";
+    if (item.id === "hr") return selectedSystem === "human-resources";
     return pathname === "/settings";
   };
 
