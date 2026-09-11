@@ -3,6 +3,7 @@ import BmReportEditor from "./BmReportEditor";
 import { filterHrReports, getHrDatePresetRange, type HrDatePreset } from "../utils/hrReportDashboard";
 import { getReportRecordScopes } from "../utils/reportRecordScopes";
 import { emptyBmKpis, emptyBmPeriods, emptyBmWorksheet, validBmWorksheet, hasBmWorksheetContent, type BmWorksheet } from "../utils/bmWorksheet";
+import { collectionMetrics, duplicateCustomerNamesBySection, reportNumber } from "../utils/reportCalculations";
 
 
 import type { ChangeEvent, FormEvent, KeyboardEvent as ReactKeyboardEvent, ReactNode } from "react";
@@ -4699,7 +4700,7 @@ function createAccountResolutionRows(customers: string[] = [], count = 0): Accou
 }
 
 function accountNumber(value: string) {
-  return Number(value.replace(/[^\d.-]/g, "")) || 0;
+  return reportNumber(value);
 }
 
 function accountReportDateInputValue() {
@@ -4918,16 +4919,11 @@ function AccountReportView() {
     });
   };
 
-  const dueCount = dueRows.filter((row) => row.customer.trim()).length;
-  const paidCount = paidRows.filter((row) => row.customer.trim()).length;
-  const duplicateAccountCustomers = useMemo(() => {
-    const names = [...dueRows, ...paidRows, ...dueNoticeRows, ...promiseRows, ...closedRows].map((row) => row.customer.trim().toLocaleLowerCase()).filter(Boolean);
-    return Array.from(new Set(names.filter((name, index) => names.indexOf(name) !== index)));
+  const duplicateAccountCustomersBySection = useMemo(() => {
+    return duplicateCustomerNamesBySection({ due: dueRows, paid: paidRows, notices: dueNoticeRows, promises: promiseRows, closed: closedRows });
   }, [closedRows, dueNoticeRows, dueRows, paidRows, promiseRows]);
-  const dueAmount = dueRows.reduce((total, row) => total + accountNumber(row.amount), 0);
-  const paidAmount = paidRows.reduce((total, row) => total + accountNumber(row.amount), 0);
-  const collectionRate = dueCount ? Math.round((paidCount / dueCount) * 100) : 0;
-  const collectionAmountRate = dueAmount ? Math.round((paidAmount / dueAmount) * 100) : 0;
+  const duplicateAccountCustomers = useMemo(() => Array.from(new Set(Object.values(duplicateAccountCustomersBySection).flat())), [duplicateAccountCustomersBySection]);
+  const { dueCount, paidCount, dueAmount, paidAmount, customerRate: collectionRate, amountRate: collectionAmountRate } = collectionMetrics(dueRows, paidRows);
   const resolutionTotal = (rows: AccountResolutionRow[], key: keyof Pick<AccountResolutionRow, "interest" | "penalty" | "principal">) => rows.reduce((total, row) => total + accountNumber(row[key]), 0);
   const promiseInterestTotal = resolutionTotal(promiseRows, "interest");
   const promisePenaltyTotal = resolutionTotal(promiseRows, "penalty");
@@ -5313,8 +5309,8 @@ function AccountReportView() {
               </table>
             ) : (
               <>
-                <div className="space-y-5"><AccountCollectionCards title={language === "km" ? "អតិថិជនដែលត្រូវប្រមូល" : "Customers Due"} rows={dueRows} onChange={setDueRows} reasons={ACCOUNT_REPORT_COLLECTION_REASONS} duplicateCustomers={duplicateAccountCustomers} /><AccountCollectionCards title={language === "km" ? "អតិថិជនដែលបានប្រមូល" : "Customers Paid"} rows={paidRows} onChange={setPaidRows} reasons={ACCOUNT_REPORT_COLLECTION_REASONS} duplicateCustomers={duplicateAccountCustomers} /></div>
-                <div className="mt-6 space-y-5"><AccountResolutionCards title={language === "km" ? "ជូនដំណឹងដល់ថ្ងៃកំណត់" : "Due-date Notices"} rows={dueNoticeRows} onChange={setDueNoticeRows} typeLabel={language === "km" ? "ជូនដំណឹង" : "Notice"} typeTone="blue" duplicateCustomers={duplicateAccountCustomers} /><AccountResolutionCards title={language === "km" ? "សន្យាបង់ និងតាមដាន" : "Promises & Follow-up"} rows={promiseRows} onChange={setPromiseRows} typeLabel={language === "km" ? "សន្យា" : "Promise"} typeTone="amber" duplicateCustomers={duplicateAccountCustomers} /><AccountResolutionCards title={language === "km" ? "ករណីបិទ និងលិខិតផ្លូវការ" : "Closed Cases & Formal Notices"} rows={closedRows} onChange={setClosedRows} typeLabel={language === "km" ? "បិទ" : "Closed"} typeTone="red" duplicateCustomers={duplicateAccountCustomers} /></div>
+                <div className="space-y-5"><AccountCollectionCards title={language === "km" ? "អតិថិជនដែលត្រូវប្រមូល" : "Customers Due"} rows={dueRows} onChange={setDueRows} reasons={ACCOUNT_REPORT_COLLECTION_REASONS} duplicateCustomers={duplicateAccountCustomersBySection.due} /><AccountCollectionCards title={language === "km" ? "អតិថិជនដែលបានប្រមូល" : "Customers Paid"} rows={paidRows} onChange={setPaidRows} reasons={ACCOUNT_REPORT_COLLECTION_REASONS} duplicateCustomers={duplicateAccountCustomersBySection.paid} /></div>
+                <div className="mt-6 space-y-5"><AccountResolutionCards title={language === "km" ? "ជូនដំណឹងដល់ថ្ងៃកំណត់" : "Due-date Notices"} rows={dueNoticeRows} onChange={setDueNoticeRows} typeLabel={language === "km" ? "ជូនដំណឹង" : "Notice"} typeTone="blue" duplicateCustomers={duplicateAccountCustomersBySection.notices} /><AccountResolutionCards title={language === "km" ? "សន្យាបង់ និងតាមដាន" : "Promises & Follow-up"} rows={promiseRows} onChange={setPromiseRows} typeLabel={language === "km" ? "សន្យា" : "Promise"} typeTone="amber" duplicateCustomers={duplicateAccountCustomersBySection.promises} /><AccountResolutionCards title={language === "km" ? "ករណីបិទ និងលិខិតផ្លូវការ" : "Closed Cases & Formal Notices"} rows={closedRows} onChange={setClosedRows} typeLabel={language === "km" ? "បិទ" : "Closed"} typeTone="red" duplicateCustomers={duplicateAccountCustomersBySection.closed} /></div>
                 <div className="hidden print:block"><div className="grid grid-cols-2">{renderCollectionTable("អតិថិជនដែលប្រមូលសរុប", dueRows, setDueRows)}{renderCollectionTable("អតិថិជនដែលប្រមូលបានសរុប", paidRows, setPaidRows, redHeader)}</div><div className="space-y-8">{renderResolutionTable("ជូនដំណឹងទៅអតិថិជន ដល់ថ្ងៃកំណត់ត្រូវបង់", dueNoticeRows, setDueNoticeRows, { interest: resolutionTotal(dueNoticeRows, "interest"), penalty: resolutionTotal(dueNoticeRows, "penalty"), principal: resolutionTotal(dueNoticeRows, "principal") }, true)}{renderResolutionTable("បានបន្តទាក់ទងអតិថិជនដែលយឺតចាប់ពី ១ថ្ងៃ ដល់ ៣ថ្ងៃ", promiseRows, setPromiseRows, { interest: promiseInterestTotal, penalty: promisePenaltyTotal, principal: promisePrincipalTotal }, true)}{renderResolutionTable("ផ្ញើលិខិតជូនដំណឹងផ្លូវការសម្រាប់អតិថិជនយឺតចាប់ពី ៤ថ្ងៃ", closedRows, setClosedRows, { interest: closedInterestTotal, penalty: closedPenaltyTotal, principal: closedPrincipalTotal }, true)}</div></div>
               </>
             )}
@@ -5639,7 +5635,7 @@ function createOperationResolutionRows() {
 }
 
 function operationNumber(value: string) {
-  return Number(value.replace(/[^\d.-]/g, "")) || 0;
+  return reportNumber(value);
 }
 
 function operationCurrency(value: string | number) {
