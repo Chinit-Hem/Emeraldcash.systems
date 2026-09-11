@@ -55,10 +55,6 @@ export default function BmReportEditor({ value, onChange, readOnly, isKhmer, rep
   const periods = value.periods || emptyBmPeriods();
   const daily = periods.find((row) => row.period === "daily") || periods[0];
   const monthly = periods.find((row) => row.period === "monthly") || periods[1];
-  const tabs: Array<[Section, string, typeof Users]> = [
-    ["overview", text("Overall View", "មើលជារួម"), ChartNoAxesCombined], ["kpis", "KPI", ChartNoAxesCombined],
-    ["team", text("Individual View", "មើលជាបុគ្គល"), Users], ["issues", text("Issues", "បញ្ហា"), AlertTriangle], ["periods", text("Periods", "រយៈពេល"), CalendarRange],
-  ];
   const updateStaff = (index: number, key: keyof BmWorksheet["staff"][number], next: string) => onChange({ ...value, staff: value.staff.map((row, rowIndex) => rowIndex === index ? { ...row, [key]: next } : row) });
   const updateAccount = (index: number, key: keyof BmWorksheet["accounts"][number], next: string) => onChange({ ...value, accounts: value.accounts.map((row, rowIndex) => rowIndex === index ? { ...row, [key]: next } : row) });
   const updateIssue = (index: number, key: keyof NonNullable<BmWorksheet["issues"]>[number], next: string) => onChange({ ...value, issues: issues.map((row, rowIndex) => rowIndex === index ? { ...row, [key]: next } : row) });
@@ -72,6 +68,12 @@ export default function BmReportEditor({ value, onChange, readOnly, isKhmer, rep
   const todayIso = new Date().toISOString().slice(0, 10);
   const openIssueCount = issues.filter((row) => row.issue.trim()).length;
   const overdueIssueCount = issues.filter((row) => row.issue.trim() && row.deadline && row.deadline < todayIso).length;
+  const kpiCount = kpis.filter((row) => row.target.trim() || row.daily.trim() || row.monthly.trim()).length;
+  const periodsWithData = periods.filter((row) => Object.entries(row).some(([key, item]) => key !== "period" && item.trim())).length;
+  const tabs: Array<[Section, string, typeof Users, string?]> = [
+    ["overview", text("Overview", "ទិដ្ឋភាពរួម"), ChartNoAxesCombined], ["kpis", "KPI", ChartNoAxesCombined, `${kpiCount}/${BM_KPIS.length}`],
+    ["team", text("Team Performance", "លទ្ធផលក្រុម"), Users, String(staffCount)], ["issues", text("Issues", "បញ្ហា"), AlertTriangle, String(openIssueCount)], ["periods", text("Periods", "រយៈពេល"), CalendarRange, `${periodsWithData}/${periods.length}`],
+  ];
 
   return <section className="space-y-5 p-3 text-slate-900 dark:text-slate-100 sm:p-5">
     <header className="rounded-2xl bg-gradient-to-r from-emerald-700 to-teal-600 p-5 text-white shadow-sm">
@@ -79,7 +81,7 @@ export default function BmReportEditor({ value, onChange, readOnly, isKhmer, rep
       <div className="mt-4 grid gap-2 text-sm text-emerald-50 sm:grid-cols-3"><span>{reportDate}</span><span>{branch || "—"}</span><span>{reporterName || "—"}</span></div>
     </header>
 
-    <nav aria-label={text("Report sections", "ផ្នែករបាយការណ៍")} className="sticky top-0 z-10 flex gap-1 overflow-x-auto rounded-xl border border-slate-200 bg-white p-1 shadow-sm dark:border-slate-700 dark:bg-slate-900 print:hidden">{tabs.map(([id, label, Icon]) => <button key={id} type="button" aria-pressed={section === id} onClick={() => setSection(id)} className={`inline-flex min-h-11 shrink-0 items-center gap-2 rounded-lg px-3 text-sm font-semibold ${section === id ? "bg-emerald-600 text-white" : "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"}`}><Icon className="h-4 w-4" />{label}</button>)}</nav>
+    <nav aria-label={text("Report sections", "ផ្នែករបាយការណ៍")} className="sticky top-0 z-10 flex gap-1 overflow-x-auto rounded-xl border border-slate-200 bg-white p-1 shadow-sm dark:border-slate-700 dark:bg-slate-900 print:hidden">{tabs.map(([id, label, Icon, count]) => <button key={id} type="button" aria-pressed={section === id} onClick={() => setSection(id)} className={`inline-flex min-h-11 shrink-0 items-center gap-2 rounded-lg px-3 text-sm font-semibold ${section === id ? "bg-emerald-600 text-white" : "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"}`}><Icon className="h-4 w-4" />{label}{count ? <span className={`rounded-full px-1.5 py-0.5 text-[11px] font-bold ${section === id ? "bg-white/20 text-white" : "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-300"}`}>{count}</span> : null}</button>)}</nav>
 
     <div className={section === "overview" ? "space-y-5" : "hidden print:block"}>
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
