@@ -50,6 +50,7 @@ type ManagedUser = {
   email?: string | null;
   phone?: string | null;
   profile_picture?: string | null;
+  is_active?: boolean;
 };
 
 type TabType = "profile" | "users" | "system";
@@ -207,6 +208,7 @@ export default function SettingsContent() {
   const [editEmail, setEditEmail] = useState("");
   const [editPhone, setEditPhone] = useState("");
   const [editProfilePicture, setEditProfilePicture] = useState<string | null>(null);
+  const [editIsActive, setEditIsActive] = useState(true);
   
   const [isCreating, setIsCreating] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
@@ -457,6 +459,7 @@ export default function SettingsContent() {
     setEditEmail(user.email || "");
     setEditPhone(user.phone || "");
     setEditProfilePicture(user.profile_picture || null);
+    setEditIsActive(user.is_active !== false);
     setError("");
     setSuccess("");
   }, []);
@@ -536,6 +539,7 @@ export default function SettingsContent() {
           email: editEmail.trim() || null,
           phone: editPhone.trim() || null,
           profile_picture: editProfilePicture,
+          isActive: editIsActive,
         }),
       });
       const data = await res.json();
@@ -553,7 +557,7 @@ export default function SettingsContent() {
     } finally {
       setIsUpdating(false);
     }
-  }, [editingUser, editUsername, editPassword, editConfirmPassword, editRole, editFullName, editPosition, editDepartment, editBranch, editEmail, editPhone, editProfilePicture, t, cancelEdit, loadUsers, refreshUser, user.username]);
+  }, [editingUser, editUsername, editPassword, editConfirmPassword, editRole, editFullName, editPosition, editDepartment, editBranch, editEmail, editPhone, editProfilePicture, editIsActive, t, cancelEdit, loadUsers, refreshUser, user.username]);
 
   return (
     <div className="min-h-screen bg-slate-50 pb-20 dark:bg-slate-950 sm:pb-8">
@@ -1453,6 +1457,7 @@ export default function SettingsContent() {
                     ))}
                   </select>
                 </div>
+                {editingUser.username !== user.username ? <label className="flex items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm dark:border-slate-700 dark:bg-slate-800/50"><input type="checkbox" checked={editIsActive} onChange={(event) => setEditIsActive(event.target.checked)} className="mt-0.5 h-4 w-4 accent-emerald-600" /><span><strong className="block text-slate-900 dark:text-white">{language === "km" ? "គណនីសកម្ម" : "Active account"}</strong><span className="mt-1 block text-xs text-slate-500">{language === "km" ? "ដោះធីកពេលបុគ្គលិកលាឈប់។ គាត់នឹងមិនអាចចូលប្រើប្រាស់បានទេ។" : "Uncheck when an employee resigns. Their active sessions are revoked and they cannot sign in."}</span></span></label> : null}
                 <div>
                   <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                     {language === "km" ? "មុខតំណែង" : "Position"}

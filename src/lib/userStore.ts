@@ -39,6 +39,7 @@ export type PublicUser = Omit<StoredUser, "passwordHash"> & {
   mobile?: string | null;
   bio?: string | null;
   profile_picture?: string | null;
+  is_active: boolean;
 };
 
 export type CreateUserErrorCode =
@@ -101,6 +102,7 @@ function publicUserFromDB(user: UserDB): PublicUser {
     mobile: user.mobile,
     bio: user.bio,
     profile_picture: user.profile_picture,
+    is_active: user.is_active ?? true,
   };
 }
 
@@ -266,6 +268,10 @@ export async function authenticateUser(
       log("INFO", "authenticateUser() - user not found", { username: normalized });
       return null;
     }
+    if (!user.is_active) {
+      log("INFO", "authenticateUser() - inactive user", { username: normalized });
+      return null;
+    }
 
     const passwordOk = await comparePassword(password, user.password_hash);
     if (!passwordOk) {
@@ -326,7 +332,6 @@ export async function createUser(params: {
       log("INFO", "createUser() - invalid role", { role: params.role });
       return { ok: false, error: "Invalid role", code: "invalid_role" };
     }
-
     // Validate createdBy
     if (!params.createdBy || typeof params.createdBy !== "string") {
       log("INFO", "createUser() - invalid createdBy");

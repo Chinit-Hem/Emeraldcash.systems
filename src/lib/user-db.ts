@@ -30,6 +30,7 @@ export interface UserDB {
   mobile?: string;
   bio?: string;
   profile_picture?: string;
+  is_active: boolean;
 }
 
 // Validation constants
@@ -121,6 +122,7 @@ export async function ensureUsersTable(): Promise<void> {
           position VARCHAR(100),
           department VARCHAR(100),
           branch VARCHAR(100)
+          ,is_active BOOLEAN NOT NULL DEFAULT TRUE
         )
       `,
       "ensureUsersTable"
@@ -130,6 +132,7 @@ export async function ensureUsersTable(): Promise<void> {
         DO $$
         BEGIN
           ALTER TABLE users ALTER COLUMN role TYPE VARCHAR(40);
+          ALTER TABLE users ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT TRUE;
 
           IF EXISTS (
             SELECT 1
@@ -706,6 +709,7 @@ export async function updateUserAccountInDB(params: {
   mobile?: string | null;
   bio?: string | null;
   profile_picture?: string | null;
+  is_active?: boolean;
 }): Promise<UserDB> {
   log("INFO", "Updating user account", {
     currentUsername: params.currentUsername,
@@ -760,6 +764,7 @@ export async function updateUserAccountInDB(params: {
     const profile_picture = params.profile_picture !== undefined ? params.profile_picture : currentUser.profile_picture;
     const password_hash = params.passwordHash ?? currentUser.password_hash;
     const role = params.role ?? currentUser.role;
+    const is_active = params.is_active ?? currentUser.is_active ?? true;
 
     if (currentUser.role === "Admin" && role !== "Admin") {
       const adminCount = await countAdminUsers();
@@ -784,6 +789,7 @@ export async function updateUserAccountInDB(params: {
           mobile = ${mobile || null},
           bio = ${bio || null},
           profile_picture = ${profile_picture || null},
+          is_active = ${is_active},
           updated_at = CURRENT_TIMESTAMP
         WHERE username = ${currentUsername}
         RETURNING *

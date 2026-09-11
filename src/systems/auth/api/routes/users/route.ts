@@ -4,6 +4,7 @@ import {
   createSessionCookie,
   getClientIp,
   getClientUserAgent,
+  revokeUserSessions,
 } from "@/lib/auth";
 import {
   isDuplicateError,
@@ -400,7 +401,10 @@ export async function PUT(req: NextRequest) {
     }
 
     const hasOrgAssignmentUpdate = body.department !== undefined || body.branch !== undefined;
-    const hasAccountUpdate = nextUsername !== targetUsername || hasPasswordUpdate || hasRoleUpdate;
+    const requestedIsActive = body.is_active ?? body.isActive;
+    if (requestedIsActive !== undefined && typeof requestedIsActive !== "boolean") return createErrorResponse("isActive must be true or false", "invalid_active_status", 400);
+    if (requestedIsActive === false && sessionUsername === targetUsername) return createErrorResponse("You cannot disable your own account", "self_disable_forbidden", 400);
+    const hasAccountUpdate = nextUsername !== targetUsername || hasPasswordUpdate || hasRoleUpdate || requestedIsActive !== undefined;
     
     // Users can only update their own profile unless their role can edit users.
     if (sessionUsername !== targetUsername && !hasAppPermission(session.role, "users:edit")) {
@@ -497,7 +501,10 @@ export async function PUT(req: NextRequest) {
       mobile: body.mobile as string | undefined,
       bio: body.bio as string | undefined,
       profile_picture: body.profile_picture as string | undefined,
+      is_active: requestedIsActive as boolean | undefined,
     });
+
+    if (requestedIsActive === false) await revokeUserSessions(updatedUser.username);
 
     invalidateUsersCache();
 
@@ -517,6 +524,8 @@ export async function PUT(req: NextRequest) {
         roleChanged: hasRoleUpdate,
         passwordChanged: hasPasswordUpdate,
         usernameChanged: nextUsername !== targetUsername,
+        activeChanged: requestedIsActive !== undefined,
+        isActive: updatedUser.is_active,
       },
     }));
 
@@ -533,6 +542,7 @@ export async function PUT(req: NextRequest) {
         mobile: updatedUser.mobile,
         bio: updatedUser.bio,
         profile_picture: updatedUser.profile_picture,
+        is_active: updatedUser.is_active,
       }
     });
 
