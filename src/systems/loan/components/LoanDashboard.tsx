@@ -5815,7 +5815,10 @@ function OperationReportView({ loans, loading, canViewLoanData, onRefresh, onOpe
   useEffect(() => {
     const requestedBranch = searchParams.get("reportBranch");
     if (!localDraftHydrated || searchParams.get("operationReportId") || (!isHumanResources && !isDirector)) return;
-    if ((isHumanResources || isReportAdministrator(user.role)) && !requestedBranch) { setBranch(""); return; }
+    // Directors review BM reports company-wide. Clear a saved/default branch unless
+    // the URL explicitly asks to focus on one branch, otherwise pending reports can
+    // be hidden along with their Approve / Return actions.
+    if ((isHumanResources || isDirector || isReportAdministrator(user.role)) && !requestedBranch) { setBranch(""); return; }
     if (!requestedBranch) return;
     const selectedBranch = workspaceBranchOptions.find((value) => normalizeReportBranchLabel(value) === normalizeReportBranchLabel(requestedBranch));
     if (selectedBranch) setBranch(selectedBranch);
