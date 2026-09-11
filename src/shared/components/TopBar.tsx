@@ -1,6 +1,7 @@
 "use client";
 
 import { getSystemForPath, useSelectedSystem } from "@/shared/hooks/useSelectedSystem";
+import { isDirectorReportActor, isHumanResourcesReportActor } from "@/systems/loan/utils/reportWorkflowRoles";
 
 import type { User } from "@/shared/types/types";
 import Image from "next/image";
@@ -446,7 +447,7 @@ export default function TopBar({
       label: language === "km" ? "ធនធានមនុស្ស" : "Human Resources",
       href: "/hr",
       icon: UserRound,
-      visible: hasAppPermission(user?.role, "settings:view"),
+      visible: user ? (isHumanResourcesReportActor(user.role, user.position) || isDirectorReportActor(user.role, user.position) || hasAppPermission(user.role, "settings:view")) : false,
       tone: "bg-rose-50 text-rose-600 dark:bg-rose-500/10 dark:text-rose-300",
     },
   ].filter((system) => system.visible && (!selectedSystem || getSystemForPath(system.href) === selectedSystem));

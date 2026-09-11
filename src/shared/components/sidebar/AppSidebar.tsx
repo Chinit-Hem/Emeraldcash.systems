@@ -1,6 +1,6 @@
 "use client";
 
-import { isHumanResourcesReportActor } from "@/systems/loan/utils/reportWorkflowRoles";
+import { isDirectorReportActor, isHumanResourcesReportActor } from "@/systems/loan/utils/reportWorkflowRoles";
 import { getReportNavigation } from "@/systems/loan/utils/reportNavigation";
 import type { User } from "@/shared/types/types";
 import { MotionConfig, motion } from "framer-motion";
@@ -252,7 +252,7 @@ export function getNavigationItems(
     // protected separately by the loan permissions and API authorization.
     workspaceModules.push(item("loan-operation-report", "Operation Report", "របាយការណ៍ប្រតិបត្តិការ", getReportNavigation(user, language).href, ClipboardList));
   }
-  if (isHumanResourcesReportActor(user.role, user.position) || hasAppPermission(user.role, "settings:view")) {
+  if (isHumanResourcesReportActor(user.role, user.position) || isDirectorReportActor(user.role, user.position) || hasAppPermission(user.role, "settings:view")) {
     workspaceModules.push(item("human-resources", "Human Resources", "ធនធានមនុស្ស", "/hr", Users));
   }
 
