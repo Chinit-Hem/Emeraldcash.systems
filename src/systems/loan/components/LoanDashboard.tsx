@@ -6687,7 +6687,7 @@ function OperationReportView({ loans, loading, canViewLoanData, onRefresh, onOpe
 
       {isBranchManagerReport && !accountCategory && canManageReports ? <div className="flex flex-wrap items-center gap-3 print:hidden">
         <button type="button" onClick={openManualBmReport} className="min-h-11 rounded-xl border border-slate-300 px-4 py-2 font-semibold dark:border-slate-700">{opText("បញ្ចូលរបាយការណ៍ខ្ញុំដោយដៃ", "Enter My Report Manually")}</button>
-        <button type="button" disabled={reportSaveDisabled || reportsLoading} onClick={generateBmReport} className="min-h-11 rounded-xl bg-emerald-600 px-4 py-2 font-semibold text-white hover:bg-emerald-700 disabled:opacity-50">{opText("បង្កើតពី LS និងគណនេយ្យ", "Generate from LS & Account")}</button>
+        <button type="button" disabled={reportSaveDisabled || reportsLoading} onClick={generateBmReport} className="min-h-11 rounded-xl bg-emerald-600 px-4 py-2 font-semibold text-white hover:bg-emerald-700 disabled:opacity-50">{opText("ទាញទិន្នន័យពី LS និង Acc", "Get data from LS & Acc")}</button>
       </div> : null}
 
       {showIncompleteLsPanel && lsReportsNeedingSubmission.length ? <section className="rounded-xl border-2 border-amber-300 bg-amber-50 p-4 dark:border-amber-700 dark:bg-amber-950/30 print:hidden">
