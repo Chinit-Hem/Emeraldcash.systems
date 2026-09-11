@@ -17,6 +17,7 @@ const roleDescriptions: Record<string, string> = {
   "Manager / Approver": "Branch management, loan approval, reporting, and read-only LMS, VMS, and SMS access.",
   Finance: "Accounting, disbursement, repayment, and financial reporting.",
   "Human Resources": "Employee records, learning, HR reporting, and full loan control.",
+  Director: "Executive dashboards, final BM report approval, and read-only operational access.",
   "IT Support": "Read-only system support and configuration visibility.",
   "Risk & Compliance": "Independent read-only loan and report oversight.",
   Marketing: "Learning access without customer or financial data.",

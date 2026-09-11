@@ -35,7 +35,9 @@ test("BM, HR, and Director identities are recognized from current role or positi
   assert.equal(isBranchManagerReportActor("Staff", "Branch Manager"), true);
   assert.equal(isHumanResourcesReportActor("Human Resources", "Human Resources Officer"), true);
   assert.equal(isHumanResourcesReportActor("Staff", "Human Resources Supervisor"), true);
+  assert.equal(isHumanResourcesReportActor("Staff", "HR Director"), true);
   assert.equal(isHumanResourcesReportActor("Staff", "Human Resources Intern"), false);
+  assert.equal(isDirectorReportActor("Director"), true);
   assert.equal(isDirectorReportActor("Executive Viewer"), true);
   assert.equal(isDirectorReportActor("Staff", "Chief Executive Officer"), true);
 });

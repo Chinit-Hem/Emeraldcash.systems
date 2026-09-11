@@ -400,6 +400,7 @@ export default function TopBar({
           "Credit / Approver": "ឥណទាន / អ្នកអនុម័ត",
           Finance: "ហិរញ្ញវត្ថុ",
           "Human Resources": "ធនធានមនុស្ស",
+          Director: "នាយក",
           "IT Support": "ជំនួយ IT",
           "Risk & Compliance": "ហានិភ័យ និងអនុលោមភាព",
           Marketing: "ទីផ្សារ",

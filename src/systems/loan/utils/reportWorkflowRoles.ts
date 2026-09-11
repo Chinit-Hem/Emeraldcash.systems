@@ -8,7 +8,7 @@ const ACCOUNT_ROLE_LABELS = new Set(["accountant", "assistant accountant", "fina
 const ACCOUNT_POSITION_LABELS = new Set(["accounting intern", "assistant accountant", "accountant", "finance manager"]);
 const LOAN_SPECIALIST_ROLE_LABELS = new Set(["loan specialist", "loan operations"]);
 const LOAN_SPECIALIST_POSITION_LABELS = new Set(["loan specialist", "collection officer"]);
-const HR_REVIEW_POSITION_LABELS = new Set(["human resources officer", "human resources supervisor", "human resources manager", "hr officer", "hr supervisor", "hr manager", "head of human resources"]);
+const HR_REVIEW_POSITION_LABELS = new Set(["human resources officer", "human resources supervisor", "human resources manager", "hr officer", "hr supervisor", "hr manager", "hr director", "head of human resources"]);
 const DIRECTOR_ROLE_LABELS = new Set(["director", "executive viewer"]);
 const DIRECTOR_POSITION_LABELS = new Set(["director", "managing director", "chief executive officer", "ceo"]);
 

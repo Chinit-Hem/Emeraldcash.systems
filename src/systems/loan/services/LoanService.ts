@@ -731,7 +731,7 @@ function approvalRulesForLoan(loan: LoanEntity): ApprovalRule[] {
   const branchManager: ApprovalRule = { key: "branch_manager", label: "Branch Manager", roles: ["Manager / Approver"] };
   const financeManager: ApprovalRule = { key: "finance_manager", label: "Finance Manager", roles: ["Finance"] };
   const creditManager: ApprovalRule = { key: "credit_manager", label: "Credit Manager", roles: ["Manager / Approver"] };
-  const chiefExecutive: ApprovalRule = { key: "chief_executive", label: "CEO / Credit Committee", roles: ["Executive Viewer"] };
+  const chiefExecutive: ApprovalRule = { key: "chief_executive", label: "CEO / Credit Committee", roles: ["Director", "Executive Viewer"] };
   const collateralChecker: ApprovalRule = { key: "collateral_checker", label: "Collateral Checker", roles: ["Loan Operations"] };
 
   if (type.includes("pawn")) {
