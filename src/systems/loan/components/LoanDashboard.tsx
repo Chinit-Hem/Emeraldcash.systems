@@ -6660,7 +6660,7 @@ function OperationReportView({ loans, loading, canViewLoanData, onRefresh, onOpe
         {(isHumanResources || isDirector) ? <label className="text-sm font-semibold text-slate-700 dark:text-slate-200">
           {opText("សាខា", "Branch")}
           <select value={branch} disabled={Boolean(searchParams.get("operationReportId"))} onChange={(event) => { setBranch(event.target.value); const params = new URLSearchParams(searchParams.toString()); params.set("reportBranch", event.target.value); router.replace(`${pathname}?${params.toString()}`, { scroll: false }); }} className="ml-2 min-h-11 rounded-lg border border-slate-300 bg-white px-3 dark:border-slate-700 dark:bg-slate-900">
-            {(isHumanResources || isReportAdministrator(user.role)) ? <option value="">{opText("សាខាទាំងអស់", "All branches")}</option> : null}
+            {(isHumanResources || isDirector || isReportAdministrator(user.role)) ? <option value="">{opText("សាខាទាំងអស់", "All branches")}</option> : null}
             {branch && !workspaceBranchOptions.includes(branch) ? <option value={branch}>{companyBranchName(branch, language)}</option> : null}
             {workspaceBranchOptions.map((value) => <option key={value} value={value}>{companyBranchName(value, language)}</option>)}
           </select>

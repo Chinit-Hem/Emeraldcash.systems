@@ -23,6 +23,10 @@ export function isBranchManagerReportActor(role: string | null | undefined, posi
 export function isHumanResourcesReportActor(role: string | null | undefined, position?: string | null) {
   const normalizedRole = normalizeIdentityLabel(role);
   const normalizedPosition = normalizeIdentityLabel(position);
+  // Role changes can leave a previous HR title in the position field. An explicit
+  // Director (or administrator) role must retain its approval workflow instead
+  // of being downgraded to the HR view-only dashboard by that stale title.
+  if (isReportAdministrator(role) || DIRECTOR_ROLE_LABELS.has(normalizedRole)) return false;
   return ["human resources", "hr"].includes(normalizedRole) || ["human resources", "hr"].includes(normalizedPosition) || HR_REVIEW_POSITION_LABELS.has(normalizedPosition);
 }
 
