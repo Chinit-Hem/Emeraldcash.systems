@@ -6684,10 +6684,19 @@ function OperationReportView({ loans, loading, canViewLoanData, onRefresh, onOpe
         <button type="button" onClick={() => router.push("/loan?view=operationReport&reportPanel=records&operationForm=summary&operationMode=operation")} className="min-h-10 shrink-0 rounded-lg border border-amber-400 bg-white px-3 text-sm font-semibold hover:bg-amber-100 dark:bg-slate-900 dark:hover:bg-amber-950">{opText("មើលរបាយការណ៍ LS", "View LS Reports")}</button>
       </section> : null}
 
-      {isBranchManagerReport && !accountCategory && canManageReports ? <div className="flex flex-wrap items-center gap-3 print:hidden">
-        <button type="button" onClick={openManualBmReport} className="min-h-11 rounded-xl border border-slate-300 px-4 py-2 font-semibold dark:border-slate-700">{opText("បញ្ចូលរបាយការណ៍ខ្ញុំដោយដៃ", "Enter My Report Manually")}</button>
-        <button type="button" disabled={reportSaveDisabled || reportsLoading} onClick={generateBmReport} className="min-h-11 rounded-xl bg-emerald-600 px-4 py-2 font-semibold text-white hover:bg-emerald-700 disabled:opacity-50">{opText("ទាញទិន្នន័យពី LS និង Acc", "Get data from LS & Acc")}</button>
-      </div> : null}
+      {isBranchManagerReport && !accountCategory && canManageReports ? <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900 print:hidden" aria-labelledby="bm-report-start-heading">
+        <div className="mb-4"><h2 id="bm-report-start-heading" className="text-base font-bold text-slate-900 dark:text-slate-100">{opText("ជ្រើសរើសវិធីចាប់ផ្ដើមរបាយការណ៍ BM", "Choose how to start your BM report")}</h2><p className="mt-1 text-sm text-slate-500">{opText("ណែនាំឱ្យប្រើទិន្នន័យពី LS និង Acc ដើម្បីកាត់បន្ថយការបញ្ចូលដោយដៃ។", "Use submitted LS and Acc data when available to reduce manual entry.")}</p></div>
+        <div className="grid gap-3 md:grid-cols-2">
+          <button type="button" disabled={reportSaveDisabled || reportsLoading} onClick={generateBmReport} className="group min-h-28 rounded-xl border-2 border-emerald-600 bg-emerald-600 p-4 text-left text-white shadow-sm transition hover:bg-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50">
+            <span className="flex items-start justify-between gap-3"><span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white/15"><Download className="h-5 w-5" /></span><span className="rounded-full bg-white/15 px-2.5 py-1 text-xs font-bold">{opText("ណែនាំ", "RECOMMENDED")}</span></span>
+            <span className="mt-3 block font-bold">{opText("ចាប់ផ្ដើមដោយទិន្នន័យ LS និង Acc", "Start with LS & Acc data")}</span><span className="mt-1 block text-sm text-emerald-50">{reportsLoading ? opText("កំពុងផ្ទុករបាយការណ៍…", "Loading reports…") : opText(`បំពេញទិន្នន័យពី LS ${branchManagerRecords.length} និង Acc ${branchAccountRecords.length} របាយការណ៍`, `Auto-fill from ${branchManagerRecords.length} LS and ${branchAccountRecords.length} Acc report(s)`)}</span>
+          </button>
+          <button type="button" disabled={reportSaveDisabled} onClick={openManualBmReport} className="group min-h-28 rounded-xl border border-slate-300 bg-white p-4 text-left text-slate-900 transition hover:border-slate-400 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:hover:bg-slate-800">
+            <span className="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200"><Pencil className="h-5 w-5" /></span>
+            <span className="mt-3 block font-bold">{opText("ចាប់ផ្ដើមរបាយការណ៍ទទេ", "Start a blank report")}</span><span className="mt-1 block text-sm text-slate-500">{opText("បញ្ចូល KPI, បុគ្គលិក, បញ្ហា និងរយៈពេលដោយដៃ។", "Enter KPI, staff, issues, and period details manually.")}</span>
+          </button>
+        </div>
+      </section> : null}
 
       {showIncompleteLsPanel && lsReportsNeedingSubmission.length ? <section className="rounded-xl border-2 border-amber-300 bg-amber-50 p-4 dark:border-amber-700 dark:bg-amber-950/30 print:hidden">
         <div className="flex items-center justify-between gap-3">
