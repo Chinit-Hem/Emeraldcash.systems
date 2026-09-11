@@ -6775,7 +6775,7 @@ function OperationReportView({ loans, loading, canViewLoanData, onRefresh, onOpe
 
       {reportPanel === "form" && validationErrors.length ? <section role="alert" className="rounded-lg border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-900 dark:border-red-800 dark:bg-red-950/25 dark:text-red-200"><p className="font-bold">{opText("សូមបំពេញតម្រូវការទាំងនេះមុនពេលដាក់ស្នើ៖", "Complete these requirements before submitting:")}</p><ul className="mt-2 list-disc space-y-1 pl-5">{validationErrors.map((error) => <li key={error}>{error}</li>)}</ul></section> : null}
       {reportPanel === "form" ? <Card className="min-w-0 overflow-hidden rounded-xl border border-slate-300 bg-white p-0 shadow-sm dark:border-slate-700 dark:bg-slate-950">
-        <fieldset disabled={reportSaveDisabled || viewOnly} className="min-w-0 border-0 p-0 disabled:opacity-90">
+        <fieldset disabled={!isBranchManagerReport && (reportSaveDisabled || viewOnly)} className="min-w-0 border-0 p-0 disabled:opacity-90">
         <div className="min-w-0 overflow-visible">
           <div className="font-khmer-battambang min-w-0 text-slate-950 dark:text-slate-100">
             {!isBranchManagerReport && !viewOnly ? reportSheetHeader : null}
