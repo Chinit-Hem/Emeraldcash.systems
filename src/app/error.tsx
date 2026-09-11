@@ -11,6 +11,7 @@
 
 import { globalLogger } from "@/lib/logger";
 import { useEffect } from "react";
+import { useRouter } from "next/navigation";
 
 interface ErrorBoundaryProps {
   error: Error & { digest?: string };
@@ -18,6 +19,7 @@ interface ErrorBoundaryProps {
 }
 
 export default function ErrorBoundary({ error, reset }: ErrorBoundaryProps) {
+  const router = useRouter();
   useEffect(() => {
     // Log error to monitoring service
     globalLogger.error("Root error boundary caught error", error, {
@@ -78,7 +80,7 @@ export default function ErrorBoundary({ error, reset }: ErrorBoundaryProps) {
             </button>
             
             <button
-              onClick={() => window.location.href = "/"}
+              onClick={() => router.push("/")}
               className="px-6 py-3 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 font-semibold rounded-xl hover:bg-gray-200 dark:hover:bg-gray-600 transition-all active:scale-[0.98] touch-target"
             >
               Go Home

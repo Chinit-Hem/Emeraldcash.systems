@@ -10,6 +10,7 @@
  */
 
 import { useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { globalLogger } from "@/lib/logger";
 
 interface AppErrorProps {
@@ -18,6 +19,7 @@ interface AppErrorProps {
 }
 
 export default function AppError({ error, reset }: AppErrorProps) {
+  const router = useRouter();
   useEffect(() => {
     // Log error
     globalLogger.error("App section error boundary caught error", error, {
@@ -77,7 +79,7 @@ export default function AppError({ error, reset }: AppErrorProps) {
             
             <div className="flex gap-2">
               <button
-                onClick={() => window.location.href = "/dashboard"}
+                onClick={() => router.push("/dashboard")}
                 className="flex-1 px-4 py-2.5 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 font-medium rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
               >
                 Dashboard

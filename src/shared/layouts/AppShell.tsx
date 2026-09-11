@@ -91,7 +91,7 @@ function AppShellContent({ children }: AppShellProps) {
         await fetch("/api/auth/logout", { method: "POST" });
       } finally {
         clearCachedUser();
-        window.location.assign("/login");
+        router.replace("/login");
       }
     })();
   }, []);

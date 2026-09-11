@@ -1,6 +1,7 @@
 "use client";
 
 import React, { Component, type ReactNode } from "react";
+import Link from "next/link";
 
 type Props = {
   children: ReactNode;
@@ -31,10 +32,6 @@ export default class LmsErrorBoundary extends Component<Props, State> {
   handleRetry = () => {
     this.setState({ hasError: false, error: null, errorInfo: null });
     window.location.reload();
-  };
-
-  handleGoHome = () => {
-    window.location.href = "/";
   };
 
   render() {
@@ -112,12 +109,12 @@ export default class LmsErrorBoundary extends Component<Props, State> {
                   >
                     Reload Page
                   </button>
-                  <button
-                    onClick={this.handleGoHome}
-                    className="w-full py-3 px-4 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg font-medium text-sm"
+                  <Link
+                    href="/"
+                    className="block w-full py-3 px-4 text-center bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg font-medium text-sm"
                   >
                     Go to Dashboard
-                  </button>
+                  </Link>
                 </div>
               </div>
             </div>

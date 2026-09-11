@@ -1,6 +1,7 @@
 "use client";
 
 import React, { Component, type ReactNode } from "react";
+import Link from "next/link";
 
 type ErrorBoundaryProps = {
   children: ReactNode;
@@ -53,10 +54,6 @@ componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
     this.setState({ hasError: false, error: null });
   };
 
-  handleDashboard = () => {
-    window.location.href = '/dashboard';
-  };
-
   handleReload = () => {
     window.location.reload();
   };
@@ -100,12 +97,12 @@ componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
                 >
                   Try Again
                 </button>
-                <button
-                  onClick={this.handleDashboard}
-                  className="flex-1 py-3 px-4 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all active:scale-[0.98] touch-target"
+                <Link
+                  href="/dashboard"
+                  className="flex-1 py-3 px-4 text-center bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all active:scale-[0.98] touch-target"
                 >
                   Dashboard
-                </button>
+                </Link>
                 <button
                   onClick={this.handleReload}
                   className="flex-1 py-3 px-4 bg-red-500 hover:bg-red-600 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all active:scale-[0.98] touch-target"
