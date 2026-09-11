@@ -9,6 +9,7 @@ const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
   "Manager / Approver": ["read", "create", "update"],
   Finance: ["read", "create", "update"],
   "Human Resources": ["read", "create", "update"],
+  Director: ["read"],
   "IT Support": ["read", "update"],
   "Risk & Compliance": ["read"],
   Marketing: ["read"],

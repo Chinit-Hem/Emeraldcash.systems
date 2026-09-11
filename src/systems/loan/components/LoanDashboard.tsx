@@ -5407,7 +5407,7 @@ function AccountingDirectory({ onOpenJournalItems }: { onOpenJournalItems: (acco
   const searchParams = useSearchParams();
   const normalizedRole = user.role.trim().toLocaleLowerCase();
   const normalizedPosition = (user.position || "").trim().toLocaleLowerCase();
-  const canViewAccountReport = ["admin", "system administrator", "manager / approver", "branch manager", "bm", "credit manager", "credit / approver", "executive viewer", "finance", "accountant", "assistant accountant", "human resources"].includes(normalizedRole)
+  const canViewAccountReport = ["admin", "system administrator", "manager / approver", "branch manager", "bm", "credit manager", "credit / approver", "director", "executive viewer", "finance", "accountant", "assistant accountant", "human resources"].includes(normalizedRole)
     || normalizedPosition.includes("accountant")
     || normalizedPosition.includes("finance");
   const [accounts, setAccounts] = useState<LoanBankingAccount[]>([]);

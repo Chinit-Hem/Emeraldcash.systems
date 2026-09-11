@@ -1,10 +1,10 @@
 
-export type Role = "System Administrator" | "Branch Manager" | "Loan Operations" | "Loan Specialist" | "Accountant" | "Assistant Accountant" | "Credit / Approver" | "Risk & Compliance" | "Human Resources" | "IT Support" | "Marketing" | "Intern / Read Only" | "Executive Viewer" | "Admin" | "Staff" | "Finance" | "Manager / Approver" | string;
+export type Role = "System Administrator" | "Branch Manager" | "Loan Operations" | "Loan Specialist" | "Accountant" | "Assistant Accountant" | "Credit / Approver" | "Risk & Compliance" | "Human Resources" | "Director" | "IT Support" | "Marketing" | "Intern / Read Only" | "Executive Viewer" | "Admin" | "Staff" | "Finance" | "Manager / Approver" | string;
 
 export const STANDARD_ROLES = [
   "System Administrator", "Branch Manager", "Loan Operations", "Loan Specialist",
   "Accountant", "Assistant Accountant", "Credit / Approver", "Risk & Compliance",
-  "Human Resources", "IT Support", "Marketing", "Intern / Read Only", "Executive Viewer",
+  "Human Resources", "Director", "IT Support", "Marketing", "Intern / Read Only", "Executive Viewer",
 ] as const;
 
 export const LEGACY_ROLE_NAMES = ["Admin", "Staff", "Finance", "Manager / Approver"] as const;
@@ -106,6 +106,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<string, Permission[]> = {
     "loans:view", "loans:create", "loans:edit", "loans:approve", "loans:disburse", "loans:repay", "loans:delete",
     "settings:view", "reports:view",
   ],
+  Director: ["loans:view", "loans:approve", "reports:view", "reports:manage"],
   "IT Support": ["vehicles:view", "sms:view", "users:view", "lms:view", "loans:view", "settings:view", "reports:view"],
   "Risk & Compliance": ["loans:view", "reports:view"],
   Marketing: ["lms:view"],
