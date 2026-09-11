@@ -6580,6 +6580,16 @@ function OperationReportView({ loans, loading, canViewLoanData, onRefresh, onOpe
   ].filter(Boolean) : [];
   const submitRequirements = isBranchManagerReport ? branchManagerSubmissionRequirements : submissionRequirements;
   const reportSubmitDisabled = reportSaveDisabled;
+  const activeSaveAction = isBranchManagerReport ? savingBranchManagerReport : savingReport;
+  const reportSaveState = activeSaveAction === "draft"
+    ? opText("កំពុងរក្សាទុក…", "Saving…")
+    : activeSaveAction === "submitted"
+      ? opText("កំពុងដាក់ស្នើ…", "Submitting…")
+      : !isBranchManagerReport && hasUnsavedChanges
+        ? opText("មានការកែប្រែមិនទាន់រក្សាទុក", "Unsaved changes")
+        : (isBranchManagerReport ? currentBmReport : ownSavedReport)
+          ? opText("បានរក្សាទុក", "Saved")
+          : opText("របាយការណ៍ថ្មី", "New report");
   const reportFormTabClass = (value: OperationReportForm) => `min-h-11 whitespace-nowrap border-b-2 px-4 py-3 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 ${activeForm === value ? "border-emerald-600 text-emerald-700 dark:text-emerald-300" : "border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"}`;
 
   const canViewBothReports = canAccessBranchManagerWorkspace;
@@ -6733,13 +6743,13 @@ function OperationReportView({ loans, loading, canViewLoanData, onRefresh, onOpe
           <div className="flex flex-wrap items-center gap-2 [&_button]:min-h-11">
 
 
-            <span className={`inline-flex items-center rounded-lg px-3 py-2 text-sm font-semibold ${operationReportStatusClass(displayedReportStatus)}`}>{operationReportStatusLabel(displayedReportStatus, language)}</span>
+            <div className="flex items-center gap-2"><span className={`inline-flex items-center rounded-lg px-3 py-2 text-sm font-semibold ${operationReportStatusClass(displayedReportStatus)}`}>{operationReportStatusLabel(displayedReportStatus, language)}</span><span aria-live="polite" className={`text-xs font-medium ${reportSaveState === opText("មានការកែប្រែមិនទាន់រក្សាទុក", "Unsaved changes") ? "text-amber-700 dark:text-amber-300" : "text-slate-500 dark:text-slate-400"}`}>{reportSaveState}</span></div>
             {!isBranchManagerReport && reviewingAnotherSpecialist ? <button type="button" onClick={openMyReport} className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300"><FilePlus2 className="h-4 w-4" />{opText("របាយការណ៍ខ្ញុំ", "My Report")}</button> : null}
           </div>
           <div className="flex flex-wrap items-center gap-2 sm:ml-auto [&>button]:min-h-11">
             <button type="button" onClick={() => { setReportPanel("records"); pushOperationReportLocation({ panel: "records" }); }} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"><List className="h-4 w-4" />{opText("កំណត់ត្រា", "Records")}</button>
             <button type="button" disabled={reportSaveDisabled} onClick={() => void (isBranchManagerReport ? saveBranchManagerReport("draft") : saveOperationReport("draft"))} className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300">{(isBranchManagerReport ? savingBranchManagerReport : savingReport) === "draft" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}{opText("រក្សាទុកព្រាង", "Save Draft")}</button>
-            <button type="button" disabled={reportSubmitDisabled} title={submitRequirements.length ? submitRequirements.join(" · ") : undefined} onClick={() => void (isBranchManagerReport ? saveBranchManagerReport("submitted") : saveOperationReport("submitted"))} className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50">{(isBranchManagerReport ? savingBranchManagerReport : savingReport) === "submitted" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}{isBranchManagerReport ? opText("ដាក់ស្នើទៅថ្នាក់លើ", "Submit to Management") : opText("ដាក់ស្នើទៅ BM", "Submit to BM")}</button>
+            <button type="button" disabled={reportSubmitDisabled} title={submitRequirements.length ? submitRequirements.join(" · ") : undefined} onClick={() => void (isBranchManagerReport ? saveBranchManagerReport("submitted") : saveOperationReport("submitted"))} className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50">{activeSaveAction === "submitted" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}{isBranchManagerReport ? opText("ដាក់ស្នើទៅនាយក", "Submit to Director") : opText("ដាក់ស្នើទៅ BM", "Submit to BM")}</button>
             <details className="relative" onKeyDown={(event) => { if (event.key === "Escape") { event.currentTarget.open = false; event.currentTarget.querySelector("summary")?.focus(); } }}>
               <summary className="flex min-h-11 cursor-pointer list-none items-center justify-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800">{opText("បន្ថែម", "More")}<ChevronDown className="h-4 w-4" /></summary>
               <div className="absolute right-0 top-full z-50 mt-2 flex w-60 max-w-[calc(100vw-2rem)] flex-col gap-1 rounded-xl border border-slate-200 bg-white p-2 shadow-lg dark:border-slate-700 dark:bg-slate-900 [&>button]:min-h-11 [&>button]:w-full [&>button]:justify-start [&>button]:border-0 [&>button]:bg-transparent [&>button]:text-slate-600 dark:[&>button]:text-slate-300" onClick={(event) => { if ((event.target as HTMLElement).closest("button")) event.currentTarget.closest("details")?.removeAttribute("open"); }}>
