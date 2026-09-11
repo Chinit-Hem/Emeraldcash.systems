@@ -1,10 +1,11 @@
+import { validBmWorksheet, hasBmWorksheetContent } from "@/systems/loan/utils/bmWorksheet";
 import { NextRequest, NextResponse } from "next/server";
 
 import { auditEventFromRequest, recordAuditEvent } from "@/lib/audit-log";
 import { getSession } from "@/lib/auth-helpers";
 import { queryWithRetry, sql } from "@/lib/db-singleton";
 import { getReportNotificationRecipients } from "@/systems/loan/api/reportRecipients";
-import { branchesMatch, canAccessReportBranch, getReportBranchAccess, normalizeReportBranch } from "@/systems/loan/api/reportBranchAccess";
+import { branchesMatch, canAccessReportBranch, canViewReportBranch, getReportBranchAccess, normalizeReportBranch } from "@/systems/loan/api/reportBranchAccess";
 import { ensureAccountReportsTable } from "@/systems/loan/api/routes/account-reports/route";
 import { isReportWorkflowTransitionAllowed } from "@/systems/loan/utils/reportWorkflowRoles";
 
@@ -182,13 +183,13 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ success: false, error: "You do not have permission to view Branch Manager Reports" }, { status: 403 });
     }
     const requestedBranch = searchParams.get("branch")?.trim() || "";
-    if ((branchAccess.isBranchManager || branchAccess.isHumanResources) && !branchAccess.branches.length) {
+    if (branchAccess.isBranchManager && !branchAccess.isHumanResources && !branchAccess.branches.length) {
       return NextResponse.json({ success: false, error: "Your account must be assigned to at least one branch" }, { status: 403 });
     }
-    if (requestedBranch && !canAccessReportBranch(branchAccess, requestedBranch)) {
+    if (requestedBranch && !canViewReportBranch(branchAccess, requestedBranch)) {
       return NextResponse.json({ success: false, error: "You can only view reports from your assigned branches" }, { status: 403 });
     }
-    const branch = branchAccess.isBranchManager ? branchAccess.branch || "" : requestedBranch;
+    const branch = branchAccess.isBranchManager && !branchAccess.isHumanResources ? branchAccess.branch || "" : requestedBranch;
     const branchKey = normalizeReportBranch(branch);
     const requestedLimit = Number.parseInt(searchParams.get("limit") || "200", 10);
     const limit = Math.min(500, Math.max(1, Number.isFinite(requestedLimit) ? requestedLimit : 200));
@@ -206,7 +207,7 @@ export async function GET(request: NextRequest) {
       LIMIT ${limit}
     `, "listOperationReports");
     const visibleRows = branchAccess.isHumanResources
-      ? rows.filter((row) => canAccessReportBranch(branchAccess, row.branch))
+      ? rows.filter((row) => canViewReportBranch(branchAccess, row.branch))
       : rows;
     return NextResponse.json({ success: true, data: visibleRows.map(mapReport) }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
@@ -226,6 +227,7 @@ export async function POST(request: NextRequest) {
     const status = body.status === "submitted" ? "submitted" : "draft";
     const reportType = body.reportType === "bm" ? "bm" : "ls";
     const branchAccess = await getReportBranchAccess(session);
+    if (branchAccess.isHumanResources) return NextResponse.json({ success: false, error: "HR report access is view-only" }, { status: 403 });
     if (reportType === "bm" && !branchAccess.isBranchManager && !branchAccess.isAdministrator) {
       return NextResponse.json({ success: false, error: "Only managers can prepare Branch Manager Reports" }, { status: 403 });
     }
@@ -233,7 +235,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: "Only Loan Specialist or Loan Operations staff can prepare LS Reports" }, { status: 403 });
     }
     const reportData = body.data && typeof body.data === "object" && !Array.isArray(body.data) ? body.data as Record<string, unknown> : {};
-    const serializedData = JSON.stringify(reportData);
+    let serializedData = JSON.stringify(reportData);
     if (serializedData.length > 2_000_000) return NextResponse.json({ success: false, error: "Report data is too large" }, { status: 413 });
 
     const reporterName = String(body.reporterName || session.username).trim().slice(0, 100);
@@ -250,7 +252,18 @@ export async function POST(request: NextRequest) {
     if (reportType === "ls" && status === "submitted" && !hasCustomerActivity(reportData, ["collectionDueRows", "collectionPaidRows", "dueNoticeRows", "followUpRows", "formalNoticeRows", "requestedRows", "approvedRows", "rejectedRows"])) {
       return NextResponse.json({ success: false, error: "Add at least one customer activity before submitting an LS report" }, { status: 400 });
     }
-    if (reportType === "bm" && status === "submitted") {
+    if (reportType === "bm" && reportData.bmWorksheet !== undefined) {
+      if (!validBmWorksheet(reportData.bmWorksheet)) return NextResponse.json({ success: false, error: "Invalid BM report figures" }, { status: 400 });
+      if (status === "submitted" && !hasBmWorksheetContent(reportData.bmWorksheet)) return NextResponse.json({ success: false, error: "Enter BM report content before submitting" }, { status: 400 });
+      if (reportData.bmWorksheet.mode === "generated") {
+        reportData.sourceReportIds = reportData.bmWorksheet.sourceReportIds;
+        reportData.sourceAccountReportIds = reportData.bmWorksheet.sourceAccountReportIds;
+      } else {
+        reportData.sourceReportIds = [];
+        reportData.sourceAccountReportIds = [];
+      }
+    }
+    if (reportType === "bm" && status === "submitted" && !(validBmWorksheet(reportData.bmWorksheet) && reportData.bmWorksheet.mode === "manual")) {
       const sourceReportIds = Array.isArray(reportData.sourceReportIds) ? reportData.sourceReportIds.map(String).filter((id) => /^[0-9a-f-]{36}$/i.test(id)) : [];
       if (!sourceReportIds.length) return NextResponse.json({ success: false, error: "A BM Report must include reviewed LS reports" }, { status: 400 });
       const eligibleSources = await queryWithRetry(async () => sql<Pick<ReportRow, "id" | "status">>`
@@ -286,6 +299,7 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ success: false, error: "Every Account Report for this branch/date must be reviewed and linked before BM submission" }, { status: 409 });
       }
     }
+    serializedData = JSON.stringify(reportData);
     const existing = await queryWithRetry(async () => sql<Pick<ReportRow, "status">>`
       SELECT status FROM operation_reports
       WHERE report_date = ${reportDate}::date AND reporter_username = ${session.username} AND report_type = ${reportType}
@@ -346,6 +360,7 @@ export async function PATCH(request: NextRequest) {
     `, "findOperationReportForReview");
     if (!current[0]) return NextResponse.json({ success: false, error: "Report not found" }, { status: 404 });
     const branchAccess = await getReportBranchAccess(session);
+    if (branchAccess.isHumanResources) return NextResponse.json({ success: false, error: "HR report access is view-only" }, { status: 403 });
     if (!canAccessReportBranch(branchAccess, current[0].branch)) {
       return NextResponse.json({ success: false, error: "You can only review reports from your assigned branches" }, { status: 403 });
     }
@@ -353,7 +368,7 @@ export async function PATCH(request: NextRequest) {
     const director = branchAccess.isDirector;
     const humanResources = branchAccess.isHumanResources;
     if (current[0].report_type === "bm") {
-      if (!humanResources && !director) return NextResponse.json({ success: false, error: "BM Reports must be reviewed by HR and approved by Director" }, { status: 403 });
+      if (!humanResources && !director) return NextResponse.json({ success: false, error: "Only Director can approve BM Reports" }, { status: 403 });
     } else if ((!branchAccess.isBranchManager && !branchAccess.isAdministrator) || humanResources || director && !branchAccess.isAdministrator) {
       return NextResponse.json({ success: false, error: "Only the assigned Branch Manager can review LS Reports" }, { status: 403 });
     }
@@ -402,6 +417,7 @@ export async function DELETE(request: NextRequest) {
   if (!session) return NextResponse.json({ success: false, error: "Unauthorized - Please log in" }, { status: 401 });
 
   try {
+    if ((await getReportBranchAccess(session)).isHumanResources) return NextResponse.json({ success: false, error: "HR report access is view-only" }, { status: 403 });
     await ensureOperationReportsTable();
     const { searchParams } = new URL(request.url);
     const id = searchParams.get("id") || "";

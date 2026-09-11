@@ -47,6 +47,11 @@ export function canAccessReportBranch(access: ReportBranchAccess, branch: string
   return access.branches.some((assignedBranch) => branchesMatch(branch, assignedBranch));
 }
 
+/** HR can read reports across the company; review/write checks stay separate. */
+export function canViewReportBranch(access: ReportBranchAccess, branch: string) {
+  return access.isHumanResources || canAccessReportBranch(access, branch);
+}
+
 /**
  * Report access for a BM is based on the current users.branch assignment in the
  * database, rather than a client supplied branch or a potentially stale cookie.

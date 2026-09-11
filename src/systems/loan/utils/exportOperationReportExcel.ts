@@ -173,7 +173,7 @@ async function addBranchManagerHeader(workbook: ExcelJS.Workbook, sheet: ExcelJS
 
   if (consolidated) {
     sheet.mergeCells(`C3:${lastColumnLetter}3`);
-    sheet.getCell("C3").value = "ទិន្នន័យប្រកាសសរុបពីមន្ត្រីឥណទានទាំងអស់ប្រចាំថ្ងៃ";
+    sheet.getCell("C3").value = "ទិន្នន័យប្រកាសសរុបពីអ្នកឯកទេសផ្ដល់កម្ចីទាំងអស់ប្រចាំថ្ងៃ";
     sheet.getCell("C3").font = { name: "Khmer OS Muol Light", size: 14, bold: true, color: { argb: GREEN } };
     sheet.getCell("C3").alignment = { horizontal: "center", vertical: "middle", shrinkToFit: true };
     styleCells(sheet, 1, 3, 1, lastColumn);
@@ -454,14 +454,14 @@ export async function buildBranchManagerOperationReportWorkbook(data: BranchMana
   });
   for (let excelRow = kpiDataStart; excelRow < kpiDataStart + kpiRows.length; excelRow += 1) dashboard.getCell(excelRow, 6).numFmt = "0.00%";
 
-  row = addBmTable(dashboard, row, "២. សង្ខេបលទ្ធផលតាមមន្ត្រីឥណទាន (Staff Performance Breakdown)", ["ល.រ", "ឈ្មោះមន្ត្រីឥណទាន", "ស្នើសុំ ($)", "អនុម័ត ($)", "បដិសេធ ($)", "ប្រមូលបាន ($)", "អតិថិជនដោះស្រាយ (នាក់)"], staffRows.map((item, index) => [index + 1, item.name, item.requested, item.approved, item.rejected, item.disbursed, item.contacts]), [3, 4, 5, 6], [3, 4, 5, 6], [7]);
+  row = addBmTable(dashboard, row, "២. សង្ខេបលទ្ធផលតាមអ្នកឯកទេសផ្ដល់កម្ចី (Staff Performance Breakdown)", ["ល.រ", "ឈ្មោះអ្នកឯកទេសផ្ដល់កម្ចី", "ស្នើសុំ ($)", "អនុម័ត ($)", "បដិសេធ ($)", "ប្រមូលបាន ($)", "អតិថិជនដោះស្រាយ (នាក់)"], staffRows.map((item, index) => [index + 1, item.name, item.requested, item.approved, item.rejected, item.disbursed, item.contacts]), [3, 4, 5, 6], [3, 4, 5, 6], [7]);
   row = addBmTable(dashboard, row, "៣. បញ្ហាប្រឈមគន្លឹះ និង ផែនការសកម្មភាពដោះស្រាយរបស់ប្រធានសាខា (Key Issues & Action Plan)", ["ល.រ", "បញ្ហាប្រឈម / ករណីយឺតយ៉ាវ", "ឈ្មោះអតិថិជន/មន្ត្រី", "ប្រាក់ដើម ($)", "ដំណោះស្រាយ/សកម្មភាពឆ្លើយតប", "អ្នកទទួលខុសត្រូវ", "កាលបរិច្ឆេទបញ្ចប់"], loansDue.slice(0, 10).map((loan, index) => [index + 1, loan.nextPaymentDate && loan.nextPaymentDate.slice(0, 10) < data.reportDate ? "អតិថិជនយឺតយ៉ាវត្រូវតាមដាន" : "អតិថិជនដល់ថ្ងៃបង់ត្រូវជូនដំណឹង", loan.borrower.fullName, loan.outstandingBalance, loan.nextPaymentDate && loan.nextPaymentDate.slice(0, 10) < data.reportDate ? "ប្រធានសាខាចុះផ្ទាល់ជាមួយ LS ដើម្បីសម្រុះសម្រួល" : "ជូនដំណឹងអតិថិជនដល់ថ្ងៃបង់", `BM & ${loan.loanContacts.loanSpecialist || loan.loanOfficer || ""}`.trim(), loan.nextPaymentDate?.slice(0, 10) || data.reportDate]), [4]);
 
   const consolidated = workbook.addWorksheet("ទិន្នន័យបូកសរុប (consolidated)");
   configureSheet(consolidated, [7, 30, 24, 22, 16, 16, 24, 32]);
   consolidated.views = [{ state: "frozen", ySplit: 3 }];
   let consolidatedRow = await addBranchManagerHeader(workbook, consolidated, data, 8, true);
-  consolidatedRow = addBmTable(consolidated, consolidatedRow, "1. សង្ខេបលទ្ធផលតាមមន្ត្រីឥណទាន (Staff Performance Breakdown)", ["ល.រ", "ឈ្មោះមន្ត្រីឥណទាន", "ស្នើសុំ ($)", "អនុម័ត ($)", "បដិសេធ ($)", "ប្រមូលបាន ($)", "អតិថិជនដោះស្រាយ (នាក់)"], staffRows.map((item, index) => [index + 1, item.name, item.requested, item.approved, item.rejected, item.disbursed, item.contacts]), [3, 4, 5, 6], [3, 4, 5, 6], [7]);
+  consolidatedRow = addBmTable(consolidated, consolidatedRow, "1. សង្ខេបលទ្ធផលតាមអ្នកឯកទេសផ្ដល់កម្ចី (Staff Performance Breakdown)", ["ល.រ", "ឈ្មោះអ្នកឯកទេសផ្ដល់កម្ចី", "ស្នើសុំ ($)", "អនុម័ត ($)", "បដិសេធ ($)", "ប្រមូលបាន ($)", "អតិថិជនដោះស្រាយ (នាក់)"], staffRows.map((item, index) => [index + 1, item.name, item.requested, item.approved, item.rejected, item.disbursed, item.contacts]), [3, 4, 5, 6], [3, 4, 5, 6], [7]);
   const accountDueNoticeRows = dayAccountRecords.flatMap((record) => record.data.dueNoticeRows || []);
   const accountFollowUpRows = dayAccountRecords.flatMap((record) => record.data.promiseRows || []);
   const accountFormalRows = dayAccountRecords.flatMap((record) => record.data.closedRows || []);
@@ -485,7 +485,7 @@ export async function buildBranchManagerOperationReportWorkbook(data: BranchMana
     consolidated.getCell(accountSummaryTotalRow, column).value = { formula: `SUM(${letter}${accountSummaryActionStart}:${letter}${accountSummaryActionEnd})` };
     consolidated.getCell(accountSummaryTotalRow, column).numFmt = "$#,##0.00;[Red]-$#,##0.00";
   });
-  addBmTable(consolidated, consolidatedRow, "បញ្ជីលម្អិតប្រតិបត្តិការប្រចាំថ្ងៃ", ["ល.រ", "ឈ្មោះមន្ត្រីឥណទាន", "ឈ្មោះអតិថិជន", "ប្រភេទសកម្មភាព", "សាច់ប្រាក់ ($)", "ប្រាក់ដើម ($)", "ស្ថានភាព/ដំណោះស្រាយ", "មូលហេតុ/ចំណាត់ការ"], dayAccountRecords.flatMap((record) => [
+  addBmTable(consolidated, consolidatedRow, "បញ្ជីលម្អិតប្រតិបត្តិការប្រចាំថ្ងៃ", ["ល.រ", "ឈ្មោះអ្នកឯកទេសផ្ដល់កម្ចី", "ឈ្មោះអតិថិជន", "ប្រភេទសកម្មភាព", "សាច់ប្រាក់ ($)", "ប្រាក់ដើម ($)", "ស្ថានភាព/ដំណោះស្រាយ", "មូលហេតុ/ចំណាត់ការ"], dayAccountRecords.flatMap((record) => [
     ...(record.data.paidRows || []).filter((item) => item.customer.trim()).map((item) => [record.reporterName, item.customer, "ប្រមូលប្រាក់", numberValue(item.amount), "", item.reason, item.reason]),
     ...(record.data.dueNoticeRows || []).filter((item) => item.customer.trim()).map((item) => [record.reporterName, item.customer, "ជូនដំណឹង", numberValue(item.interest), numberValue(item.principal), item.assetType, item.note]),
     ...(record.data.promiseRows || []).filter((item) => item.customer.trim()).map((item) => [record.reporterName, item.customer, "តាមដាន", numberValue(item.interest), numberValue(item.principal), item.assetType, item.note]),

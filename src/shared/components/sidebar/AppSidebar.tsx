@@ -1,5 +1,7 @@
 "use client";
 
+import { isHumanResourcesReportActor } from "@/systems/loan/utils/reportWorkflowRoles";
+import { getReportNavigation } from "@/systems/loan/utils/reportNavigation";
 import type { User } from "@/shared/types/types";
 import { MotionConfig, motion } from "framer-motion";
 import Link from "next/link";
@@ -242,15 +244,15 @@ export function getNavigationItems(
         item("loan-borrowers", "Borrowers", "អតិថិជនខ្ចីប្រាក់", "/loan?view=borrowers", Users),
         item("loan-contacts", "Contacts", "ទំនាក់ទំនង", "/loan?view=contacts", UserRound),
         item("loan-accounting", "Accounting", "គណនេយ្យ", "/loan?view=accounting", Landmark),
-        item("loan-operation-report", "Operation Report", "របាយការណ៍ប្រតិបត្តិការ", "/loan?view=operationReport", ClipboardList),
+        item("loan-operation-report", "Operation Report", "របាយការណ៍ប្រតិបត្តិការ", getReportNavigation(user, language).href, ClipboardList),
       ],
     }));
   } else {
     // Operation reporting is a company-wide workspace. Loan records remain
     // protected separately by the loan permissions and API authorization.
-    workspaceModules.push(item("loan-operation-report", "Operation Report", "របាយការណ៍ប្រតិបត្តិការ", "/loan?view=operationReport", ClipboardList));
+    workspaceModules.push(item("loan-operation-report", "Operation Report", "របាយការណ៍ប្រតិបត្តិការ", getReportNavigation(user, language).href, ClipboardList));
   }
-  if (hasAppPermission(user.role, "settings:view")) {
+  if (isHumanResourcesReportActor(user.role, user.position) || hasAppPermission(user.role, "settings:view")) {
     workspaceModules.push(item("human-resources", "Human Resources", "ធនធានមនុស្ស", "/hr", Users));
   }
 

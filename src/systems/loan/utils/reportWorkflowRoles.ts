@@ -23,7 +23,7 @@ export function isBranchManagerReportActor(role: string | null | undefined, posi
 export function isHumanResourcesReportActor(role: string | null | undefined, position?: string | null) {
   const normalizedRole = normalizeIdentityLabel(role);
   const normalizedPosition = normalizeIdentityLabel(position);
-  return normalizedRole === "human resources" || HR_REVIEW_POSITION_LABELS.has(normalizedPosition);
+  return ["human resources", "hr"].includes(normalizedRole) || ["human resources", "hr"].includes(normalizedPosition) || HR_REVIEW_POSITION_LABELS.has(normalizedPosition);
 }
 
 export function isDirectorReportActor(role: string | null | undefined, position?: string | null) {
@@ -53,11 +53,9 @@ export function isReportWorkflowTransitionAllowed(
   status: ReportWorkflowStatus,
   action: ReportWorkflowAction,
 ) {
+  if (actor === "humanResources") return false;
   if (report === "source") {
-    return actor === "branchManager" && status === "submitted" && (action === "reviewed" || action === "returned");
+    return actor === "branchManager" && status === "submitted" && (action === "approved" || action === "returned");
   }
-  if (actor === "humanResources") {
-    return status === "submitted" && (action === "reviewed" || action === "returned");
-  }
-  return actor === "director" && status === "reviewed" && (action === "approved" || action === "returned");
+  return actor === "director" && ["submitted", "reviewed"].includes(status) && (action === "approved" || action === "returned");
 }

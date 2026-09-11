@@ -1,5 +1,6 @@
 "use client";
 
+import { OperationReportMenu } from "@/shared/components/OperationReportMenu";
 import Link from "next/link";
 import type { MouseEvent } from "react";
 import { motion } from "framer-motion";
@@ -140,6 +141,8 @@ export function SidebarItem({
       {item.href === "#" && !collapsed ? <ArrowUpRight className="h-3.5 w-3.5 text-slate-400" aria-hidden="true" /> : null}
     </Link>
   );
+
+  if (item.id === "loan-operation-report") return <OperationReportMenu>{link}</OperationReportMenu>;
 
   return collapsed ? <SidebarTooltip label={item.label}>{link}</SidebarTooltip> : link;
 }
