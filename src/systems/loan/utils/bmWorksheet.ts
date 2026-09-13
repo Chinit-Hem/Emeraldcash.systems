@@ -7,6 +7,8 @@ export type BmWorksheet = {
   staff: BmWorksheetRow[];
   accounts: { name: string; due: string; paid: string; dueAmount: string; paidAmount: string }[];
   notes: string;
+  /** Required when BM submits despite incomplete LS/Account sources. */
+  incompleteSourceReason?: string;
   sourceReportIds: string[];
   sourceAccountReportIds: string[];
 };
@@ -21,7 +23,7 @@ export function validBmWorksheet(value: unknown): value is BmWorksheet {
   if (data.kpis !== undefined && (!Array.isArray(data.kpis) || data.kpis.length !== BM_KPIS.length || !BM_KPIS.every(([id]) => data.kpis!.filter((row) => row?.id === id).length === 1) || !data.kpis.every((row) => [row.target, row.daily, row.monthly].every(numeric) && typeof row.note === "string"))) return false;
   if (data.issues !== undefined && (!Array.isArray(data.issues) || data.issues.length > 500 || !data.issues.every((row) => row && [row.issue, row.name, row.action, row.owner, row.deadline].every((value) => typeof value === "string") && numeric(row.principal) && (!row.deadline || /^\d{4}-\d{2}-\d{2}$/.test(row.deadline))))) return false;
   if (data.periods !== undefined && (!Array.isArray(data.periods) || data.periods.length !== 3 || !["daily", "monthly", "yearly"].every((period) => data.periods!.filter((row) => row?.period === period).length === 1) || !data.periods.every((row) => [row.lsReports, row.accountReports, row.requested, row.approved, row.approvedAmount, row.due, row.paid, row.collected].every(numeric)))) return false;
-  return ["manual", "generated"].includes(data.mode) && typeof data.notes === "string" && validRows(data.staff, ["name", "requested", "approved", "collected", "rejected", "contacts"]) && validRows(data.accounts, ["name", "due", "paid", "dueAmount", "paidAmount"]) && Array.isArray(data.sourceReportIds) && data.sourceReportIds.every((id) => typeof id === "string") && Array.isArray(data.sourceAccountReportIds) && data.sourceAccountReportIds.every((id) => typeof id === "string");
+  return ["manual", "generated"].includes(data.mode) && typeof data.notes === "string" && (data.incompleteSourceReason === undefined || (typeof data.incompleteSourceReason === "string" && data.incompleteSourceReason.length <= 2000)) && validRows(data.staff, ["name", "requested", "approved", "collected", "rejected", "contacts"]) && validRows(data.accounts, ["name", "due", "paid", "dueAmount", "paidAmount"]) && Array.isArray(data.sourceReportIds) && data.sourceReportIds.every((id) => typeof id === "string") && Array.isArray(data.sourceAccountReportIds) && data.sourceAccountReportIds.every((id) => typeof id === "string");
 }
 export function hasBmWorksheetContent(data: BmWorksheet) {
   return Boolean(data.kpis?.some((row) => row.daily !== "" || row.monthly !== "" || row.note.trim()) || data.issues?.some((row) => row.issue.trim() || row.action.trim()) || data.periods?.some((row) => row.collected !== "" || row.approvedAmount !== "") || data.notes.trim() || [...data.staff, ...data.accounts].some((row) => row.name.trim()));

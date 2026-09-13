@@ -689,6 +689,13 @@ function Field({ label, children, className }: { label: string; children: ReactN
   );
 }
 
+function ReportBrandLogo({ branch, className }: { branch: string; className?: string }) {
+  if (normalizeCompanyBranch(branch) === "sen-sok") {
+    return <img src="/sen-sok-logo.png" alt="Vimean Capital Sen Sok" className={className} />;
+  }
+  return <EmeraldCashLogo className={className} />;
+}
+
 const inputClass = "w-full rounded-none border-0 border-b border-slate-300 bg-transparent px-2 py-2.5 text-base text-slate-900 shadow-none outline-none transition placeholder:text-slate-400 focus:border-slate-300 focus:ring-0 sm:text-sm dark:border-slate-700 dark:bg-transparent dark:text-white dark:focus:border-slate-700";
 
 const PAYMENT_TERM_OPTIONS = [
@@ -4675,7 +4682,7 @@ type AccountReportSheet = "summary" | "collection";
 type AccountCollectionRow = { id: number; customer: string; amount: string; reason: string };
 type AccountResolutionRow = OperationReportAttachment & { id: number; customer: string; assetType: string; interest: string; penalty: string; principal: string; note: string };
 type AccountResolutionTextField = "customer" | "assetType" | "interest" | "penalty" | "principal" | "note";
-type AccountReportSavedData = { dueRows: AccountCollectionRow[]; paidRows: AccountCollectionRow[]; dueNoticeRows: AccountResolutionRow[]; promiseRows: AccountResolutionRow[]; closedRows: AccountResolutionRow[] };
+type AccountReportSavedData = { dueRows: AccountCollectionRow[]; paidRows: AccountCollectionRow[]; dueNoticeRows: AccountResolutionRow[]; promiseRows: AccountResolutionRow[]; closedRows: AccountResolutionRow[]; noActivityReason?: string };
 type AccountReportLocalDraft = AccountReportSavedData & { reportDate: string; reporterName: string; reporterRole: string; department: string; branch: string; activeSheet: AccountReportSheet; reportPanel: "records" | "form"; loadedStatus: OperationReportStatus; loadedReporterUsername: string };
 
 function scrollLoanWorkspaceToTop(behavior: ScrollBehavior = "smooth") {
@@ -4707,7 +4714,7 @@ function accountReportDateInputValue() {
   return new Date().toISOString().slice(0, 10);
 }
 
-function AccountCollectionCards({ title, rows, onChange, reasons, duplicateCustomers }: { title: string; rows: AccountCollectionRow[]; onChange: (rows: AccountCollectionRow[]) => void; reasons: string[]; duplicateCustomers?: string[] }) {
+function AccountCollectionCards({ title, rows, onChange, reasons, duplicateCustomers, accent = "green" }: { title: string; rows: AccountCollectionRow[]; onChange: (rows: AccountCollectionRow[]) => void; reasons: string[]; duplicateCustomers?: string[]; accent?: "green" | "red" }) {
   const { language } = useLanguage();
   const text = (km: string, en: string) => language === "km" ? km : en;
   const update = (id: number, key: keyof Omit<AccountCollectionRow, "id">, next: string) => onChange(rows.map((row) => row.id === id ? { ...row, [key]: next } : row));
@@ -4718,7 +4725,7 @@ function AccountCollectionCards({ title, rows, onChange, reasons, duplicateCusto
   const onEnter = (event: ReactKeyboardEvent<HTMLInputElement>, index: number, field: keyof Omit<AccountCollectionRow, "id">) => appendAccountRowOnEnter(event, index, rows, onChange, createRow, field);
   const total = rows.reduce((sum, row) => sum + accountNumber(row.amount), 0);
   return <section className="rounded-2xl border border-slate-200 bg-slate-50/60 p-4 dark:border-slate-700 dark:bg-slate-900/50 print:hidden">
-    <div className="flex flex-wrap items-center justify-between gap-3"><div><h3 className="font-bold">{title}</h3><p className="mt-1 text-sm text-slate-500">{rows.filter((row) => row.customer.trim()).length} {text("កំណត់ត្រា", "records")} · {formatCurrency(total)}</p></div><div className="flex shrink-0 items-center gap-2"><button type="button" onClick={add} className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-emerald-600 px-3 text-sm font-semibold text-white hover:bg-emerald-700"><Plus className="h-4 w-4" />{text("បន្ថែម", "Add")}</button><button type="button" onClick={removeLast} aria-label={text("លុបជួរចុងក្រោយ", "Remove last row")} title={text("លុបជួរចុងក្រោយ", "Remove last row")} className="inline-flex min-h-10 min-w-10 items-center justify-center rounded-lg border border-slate-200 px-2 text-red-700 hover:border-red-300 hover:bg-red-50 hover:text-red-800 dark:hover:border-red-800 dark:hover:bg-red-950/40 dark:hover:text-red-300"><X className="h-4 w-4" /></button></div></div>
+    <div className="flex flex-wrap items-center justify-between gap-3"><div><h3 className={`font-bold ${accent === "red" ? "text-red-700 dark:text-red-300" : "text-emerald-800 dark:text-emerald-300"}`}>{title}</h3><p className="mt-1 text-sm text-slate-500">{rows.filter((row) => row.customer.trim()).length} {text("កំណត់ត្រា", "records")} · {formatCurrency(total)}</p></div><div className="flex shrink-0 items-center gap-2"><button type="button" onClick={add} className={`inline-flex min-h-10 items-center gap-2 rounded-lg px-3 text-sm font-semibold text-white ${accent === "red" ? "bg-red-600 hover:bg-red-700" : "bg-emerald-600 hover:bg-emerald-700"}`}><Plus className="h-4 w-4" />{text("បន្ថែម", "Add")}</button><button type="button" onClick={removeLast} aria-label={text("លុបជួរចុងក្រោយ", "Remove last row")} title={text("លុបជួរចុងក្រោយ", "Remove last row")} className="inline-flex min-h-10 min-w-10 items-center justify-center rounded-lg border border-slate-200 px-2 text-red-700 hover:border-red-300 hover:bg-red-50 hover:text-red-800 dark:hover:border-red-800 dark:hover:bg-red-950/40 dark:hover:text-red-300"><X className="h-4 w-4" /></button></div></div>
     <div className="mt-4 grid gap-3 lg:grid-cols-2">{rows.map((row, index) => { const isDuplicate = duplicateCustomers?.includes(row.customer.trim().toLocaleLowerCase()); return <details key={row.id} open={Boolean(row.customer.trim())} className={`group rounded-xl border bg-white shadow-sm open:ring-2 open:ring-emerald-500/20 dark:bg-slate-900 ${isDuplicate ? "border-amber-300 dark:border-amber-800" : "border-slate-200 dark:border-slate-700"}`}><summary className="flex min-h-16 cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 [&::-webkit-details-marker]:hidden"><div className="min-w-0"><p className="truncate font-semibold">{row.customer || `${text("កំណត់ត្រាថ្មី", "New entry")} ${index + 1}`}</p><p className="mt-1 truncate text-xs text-slate-500">{row.reason || text("ចុចដើម្បីបំពេញព័ត៌មាន", "Open for full details")}</p></div><div className="flex shrink-0 items-center gap-3">{isDuplicate ? <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-bold text-amber-800 dark:bg-amber-950/40 dark:text-amber-200">{text("អតិថិជនដដែល", "Duplicate")}</span> : null}<strong className="tabular-nums text-emerald-700">{formatCurrency(accountNumber(row.amount))}</strong><ChevronDown className="h-4 w-4 transition group-open:rotate-180" /></div></summary><div className="grid gap-3 border-t border-slate-200 p-4 sm:grid-cols-2 dark:border-slate-700"><Field label={text("ឈ្មោះអតិថិជន", "Customer name")}><input data-account-row={index} data-account-field="customer" value={row.customer} onKeyDown={(event) => onEnter(event, index, "customer")} onChange={(event) => update(row.id, "customer", event.target.value)} className={inputClass} /></Field><Field label={text("ចំនួនទឹកប្រាក់", "Amount")}><input data-account-row={index} data-account-field="amount" type="number" min="0" value={row.amount} onKeyDown={(event) => onEnter(event, index, "amount")} onChange={(event) => update(row.id, "amount", event.target.value)} className={inputClass} /></Field><Field label={text("មូលហេតុ", "Reason")} className="sm:col-span-2"><input data-account-row={index} data-account-field="reason" list="account-report-reasons" value={row.reason} onKeyDown={(event) => onEnter(event, index, "reason")} onChange={(event) => update(row.id, "reason", event.target.value)} className={inputClass} />{reasons.length ? <p className="mt-1 text-xs text-slate-400">{text("អាចជ្រើស ឬបញ្ចូលមូលហេតុថ្មី", "Select or enter a new reason")}</p> : null}</Field><div className="sm:col-span-2 flex justify-end"><button type="button" onClick={() => remove(row.id)} className="min-h-10 rounded-lg px-3 text-sm font-semibold text-red-700 hover:bg-red-50">{text("លុបកំណត់ត្រា", "Remove entry")}</button></div></div></details>; })}</div>
   </section>;
 }
@@ -4808,6 +4815,9 @@ function AccountReportView() {
   const [reviewComment, setReviewComment] = useState("");
   const [reviewCommentError, setReviewCommentError] = useState(false);
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
+  const [accountValidationFocus, setAccountValidationFocus] = useState<"noActivityReason" | null>(null);
+  const [accountValidationFocusVersion, setAccountValidationFocusVersion] = useState(0);
+  const [noActivityReason, setNoActivityReason] = useState("");
   const accountFieldInvalid = (value: string) => validationErrors.length > 0 && !value.trim();
   const restoredLocalDraft = useRef(false);
   const initializedSavedAccountReport = useRef(false);
@@ -4822,6 +4832,17 @@ function AccountReportView() {
   const canPrepareOwnAccountReport = canPrepareAccountReport(user.role, user.position);
   const canReviewAccount = isBranchManagerReportActor(user.role, user.position) || isReportAdministrator(user.role);
   const canViewAllAccountReports = canReviewAccount || isHumanResourcesReportActor(user.role, user.position) || isDirectorReportActor(user.role, user.position);
+  const isSenSokReport = normalizeCompanyBranch(branch) === "sen-sok";
+
+  useEffect(() => {
+    if (!accountValidationFocusVersion || accountValidationFocus !== "noActivityReason") return;
+    setActiveSheet("summary");
+    window.setTimeout(() => {
+      const field = document.querySelector<HTMLElement>('[data-account-validation-field="noActivityReason"]');
+      field?.scrollIntoView({ behavior: "smooth", block: "center" });
+      field?.focus({ preventScroll: true });
+    }, 80);
+  }, [accountValidationFocus, accountValidationFocusVersion]);
 
   const selectableAssetTypes = useMemo(() => Array.from(new Set([
     ...rememberedAssetTypes,
@@ -4878,6 +4899,7 @@ function AccountReportView() {
         if (Array.isArray(storedDraft.dueNoticeRows)) setDueNoticeRows(storedDraft.dueNoticeRows);
         if (Array.isArray(storedDraft.promiseRows)) setPromiseRows(storedDraft.promiseRows);
         if (Array.isArray(storedDraft.closedRows)) setClosedRows(storedDraft.closedRows);
+        if (typeof storedDraft.noActivityReason === "string") setNoActivityReason(storedDraft.noActivityReason);
         restoredLocalDraft.current = true;
       }
       const storedView = JSON.parse(window.localStorage.getItem(viewStorageKey) || "null") as { reportPanel?: string; activeSheet?: string } | null;
@@ -4890,9 +4912,9 @@ function AccountReportView() {
   useEffect(() => {
     if (!localDraftHydrated) return;
     if (reviewingAnotherAccountReport) return;
-    const draft: AccountReportLocalDraft = { reportDate, reporterName, reporterRole, department, branch, activeSheet, reportPanel, loadedStatus, loadedReporterUsername, dueRows, paidRows, dueNoticeRows, promiseRows, closedRows };
+    const draft: AccountReportLocalDraft = { reportDate, reporterName, reporterRole, department, branch, activeSheet, reportPanel, loadedStatus, loadedReporterUsername, dueRows, paidRows, dueNoticeRows, promiseRows, closedRows, noActivityReason };
     try { window.localStorage.setItem(localDraftStorageKey, JSON.stringify(draft)); } catch { /* Browser storage may be unavailable. */ }
-  }, [activeSheet, branch, closedRows, department, dueNoticeRows, dueRows, loadedReporterUsername, loadedStatus, localDraftHydrated, localDraftStorageKey, paidRows, promiseRows, reportDate, reportPanel, reporterName, reporterRole, reviewingAnotherAccountReport]);
+  }, [activeSheet, branch, closedRows, department, dueNoticeRows, dueRows, loadedReporterUsername, loadedStatus, localDraftHydrated, localDraftStorageKey, noActivityReason, paidRows, promiseRows, reportDate, reportPanel, reporterName, reporterRole, reviewingAnotherAccountReport]);
 
   useEffect(() => {
     if (!localDraftHydrated) return;
@@ -4943,6 +4965,7 @@ function AccountReportView() {
     setDueNoticeRows(record.data.dueNoticeRows?.length ? record.data.dueNoticeRows : createAccountResolutionRows());
     setPromiseRows(record.data.promiseRows?.length ? record.data.promiseRows : createAccountResolutionRows());
     setClosedRows(record.data.closedRows?.length ? record.data.closedRows : createAccountResolutionRows());
+    setNoActivityReason(record.data.noActivityReason || "");
     setLoadedStatus(record.status);
     setLoadedReporterUsername(record.reporterUsername);
     setReviewComment(record.reviewComment || "");
@@ -5039,6 +5062,7 @@ function AccountReportView() {
       setDueNoticeRows(createAccountResolutionRows());
       setPromiseRows(createAccountResolutionRows());
       setClosedRows(createAccountResolutionRows());
+      setNoActivityReason("");
       setLoadedStatus("draft");
       setLoadedReporterUsername(user.username);
     }
@@ -5066,6 +5090,7 @@ function AccountReportView() {
     setDueNoticeRows(createAccountResolutionRows());
     setPromiseRows(createAccountResolutionRows());
     setClosedRows(createAccountResolutionRows());
+    setNoActivityReason("");
     setLoadedStatus("draft");
     setLoadedReporterUsername(user.username);
     setActiveSheet("collection");
@@ -5116,7 +5141,7 @@ function AccountReportView() {
     if (!reporterRole.trim()) errors.push(language === "km" ? "ត្រូវបញ្ចូលមុខតំណែង" : "Position is required.");
     if (!department.trim()) errors.push(language === "km" ? "ត្រូវបញ្ចូលនាយកដ្ឋាន" : "Department is required.");
     const rows = [...dueRows, ...paidRows, ...dueNoticeRows, ...promiseRows, ...closedRows];
-    if (!rows.some((row) => row.customer.trim())) errors.push(language === "km" ? "សូមបំពេញអតិថិជនយ៉ាងតិចមួយ" : "Add at least one customer activity.");
+    if (!rows.some((row) => row.customer.trim()) && !noActivityReason.trim()) errors.push(language === "km" ? "បើគ្មានសកម្មភាព សូមបញ្ចូលមូលហេតុ" : "If there was no activity, enter the reason.");
     if ([...dueRows, ...paidRows].some((row) => row.customer.trim() && accountNumber(row.amount) <= 0)) errors.push(language === "km" ? "ចំនួនទឹកប្រាក់ត្រូវធំជាងសូន្យ" : "Every customer amount must be greater than zero.");
     return errors;
   };
@@ -5138,13 +5163,18 @@ function AccountReportView() {
       const errors = validateAccountReport();
       setValidationErrors(errors);
       if (errors.length) {
+        const rows = [...dueRows, ...paidRows, ...dueNoticeRows, ...promiseRows, ...closedRows];
+        if (!rows.some((row) => row.customer.trim()) && !noActivityReason.trim()) {
+          setAccountValidationFocus("noActivityReason");
+          setAccountValidationFocusVersion((version) => version + 1);
+        }
         toastError(language === "km" ? "សូមបំពេញប្រអប់ដែលមានសញ្ញាពណ៌ក្រហមជាមុនសិន។" : "Please complete the fields highlighted in red before submitting.");
         return;
       }
     }
     setSavingReport(status);
     try {
-      const saved = await api<AccountReportRecord>("/api/loan/account-reports", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ reportDate, reporterName, reporterPosition: reporterRole, department, branch, status, data: { dueRows, paidRows, dueNoticeRows, promiseRows, closedRows } }) });
+      const saved = await api<AccountReportRecord>("/api/loan/account-reports", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ reportDate, reporterName, reporterPosition: reporterRole, department, branch, status, data: { dueRows, paidRows, dueNoticeRows, promiseRows, closedRows, noActivityReason: noActivityReason.trim() || undefined } }) });
       setLoadedStatus(saved.status);
       setLoadedReporterUsername(saved.reporterUsername);
       setValidationErrors([]);
@@ -5154,28 +5184,6 @@ function AccountReportView() {
       toastError(caught instanceof Error ? caught.message : "Could not save Account Report");
     } finally {
       setSavingReport(null);
-    }
-  };
-
-  const prepareFromLoans = async () => {
-    if (reportLocked || viewOnly) return;
-    setLoadingLoans(true);
-    try {
-      const loans = await api<LoanEntity[]>("/api/loan/loans?limit=200");
-      const activeLoans = loans.filter((loan) => !["Closed", "Rejected", "Draft"].includes(loan.repaymentStatus)).slice(0, 10);
-      const names = activeLoans.map((loan) => loan.borrower.fullName);
-      const collection = activeLoans.map((loan, index) => ({ id: index + 1, customer: loan.borrower.fullName, amount: String(loan.paymentAmount || ""), reason: loan.nextPaymentDate && loan.nextPaymentDate.slice(0, 10) < reportDate ? "យឺត" : "ដល់ថ្ងៃបង់" }));
-      const paddedCollection = [...collection, ...createAccountCollectionRows([]).slice(0, Math.max(0, 10 - collection.length)).map((row, index) => ({ ...row, id: collection.length + index + 1 }))];
-      const resolution = activeLoans.map((loan, index) => ({ id: index + 1, customer: loan.borrower.fullName, assetType: loan.loanType, interest: String(loan.paymentAmount || ""), penalty: "", principal: String(loan.outstandingBalance || loan.principal || ""), note: "" }));
-      const paddedResolution = [...resolution, ...createAccountResolutionRows([], 0).slice(0, Math.max(0, 10 - resolution.length)).map((row, index) => ({ ...row, id: resolution.length + index + 1 }))];
-      setDueRows(paddedCollection);
-      setPaidRows(createAccountCollectionRows(names.slice(0, Math.min(3, names.length))));
-      setDueNoticeRows(paddedResolution);
-      toastSuccess("Account report prepared from active loans.");
-    } catch (caught) {
-      toastError(caught instanceof Error ? caught.message : "Could not prepare report from loans");
-    } finally {
-      setLoadingLoans(false);
     }
   };
 
@@ -5192,7 +5200,7 @@ function AccountReportView() {
   const updateCollection = (rows: AccountCollectionRow[], rowId: number, key: keyof Omit<AccountCollectionRow, "id">, value: string, setter: (rows: AccountCollectionRow[]) => void) => setter(rows.map((row) => row.id === rowId ? { ...row, [key]: value } : row));
   const updateResolution = (rows: AccountResolutionRow[], rowId: number, key: AccountResolutionTextField, value: string, setter: (rows: AccountResolutionRow[]) => void) => setter(rows.map((row) => row.id === rowId ? { ...row, [key]: value } : row));
   const cellInput = "w-full min-w-0 border-0 bg-transparent px-2 py-1.5 text-sm text-slate-900 outline-none focus:bg-emerald-50 focus:ring-1 focus:ring-emerald-500 dark:text-white dark:focus:bg-emerald-950/30";
-  const khmerHeader = "bg-[#087323] text-white";
+  const khmerHeader = isSenSokReport ? "bg-[#172b55] text-white" : "bg-[#087323] text-white";
   const redHeader = "bg-[#c90000] text-white";
 
   const renderCollectionTable = (title: string, rows: AccountCollectionRow[], setter: (rows: AccountCollectionRow[]) => void, headerClass = khmerHeader) => {
@@ -5233,7 +5241,7 @@ function AccountReportView() {
         <span className={`inline-flex items-center rounded-lg px-3 py-2 text-sm font-semibold ${operationReportStatusClass(loadedStatus)}`}>{operationReportStatusLabel(loadedStatus, language)}</span>{viewOnly ? <span className="inline-flex items-center rounded-lg bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-800 dark:bg-amber-950/30 dark:text-amber-200">{language === "km" ? "មើលតែប៉ុណ្ណោះ" : "View only"}</span> : null}
         {!viewOnly ? <><button type="button" disabled={!canPrepareOwnAccountReport || Boolean(savingReport) || loadingLoans || reportLocked} onClick={() => void saveAccountReport("draft")} className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300">{savingReport === "draft" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}Save Draft</button>
         <button type="button" disabled={!canPrepareOwnAccountReport || Boolean(savingReport) || loadingLoans || reportLocked} onClick={() => void saveAccountReport("submitted")} className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50">{savingReport === "submitted" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}Submit to BM</button>
-        <button type="button" disabled={loadingLoans || reportLocked} onClick={() => void prepareFromLoans()} className="inline-flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-700 hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-300"><RefreshCw className={`h-4 w-4 ${loadingLoans ? "animate-spin" : ""}`} />Prepare from loans</button></> : null}
+        </> : null}
         <button type="button" onClick={exportAccountReport} className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300"><Download className="h-4 w-4" />Export</button>
         <button type="button" onClick={() => window.print()} className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-700"><Printer className="h-4 w-4" />Print</button>
       </div>
@@ -5246,7 +5254,7 @@ function AccountReportView() {
             role="tab"
             aria-selected={activeSheet === "summary"}
             onClick={() => { setActiveSheet("summary"); replaceAccountReportLocation("form", { recordId: searchParams.get("accountReportId") || undefined, sheet: "summary" }); }}
-            className={`min-h-12 min-w-0 rounded-xl border-2 px-4 py-2 text-center text-base font-bold shadow-sm transition-all ${activeSheet === "summary" ? "border-blue-700 bg-blue-600 text-white shadow-md ring-2 ring-blue-200 hover:bg-blue-700 dark:ring-blue-900" : "border-blue-200 bg-blue-50 text-blue-800 hover:-translate-y-0.5 hover:border-blue-400 hover:bg-blue-100 hover:shadow-md dark:border-blue-800 dark:bg-blue-950/40 dark:text-blue-200 dark:hover:bg-blue-900/60"}`}
+            className={`min-h-12 min-w-0 rounded-xl border-2 px-4 py-2 text-center text-base font-bold shadow-sm transition-all ${isSenSokReport ? activeSheet === "summary" ? "border-[#172b55] bg-[#172b55] text-[#f7eedf] shadow-md ring-2 ring-[#cfa66d]/40 hover:bg-[#304a79]" : "border-[#cfa66d] bg-[#f7eedf] text-[#172b55] hover:-translate-y-0.5 hover:bg-[#eedcbc]" : activeSheet === "summary" ? "border-blue-700 bg-blue-600 text-white shadow-md ring-2 ring-blue-200 hover:bg-blue-700 dark:ring-blue-900" : "border-blue-200 bg-blue-50 text-blue-800 hover:-translate-y-0.5 hover:border-blue-400 hover:bg-blue-100 hover:shadow-md dark:border-blue-800 dark:bg-blue-950/40 dark:text-blue-200 dark:hover:bg-blue-900/60"}`}
           >
             របាយការណ៍សង្ខេប
           </button>
@@ -5255,7 +5263,7 @@ function AccountReportView() {
             role="tab"
             aria-selected={activeSheet === "collection"}
             onClick={() => { setActiveSheet("collection"); replaceAccountReportLocation("form", { recordId: searchParams.get("accountReportId") || undefined, sheet: "collection" }); }}
-            className={`min-h-12 min-w-0 rounded-xl border-2 px-4 py-2 text-center text-base font-bold shadow-sm transition-all ${activeSheet === "collection" ? "border-emerald-700 bg-emerald-600 text-white shadow-md ring-2 ring-emerald-200 hover:bg-emerald-700 dark:ring-emerald-900" : "border-emerald-200 bg-emerald-50 text-emerald-800 hover:-translate-y-0.5 hover:border-emerald-400 hover:bg-emerald-100 hover:shadow-md dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200 dark:hover:bg-emerald-900/60"}`}
+            className={`min-h-12 min-w-0 rounded-xl border-2 px-4 py-2 text-center text-base font-bold shadow-sm transition-all ${isSenSokReport ? activeSheet === "collection" ? "border-[#172b55] bg-[#172b55] text-[#f7eedf] shadow-md ring-2 ring-[#cfa66d]/40 hover:bg-[#304a79]" : "border-[#cfa66d] bg-[#f7eedf] text-[#172b55] hover:-translate-y-0.5 hover:bg-[#eedcbc]" : activeSheet === "collection" ? "border-emerald-700 bg-emerald-600 text-white shadow-md ring-2 ring-emerald-200 hover:bg-emerald-700 dark:ring-emerald-900" : "border-emerald-200 bg-emerald-50 text-emerald-800 hover:-translate-y-0.5 hover:border-emerald-400 hover:bg-emerald-100 hover:shadow-md dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200 dark:hover:bg-emerald-900/60"}`}
           >
             អតិថិជនប្រមូល&amp;ដោះស្រាយ
           </button>
@@ -5279,10 +5287,10 @@ function AccountReportView() {
           <div className="min-w-0 p-0 text-slate-950 dark:text-slate-100">
             {!viewOnly ? <>
             <div className="relative flex min-h-28 flex-col items-center justify-center gap-2 border-b border-slate-300 bg-white px-4 py-4 dark:border-slate-700 dark:bg-slate-950 sm:min-h-36 sm:px-0 sm:py-0">
-              <div className="flex items-center justify-center sm:absolute sm:inset-y-0 sm:left-0 sm:p-4"><EmeraldCashLogo className="h-auto w-28 object-contain sm:w-44" /></div>
-              <div className="font-khmer-muol-light w-full px-2 text-center text-xl leading-relaxed text-red-700 sm:px-32 sm:text-3xl">ក្រុមហ៊ុន អេមើរ៉ល ឃែស ឯ.ក</div>
+              <div className="flex items-center justify-center sm:absolute sm:inset-y-0 sm:left-0 sm:p-4"><ReportBrandLogo branch={branch} className="h-auto w-28 object-contain sm:w-44" /></div>
+              <div className={`font-khmer-muol-light w-full px-2 text-center text-xl leading-relaxed sm:px-32 sm:text-3xl ${isSenSokReport ? "text-[#172b55]" : "text-red-700"}`}>{isSenSokReport ? "ក្រុមហ៊ុន វីមាន ខេពីតាល់" : "ក្រុមហ៊ុន អេមើរ៉ល ឃែស ឯ.ក"}</div>
             </div>
-            <div className="font-khmer-muol-light border-b border-slate-300 px-3 py-3 text-center text-lg leading-relaxed text-emerald-700 dark:border-slate-700 sm:text-2xl">{language === "km" ? `របាយការណ៍គណនេយ្យប្រចាំថ្ងៃ ${companyBranchName(branch, "km")}` : `Daily Account Report — ${companyBranchName(branch, "en")}`}</div>
+            <div className={`font-khmer-muol-light border-b border-slate-300 px-3 py-3 text-center text-lg leading-relaxed dark:border-slate-700 sm:text-2xl ${isSenSokReport ? "text-[#cfa66d]" : "text-emerald-700"}`}>{language === "km" ? `របាយការណ៍គណនេយ្យប្រចាំថ្ងៃ ${companyBranchName(branch, "km")}` : `Daily Account Report — ${companyBranchName(branch, "en")}`}</div>
             <div className="grid grid-cols-1 border-b border-slate-300 dark:border-slate-700 lg:grid-cols-[1fr_180px_1.4fr_1fr]">
               <div className="hidden border-r border-slate-300 dark:border-slate-700 lg:block" />
               <div className="grid grid-cols-[120px_minmax(0,1fr)] sm:grid-cols-[180px_minmax(0,1fr)] lg:col-span-2">
@@ -5300,6 +5308,7 @@ function AccountReportView() {
             <div className="h-10 border-b border-slate-300 dark:border-slate-700" />
             </> : null}
             {activeSheet === "summary" ? (
+              <>
               <table className="w-full table-fixed border-collapse text-sm">
                 <thead className={khmerHeader}><tr><th className="border border-slate-300 px-3 py-3">ការប្រមូល</th><th className="border border-slate-300 px-3 py-3">ចំនួនអតិថិជន (នាក់)</th><th className="border border-slate-300 px-3 py-3">ចំនួនទឹកប្រាក់</th></tr></thead>
                 <tbody><tr><td className="border border-slate-300 px-3 py-2">អតិថិជនត្រូវបង់សរុប</td><td className="border border-slate-300 px-3 py-2 text-center">{dueCount}</td><td className="border border-slate-300 px-3 py-2 text-right">{formatCurrency(dueAmount)}</td></tr><tr><td className="border border-slate-300 px-3 py-2">ចំនួនអតិថិជនដែលបានបង់សរុប</td><td className="border border-slate-300 px-3 py-2 text-center">{paidCount}</td><td className="border border-slate-300 px-3 py-2 text-right">{formatCurrency(paidAmount)}</td></tr><tr><td className="border border-slate-300 px-3 py-2">អត្រាប្រមូលប្រាក់គិតជាភាគរយ</td><td className="border border-slate-300 px-3 py-2 text-center">{collectionRate}%</td><td className="border border-slate-300 px-3 py-2 text-right">{collectionAmountRate}%</td></tr></tbody>
@@ -5307,9 +5316,11 @@ function AccountReportView() {
                 <tbody><tr><td className="border border-slate-300 px-3 py-2">ជូនដំណឹងទៅអតិថិជន ដល់ថ្ងៃកំណត់ត្រូវបង់</td><td className="border border-slate-300 px-3 py-2 text-center">{dueNoticeRows.filter((row) => row.customer.trim()).length}</td><td className="border border-slate-300" /></tr><tr><td className="border border-slate-300 px-3 py-2">បានបន្តទាក់ទងអតិថិជនដែលយឺតចាប់ពី ១ថ្ងៃ ដល់ ៣ថ្ងៃ</td><td className="border border-slate-300 px-3 py-2 text-center">{promiseRows.filter((row) => row.customer.trim()).length}</td><td className="border border-slate-300 px-3 py-2 text-right">{formatCurrency(promiseInterestTotal)}</td></tr><tr><td className="border border-slate-300 px-3 py-2">ផ្ញើលិខិតជូនដំណឹងផ្លូវការសម្រាប់អតិថិជនយឺតចាប់ពី ៤ថ្ងៃ</td><td className="border border-slate-300 px-3 py-2 text-center">{closedRows.filter((row) => row.customer.trim()).length}</td><td className="border border-slate-300 px-3 py-2 text-right">{formatCurrency(closedInterestTotal)}</td></tr></tbody>
                 <tfoot><tr className="border-t-2 border-slate-900 bg-slate-100 font-bold text-red-600 dark:bg-slate-800"><td colSpan={2} className="border border-slate-300 px-3 py-3 text-center">សរុប</td><td className="border border-slate-300 px-3 py-3 text-right text-lg">{formatCurrency(promiseInterestTotal + closedInterestTotal)}</td></tr></tfoot>
               </table>
+              <section className={`m-4 rounded-xl border p-4 ${accountValidationFocus === "noActivityReason" ? "border-red-400 bg-red-50 dark:border-red-700 dark:bg-red-950/25" : "border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/20"}`}><div className="flex items-start gap-3"><AlertTriangle className={`mt-0.5 h-5 w-5 shrink-0 ${accountValidationFocus === "noActivityReason" ? "text-red-600" : "text-amber-600"}`} /><div className="min-w-0 flex-1"><h3 className="font-bold">{language === "km" ? "បើគ្មានសកម្មភាពថ្ងៃនេះ" : "If there was no activity today"}</h3><p className="mt-1 text-sm text-slate-600 dark:text-slate-300">{language === "km" ? "មិនត្រូវបញ្ចូលឈ្មោះអតិថិជនក្លែងក្លាយទេ។ សូមបញ្ចូលមូលហេតុ ដើម្បីដាក់ស្នើរបាយការណ៍សូន្យបាន។" : "Do not enter a fake customer. Enter the reason to submit a zero-activity report."}</p><label className="mt-3 block text-sm font-semibold" htmlFor="account-no-activity-reason">{language === "km" ? "មូលហេតុដែលគ្មានសកម្មភាព" : "Reason for no activity"}</label><textarea id="account-no-activity-reason" data-account-validation-field="noActivityReason" aria-invalid={accountValidationFocus === "noActivityReason"} rows={3} value={noActivityReason} onChange={(event) => { setNoActivityReason(event.target.value); if (event.target.value.trim()) { setValidationErrors([]); setAccountValidationFocus(null); } }} placeholder={language === "km" ? "ឧ. មិនមានអតិថិជនត្រូវប្រមូល ឬករណីត្រូវដោះស្រាយនៅថ្ងៃនេះ" : "e.g. No customers were due or required follow-up today"} className={`mt-1 w-full rounded-lg border bg-white px-3 py-2 outline-none focus:ring-2 dark:bg-slate-900 ${accountValidationFocus === "noActivityReason" ? "border-red-500 focus:ring-red-200 dark:focus:ring-red-950" : "border-slate-300 focus:ring-emerald-200 dark:border-slate-700 dark:focus:ring-emerald-950"}`} />{accountValidationFocus === "noActivityReason" ? <p className="mt-2 text-sm font-semibold text-red-700 dark:text-red-300">{language === "km" ? "សូមបញ្ចូលមូលហេតុ មុនពេលដាក់ស្នើ។" : "Enter the reason before submitting."}</p> : null}<button type="button" onClick={() => { setNoActivityReason(""); setAccountValidationFocus(null); setValidationErrors([]); setActiveSheet("collection"); }} className="mt-3 inline-flex min-h-11 items-center gap-2 rounded-lg border border-emerald-300 bg-white px-4 py-2 text-sm font-bold text-emerald-800 shadow-sm hover:bg-emerald-50 dark:border-emerald-800 dark:bg-slate-900 dark:text-emerald-300"><ArrowRight className="h-4 w-4" />{language === "km" ? "មានសកម្មភាព? ចុចទីនេះដើម្បីបំពេញ" : "Have activity? Add it here"}</button></div></div></section>
+              </>
             ) : (
               <>
-                <div className="space-y-5"><AccountCollectionCards title={language === "km" ? "អតិថិជនដែលត្រូវប្រមូល" : "Customers Due"} rows={dueRows} onChange={setDueRows} reasons={ACCOUNT_REPORT_COLLECTION_REASONS} duplicateCustomers={duplicateAccountCustomersBySection.due} /><AccountCollectionCards title={language === "km" ? "អតិថិជនដែលបានប្រមូល" : "Customers Paid"} rows={paidRows} onChange={setPaidRows} reasons={ACCOUNT_REPORT_COLLECTION_REASONS} duplicateCustomers={duplicateAccountCustomersBySection.paid} /></div>
+                <div className="space-y-5"><AccountCollectionCards title={language === "km" ? "អតិថិជនដែលត្រូវប្រមូល" : "Customers Due"} rows={dueRows} onChange={setDueRows} reasons={ACCOUNT_REPORT_COLLECTION_REASONS} duplicateCustomers={duplicateAccountCustomersBySection.due} /><AccountCollectionCards title={language === "km" ? "អតិថិជនដែលប្រមូលបានសរុប" : "Total Customers Collected"} rows={paidRows} onChange={setPaidRows} reasons={ACCOUNT_REPORT_COLLECTION_REASONS} duplicateCustomers={duplicateAccountCustomersBySection.paid} accent="red" /></div>
                 <div className="mt-6 space-y-5"><AccountResolutionCards title={language === "km" ? "ជូនដំណឹងដល់ថ្ងៃកំណត់" : "Due-date Notices"} rows={dueNoticeRows} onChange={setDueNoticeRows} typeLabel={language === "km" ? "ជូនដំណឹង" : "Notice"} typeTone="blue" duplicateCustomers={duplicateAccountCustomersBySection.notices} /><AccountResolutionCards title={language === "km" ? "សន្យាបង់ និងតាមដាន" : "Promises & Follow-up"} rows={promiseRows} onChange={setPromiseRows} typeLabel={language === "km" ? "សន្យា" : "Promise"} typeTone="amber" duplicateCustomers={duplicateAccountCustomersBySection.promises} /><AccountResolutionCards title={language === "km" ? "ករណីបិទ និងលិខិតផ្លូវការ" : "Closed Cases & Formal Notices"} rows={closedRows} onChange={setClosedRows} typeLabel={language === "km" ? "បិទ" : "Closed"} typeTone="red" duplicateCustomers={duplicateAccountCustomersBySection.closed} /></div>
                 <div className="hidden print:block"><div className="grid grid-cols-2">{renderCollectionTable("អតិថិជនដែលប្រមូលសរុប", dueRows, setDueRows)}{renderCollectionTable("អតិថិជនដែលប្រមូលបានសរុប", paidRows, setPaidRows, redHeader)}</div><div className="space-y-8">{renderResolutionTable("ជូនដំណឹងទៅអតិថិជន ដល់ថ្ងៃកំណត់ត្រូវបង់", dueNoticeRows, setDueNoticeRows, { interest: resolutionTotal(dueNoticeRows, "interest"), penalty: resolutionTotal(dueNoticeRows, "penalty"), principal: resolutionTotal(dueNoticeRows, "principal") }, true)}{renderResolutionTable("បានបន្តទាក់ទងអតិថិជនដែលយឺតចាប់ពី ១ថ្ងៃ ដល់ ៣ថ្ងៃ", promiseRows, setPromiseRows, { interest: promiseInterestTotal, penalty: promisePenaltyTotal, principal: promisePrincipalTotal }, true)}{renderResolutionTable("ផ្ញើលិខិតជូនដំណឹងផ្លូវការសម្រាប់អតិថិជនយឺតចាប់ពី ៤ថ្ងៃ", closedRows, setClosedRows, { interest: closedInterestTotal, penalty: closedPenaltyTotal, principal: closedPrincipalTotal }, true)}</div></div>
               </>
@@ -5417,7 +5428,7 @@ function AccountReportRecordsDashboard({ records, loading, currentUsername, lang
   const submitted = filtered.filter((record) => record.status === "submitted").length;
   const returned = filtered.filter((record) => record.status === "returned").length;
   const todayReports = filtered.filter((record) => record.reportDate === operationDateInputValue()).length;
-  const rowCount = (record: AccountReportRecord, key: keyof AccountReportSavedData) => (record.data[key] || []).filter((row) => row.customer.trim()).length;
+  const rowCount = (record: AccountReportRecord, key: Exclude<keyof AccountReportSavedData, "noActivityReason">) => (record.data[key] || []).filter((row) => row.customer.trim()).length;
   const periodLabel = reportPeriod === "daily" ? periodValue || "daily"
     : reportPeriod === "monthly" ? periodValue || "monthly"
       : reportPeriod === "yearly" ? periodValue || "yearly"
@@ -5585,6 +5596,7 @@ type OperationReportSavedData = {
   requestedRows: OperationReportLoanDecisionRow[];
   approvedRows: OperationReportLoanDecisionRow[];
   rejectedRows: OperationReportLoanDecisionRow[];
+  noActivityReason?: string;
   bmWorksheet?: BmWorksheet;
   sourceReportIds?: string[];
   sourceAccountReportIds?: string[];
@@ -5732,6 +5744,11 @@ function OperationReportView({ loans, loading, canViewLoanData, onRefresh, onOpe
   const [reviewingAction, setReviewingAction] = useState<"reviewed" | "approved" | "returned" | null>(null);
   const [deletingReportId, setDeletingReportId] = useState<string | null>(null);
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
+  const [operationValidationFocus, setOperationValidationFocus] = useState<"noActivityReason" | "customerActivity" | "amount" | "reportDate" | "reporterName" | "reporterRole" | "department" | null>(null);
+  const [operationValidationFocusVersion, setOperationValidationFocusVersion] = useState(0);
+  const [noActivityReason, setNoActivityReason] = useState("");
+  const [bmValidationErrors, setBmValidationErrors] = useState<string[]>([]);
+  const [bmValidationFocusVersion, setBmValidationFocusVersion] = useState(0);
   const [rememberedAssetTypes, setRememberedAssetTypes] = useState<string[]>([]);
   const [localDraftHydrated, setLocalDraftHydrated] = useState(false);
   const [savedValuesOpen, setSavedValuesOpen] = useState(false);
@@ -5739,6 +5756,17 @@ function OperationReportView({ loans, loading, canViewLoanData, onRefresh, onOpe
   useEffect(() => {
     if (reviewComment.trim()) setReviewCommentError(false);
   }, [reviewComment]);
+
+  useEffect(() => {
+    if (!operationValidationFocusVersion || !operationValidationFocus) return;
+    if (operationValidationFocus === "customerActivity" || operationValidationFocus === "amount") setActiveForm("collection");
+    if (operationValidationFocus === "noActivityReason") setActiveForm("summary");
+    window.setTimeout(() => {
+      const field = document.querySelector<HTMLElement>(`[data-operation-validation-field="${operationValidationFocus}"]`);
+      field?.scrollIntoView({ behavior: "smooth", block: "center" });
+      field?.focus({ preventScroll: true });
+    }, 80);
+  }, [operationValidationFocus, operationValidationFocusVersion]);
 
   const isHumanResources = isHumanResourcesReportActor(user.role, user.position);
   const isDirector = isDirectorReportActor(user.role, user.position);
@@ -5807,6 +5835,14 @@ function OperationReportView({ loans, loading, canViewLoanData, onRefresh, onOpe
   const branchManagerMonthRecords = useMemo(() => visibleSavedReports.filter((record) => record.reportDate.startsWith(reportDate.slice(0, 7)) && (!branch.trim() || normalizeReportBranchLabel(record.branch) === normalizeReportBranchLabel(branch)) && ["submitted", "reviewed", "approved"].includes(record.status)), [branch, reportDate, visibleSavedReports]);
   const branchManagerYearRecords = useMemo(() => visibleSavedReports.filter((record) => record.reportDate.startsWith(reportDate.slice(0, 4)) && (!branch.trim() || normalizeReportBranchLabel(record.branch) === normalizeReportBranchLabel(branch)) && ["submitted", "reviewed", "approved"].includes(record.status)), [branch, reportDate, visibleSavedReports]);
   const branchAccountRecords = useMemo(() => accountReports.filter((record) => record.reportDate === reportDate && (!branch.trim() || normalizeReportBranchLabel(record.branch) === normalizeReportBranchLabel(branch)) && ["submitted", "reviewed", "approved"].includes(record.status)), [accountReports, branch, reportDate]);
+  const branchAccountReportsNeedingSubmission = useMemo(() => accountReports.filter((record) => record.reportDate === reportDate && (!branch.trim() || normalizeReportBranchLabel(record.branch) === normalizeReportBranchLabel(branch)) && ["draft", "returned"].includes(record.status)), [accountReports, branch, reportDate]);
+  // The API accepts only reviewed/approved sources in a generated BM report.
+  // Keep submitted records visible for the BM review queue, but never advertise
+  // them as ready for the auto-fill action.
+  const readyBranchManagerRecords = useMemo(() => branchManagerRecords.filter((record) => ["reviewed", "approved"].includes(record.status)), [branchManagerRecords]);
+  const readyBranchManagerMonthRecords = useMemo(() => branchManagerMonthRecords.filter((record) => ["reviewed", "approved"].includes(record.status)), [branchManagerMonthRecords]);
+  const readyBranchManagerYearRecords = useMemo(() => branchManagerYearRecords.filter((record) => ["reviewed", "approved"].includes(record.status)), [branchManagerYearRecords]);
+  const readyBranchAccountRecords = useMemo(() => branchAccountRecords.filter((record) => ["reviewed", "approved"].includes(record.status)), [branchAccountRecords]);
   const branchAccountReportHistory = useMemo(() => accountReports.filter((record) => !branch.trim() || normalizeReportBranchLabel(record.branch) === normalizeReportBranchLabel(branch)), [accountReports, branch]);
   const workspaceBranchOptions = useMemo(() => Array.from(new Map([
     ...COMPANY_BRANCH_OPTIONS, ...assignedReportBranches,
@@ -5825,8 +5861,14 @@ function OperationReportView({ loans, loading, canViewLoanData, onRefresh, onOpe
   }, [localDraftHydrated, searchParams, isHumanResources, isDirector, workspaceBranchOptions]);
   const branchAccountMonthRecords = useMemo(() => accountReports.filter((record) => record.reportDate.startsWith(reportDate.slice(0, 7)) && (!branch.trim() || normalizeReportBranchLabel(record.branch) === normalizeReportBranchLabel(branch)) && ["submitted", "reviewed", "approved"].includes(record.status)), [accountReports, branch, reportDate]);
   const branchAccountYearRecords = useMemo(() => accountReports.filter((record) => record.reportDate.startsWith(reportDate.slice(0, 4)) && (!branch.trim() || normalizeReportBranchLabel(record.branch) === normalizeReportBranchLabel(branch)) && ["submitted", "reviewed", "approved"].includes(record.status)), [accountReports, branch, reportDate]);
+  const readyBranchAccountMonthRecords = useMemo(() => branchAccountMonthRecords.filter((record) => ["reviewed", "approved"].includes(record.status)), [branchAccountMonthRecords]);
+  const readyBranchAccountYearRecords = useMemo(() => branchAccountYearRecords.filter((record) => ["reviewed", "approved"].includes(record.status)), [branchAccountYearRecords]);
   const branchLoanSpecialistRecords = useMemo(() => visibleSavedReports.filter((record) => !branch.trim() || normalizeReportBranchLabel(record.branch) === normalizeReportBranchLabel(branch)), [branch, visibleSavedReports]);
   const lsReportsNeedingSubmission = useMemo(() => Array.from(new Map(branchLoanSpecialistRecords.filter((record) => record.reportDate === reportDate && ["draft", "returned"].includes(record.status)).map((record) => [`${record.reporterUsername.trim().toLowerCase()}:${normalizeReportBranchLabel(record.branch)}`, record])).values()), [branchLoanSpecialistRecords, reportDate]);
+  const submittedLsAwaitingReview = branchManagerRecords.filter((record) => record.status === "submitted").length;
+  const submittedAccountsAwaitingReview = branchAccountRecords.filter((record) => record.status === "submitted").length;
+  const incompleteSourceCount = lsReportsNeedingSubmission.length + branchAccountReportsNeedingSubmission.length + submittedLsAwaitingReview + submittedAccountsAwaitingReview;
+  const hasIncompleteSources = incompleteSourceCount > 0;
   const hrFrom = searchParams.get("hrFrom") || "";
   const hrTo = searchParams.get("hrTo") || "";
   const hrStatus = searchParams.get("hrStatus") ?? "";
@@ -5871,6 +5913,9 @@ function OperationReportView({ loans, loading, canViewLoanData, onRefresh, onOpe
   const ownBranchManagerReport = branchManagerReports.find((record) => record.reporterUsername === user.username && record.reportDate === reportDate && normalizeReportBranchLabel(record.branch) === normalizeReportBranchLabel(branch));
   const openedBmReport = branchManagerReports.find((record) => record.id === searchParams.get("operationReportId"));
   const currentBmReport = openedBmReport || ownBranchManagerReport;
+  const openedBmReportIsEditable = Boolean(openedBmReport
+    && openedBmReport.reporterUsername.trim().toLowerCase() === user.username.trim().toLowerCase()
+    && ["draft", "returned"].includes(openedBmReport.status));
   const bmEntryMode = searchParams.get("reportEntry") === "manual" ? "manual" : "generated";
   const bmDraftKeyForMode = (mode: "manual" | "generated") => `bm-report:${mode}:${user.username}:${normalizeReportBranchLabel(branch)}:${reportDate}`;
   const bmDraftKey = bmDraftKeyForMode(bmEntryMode);
@@ -5918,10 +5963,11 @@ function OperationReportView({ loans, loading, canViewLoanData, onRefresh, onOpe
   }, [openedBmReport]);
   const bmWorksheet = (openedBmReport
     ? openedBmReport.data.bmWorksheet || legacyBmWorksheet
-    : currentBmReport && !["draft", "returned"].includes(currentBmReport.status)
+    : currentBmReport
       ? savedBmWorksheet
       : bmDrafts[bmDraftKey] || (savedBmWorksheet?.mode === bmEntryMode ? savedBmWorksheet : undefined)) || blankBmWorksheet;
   const updateBmWorksheet = (value: BmWorksheet) => {
+    setBmValidationErrors([]);
     setBmDrafts((current) => ({ ...current, [bmDraftKey]: value }));
     try { window.localStorage.setItem(bmDraftKey, JSON.stringify(value)); } catch { /* Saving to the server remains available. */ }
   };
@@ -5932,21 +5978,19 @@ function OperationReportView({ loans, loading, canViewLoanData, onRefresh, onOpe
     } catch { /* Start with the saved report or an empty manual report. */ }
   }, [bmDraftKey]);
   const generateBmReport = () => {
-    if (!canManageReports || openedBmReport || (currentBmReport && !["draft", "returned"].includes(currentBmReport.status))) return;
+    if (!canManageReports || (openedBmReport && !openedBmReportIsEditable) || (currentBmReport && !["draft", "returned"].includes(currentBmReport.status))) return;
     if (lsReportsNeedingSubmission.length) {
       setShowIncompleteLsPanel(true);
-      toastError(opText(`LS មិនទាន់ដាក់ស្នើ៖ សូមពិនិត្យរបាយការណ៍ខាងក្រោម`, `LS reports pending: see the details below`));
-      return;
     }
-    if (!branchManagerRecords.length || !branchAccountRecords.length) {
-      toastError(opText("ត្រូវមានរបាយការណ៍ LS និងគណនេយ្យសម្រាប់សាខា និងថ្ងៃនេះ។", "Generate requires LS and Account reports for the selected branch and date."));
+    if (!readyBranchManagerRecords.length || !readyBranchAccountRecords.length) {
+      toastError(opText("ត្រូវពិនិត្យ/អនុម័តរបាយការណ៍ LS និងគណនេយ្យសម្រាប់សាខា និងថ្ងៃនេះជាមុនសិន។", "Generate requires reviewed or approved LS and Account reports for the selected branch and date."));
       return;
     }
     if (hasBmWorksheetContent(bmWorksheet) && !window.confirm(opText("ជំនួសទិន្នន័យដែលបានបញ្ចូលដោយរបាយការណ៍ LS និងគណនេយ្យ?", "Replace the entered figures with LS and Account report results?"))) return;
     const periodSources = [
-      [branchManagerRecords, branchAccountRecords],
-      [branchManagerMonthRecords.filter((record) => record.reportDate <= reportDate), branchAccountMonthRecords.filter((record) => record.reportDate <= reportDate)],
-      [branchManagerYearRecords.filter((record) => record.reportDate <= reportDate), branchAccountYearRecords.filter((record) => record.reportDate <= reportDate)],
+      [readyBranchManagerRecords, readyBranchAccountRecords],
+      [readyBranchManagerMonthRecords.filter((record) => record.reportDate <= reportDate), readyBranchAccountMonthRecords.filter((record) => record.reportDate <= reportDate)],
+      [readyBranchManagerYearRecords.filter((record) => record.reportDate <= reportDate), readyBranchAccountYearRecords.filter((record) => record.reportDate <= reportDate)],
     ] as const;
     const periods = emptyBmPeriods().map((period, index) => {
       const [ls, accounts] = periodSources[index];
@@ -5957,15 +6001,22 @@ function OperationReportView({ loans, loading, canViewLoanData, onRefresh, onOpe
       kpis: (bmWorksheet.kpis || emptyBmKpis()).map((row) => row.id === "collected" ? { ...row, daily: periods[0].collected, monthly: periods[1].collected } : row),
       periods,
       mode: "generated",
-      staff: branchManagerStaffPerformance(branchManagerRecords).map((row) => ({ name: row.name, requested: String(row.requested), approved: String(row.approved), collected: String(row.collected), rejected: String(row.rejected), contacts: String(branchManagerRecords.filter((record) => (record.reporterName || record.reporterUsername) === row.name).reduce((sum, record) => sum + [...(record.data.followUpRows || []), ...(record.data.formalNoticeRows || [])].filter((entry) => entry.customer.trim()).length, 0)) })),
-      accounts: branchAccountRecords.map((record) => ({ name: record.reporterName || record.reporterUsername, due: String((record.data.dueRows || []).filter((row) => row.customer.trim()).length), paid: String((record.data.paidRows || []).filter((row) => row.customer.trim()).length), dueAmount: String((record.data.dueRows || []).reduce((total, row) => total + operationNumber(row.amount), 0)), paidAmount: String((record.data.paidRows || []).reduce((total, row) => total + operationNumber(row.amount), 0)) })),
+      staff: branchManagerStaffPerformance(readyBranchManagerRecords).map((row) => ({ name: row.name, requested: String(row.requested), approved: String(row.approved), collected: String(row.collected), rejected: String(row.rejected), contacts: String(readyBranchManagerRecords.filter((record) => (record.reporterName || record.reporterUsername) === row.name).reduce((sum, record) => sum + [...(record.data.followUpRows || []), ...(record.data.formalNoticeRows || [])].filter((entry) => entry.customer.trim()).length, 0)) })),
+      accounts: readyBranchAccountRecords.map((record) => ({ name: record.reporterName || record.reporterUsername, due: String((record.data.dueRows || []).filter((row) => row.customer.trim()).length), paid: String((record.data.paidRows || []).filter((row) => row.customer.trim()).length), dueAmount: String((record.data.dueRows || []).reduce((total, row) => total + operationNumber(row.amount), 0)), paidAmount: String((record.data.paidRows || []).reduce((total, row) => total + operationNumber(row.amount), 0)) })),
       notes: bmWorksheet.notes,
-      sourceReportIds: branchManagerRecords.map((record) => record.id),
-      sourceAccountReportIds: branchAccountRecords.map((record) => record.id),
+      sourceReportIds: readyBranchManagerRecords.map((record) => record.id),
+      sourceAccountReportIds: readyBranchAccountRecords.map((record) => record.id),
     };
     const generatedDraftKey = bmDraftKeyForMode("generated");
     setBmDrafts((current) => ({ ...current, [generatedDraftKey]: generatedWorksheet }));
     try { window.localStorage.setItem(generatedDraftKey, JSON.stringify(generatedWorksheet)); } catch { /* Saving to the server remains available. */ }
+    const pendingLs = branchManagerRecords.filter((record) => !["reviewed", "approved"].includes(record.status)).length;
+    const pendingAccounts = branchAccountRecords.filter((record) => !["reviewed", "approved"].includes(record.status)).length;
+    toastSuccess(
+      pendingLs || pendingAccounts
+        ? opText(`បានបង្កើត Draft ពី LS ${readyBranchManagerRecords.length} និង Acc ${readyBranchAccountRecords.length} រួចរាល់។ នៅសល់ LS ${pendingLs} និង Acc ${pendingAccounts} ត្រូវពិនិត្យ មុនពេល Submit។`, `Draft generated from ${readyBranchManagerRecords.length} ready LS and ${readyBranchAccountRecords.length} ready Acc reports. ${pendingLs} LS and ${pendingAccounts} Acc report(s) still need review before submission.`)
+        : opText(`បានបង្កើត Draft ពី LS ${readyBranchManagerRecords.length} និង Acc ${readyBranchAccountRecords.length} របាយការណ៍ដែលបានពិនិត្យរួច។`, `Draft generated from ${readyBranchManagerRecords.length} reviewed LS and ${readyBranchAccountRecords.length} reviewed Acc reports.`),
+    );
     setReportPanel("form");
     const params = new URLSearchParams(searchParams.toString());
     params.set("view", "operationReport");
@@ -6070,6 +6121,7 @@ function OperationReportView({ loans, loading, canViewLoanData, onRefresh, onOpe
         if (Array.isArray(stored.requestedRows)) setRequestedRows(stored.requestedRows);
         if (Array.isArray(stored.approvedRows)) setApprovedRows(stored.approvedRows);
         if (Array.isArray(stored.rejectedRows)) setRejectedRows(stored.rejectedRows);
+        if (typeof stored.noActivityReason === "string") setNoActivityReason(stored.noActivityReason);
       }
       const storedView = JSON.parse(window.localStorage.getItem(viewStorageKey) || "null") as { reportPanel?: string; activeForm?: string; reportMode?: string } | null;
       if (storedView?.reportPanel === "records" || storedView?.reportPanel === "form") setReportPanel(storedView.reportPanel);
@@ -6081,9 +6133,9 @@ function OperationReportView({ loans, loading, canViewLoanData, onRefresh, onOpe
 
   useEffect(() => {
     if (!localDraftHydrated) return;
-    const draft: OperationReportLocalDraft = { reportDate, branch, reporterName, reporterRole, department, activeForm, reportPanel, reportMode, loadedReporterUsername, loadedReportStatus, reviewComment, collectionDueRows, collectionPaidRows, dueNoticeRows, followUpRows, formalNoticeRows, requestedRows, approvedRows, rejectedRows };
+    const draft: OperationReportLocalDraft = { reportDate, branch, reporterName, reporterRole, department, activeForm, reportPanel, reportMode, loadedReporterUsername, loadedReportStatus, reviewComment, collectionDueRows, collectionPaidRows, dueNoticeRows, followUpRows, formalNoticeRows, requestedRows, approvedRows, rejectedRows, noActivityReason };
     try { window.localStorage.setItem(localDraftStorageKey, JSON.stringify(draft)); } catch { /* Browser storage may be unavailable. */ }
-  }, [activeForm, approvedRows, branch, collectionDueRows, collectionPaidRows, department, dueNoticeRows, followUpRows, formalNoticeRows, loadedReportStatus, loadedReporterUsername, localDraftHydrated, localDraftStorageKey, rejectedRows, reportDate, reportMode, reportPanel, reporterName, reporterRole, requestedRows, reviewComment]);
+  }, [activeForm, approvedRows, branch, collectionDueRows, collectionPaidRows, department, dueNoticeRows, followUpRows, formalNoticeRows, loadedReportStatus, loadedReporterUsername, localDraftHydrated, localDraftStorageKey, noActivityReason, rejectedRows, reportDate, reportMode, reportPanel, reporterName, reporterRole, requestedRows, reviewComment]);
 
   useEffect(() => {
     if (!localDraftHydrated) return;
@@ -6110,7 +6162,7 @@ function OperationReportView({ loans, loading, canViewLoanData, onRefresh, onOpe
     });
   };
 
-  const currentReportData = (): OperationReportSavedData => ({ collectionDueRows, collectionPaidRows, dueNoticeRows, followUpRows, formalNoticeRows, requestedRows, approvedRows, rejectedRows });
+  const currentReportData = (): OperationReportSavedData => ({ collectionDueRows, collectionPaidRows, dueNoticeRows, followUpRows, formalNoticeRows, requestedRows, approvedRows, rejectedRows, noActivityReason: noActivityReason.trim() || undefined });
 
   const validateOperationReport = () => {
     const errors: string[] = [];
@@ -6120,47 +6172,12 @@ function OperationReportView({ loans, loading, canViewLoanData, onRefresh, onOpe
     if (!reporterRole.trim()) errors.push(opText("ត្រូវបញ្ចូលមុខតំណែង", "Position is required."));
     if (!department.trim()) errors.push(opText("ត្រូវបញ្ចូលនាយកដ្ឋាន", "Department is required."));
     const allRows = [...collectionDueRows, ...collectionPaidRows, ...dueNoticeRows, ...followUpRows, ...formalNoticeRows, ...requestedRows, ...approvedRows, ...rejectedRows];
-    if (!allRows.some((row) => row.customer.trim())) errors.push(opText("បន្ថែមសកម្មភាពអតិថិជនយ៉ាងតិចមួយមុនពេលដាក់ស្នើ", "Add at least one customer activity before submitting."));
+    if (!allRows.some((row) => row.customer.trim()) && !noActivityReason.trim()) errors.push(opText("បើគ្មានសកម្មភាព សូមបញ្ចូលមូលហេតុថាហេតុអ្វីគ្មានសកម្មភាព", "If there was no activity, enter the reason."));
     if ([...collectionDueRows, ...collectionPaidRows, ...requestedRows, ...approvedRows, ...rejectedRows].some((row) => row.customer.trim() && operationNumber(row.amount) <= 0)) errors.push(opText("ចំនួនទឹកប្រាក់អតិថិជនត្រូវធំជាងសូន្យ", "Every customer amount must be greater than zero."));
     if (rejectedRows.some((row) => row.customer.trim() && !row.reason.trim())) errors.push(opText("ឥណទានដែលបដិសេធត្រូវមានមូលហេតុ", "Rejected loans require a reason."));
     const dueNames = collectionDueRows.map((row) => row.customer.trim().toLocaleLowerCase()).filter(Boolean);
     if (new Set(dueNames).size !== dueNames.length) errors.push(opText("បញ្ជីអតិថិជនត្រូវបង់មានឈ្មោះស្ទួន", "The due-customer list contains duplicate customers."));
     return errors;
-  };
-
-  const prepareDailyWork = () => {
-    if (!myDueLoans.length) {
-      toastError(opText("គ្មានឥណទានដល់ថ្ងៃបង់ ឬហួសកំណត់ដែលបានចាត់តាំងឱ្យអ្នកសម្រាប់ថ្ងៃនេះ", "No due or overdue loans are assigned to you for this date."));
-      return;
-    }
-    const hasEnteredWork = [...collectionDueRows, ...dueNoticeRows, ...followUpRows, ...formalNoticeRows].some((row) => row.customer.trim());
-    if (hasEnteredWork && !window.confirm(opText("ជំនួសទិន្នន័យបច្ចុប្បន្នដោយទិន្នន័យឥណទានផ្ទាល់មែនទេ?", "Replace the current rows with live loan data?"))) return;
-    const reportTime = new Date(`${reportDate}T00:00:00`).getTime();
-    const rowsFor = (items: LoanEntity[]) => {
-      const rows = items.map((loan, index): OperationReportResolutionRow => ({ id: index + 1, customer: loan.borrower.fullName, assetType: loan.loanType, interest: "", penalty: "", principal: String(loan.outstandingBalance), solution: "" }));
-      return rows.length >= OPERATION_REPORT_DEFAULT_ROWS ? rows : [...rows, ...createOperationResolutionRows().slice(0, OPERATION_REPORT_DEFAULT_ROWS - rows.length).map((row, index) => ({ ...row, id: rows.length + index + 1 }))];
-    };
-    const dueToday: LoanEntity[] = [];
-    const followUp: LoanEntity[] = [];
-    const formal: LoanEntity[] = [];
-    myDueLoans.forEach((loan) => {
-      const dueTime = new Date(`${loan.nextPaymentDate!.slice(0, 10)}T00:00:00`).getTime();
-      const overdueDays = Math.max(0, Math.round((reportTime - dueTime) / 86_400_000));
-      if (overdueDays === 0) dueToday.push(loan);
-      else if (overdueDays <= 3) followUp.push(loan);
-      else formal.push(loan);
-    });
-    const dueRows = myDueLoans.map((loan, index): OperationReportCollectionRow => {
-      const dueTime = new Date(`${loan.nextPaymentDate!.slice(0, 10)}T00:00:00`).getTime();
-      const overdueDays = Math.max(0, Math.round((reportTime - dueTime) / 86_400_000));
-      return { id: index + 1, customer: loan.borrower.fullName, amount: String(loan.paymentAmount), reason: overdueDays ? opText(`ហួសកំណត់ ${overdueDays} ថ្ងៃ`, `${overdueDays} day(s) overdue`) : opText("ដល់ថ្ងៃបង់", "Due today") };
-    });
-    setCollectionDueRows(dueRows.length >= OPERATION_REPORT_DEFAULT_ROWS ? dueRows : [...dueRows, ...createOperationCollectionRows().slice(0, OPERATION_REPORT_DEFAULT_ROWS - dueRows.length).map((row, index) => ({ ...row, id: dueRows.length + index + 1 }))]);
-    setDueNoticeRows(rowsFor(dueToday));
-    setFollowUpRows(rowsFor(followUp));
-    setFormalNoticeRows(rowsFor(formal));
-    setValidationErrors([]);
-    toastSuccess(opText(`បានរៀបចំអតិថិជនត្រូវបង់ ${myDueLoans.length} នាក់ពីទិន្នន័យឥណទានផ្ទាល់`, `Prepared ${myDueLoans.length} due customer(s) from live loans.`));
   };
 
   const saveOperationReport = async (status: "draft" | "submitted") => {
@@ -6176,6 +6193,10 @@ function OperationReportView({ loans, loading, canViewLoanData, onRefresh, onOpe
       const errors = validateOperationReport();
       setValidationErrors(errors);
       if (errors.length) {
+        const allRows = [...collectionDueRows, ...collectionPaidRows, ...dueNoticeRows, ...followUpRows, ...formalNoticeRows, ...requestedRows, ...approvedRows, ...rejectedRows];
+        const focus = !reportDate ? "reportDate" : !reporterName.trim() ? "reporterName" : !reporterRole.trim() ? "reporterRole" : !department.trim() ? "department" : !allRows.some((row) => row.customer.trim()) && !noActivityReason.trim() ? "noActivityReason" : [...collectionDueRows, ...collectionPaidRows, ...requestedRows, ...approvedRows, ...rejectedRows].some((row) => row.customer.trim() && operationNumber(row.amount) <= 0) ? "amount" : "customerActivity";
+        setOperationValidationFocus(focus);
+        setOperationValidationFocusVersion((version) => version + 1);
         toastError(opText("សូមកែតម្រូវតម្រូវការដែលបានបង្ហាញមុនពេលដាក់ស្នើ", "Please correct the highlighted requirements before submitting."));
         return;
       }
@@ -6230,7 +6251,10 @@ function OperationReportView({ loans, loading, canViewLoanData, onRefresh, onOpe
   const reviewBranchManagerSubmission = async (record: OperationReportRecord, action: "reviewed" | "approved" | "returned") => {
     if ((!isHumanResources && !isDirector) || record.reporterUsername === user.username) return;
     const comment = action === "returned" ? window.prompt(opText("បញ្ចូលមូលហេតុដែលត្រូវកែតម្រូវ", "Enter the correction required"), "")?.trim() || "" : "";
-    if (action === "returned" && !comment) return;
+    if (action === "returned" && !comment) {
+      toastError(opText("សូមបញ្ចូលមូលហេតុ/ចំណុចដែលត្រូវកែតម្រូវ មុនពេលបញ្ជូនរបាយការណ៍ត្រឡប់។", "Enter the correction required before returning the report."));
+      return;
+    }
     setReviewingAction(action);
     try {
       await api<OperationReportRecord>("/api/loan/operation-reports", {
@@ -6287,6 +6311,7 @@ function OperationReportView({ loans, loading, canViewLoanData, onRefresh, onOpe
     setRequestedRows(record.data.requestedRows?.length ? record.data.requestedRows : [{ id: 1, customer: "", type: "", amount: "", reason: "" }]);
     setApprovedRows(record.data.approvedRows?.length ? record.data.approvedRows : [{ id: 1, customer: "", type: "", amount: "", reason: "" }]);
     setRejectedRows(record.data.rejectedRows?.length ? record.data.rejectedRows : [{ id: 1, customer: "", type: "", amount: "", reason: "" }]);
+    setNoActivityReason(record.data.noActivityReason || "");
     setLoadedReporterUsername(record.reporterUsername);
     setLoadedReportStatus(record.status);
     setReviewComment(record.reviewComment || "");
@@ -6433,7 +6458,16 @@ function OperationReportView({ loans, loading, canViewLoanData, onRefresh, onOpe
 
   const saveBranchManagerReport = async (status: "draft" | "submitted") => {
     if (!canManageReports) return;
-    if (branchManagerReportLocked || openedBmReport) return;
+    if (branchManagerReportLocked || (openedBmReport && !openedBmReportIsEditable)) return;
+    if (status === "submitted") {
+      const errors = submitRequirements;
+      setBmValidationErrors(errors);
+      if (errors.length) {
+        if (bmWorksheet.mode === "manual") setBmValidationFocusVersion((current) => current + 1);
+        toastError(opText("សូមបំពេញប្រអប់ដែលមានសញ្ញាពណ៌ក្រហម មុនពេលដាក់ស្នើ។", "Complete the fields highlighted in red before submitting."));
+        return;
+      }
+    }
     if (!validBmWorksheet(bmWorksheet) || (status === "submitted" && !hasBmWorksheetContent(bmWorksheet))) {
       toastError(opText("សូមបញ្ចូលទិន្នន័យរបាយការណ៍ និងចំនួនវិជ្ជមាន។", "Enter report content and valid non-negative figures before submitting."));
       return;
@@ -6457,6 +6491,7 @@ function OperationReportView({ loans, loading, canViewLoanData, onRefresh, onOpe
       try { window.localStorage.removeItem(bmDraftKey); } catch { /* The report is saved on the server. */ }
       toastSuccess(status === "submitted" ? opText("បានដាក់ស្នើរបាយការណ៍ខ្ញុំទៅថ្នាក់លើ", "My Report was submitted to management.") : opText("បានរក្សាទុករបាយការណ៍ខ្ញុំជាព្រាង", "My Report was saved as a draft."));
       await loadSavedReports();
+      setBmValidationErrors([]);
     } catch (caught) {
       toastError(caught instanceof Error ? caught.message : opText("មិនអាចរក្សាទុករបាយការណ៍ខ្ញុំ", "Could not save My Report"));
     } finally {
@@ -6498,24 +6533,25 @@ function OperationReportView({ loans, loading, canViewLoanData, onRefresh, onOpe
   const assetTypeDatalist = <datalist id="operation-report-asset-types">{selectableAssetTypes.map((type) => <option key={type} value={type} />)}</datalist>;
   const reportFieldClass = "block w-full border-0 bg-transparent px-3 py-2 text-slate-950 outline-none focus:bg-emerald-50 disabled:opacity-100 dark:text-slate-100 dark:focus:bg-emerald-950/30";
   const operationFieldInvalid = (value: string) => validationErrors.length > 0 && !value.trim();
+  const isSenSokReport = normalizeCompanyBranch(branch) === "sen-sok";
   const printedReportSheetHeader = (
     <>
       <div className="relative flex min-h-28 flex-col items-center justify-center gap-2 border-b border-slate-300 bg-white px-4 py-4 dark:border-slate-700 dark:bg-slate-950 sm:min-h-36 sm:px-0 sm:py-0">
-        <div className="flex items-center justify-center sm:absolute sm:inset-y-0 sm:left-0 sm:p-4"><EmeraldCashLogo className="h-auto w-28 object-contain sm:w-44" /></div>
-        <div className="font-khmer-muol-light w-full px-2 text-center text-xl leading-relaxed text-red-700 sm:px-32 sm:text-3xl">ក្រុមហ៊ុន អេមើរ៉ល ឃែស ឯ.ក</div>
+        <div className="flex items-center justify-center sm:absolute sm:inset-y-0 sm:left-0 sm:p-4"><ReportBrandLogo branch={branch} className="h-auto w-28 object-contain sm:w-44" /></div>
+        <div className={`font-khmer-muol-light w-full px-2 text-center text-xl leading-relaxed sm:px-32 sm:text-3xl ${isSenSokReport ? "text-[#172b55]" : "text-red-700"}`}>{isSenSokReport ? "ក្រុមហ៊ុន វីមាន ខេពីតាល់" : "ក្រុមហ៊ុន អេមើរ៉ល ឃែស ឯ.ក"}</div>
       </div>
-      <div className="font-khmer-muol-light flex items-center justify-center border-b border-slate-300 px-3 py-3 text-center text-lg leading-relaxed text-emerald-700 dark:border-slate-700 sm:text-2xl">{opText(`របាយការណ៍លទ្ធផលប្រចាំថ្ងៃ ${companyBranchName(branch, "km")}`, `Daily Performance Report — ${companyBranchName(branch, "en")}`)}</div>
+      <div className={`font-khmer-muol-light flex items-center justify-center border-b border-slate-300 px-3 py-3 text-center text-lg leading-relaxed dark:border-slate-700 sm:text-2xl ${isSenSokReport ? "text-[#cfa66d]" : "text-emerald-700"}`}>{opText(`របាយការណ៍លទ្ធផលប្រចាំថ្ងៃ ${companyBranchName(branch, "km")}`, `Daily Performance Report — ${companyBranchName(branch, "en")}`)}</div>
       <div className="grid grid-cols-1 border-b border-slate-300 dark:border-slate-700 lg:grid-cols-[1fr_180px_1.4fr_1fr]">
         <div className="hidden border-r border-slate-300 dark:border-slate-700 lg:block" />
         <div className="grid grid-cols-[108px_minmax(0,1fr)] sm:grid-cols-[150px_minmax(0,1fr)] lg:col-span-2 lg:grid-cols-[180px_minmax(0,1fr)]">
           <div className="flex min-h-12 items-center justify-end whitespace-nowrap border-b border-slate-300 px-3 py-2 text-right font-semibold dark:border-slate-700">កាលបរិច្ឆេទ៖</div>
-          <DateInput title="Report date" disabled={reviewingAnotherSpecialist || reportLocked} value={reportDate} onChange={changeReportDate} className={`${reportFieldClass} min-h-12 border-b ${operationFieldInvalid(reportDate) ? "border-red-500 bg-red-50 text-red-900" : "border-slate-300"} dark:border-slate-700`} />
+          <DateInput title="Report date" disabled={reviewingAnotherSpecialist || reportLocked} value={reportDate} onChange={changeReportDate} data-operation-validation-field="reportDate" aria-invalid={operationFieldInvalid(reportDate)} className={`${reportFieldClass} min-h-12 border-b ${operationFieldInvalid(reportDate) ? "border-red-500 bg-red-50 text-red-900" : "border-slate-300"} dark:border-slate-700`} />
           <div className="flex min-h-12 items-center justify-end whitespace-nowrap border-b border-slate-300 px-3 py-2 text-right font-semibold dark:border-slate-700">ឈ្មោះ៖</div>
-          <input disabled={reviewingAnotherSpecialist || reportLocked} {...operationFieldProps("reporterName")} value={reporterName} onChange={(event) => setReporterName(event.target.value)} className={`${reportFieldClass} min-h-12 border-b ${operationFieldInvalid(reporterName) ? "border-red-500 bg-red-50" : "border-slate-300"} dark:border-slate-700`} />
+          <input disabled={reviewingAnotherSpecialist || reportLocked} data-operation-validation-field="reporterName" aria-invalid={operationFieldInvalid(reporterName)} {...operationFieldProps("reporterName")} value={reporterName} onChange={(event) => setReporterName(event.target.value)} className={`${reportFieldClass} min-h-12 border-b ${operationFieldInvalid(reporterName) ? "border-red-500 bg-red-50" : "border-slate-300"} dark:border-slate-700`} />
           <div className="flex min-h-12 items-center justify-end whitespace-nowrap border-b border-slate-300 px-3 py-2 text-right font-semibold dark:border-slate-700">តួនាទី៖</div>
-          <input disabled={reviewingAnotherSpecialist || reportLocked} {...operationFieldProps("reporterRole")} value={reporterRole} onChange={(event) => setReporterRole(event.target.value)} className={`${reportFieldClass} min-h-12 border-b ${operationFieldInvalid(reporterRole) ? "border-red-500 bg-red-50" : "border-slate-300"} dark:border-slate-700`} />
+          <input disabled={reviewingAnotherSpecialist || reportLocked} data-operation-validation-field="reporterRole" aria-invalid={operationFieldInvalid(reporterRole)} {...operationFieldProps("reporterRole")} value={reporterRole} onChange={(event) => setReporterRole(event.target.value)} className={`${reportFieldClass} min-h-12 border-b ${operationFieldInvalid(reporterRole) ? "border-red-500 bg-red-50" : "border-slate-300"} dark:border-slate-700`} />
           <div className="flex min-h-12 items-center justify-end whitespace-nowrap px-3 py-2 text-right font-semibold">នាយកដ្ឋាន៖</div>
-          <input disabled={reviewingAnotherSpecialist || reportLocked} {...operationFieldProps("department")} value={department} onChange={(event) => setDepartment(event.target.value)} className={`${reportFieldClass} min-h-12 ${operationFieldInvalid(department) ? "bg-red-50 text-red-900" : ""}`} />
+          <input disabled={reviewingAnotherSpecialist || reportLocked} data-operation-validation-field="department" aria-invalid={operationFieldInvalid(department)} {...operationFieldProps("department")} value={department} onChange={(event) => setDepartment(event.target.value)} className={`${reportFieldClass} min-h-12 ${operationFieldInvalid(department) ? "bg-red-50 text-red-900" : ""}`} />
         </div>
         <div aria-hidden="true" className="hidden border-l border-slate-300 dark:border-slate-700 lg:block" />
       </div>
@@ -6527,7 +6563,7 @@ function OperationReportView({ loans, loading, canViewLoanData, onRefresh, onOpe
     <div className="space-y-4 border-b border-slate-200 p-4 dark:border-slate-800 sm:p-5 print:hidden">
       <div className="flex items-center justify-between gap-3">
         <div><h2 className="text-lg font-bold">{opText("របាយការណ៍លទ្ធផលប្រចាំថ្ងៃ", "Daily Performance Report")}</h2><p className="mt-1 text-sm text-slate-500">{companyBranchName(branch, language)}</p></div>
-        <EmeraldCashLogo className="h-12 w-20 object-contain" />
+        <ReportBrandLogo branch={branch} className="h-12 w-20 object-contain" />
       </div>
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <Field label={opText("កាលបរិច្ឆេទ", "Report date")}><DateInput title="Report date" disabled={reviewingAnotherSpecialist || reportLocked} value={reportDate} onChange={changeReportDate} className={inputClass} /></Field>
@@ -6539,19 +6575,19 @@ function OperationReportView({ loans, loading, canViewLoanData, onRefresh, onOpe
   </>;
   const branchManagerBrandHeader = (
     <div className="grid min-h-28 grid-cols-1 border-b border-slate-300 bg-white px-4 py-4 dark:border-slate-700 dark:bg-slate-950 sm:grid-cols-[220px_1fr] sm:px-0 sm:py-0">
-      <div className="flex items-center justify-center sm:p-4"><EmeraldCashLogo className="h-auto w-28 object-contain sm:w-44" /></div>
-      <div className="font-khmer-muol-light flex items-center justify-center px-3 text-center text-xl leading-relaxed text-emerald-800 dark:text-emerald-300 sm:px-5 sm:text-3xl">ក្រុមហ៊ុន អេមើរ៉ល ឃែស ឯ.ក</div>
+      <div className="flex items-center justify-center sm:p-4"><ReportBrandLogo branch={branch} className="h-auto w-28 object-contain sm:w-44" /></div>
+      <div className={`font-khmer-muol-light flex items-center justify-center px-3 text-center text-xl leading-relaxed sm:px-5 sm:text-3xl ${isSenSokReport ? "text-[#172b55]" : "text-emerald-800 dark:text-emerald-300"}`}>{isSenSokReport ? "ក្រុមហ៊ុន វីមាន ខេពីតាល់" : "ក្រុមហ៊ុន អេមើរ៉ល ឃែស ឯ.ក"}</div>
     </div>
   );
   const branchManagerReportSheetHeader = activeForm === "collection" ? (
     <>
       {branchManagerBrandHeader}
-      <div className="font-khmer-muol-light flex min-h-14 items-center justify-center border-b border-slate-300 px-3 py-3 text-center text-lg leading-relaxed text-emerald-800 dark:border-slate-700 dark:text-emerald-300 sm:px-5 sm:text-2xl">ទិន្នន័យប្រកាសសរុបពីអ្នកឯកទេសផ្ដល់កម្ចីទាំងអស់ប្រចាំថ្ងៃ</div>
+      <div className={`font-khmer-muol-light flex min-h-14 items-center justify-center border-b border-slate-300 px-3 py-3 text-center text-lg leading-relaxed dark:border-slate-700 sm:px-5 sm:text-2xl ${isSenSokReport ? "text-[#cfa66d]" : "text-emerald-800 dark:text-emerald-300"}`}>ទិន្នន័យប្រកាសសរុបពីអ្នកឯកទេសផ្ដល់កម្ចីទាំងអស់ប្រចាំថ្ងៃ</div>
     </>
   ) : (
     <>
       {branchManagerBrandHeader}
-      <div className="font-khmer-muol-light flex items-center justify-center border-b border-slate-300 px-3 py-3 text-center text-lg leading-relaxed text-emerald-800 dark:border-slate-700 dark:text-emerald-300 sm:text-2xl">របាយការណ៍សង្ខេបលទ្ធផលប្រចាំថ្ងៃ - ថ្នាក់ប្រធានសាខា (Branch Manager Daily Report)</div>
+      <div className={`font-khmer-muol-light flex items-center justify-center border-b border-slate-300 px-3 py-3 text-center text-lg leading-relaxed dark:border-slate-700 sm:text-2xl ${isSenSokReport ? "text-[#cfa66d]" : "text-emerald-800 dark:text-emerald-300"}`}>របាយការណ៍សង្ខេបលទ្ធផលប្រចាំថ្ងៃ - ថ្នាក់ប្រធានសាខា (Branch Manager Daily Report)</div>
       <div className="grid grid-cols-[112px_minmax(0,1fr)] border-b border-slate-300 dark:border-slate-700 lg:grid-cols-[150px_minmax(0,1fr)_180px_minmax(0,1fr)]">
         <div className="flex min-h-12 items-center justify-end whitespace-nowrap border-b border-r border-slate-300 px-3 py-2 font-semibold dark:border-slate-700">សាខា៖</div>
         <input disabled={reviewingAnotherSpecialist || reportLocked} {...operationFieldProps("branch")} value={branch} onChange={(event) => setBranch(event.target.value)} className={`${reportFieldClass} min-h-12 border-b border-r border-slate-300 dark:border-slate-700`} />
@@ -6566,18 +6602,34 @@ function OperationReportView({ loans, loading, canViewLoanData, onRefresh, onOpe
   );
   const reportSheetHeader = isBranchManagerReport ? branchManagerReportSheetHeader : standardReportSheetHeader;
   const displayedReportStatus = isBranchManagerReport ? branchManagerReportStatus : effectiveReportStatus;
-  const reportSaveDisabled = isHumanResources || isDirector || (isBranchManagerReport ? Boolean(savingBranchManagerReport) || branchManagerReportLocked || Boolean(openedBmReport) : !canPrepareLsReport || Boolean(savingReport) || reviewingAnotherSpecialist || reportLocked);
+  const reportSaveDisabled = isHumanResources || isDirector || (isBranchManagerReport ? Boolean(savingBranchManagerReport) || branchManagerReportLocked || Boolean(openedBmReport && !openedBmReportIsEditable) : !canPrepareLsReport || Boolean(savingReport) || reviewingAnotherSpecialist || reportLocked);
   const ownSavedReport = !isBranchManagerReport ? savedReports.find((record) => record.reporterUsername === user.username && record.reportDate === reportDate) : undefined;
   const hasEnteredOperationData = !isBranchManagerReport && [...collectionDueRows, ...collectionPaidRows, ...dueNoticeRows, ...followUpRows, ...formalNoticeRows, ...requestedRows, ...approvedRows, ...rejectedRows].some((row) => row.customer.trim());
   const hasUnsavedChanges = hasEnteredOperationData && (!ownSavedReport || JSON.stringify(currentReportData()) !== JSON.stringify(ownSavedReport.data));
   const submissionRequirements = !isBranchManagerReport && !reviewingAnotherSpecialist && !reportLocked ? validateOperationReport() : [];
-  const branchManagerSubmissionRequirements = isBranchManagerReport && bmWorksheet.mode === "generated" ? [
-    !branchManagerRecords.length ? opText("មិនទាន់មានរបាយការណ៍ LS ដែលបានដាក់ស្នើ", "A submitted LS report is required") : "",
-    !branchAccountRecords.length ? opText("មិនទាន់មានរបាយការណ៍គណនេយ្យដែលបានដាក់ស្នើ", "A submitted Account Report is required") : "",
-    branchManagerRecords.some((record) => record.status === "submitted") ? opText("ត្រូវពិនិត្យរបាយការណ៍ LS ដែលបានដាក់ស្នើ", "Review submitted LS reports") : "",
-    branchAccountRecords.some((record) => record.status === "submitted") ? opText("ត្រូវពិនិត្យរបាយការណ៍គណនេយ្យដែលបានដាក់ស្នើ", "Review submitted Account Reports") : "",
+  const bmDailyPeriod = bmWorksheet.periods?.find((period) => period.period === "daily");
+  const bmDailyRequiredFields = ["lsReports", "accountReports", "requested", "approved", "approvedAmount", "due", "paid", "collected"] as const;
+  const bmFirstMissingDailyField = bmWorksheet.mode === "manual"
+    ? bmDailyRequiredFields.find((field) => !bmDailyPeriod?.[field].trim())
+    : undefined;
+  const manualBmSubmissionRequirements = isBranchManagerReport && bmWorksheet.mode === "manual" ? [
+    !reportDate ? opText("សូមជ្រើសរើសកាលបរិច្ឆេទរបាយការណ៍", "Select the report date") : "",
+    !branch.trim() ? opText("សូមបំពេញសាខា", "Enter the branch") : "",
+    !bmDailyPeriod?.lsReports.trim() ? opText("សូមបំពេញ រយៈពេលថ្ងៃនេះ៖ ចំនួនរបាយការណ៍ LS", "Complete Today: LS reports") : "",
+    !bmDailyPeriod?.accountReports.trim() ? opText("សូមបំពេញ រយៈពេលថ្ងៃនេះ៖ ចំនួនរបាយការណ៍គណនេយ្យ", "Complete Today: Account reports") : "",
+    !bmDailyPeriod?.requested.trim() ? opText("សូមបំពេញ រយៈពេលថ្ងៃនេះ៖ ចំនួនសំណើ", "Complete Today: Requests") : "",
+    !bmDailyPeriod?.approved.trim() ? opText("សូមបំពេញ រយៈពេលថ្ងៃនេះ៖ ចំនួនអនុម័ត", "Complete Today: Approvals") : "",
+    !bmDailyPeriod?.approvedAmount.trim() ? opText("សូមបំពេញ រយៈពេលថ្ងៃនេះ៖ ប្រាក់អនុម័ត", "Complete Today: Approved amount") : "",
+    !bmDailyPeriod?.due.trim() ? opText("សូមបំពេញ រយៈពេលថ្ងៃនេះ៖ អតិថិជនត្រូវបង់", "Complete Today: Due customers") : "",
+    !bmDailyPeriod?.paid.trim() ? opText("សូមបំពេញ រយៈពេលថ្ងៃនេះ៖ អតិថិជនបានបង់", "Complete Today: Paid customers") : "",
+    !bmDailyPeriod?.collected.trim() ? opText("សូមបំពេញ រយៈពេលថ្ងៃនេះ៖ ប្រាក់ប្រមូលបាន", "Complete Today: Collected amount") : "",
   ].filter(Boolean) : [];
-  const submitRequirements = isBranchManagerReport ? branchManagerSubmissionRequirements : submissionRequirements;
+  const branchManagerSubmissionRequirements = isBranchManagerReport && bmWorksheet.mode === "generated" ? [
+    !readyBranchManagerRecords.length ? opText("មិនទាន់មានរបាយការណ៍ LS ដែលបានពិនិត្យ/អនុម័ត", "A reviewed or approved LS report is required") : "",
+    !readyBranchAccountRecords.length ? opText("មិនទាន់មានរបាយការណ៍គណនេយ្យដែលបានពិនិត្យ/អនុម័ត", "A reviewed or approved Account Report is required") : "",
+    hasIncompleteSources && !bmWorksheet.incompleteSourceReason?.trim() ? opText("សូមបញ្ចូលមូលហេតុដែលទិន្នន័យ LS/Acc មិនទាន់គ្រប់", "Enter the reason why LS/Acc source data is incomplete") : "",
+  ].filter(Boolean) : [];
+  const submitRequirements = isBranchManagerReport ? [...manualBmSubmissionRequirements, ...branchManagerSubmissionRequirements] : submissionRequirements;
   const reportSubmitDisabled = reportSaveDisabled;
   const activeSaveAction = isBranchManagerReport ? savingBranchManagerReport : savingReport;
   const reportSaveState = activeSaveAction === "draft"
@@ -6589,7 +6641,7 @@ function OperationReportView({ loans, loading, canViewLoanData, onRefresh, onOpe
         : (isBranchManagerReport ? currentBmReport : ownSavedReport)
           ? opText("បានរក្សាទុក", "Saved")
           : opText("របាយការណ៍ថ្មី", "New report");
-  const reportFormTabClass = (value: OperationReportForm) => `min-h-11 whitespace-nowrap border-b-2 px-4 py-3 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 ${activeForm === value ? "border-emerald-600 text-emerald-700 dark:text-emerald-300" : "border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"}`;
+  const reportFormTabClass = (value: OperationReportForm) => `min-h-11 whitespace-nowrap border-b-2 px-4 py-3 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 ${isSenSokReport ? "focus-visible:ring-[#cfa66d]" : "focus-visible:ring-emerald-500"} ${activeForm === value ? isSenSokReport ? "border-[#cfa66d] text-[#172b55] dark:text-[#d8b17e]" : "border-emerald-600 text-emerald-700 dark:text-emerald-300" : "border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"}`;
 
   const canViewBothReports = canAccessBranchManagerWorkspace;
   const accountOnlyUser = !canViewBothReports && canPrepareAccountReport(user.role, user.position);
@@ -6698,7 +6750,7 @@ function OperationReportView({ loans, loading, canViewLoanData, onRefresh, onOpe
         <div className="grid gap-3 md:grid-cols-2">
           <button type="button" disabled={reportSaveDisabled || reportsLoading} onClick={generateBmReport} className="group min-h-28 rounded-xl border-2 border-emerald-600 bg-emerald-600 p-4 text-left text-white shadow-sm transition hover:bg-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50">
             <span className="flex items-start justify-between gap-3"><span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white/15"><Download className="h-5 w-5" /></span><span className="rounded-full bg-white/15 px-2.5 py-1 text-xs font-bold">{opText("ណែនាំ", "RECOMMENDED")}</span></span>
-            <span className="mt-3 block font-bold">{opText("ចាប់ផ្ដើមដោយទិន្នន័យ LS និង Acc", "Start with LS & Acc data")}</span><span className="mt-1 block text-sm text-emerald-50">{reportsLoading ? opText("កំពុងផ្ទុករបាយការណ៍…", "Loading reports…") : opText(`បំពេញទិន្នន័យពី LS ${branchManagerRecords.length} និង Acc ${branchAccountRecords.length} របាយការណ៍`, `Auto-fill from ${branchManagerRecords.length} LS and ${branchAccountRecords.length} Acc report(s)`)}</span>
+            <span className="mt-3 block font-bold">{opText("ចាប់ផ្ដើមដោយទិន្នន័យ LS និង Acc", "Start with LS & Acc data")}</span><span className="mt-1 block text-sm text-emerald-50">{reportsLoading ? opText("កំពុងផ្ទុករបាយការណ៍…", "Loading reports…") : opText(`បំពេញទិន្នន័យពី LS ${readyBranchManagerRecords.length} និង Acc ${readyBranchAccountRecords.length} របាយការណ៍ដែលបានពិនិត្យរួច`, `Auto-fill from ${readyBranchManagerRecords.length} reviewed LS and ${readyBranchAccountRecords.length} reviewed Acc report(s)`)}</span>
           </button>
           <button type="button" disabled={reportSaveDisabled} onClick={openManualBmReport} className="group min-h-28 rounded-xl border border-slate-300 bg-white p-4 text-left text-slate-900 transition hover:border-slate-400 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:hover:bg-slate-800">
             <span className="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200"><Pencil className="h-5 w-5" /></span>
@@ -6731,10 +6783,11 @@ function OperationReportView({ loans, loading, canViewLoanData, onRefresh, onOpe
         </div>
       </section> : null}
 
-      {isBranchManagerReport && reportPanel === "form" && !openedBmReport ? <div className={`rounded-xl border px-4 py-3 text-sm print:hidden ${bmWorksheet.mode === "generated" ? "border-emerald-200 bg-emerald-50 text-emerald-900 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-200" : "border-blue-200 bg-blue-50 text-blue-900 dark:border-blue-800 dark:bg-blue-950/30 dark:text-blue-200"}`}>
+      {isBranchManagerReport && reportPanel === "form" && (!openedBmReport || openedBmReportIsEditable) ? <div className={`rounded-xl border px-4 py-3 text-sm print:hidden ${bmWorksheet.mode === "generated" ? "border-emerald-200 bg-emerald-50 text-emerald-900 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-200" : "border-blue-200 bg-blue-50 text-blue-900 dark:border-blue-800 dark:bg-blue-950/30 dark:text-blue-200"}`}>
         <p className="font-bold">{bmWorksheet.mode === "generated" ? opText("របាយការណ៍បានបង្កើតដោយស្វ័យប្រវត្តិ", "Generated report is complete") : opText("របាយការណ៍ខ្ញុំបញ្ចូលដោយដៃ", "Manual My Report")}</p>
-        <p className="mt-1">{bmWorksheet.mode === "generated" ? opText("លេខពី LS និងគណនេយ្យត្រូវបានការពារ។ អ្នកអាចបន្ថែម KPI note, Issues និង management notes មុនពេលដាក់ស្នើ។", "LS and Account figures are protected. Add KPI notes, issues, and management notes before submitting.") : opText("សូមបំពេញទិន្នន័យរបាយការណ៍ដោយដៃ មុនពេលរក្សាទុក ឬដាក់ស្នើ។", "Complete the report fields manually before saving or submitting.")}</p>
+        <p className="mt-1">{bmWorksheet.mode === "generated" ? opText(`បានភ្ជាប់ប្រភព LS ${bmWorksheet.sourceReportIds.length} និង Acc ${bmWorksheet.sourceAccountReportIds.length} របាយការណ៍។ លេខពី LS និងគណនេយ្យត្រូវបានការពារ; អ្នកអាចបន្ថែម KPI note, Issues និង management notes មុនពេលដាក់ស្នើ។`, `Linked ${bmWorksheet.sourceReportIds.length} LS and ${bmWorksheet.sourceAccountReportIds.length} Acc source report(s). Source figures are protected; add KPI notes, issues, and management notes before submitting.`) : opText("សូមបំពេញទិន្នន័យរបាយការណ៍ដោយដៃ មុនពេលរក្សាទុក ឬដាក់ស្នើ។", "Complete the report fields manually before saving or submitting.")}</p>
       </div> : null}
+      {isBranchManagerReport && reportPanel === "form" && bmWorksheet.mode === "generated" && hasIncompleteSources && !reportSaveDisabled ? <section className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-100"><p className="font-bold">{opText(`ទិន្នន័យប្រភពមិនទាន់គ្រប់ (${incompleteSourceCount} របាយការណ៍)`, `${incompleteSourceCount} source report(s) are incomplete`)}</p><p className="mt-1">{opText("បើត្រូវដាក់ស្នើ BM Report មុន សូមបញ្ចូលមូលហេតុខាងក្រោម។ បើមិនទាន់ចង់ដាក់ស្នើ សូមត្រឡប់ទៅពិនិត្យ/បញ្ជូន LS ឬ Acc ឱ្យកែ ហើយ Generate ម្តងទៀត។", "To submit this BM Report now, enter an exception reason below. Otherwise, review/return the LS or Acc report for correction, then generate again.")}</p><label className="mt-3 block font-semibold">{opText("មូលហេតុទិន្នន័យមិនគ្រប់ (Required to submit)", "Reason for incomplete data (Required to submit)")}<textarea aria-label={opText("មូលហេតុទិន្នន័យមិនគ្រប់", "Reason for incomplete data")} rows={3} value={bmWorksheet.incompleteSourceReason || ""} onChange={(event) => updateBmWorksheet({ ...bmWorksheet, incompleteSourceReason: event.target.value })} className={`${inputClass} mt-1 ${bmValidationErrors.length && !bmWorksheet.incompleteSourceReason?.trim() ? "border-red-500 bg-red-50 dark:bg-red-950/20" : ""}`} placeholder={opText("ឧ. LS មិនទាន់ផ្តល់ព័ត៌មានដោយសារ...", "Example: LS information is pending because...")} /></label><div className="mt-3 flex flex-wrap gap-2"><button type="button" onClick={() => router.push("/loan?view=operationReport&reportPanel=records&operationForm=summary&operationMode=operation")} className="min-h-10 rounded-lg border border-amber-400 bg-white px-3 font-semibold text-amber-800 hover:bg-amber-100 dark:border-amber-700 dark:bg-slate-900 dark:text-amber-200">{opText("ពិនិត្យ LS", "Review LS")}</button><button type="button" onClick={() => router.push("/loan?view=accounting&accountMode=accountReport&reportPanel=records")} className="min-h-10 rounded-lg border border-amber-400 bg-white px-3 font-semibold text-amber-800 hover:bg-amber-100 dark:border-amber-700 dark:bg-slate-900 dark:text-amber-200">{opText("ពិនិត្យ Acc", "Review Acc")}</button></div></section> : null}
 
       <div className={`${reportPanel === "records" ? "hidden" : "sm:sticky"} top-0 z-40 space-y-2 border-b border-slate-200 bg-slate-50/95 pb-2 backdrop-blur-md dark:border-slate-800 dark:bg-slate-950/95 print:static print:border-0 print:bg-transparent print:pb-0`}>
       <section className="rounded-lg border border-slate-200 bg-white px-3 py-2 shadow-sm dark:border-slate-800 dark:bg-slate-900 print:hidden">
@@ -6764,8 +6817,8 @@ function OperationReportView({ loans, loading, canViewLoanData, onRefresh, onOpe
       </section>
       {!reviewingAnotherSpecialist ? <div className="flex flex-wrap items-center justify-between gap-2 px-2 text-xs text-slate-500 print:hidden">
         <span aria-live="polite">{!isBranchManagerReport ? hasUnsavedChanges ? opText("មានការកែប្រែមិនទាន់រក្សាទុក", "Unsaved changes") : ownSavedReport ? opText("បានរក្សាទុក", "Saved") : opText("របាយការណ៍ថ្មី", "New report") : isHumanResources || isDirector ? opText("របាយការណ៍ BM", "BM Report") : opText("របាយការណ៍ខ្ញុំ", "My Report")}</span>
-        {submitRequirements.length ? <details className="max-w-full"><summary className="cursor-pointer py-2 text-amber-700 dark:text-amber-300">{opText("អ្វីដែលត្រូវបំពេញមុនដាក់ស្នើ", "What’s needed before submitting")}</summary><ul className="list-inside list-disc space-y-1 pb-2">{submitRequirements.map((requirement) => <li key={requirement}>{requirement}</li>)}</ul></details> : null}
       </div> : null}
+      {isBranchManagerReport && reportPanel === "form" && bmValidationErrors.length ? <section role="alert" className="rounded-lg border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-900 dark:border-red-800 dark:bg-red-950/30 dark:text-red-100"><p className="font-bold">{opText("មិនទាន់អាចដាក់ស្នើបានទេ៖", "Submission is not ready:")}</p><p className="mt-1">{bmValidationErrors[0]}</p></section> : null}
       {!isBranchManagerReport && !reviewingAnotherSpecialist && reportLocked ? <section className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-950 dark:border-amber-800 dark:bg-amber-950/25 dark:text-amber-100"><strong>{opText("របាយការណ៍ត្រូវបានចាក់សោសម្រាប់ពិនិត្យ៖", "Report locked for review:")}</strong> {opText("របាយការណ៍ដែលបានដាក់ស្នើ មិនអាចកែប្រែ ឬដាក់ស្នើម្តងទៀតបានទេ រហូតដល់ BM បញ្ជូនត្រឡប់ឱ្យកែតម្រូវ។ សម្រាប់របាយការណ៍ថ្មី សូមជ្រើសរើសកាលបរិច្ឆេទថ្មី។", "A submitted report cannot be changed or submitted again until the BM returns it for correction. Choose a new report date to create a new report.")}</section> : null}
 
       {!isBranchManagerReport ? <div role="tablist" aria-label="Operation Report forms" className="font-khmer-battambang overflow-x-auto border-b border-slate-200 dark:border-slate-700 print:hidden">
@@ -6796,13 +6849,14 @@ function OperationReportView({ loans, loading, canViewLoanData, onRefresh, onOpe
         <div className="min-w-0 overflow-visible">
           <div className="font-khmer-battambang min-w-0 text-slate-950 dark:text-slate-100">
             {!isBranchManagerReport && !viewOnly ? reportSheetHeader : null}
-            {activeForm === "summary" && !isBranchManagerReport ? <OperationSummaryTable dueCount={dueCustomerCount} paidCount={paidCustomerCount} collectionRate={collectionRate} followUpRows={followUpRows} formalNoticeRows={formalNoticeRows} requestedRows={requestedRows} approvedRows={approvedRows} rejectedRows={rejectedRows} /> : null}
-            {isBranchManagerReport ? <BmReportEditor reportDate={reportDate} branch={branch} reporterName={currentBmReport?.reporterName || user.full_name || user.username} value={bmWorksheet} onChange={updateBmWorksheet} readOnly={Boolean(reportSaveDisabled || viewOnly)} isKhmer={language === "km"} /> : null}
+            {activeForm === "summary" && !isBranchManagerReport ? <><OperationSummaryTable dueCount={dueCustomerCount} paidCount={paidCustomerCount} collectionRate={collectionRate} followUpRows={followUpRows} formalNoticeRows={formalNoticeRows} requestedRows={requestedRows} approvedRows={approvedRows} rejectedRows={rejectedRows} senSok={isSenSokReport} /><section className={`m-4 rounded-xl border p-4 ${operationValidationFocus === "noActivityReason" ? "border-red-400 bg-red-50 dark:border-red-700 dark:bg-red-950/25" : "border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/20"}`}><div className="flex items-start gap-3"><AlertTriangle className={`mt-0.5 h-5 w-5 shrink-0 ${operationValidationFocus === "noActivityReason" ? "text-red-600" : "text-amber-600"}`} /><div className="min-w-0 flex-1"><h3 className="font-bold">{opText("បើគ្មានសកម្មភាពថ្ងៃនេះ", "If there was no activity today")}</h3><p className="mt-1 text-sm text-slate-600 dark:text-slate-300">{opText("មិនត្រូវបញ្ចូលឈ្មោះអតិថិជនក្លែងក្លាយទេ។ សូមបញ្ចូលមូលហេតុ ដើម្បីដាក់ស្នើរបាយការណ៍សូន្យបាន។", "Do not enter a fake customer. Enter the reason to submit a zero-activity report.")}</p><label className="mt-3 block text-sm font-semibold" htmlFor="no-activity-reason">{opText("មូលហេតុដែលគ្មានសកម្មភាព", "Reason for no activity")}</label><textarea id="no-activity-reason" data-operation-validation-field="noActivityReason" aria-invalid={operationValidationFocus === "noActivityReason"} rows={3} value={noActivityReason} onChange={(event) => { setNoActivityReason(event.target.value); if (event.target.value.trim()) { setValidationErrors([]); setOperationValidationFocus(null); } }} placeholder={opText("ឧ. មិនមានអតិថិជនត្រូវប្រមូល/ស្នើឥណទាននៅថ្ងៃនេះ", "e.g. No customers were due or applied for a loan today") } className={`mt-1 w-full rounded-lg border bg-white px-3 py-2 outline-none focus:ring-2 dark:bg-slate-900 ${operationValidationFocus === "noActivityReason" ? "border-red-500 focus:ring-red-200 dark:focus:ring-red-950" : "border-slate-300 focus:ring-emerald-200 dark:border-slate-700 dark:focus:ring-emerald-950"}`} />{operationValidationFocus === "noActivityReason" ? <p className="mt-2 text-sm font-semibold text-red-700 dark:text-red-300">{opText("សូមបញ្ចូលមូលហេតុ មុនពេលដាក់ស្នើ។", "Enter the reason before submitting.")}</p> : null}</div></div></section></> : null}
+            {activeForm === "summary" && !isBranchManagerReport ? <div className="mx-4 -mt-2 mb-4 flex justify-start"><button type="button" onClick={() => { setNoActivityReason(""); setOperationValidationFocus(null); setValidationErrors([]); setActiveForm("collection"); }} className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-emerald-300 bg-white px-4 py-2 text-sm font-bold text-emerald-800 shadow-sm hover:bg-emerald-50 dark:border-emerald-800 dark:bg-slate-900 dark:text-emerald-300"><ArrowRight className="h-4 w-4" />{opText("មានសកម្មភាព? ចុចទីនេះដើម្បីបំពេញ", "Have activity? Add it here")}</button></div> : null}
+            {isBranchManagerReport ? <BmReportEditor reportDate={reportDate} branch={branch} reporterName={currentBmReport?.reporterName || user.full_name || user.username} value={bmWorksheet} onChange={updateBmWorksheet} readOnly={Boolean(reportSaveDisabled || viewOnly)} isKhmer={language === "km"} validationFocusVersion={bmValidationFocusVersion} invalidDailyField={bmValidationErrors.length ? bmFirstMissingDailyField : undefined} /> : null}
             {activeForm === "collection" ? isBranchManagerReport ? null : <>
-              <div className="grid grid-cols-1 lg:grid-cols-2"><CollectionReportTable title={opText("អតិថិជនដែលត្រូវប្រមូលសរុប", "Total Customers Due")} rows={collectionDueRows} onChange={setCollectionDueRows} statusLabel={opText("ត្រូវប្រមូល", "Due")} statusTone="amber" onRememberField={rememberField} /><CollectionReportTable title={opText("អតិថិជនដែលប្រមូលបានសរុប", "Total Customers Collected")} rows={collectionPaidRows} onChange={setCollectionPaidRows} accent="red" statusLabel={opText("បានប្រមូល", "Collected")} statusTone="emerald" onRememberField={rememberField} /></div>
-              <div className="space-y-8 border-t-4 border-double border-slate-900 pt-6"><ResolutionTable title={opText("អតិថិជនដែលដោះស្រាយសរុប", "Total Customers to Resolve")} rows={followUpRows} onChange={setFollowUpRows} onRememberAssetType={rememberAssetType} statusLabel={opText("តាមដាន", "Follow-up")} statusTone="amber" onRememberField={rememberField} /><ResolutionTable title={opText("អតិថិជនដែលដោះស្រាយបានសរុប", "Total Customers Resolved")} rows={formalNoticeRows} onChange={setFormalNoticeRows} onRememberAssetType={rememberAssetType} statusLabel={opText("បានដោះស្រាយ", "Resolved")} statusTone="emerald" onRememberField={rememberField} /></div>
+              <div className="grid grid-cols-1 lg:grid-cols-2"><CollectionReportTable title={opText("អតិថិជនដែលត្រូវប្រមូលសរុប", "Total Customers Due")} rows={collectionDueRows} onChange={setCollectionDueRows} statusLabel={opText("ត្រូវប្រមូល", "Due")} statusTone="amber" onRememberField={rememberField} validationFocus={operationValidationFocus} senSok={isSenSokReport} /><CollectionReportTable title={opText("អតិថិជនដែលប្រមូលបានសរុប", "Total Customers Collected")} rows={collectionPaidRows} onChange={setCollectionPaidRows} accent="red" statusLabel={opText("បានប្រមូល", "Collected")} statusTone="emerald" onRememberField={rememberField} senSok={isSenSokReport} /></div>
+              <div className="space-y-8 border-t-4 border-double border-slate-900 pt-6"><ResolutionTable title={opText("អតិថិជនដែលដោះស្រាយសរុប", "Total Customers to Resolve")} rows={followUpRows} onChange={setFollowUpRows} onRememberAssetType={rememberAssetType} statusLabel={opText("តាមដាន", "Follow-up")} statusTone="amber" onRememberField={rememberField} senSok={isSenSokReport} /><ResolutionTable title={opText("អតិថិជនដែលដោះស្រាយបានសរុប", "Total Customers Resolved")} rows={formalNoticeRows} onChange={setFormalNoticeRows} onRememberAssetType={rememberAssetType} statusLabel={opText("បានដោះស្រាយ", "Resolved")} statusTone="emerald" onRememberField={rememberField} senSok={isSenSokReport} /></div>
             </> : null}
-            {!isBranchManagerReport && activeForm === "decisions" ? <div className="space-y-8 pb-4"><DecisionTable title={opText("អតិថិជនដែលស្នើឥណទាន", "Loan Requests")} rows={requestedRows} total={sumRows(requestedRows, "amount")} onChange={setRequestedRows} loans={visibleLoans} statusGroup="requested" onRememberType={rememberAssetType} onRememberField={rememberField} /><DecisionTable title={opText("អតិថិជនដែលបានអនុម័ត", "Approved Loans")} rows={approvedRows} total={sumRows(approvedRows, "amount")} onChange={setApprovedRows} loans={visibleLoans} statusGroup="approved" onRememberType={rememberAssetType} onRememberField={rememberField} /><DecisionTable title={opText("អតិថិជនដែលបានបដិសេធ", "Rejected Loans")} rows={rejectedRows} total={sumRows(rejectedRows, "amount")} onChange={setRejectedRows} loans={visibleLoans} statusGroup="rejected" showReason onRememberType={rememberAssetType} onRememberField={rememberField} /></div> : null}
+            {!isBranchManagerReport && activeForm === "decisions" ? <div className="space-y-8 pb-4"><DecisionTable title={opText("អតិថិជនដែលស្នើឥណទាន", "Loan Requests")} rows={requestedRows} total={sumRows(requestedRows, "amount")} onChange={setRequestedRows} loans={visibleLoans} statusGroup="requested" onRememberType={rememberAssetType} onRememberField={rememberField} senSok={isSenSokReport} /><DecisionTable title={opText("អតិថិជនដែលបានអនុម័ត", "Approved Loans")} rows={approvedRows} total={sumRows(approvedRows, "amount")} onChange={setApprovedRows} loans={visibleLoans} statusGroup="approved" onRememberType={rememberAssetType} onRememberField={rememberField} senSok={isSenSokReport} /><DecisionTable title={opText("អតិថិជនដែលបានបដិសេធ", "Rejected Loans")} rows={rejectedRows} total={sumRows(rejectedRows, "amount")} onChange={setRejectedRows} loans={visibleLoans} statusGroup="rejected" showReason onRememberType={rememberAssetType} onRememberField={rememberField} senSok={isSenSokReport} /></div> : null}
           </div>
         </div>
         </fieldset>
@@ -6816,7 +6870,7 @@ function OperationReportView({ loans, loading, canViewLoanData, onRefresh, onOpe
             <Card className="p-4">
               <h2 className="mb-4 text-lg font-bold">{opText("ប្រវត្តិរបស់ខ្ញុំ", "My History")} — BM</h2>
               {reportsLoading ? <p role="status">{opText("កំពុងផ្ទុក...", "Loading reports…")}</p> : <div className="space-y-2">
-                {branchManagerReports.filter((record) => record.reporterUsername.trim().toLowerCase() === user.username.trim().toLowerCase()).map((record) => <button key={record.id} type="button" onClick={() => pushOperationReportLocation({ panel: "form", mode: "branchManager", recordId: record.id, readOnly: true })} className="flex min-h-12 w-full flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-200 px-4 py-3 text-left hover:bg-slate-50 focus-visible:ring-2 focus-visible:ring-emerald-500 dark:border-slate-700 dark:hover:bg-slate-800"><span>{record.reportDate} · {record.branch}</span><span className={`rounded px-2 py-1 text-xs ${operationReportStatusClass(record.status)}`}>{operationReportStatusLabel(record.status, language)}</span></button>)}
+                {branchManagerReports.filter((record) => record.reporterUsername.trim().toLowerCase() === user.username.trim().toLowerCase()).map((record) => { const editable = ["draft", "returned"].includes(record.status); return <button key={record.id} type="button" onClick={() => pushOperationReportLocation({ panel: "form", mode: "branchManager", recordId: record.id, readOnly: !editable })} className="flex min-h-12 w-full flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-200 px-4 py-3 text-left hover:bg-slate-50 focus-visible:ring-2 focus-visible:ring-emerald-500 dark:border-slate-700 dark:hover:bg-slate-800"><span>{record.reportDate} · {record.branch}</span><span className="ml-auto text-xs font-semibold text-slate-500">{editable ? opText("បន្តកែ", "Continue editing") : opText("មើល", "View")}</span><span className={`rounded px-2 py-1 text-xs ${operationReportStatusClass(record.status)}`}>{operationReportStatusLabel(record.status, language)}</span></button>; })}
                 {!branchManagerReports.some((record) => record.reporterUsername.trim().toLowerCase() === user.username.trim().toLowerCase()) ? <p className="text-sm text-slate-500">{opText("មិនទាន់មានរបាយការណ៍", "No saved BM reports yet.")}</p> : null}
               </div>}
             </Card>
@@ -6827,11 +6881,12 @@ function OperationReportView({ loans, loading, canViewLoanData, onRefresh, onOpe
                   <div><p className="text-sm font-semibold text-emerald-700 dark:text-emerald-300">{opText("សង្ខេបសម្រាប់ថ្ងៃដែលបានជ្រើស", "Selected date overview")}</p><h2 className="mt-1 text-xl font-bold">{opText("ទិន្នន័យសម្រាប់របាយការណ៍ខ្ញុំ", "Data for My Report")}</h2><p className="mt-1 text-sm text-slate-500">{reportDate} · {companyBranchName(branch, language)}</p></div>
                   <div className="flex flex-wrap items-center gap-2">
                     <span className={`w-fit rounded-lg px-3 py-2 text-sm font-semibold ${operationReportStatusClass(currentBmReport?.status || "draft")}`}>{operationReportStatusLabel(currentBmReport?.status || "draft", language)}</span>
+                    {currentBmReport && ["draft", "returned"].includes(currentBmReport.status) ? <button type="button" onClick={() => pushOperationReportLocation({ panel: "form", mode: "branchManager", form: "collection" })} className="min-h-10 rounded-lg bg-emerald-600 px-3 text-sm font-bold text-white hover:bg-emerald-700">{opText("បន្តកែប្រែ", "Continue editing")}</button> : null}
                     <button type="button" onClick={() => router.push("/loan?view=operationReport&reportPanel=records&operationForm=summary&operationMode=branchManager&reportScope=mine")} className="min-h-10 rounded-lg border border-slate-300 px-3 text-sm font-semibold hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800">{opText("ប្រវត្តិរបស់ខ្ញុំ", "My History")}</button>
                   </div>
                 </div>
                 <div className="grid gap-px bg-slate-200 sm:grid-cols-3 dark:bg-slate-800">
-                  {[[opText("របាយការណ៍ LS រួចរាល់", "LS reports ready"), branchManagerRecords.length], [opText("របាយការណ៍គណនេយ្យរួចរាល់", "Account reports ready"), branchAccountRecords.length], [opText("រង់ចាំពិនិត្យ", "Awaiting review"), branchManagerRecords.filter((record) => record.status === "submitted").length + branchAccountRecords.filter((record) => record.status === "submitted").length]].map(([label, value]) => <div key={label} className="bg-white px-5 py-5 dark:bg-slate-900"><p className="text-sm text-slate-500">{label}</p><p className="mt-2 text-3xl font-bold text-slate-900 dark:text-white">{value}</p></div>)}
+                  {[[opText("របាយការណ៍ LS រួចរាល់", "LS reports ready"), readyBranchManagerRecords.length], [opText("របាយការណ៍គណនេយ្យរួចរាល់", "Account reports ready"), readyBranchAccountRecords.length], [opText("រង់ចាំពិនិត្យ", "Awaiting review"), branchManagerRecords.filter((record) => record.status === "submitted").length + branchAccountRecords.filter((record) => record.status === "submitted").length]].map(([label, value]) => <div key={label} className="bg-white px-5 py-5 dark:bg-slate-900"><p className="text-sm text-slate-500">{label}</p><p className="mt-2 text-3xl font-bold text-slate-900 dark:text-white">{value}</p></div>)}
                 </div>
               </section>}
             </>
@@ -7052,7 +7107,7 @@ function OperationReportRecordsDashboard({ records, loading, currentUsername, ca
   const specialists = new Set(filtered.map((record) => record.reporterUsername)).size;
   const today = operationDateInputValue();
   const todayReports = filtered.filter((record) => record.reportDate === today).length;
-  const rowCount = (record: OperationReportRecord, key: Exclude<keyof OperationReportSavedData, "sourceReportIds" | "sourceAccountReportIds" | "bmWorksheet">) => (record.data[key] || []).filter((row) => row.customer.trim()).length;
+  const rowCount = (record: OperationReportRecord, key: Exclude<keyof OperationReportSavedData, "sourceReportIds" | "sourceAccountReportIds" | "bmWorksheet" | "noActivityReason">) => (record.data[key] || []).filter((row) => row.customer.trim()).length;
   const periodLabel = reportPeriod === "daily" ? periodValue || "daily"
     : reportPeriod === "monthly" ? periodValue || "monthly"
       : reportPeriod === "yearly" ? periodValue || "yearly"
@@ -7163,9 +7218,10 @@ function PaymentDateAlerts({ loans, canViewLoanData, onOpenLoan }: { loans: Loan
   );
 }
 
-function OperationSummaryTable({ dueCount, paidCount, collectionRate, followUpRows, formalNoticeRows, requestedRows, approvedRows, rejectedRows }: { dueCount: number; paidCount: number; collectionRate: number; followUpRows: OperationReportResolutionRow[]; formalNoticeRows: OperationReportResolutionRow[]; requestedRows: OperationReportLoanDecisionRow[]; approvedRows: OperationReportLoanDecisionRow[]; rejectedRows: OperationReportLoanDecisionRow[] }) {
+function OperationSummaryTable({ dueCount, paidCount, collectionRate, followUpRows, formalNoticeRows, requestedRows, approvedRows, rejectedRows, senSok = false }: { dueCount: number; paidCount: number; collectionRate: number; followUpRows: OperationReportResolutionRow[]; formalNoticeRows: OperationReportResolutionRow[]; requestedRows: OperationReportLoanDecisionRow[]; approvedRows: OperationReportLoanDecisionRow[]; rejectedRows: OperationReportLoanDecisionRow[]; senSok?: boolean }) {
   const { language } = useLanguage();
   const text = (km: string, en: string) => language === "km" ? km : en;
+  const sectionHeaderClass = senSok ? "bg-[#172b55]" : "bg-[#087323]";
   const resolutionCount = (rows: OperationReportResolutionRow[]) => rows.filter((row) => row.customer.trim()).length;
   const decisionCount = (rows: OperationReportLoanDecisionRow[]) => rows.filter((row) => row.customer.trim()).length;
   const decisionTotal = (rows: OperationReportLoanDecisionRow[]) => rows.reduce((sum, row) => sum + operationNumber(row.amount), 0);
@@ -7189,19 +7245,19 @@ function OperationSummaryTable({ dueCount, paidCount, collectionRate, followUpRo
     <section aria-label="Operation Report summary">
       <div className="space-y-5 p-3 sm:hidden print:hidden">
         <section className="overflow-hidden rounded-xl border border-slate-200 dark:border-slate-700">
-          <h2 className="bg-[#087323] px-4 py-3 text-base font-bold leading-relaxed text-white">{text("ការប្រមូល និង ដោះស្រាយ", "Collection & Resolution")}</h2>
+          <h2 className={`${sectionHeaderClass} px-4 py-3 text-base font-bold leading-relaxed text-white`}>{text("ការប្រមូល និង ដោះស្រាយ", "Collection & Resolution")}</h2>
           <div className="divide-y divide-slate-200 dark:divide-slate-700">{collectionRows.map(([label, collected, resolved]) => <article key={label} className="p-4"><p className="font-semibold leading-7 text-slate-800 dark:text-slate-100">{label}</p><div className="mt-3 grid grid-cols-2 gap-3"><div className="rounded-lg bg-emerald-50 p-3 dark:bg-emerald-950/30"><p className="text-xs leading-5 text-slate-500 dark:text-slate-400">{text("ចំនួនប្រមូល", "Collected")}</p><p className="mt-1 text-xl font-bold text-emerald-800 dark:text-emerald-300">{collected}</p></div><div className="rounded-lg bg-blue-50 p-3 dark:bg-blue-950/30"><p className="text-xs leading-5 text-slate-500 dark:text-slate-400">{text("ចំនួនដោះស្រាយ", "Resolved")}</p><p className="mt-1 text-xl font-bold text-blue-800 dark:text-blue-300">{resolved}</p></div></div></article>)}</div>
         </section>
         <section className="overflow-hidden rounded-xl border border-slate-200 dark:border-slate-700">
-          <h2 className="bg-[#087323] px-4 py-3 text-base font-bold leading-relaxed text-white">{text("ការចេញឥណទាន", "Loan Issuance")}</h2>
+          <h2 className={`${sectionHeaderClass} px-4 py-3 text-base font-bold leading-relaxed text-white`}>{text("ការចេញឥណទាន", "Loan Issuance")}</h2>
           <div className="divide-y divide-slate-200 dark:divide-slate-700">{loanRows.map(([label, count, amount]) => <article key={label} className="p-4"><p className="font-semibold leading-7 text-slate-800 dark:text-slate-100">{label}</p><div className="mt-2 flex items-end justify-between gap-4"><span className="text-sm text-slate-500">{text("ចំនួន", "Count")}: <strong className="text-slate-900 dark:text-white">{count}</strong></span><strong className="text-right text-emerald-700 dark:text-emerald-300">{amount}</strong></div></article>)}</div>
           <div className="flex items-center justify-between gap-4 border-t-2 border-slate-900 bg-slate-100 px-4 py-3 font-bold text-red-700 dark:bg-slate-800"><span>{text("សរុប", "Total")} · {totalLoanCount}</span><span className="text-right tabular-nums">{totalLoanAmount ? operationCurrency(totalLoanAmount) : "-"}</span></div>
         </section>
       </div>
       <table className="hidden w-full table-fixed border-collapse text-sm sm:table print:table [&_td]:border [&_td]:border-slate-300 [&_th]:border [&_th]:border-slate-300 dark:[&_td]:border-slate-700 dark:[&_th]:border-slate-700">
-        <thead className="bg-[#087323] text-white"><tr><th className="px-3 py-3 text-center">{text("ការប្រមូល និង ដោះស្រាយ", "Collection & Resolution")}</th><th className="w-64 px-3 py-3 text-center">{text("ចំនួនប្រមូល (នាក់)", "Collected Customers")}</th><th className="w-64 px-3 py-3 text-center">{text("ចំនួនដោះស្រាយ (នាក់)", "Resolved Customers")}</th></tr></thead>
+        <thead className={`${sectionHeaderClass} text-white`}><tr><th className="px-3 py-3 text-center">{text("ការប្រមូល និង ដោះស្រាយ", "Collection & Resolution")}</th><th className="w-64 px-3 py-3 text-center">{text("ចំនួនប្រមូល (នាក់)", "Collected Customers")}</th><th className="w-64 px-3 py-3 text-center">{text("ចំនួនដោះស្រាយ (នាក់)", "Resolved Customers")}</th></tr></thead>
         <tbody><tr><td className="px-3 py-3 font-semibold">{text("អតិថិជនប្រមូល និងដោះស្រាយសរុប", "Total Customers for Collection & Resolution")}</td><td className="px-3 py-3 text-center font-bold">{dueCount}</td><td className="px-3 py-3 text-center font-bold">{toResolveCount}</td></tr><tr><td className="px-3 py-3 font-semibold">{text("ចំនួនអតិថិជនដែលប្រមូល និងដោះស្រាយបាន", "Customers Collected & Resolved")}</td><td className="px-3 py-3 text-center font-bold">{paidCount}</td><td className="px-3 py-3 text-center font-bold">{resolvedCount}</td></tr><tr><td className="px-3 py-3 font-semibold">{text("អត្រាប្រមូលចូលគិតជាភាគរយ", "Collection & Resolution Rate")}</td><td className="px-3 py-3 text-center font-bold">{dueCount ? `${collectionRate}%` : "0%"}</td><td className="px-3 py-3 text-center font-bold">{resolutionRate === null ? "0%" : `${resolutionRate}%`}</td></tr></tbody>
-        <thead className="bg-[#087323] text-white"><tr><th className="px-3 py-3 text-center">{text("ការចេញឥណទាន", "Loan Issuance")}</th><th className="w-64 px-3 py-3 text-center">{text("ចំនួន (នាក់)", "Count")}</th><th className="w-64 px-3 py-3 text-center">{text("ជាសាច់ប្រាក់ (សរុបគិតជាដុល្លារ)", "Total Amount ($)")}</th></tr></thead>
+        <thead className={`${sectionHeaderClass} text-white`}><tr><th className="px-3 py-3 text-center">{text("ការចេញឥណទាន", "Loan Issuance")}</th><th className="w-64 px-3 py-3 text-center">{text("ចំនួន (នាក់)", "Count")}</th><th className="w-64 px-3 py-3 text-center">{text("ជាសាច់ប្រាក់ (សរុបគិតជាដុល្លារ)", "Total Amount ($)")}</th></tr></thead>
         <tbody>{loanRows.map(([label, count, amount]) => <tr key={label}><td className="px-3 py-3 font-semibold">{label}</td><td className="px-3 py-3 text-center font-bold">{count}</td><td className="px-3 py-3 text-right font-semibold tabular-nums">{amount}</td></tr>)}</tbody>
         <tfoot className="border-y-2 border-double border-slate-900 bg-slate-100 font-bold text-red-700 dark:bg-slate-800"><tr><td className="px-3 py-3 text-center">{text("សរុប", "Total")}</td><td className="px-3 py-3 text-center">{totalLoanCount}</td><td className="px-3 py-3 text-right tabular-nums">{totalLoanAmount ? operationCurrency(totalLoanAmount) : "-"}</td></tr></tfoot>
       </table>
@@ -7511,12 +7567,14 @@ function OperationReportImageCell({ images, imageUrl, imageName, onChange, compa
   );
 }
 
-function CollectionReportTable({ title, rows, onChange, accent = "green", statusLabel, statusTone, onRememberField }: { title: string; rows: OperationReportCollectionRow[]; onChange: (rows: OperationReportCollectionRow[]) => void; accent?: "green" | "red"; statusLabel?: string; statusTone?: "emerald" | "amber" | "red"; onRememberField: (field: string, value: string) => void }) {
+function CollectionReportTable({ title, rows, onChange, accent = "green", statusLabel, statusTone, onRememberField, validationFocus, senSok = false }: { title: string; rows: OperationReportCollectionRow[]; onChange: (rows: OperationReportCollectionRow[]) => void; accent?: "green" | "red"; statusLabel?: string; statusTone?: "emerald" | "amber" | "red"; onRememberField: (field: string, value: string) => void; validationFocus?: "noActivityReason" | "customerActivity" | "amount" | "reportDate" | "reporterName" | "reporterRole" | "department" | null; senSok?: boolean }) {
   const { language } = useLanguage();
   const text = (km: string, en: string) => language === "km" ? km : en;
   const pillClass = statusTone === "amber" ? "bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-200" : statusTone === "red" ? "bg-red-100 text-red-800 dark:bg-red-950/40 dark:text-red-200" : "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200";
   const total = rows.reduce((sum, row) => sum + operationNumber(row.amount), 0);
   const header = accent === "red" ? "bg-red-700" : "bg-emerald-800";
+  const needsCustomer = validationFocus === "customerActivity";
+  const needsAmount = validationFocus === "amount";
   const onEnter = (event: ReactKeyboardEvent<HTMLInputElement>, index: number, field: keyof OperationReportCollectionRow) => appendOperationRowOnEnter(
     event,
     index,
@@ -7529,9 +7587,9 @@ function CollectionReportTable({ title, rows, onChange, accent = "green", status
   const removeLast = () => onChange(rows.length > 1 ? rows.slice(0, -1) : createOperationCollectionRows().slice(0, 1));
   return (
     <>
-      <details open className="group min-w-0 rounded-2xl border border-slate-200 bg-white print:hidden dark:border-slate-700 dark:bg-slate-900"><summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 font-bold text-emerald-800 [&::-webkit-details-marker]:hidden dark:text-emerald-300"><span>{title}</span><ChevronDown className="h-4 w-4 transition group-open:rotate-180" /></summary><section className="border-t border-slate-200 [&_input]:min-h-11 [&_input]:text-base dark:border-slate-700">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-300 px-3 py-3"><h2 className={`min-w-0 flex-1 font-bold leading-6 ${accent === "red" ? "text-red-700" : "text-emerald-800"}`}>{title}</h2><div className="flex shrink-0 items-center gap-2"><button type="button" onClick={addRow} className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-bold text-emerald-800"><Plus className="h-4 w-4" />{text("បន្ថែមជួរ", "Add row")}</button><button type="button" onClick={removeLast} aria-label={text("លុបជួរចុងក្រោយ", "Remove last row")} title={text("លុបជួរចុងក្រោយ", "Remove last row")} className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg border border-slate-200 px-2 py-2 text-red-700 hover:border-red-300 hover:bg-red-50 hover:text-red-800 dark:hover:border-red-800 dark:hover:bg-red-950/40 dark:hover:text-red-300"><X className="h-4 w-4" /></button></div></div>
-        <div className="space-y-3 p-3">{rows.map((row, index) => <details key={row.id} open={Boolean(row.customer.trim())} className="group/row min-w-0 rounded-xl border border-slate-200 bg-white shadow-sm open:ring-2 open:ring-emerald-500/20 dark:border-slate-700 dark:bg-slate-900"><summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-3 px-4 py-2.5 [&::-webkit-details-marker]:hidden"><div className="flex min-w-0 items-center gap-3"><span className="w-6 shrink-0 text-center text-xs font-bold text-slate-400">{index + 1}</span><div className="min-w-0"><p className="truncate text-sm font-bold text-slate-900 dark:text-white">{row.customer.trim() || `${text("អតិថិជនថ្មី", "New customer")} ${index + 1}`}</p><p className="mt-0.5 truncate text-xs text-slate-500">{row.reason.trim() || text("បើកដើម្បីបំពេញព័ត៌មាន", "Open for full details")}</p></div></div><div className="flex shrink-0 items-center gap-3"><span className={`rounded-full px-2.5 py-1 text-xs font-bold ${pillClass}`}>{statusLabel}</span>{row.amount.trim() ? <strong className="tabular-nums text-sm text-emerald-700 dark:text-emerald-300">{operationCurrency(operationNumber(row.amount))}</strong> : null}<ChevronDown className="h-4 w-4 text-slate-400 transition group-open/row:rotate-180" /></div></summary><div className="space-y-3 border-t border-slate-200 p-4 dark:border-slate-700"><Field label={text("ឈ្មោះអតិថិជន", "Customer Name")}><input list="operation-report-customer-options" value={row.customer} onBlur={(event) => onRememberField("customer", event.target.value)} onChange={(event) => onChange(rows.map((item) => item.id === row.id ? { ...item, customer: event.target.value } : item))} className={inputClass} placeholder={text("ឈ្មោះអតិថិជន", "Customer name")} /></Field><Field label={text("ជាសាច់ប្រាក់ ($)", "Amount ($)")}><input list="operation-report-amount-options" type="number" min="0" inputMode="decimal" value={row.amount} onBlur={(event) => onRememberField("amount", event.target.value)} onChange={(event) => onChange(rows.map((item) => item.id === row.id ? { ...item, amount: event.target.value } : item))} className={inputClass} placeholder="0.00" /></Field><Field label={text("មូលហេតុ និងរូបភាព", "Reason and photos")}><div className="space-y-2"><input list="operation-report-reason-options" value={row.reason} onBlur={(event) => onRememberField("reason", event.target.value)} onChange={(event) => onChange(rows.map((item) => item.id === row.id ? { ...item, reason: event.target.value } : item))} className={inputClass} placeholder={text("មូលហេតុ", "Reason")} /><OperationReportImageCell images={row.images} imageUrl={row.imageUrl} imageName={row.imageName} onChange={(attachment) => onChange(rows.map((item) => item.id === row.id ? { ...item, ...attachment } : item))} /></div></Field></div></details>)}</div>
+      <details open className="group min-w-0 rounded-2xl border border-slate-200 bg-white print:hidden dark:border-slate-700 dark:bg-slate-900"><summary className={`flex min-h-14 cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 font-bold [&::-webkit-details-marker]:hidden ${accent === "red" ? "text-red-700 dark:text-red-300" : senSok ? "text-[#172b55] dark:text-[#d8b17e]" : "text-emerald-800 dark:text-emerald-300"}`}><span>{title}</span><ChevronDown className="h-4 w-4 transition group-open:rotate-180" /></summary><section className="border-t border-slate-200 [&_input]:min-h-11 [&_input]:text-base dark:border-slate-700">
+        <div className="flex flex-wrap items-center justify-end gap-3 border-b border-slate-300 px-3 py-3"><div className="flex shrink-0 items-center gap-2"><button type="button" onClick={addRow} className={`inline-flex min-h-11 items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-bold ${accent === "red" ? "border-red-200 bg-red-50 text-red-800 hover:bg-red-100 dark:border-red-800 dark:bg-red-950/30 dark:text-red-300" : senSok ? "border-[#cfa66d] bg-[#f7eedf] text-[#172b55] hover:bg-[#eedcbc] dark:border-[#cfa66d]/60 dark:bg-[#172b55]/30 dark:text-[#e7c998]" : "border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-300"}`}><Plus className="h-4 w-4" />{text("បន្ថែមជួរ", "Add row")}</button><button type="button" onClick={removeLast} aria-label={text("លុបជួរចុងក្រោយ", "Remove last row")} title={text("លុបជួរចុងក្រោយ", "Remove last row")} className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg border border-slate-200 px-2 py-2 text-red-700 hover:border-red-300 hover:bg-red-50 hover:text-red-800 dark:hover:border-red-800 dark:hover:bg-red-950/40 dark:hover:text-red-300"><X className="h-4 w-4" /></button></div></div>
+        <div className="space-y-3 p-3">{rows.map((row, index) => <details key={row.id} open={Boolean(row.customer.trim()) || (index === 0 && (needsCustomer || needsAmount))} className={`group/row min-w-0 rounded-xl border bg-white shadow-sm open:ring-2 open:ring-emerald-500/20 dark:bg-slate-900 ${index === 0 && (needsCustomer || needsAmount) ? "border-red-400 ring-2 ring-red-100 dark:border-red-700 dark:ring-red-950/50" : "border-slate-200 dark:border-slate-700"}`}><summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-3 px-4 py-2.5 [&::-webkit-details-marker]:hidden"><div className="flex min-w-0 items-center gap-3"><span className="w-6 shrink-0 text-center text-xs font-bold text-slate-400">{index + 1}</span><div className="min-w-0"><p className="truncate text-sm font-bold text-slate-900 dark:text-white">{row.customer.trim() || `${text("អតិថិជនថ្មី", "New customer")} ${index + 1}`}</p><p className="mt-0.5 truncate text-xs text-slate-500">{row.reason.trim() || text("បើកដើម្បីបំពេញព័ត៌មាន", "Open for full details")}</p></div></div><div className="flex shrink-0 items-center gap-3"><span className={`rounded-full px-2.5 py-1 text-xs font-bold ${pillClass}`}>{statusLabel}</span>{row.amount.trim() ? <strong className="tabular-nums text-sm text-emerald-700 dark:text-emerald-300">{operationCurrency(operationNumber(row.amount))}</strong> : null}<ChevronDown className="h-4 w-4 text-slate-400 transition group-open/row:rotate-180" /></div></summary><div className="space-y-3 border-t border-slate-200 p-4 dark:border-slate-700"><Field label={text("ឈ្មោះអតិថិជន", "Customer Name")}><input data-operation-validation-field={index === 0 ? "customerActivity" : undefined} aria-invalid={index === 0 && needsCustomer} list="operation-report-customer-options" value={row.customer} onBlur={(event) => onRememberField("customer", event.target.value)} onChange={(event) => onChange(rows.map((item) => item.id === row.id ? { ...item, customer: event.target.value } : item))} className={`${inputClass} ${index === 0 && needsCustomer ? "border-red-500 bg-red-50 dark:bg-red-950/25" : ""}`} placeholder={text("ឈ្មោះអតិថិជន", "Customer name")} />{index === 0 && needsCustomer ? <p className="mt-1 text-sm font-semibold text-red-700 dark:text-red-300">{text("សូមបញ្ចូលអតិថិជន ឬសកម្មភាពយ៉ាងតិច ១។", "Enter at least one customer activity.")}</p> : null}</Field><Field label={text("ជាសាច់ប្រាក់ ($)", "Amount ($)")}><input data-operation-validation-field={index === 0 ? "amount" : undefined} aria-invalid={index === 0 && needsAmount} list="operation-report-amount-options" type="number" min="0" inputMode="decimal" value={row.amount} onBlur={(event) => onRememberField("amount", event.target.value)} onChange={(event) => onChange(rows.map((item) => item.id === row.id ? { ...item, amount: event.target.value } : item))} className={`${inputClass} ${index === 0 && needsAmount ? "border-red-500 bg-red-50 dark:bg-red-950/25" : ""}`} placeholder="0.00" /></Field><Field label={text("មូលហេតុ និងរូបភាព", "Reason and photos")}><div className="space-y-2"><input list="operation-report-reason-options" value={row.reason} onBlur={(event) => onRememberField("reason", event.target.value)} onChange={(event) => onChange(rows.map((item) => item.id === row.id ? { ...item, reason: event.target.value } : item))} className={inputClass} placeholder={text("មូលហេតុ", "Reason")} /><OperationReportImageCell images={row.images} imageUrl={row.imageUrl} imageName={row.imageName} onChange={(attachment) => onChange(rows.map((item) => item.id === row.id ? { ...item, ...attachment } : item))} /></div></Field></div></details>)}</div>
         <div className="flex items-center justify-between border-t-2 border-slate-900 bg-slate-100 px-4 py-3 font-bold text-red-700 dark:bg-slate-800"><span>{text("សរុប", "Total")}</span><span>{operationCurrency(total)}</span></div>
       </section></details>
       <div className="hidden print:block"><ReportTable title={title} count={rows.filter((row) => row.customer.trim()).length} total={total} titleTone={accent} onAddRow={addRow} onRemoveLast={removeLast} addRowLabel={text("បន្ថែមជួរ", "Add row")}>
@@ -7543,7 +7601,7 @@ function CollectionReportTable({ title, rows, onChange, accent = "green", status
   );
 }
 
-function ResolutionTable({ title, rows, onChange, onRememberAssetType, statusLabel, statusTone, onRememberField }: { title: string; rows: OperationReportResolutionRow[]; onChange: (rows: OperationReportResolutionRow[]) => void; onRememberAssetType?: (value: string) => void; statusLabel?: string; statusTone?: "emerald" | "amber" | "red"; onRememberField: (field: string, value: string) => void }) {
+function ResolutionTable({ title, rows, onChange, onRememberAssetType, statusLabel, statusTone, onRememberField, senSok = false }: { title: string; rows: OperationReportResolutionRow[]; onChange: (rows: OperationReportResolutionRow[]) => void; onRememberAssetType?: (value: string) => void; statusLabel?: string; statusTone?: "emerald" | "amber" | "red"; onRememberField: (field: string, value: string) => void; senSok?: boolean }) {
   const { language } = useLanguage();
   const text = (km: string, en: string) => language === "km" ? km : en;
   const pillClass = statusTone === "amber" ? "bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-200" : statusTone === "red" ? "bg-red-100 text-red-800 dark:bg-red-950/40 dark:text-red-200" : "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200";
@@ -7563,8 +7621,8 @@ function ResolutionTable({ title, rows, onChange, onRememberAssetType, statusLab
   const updateRow = (id: number, field: keyof OperationReportResolutionRow, value: string) => onChange(rows.map((item) => item.id === id ? { ...item, [field]: value } : item));
   return (
     <>
-      <details open className="group min-w-0 rounded-2xl border border-slate-200 bg-white print:hidden dark:border-slate-700 dark:bg-slate-900"><summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 font-bold text-emerald-800 [&::-webkit-details-marker]:hidden dark:text-emerald-300"><span>{title}</span><ChevronDown className="h-4 w-4 transition group-open:rotate-180" /></summary><section className="border-t border-slate-200 [&_input]:min-h-11 [&_input]:text-base dark:border-slate-700">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-300 px-3 py-3"><h2 className="min-w-0 flex-1 font-bold leading-6 text-emerald-800 dark:text-emerald-300">{title}</h2><div className="flex shrink-0 items-center gap-2"><button type="button" onClick={addRow} className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-bold text-emerald-800"><Plus className="h-4 w-4" />{text("បន្ថែមជួរ", "Add row")}</button><button type="button" onClick={removeLast} aria-label={text("លុបជួរចុងក្រោយ", "Remove last row")} title={text("លុបជួរចុងក្រោយ", "Remove last row")} className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg border border-slate-200 px-2 py-2 text-red-700 hover:border-red-300 hover:bg-red-50 hover:text-red-800 dark:hover:border-red-800 dark:hover:bg-red-950/40 dark:hover:text-red-300"><X className="h-4 w-4" /></button></div></div>
+      <details open className="group min-w-0 rounded-2xl border border-slate-200 bg-white print:hidden dark:border-slate-700 dark:bg-slate-900"><summary className={`flex min-h-14 cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 font-bold [&::-webkit-details-marker]:hidden ${senSok ? "text-[#172b55] dark:text-[#d8b17e]" : "text-emerald-800 dark:text-emerald-300"}`}><span>{title}</span><ChevronDown className="h-4 w-4 transition group-open:rotate-180" /></summary><section className="border-t border-slate-200 [&_input]:min-h-11 [&_input]:text-base dark:border-slate-700">
+        <div className="flex flex-wrap items-center justify-end gap-3 border-b border-slate-300 px-3 py-3"><div className="flex shrink-0 items-center gap-2"><button type="button" onClick={addRow} className={`inline-flex min-h-11 items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-bold ${senSok ? "border-[#cfa66d] bg-[#f7eedf] text-[#172b55] hover:bg-[#eedcbc] dark:border-[#cfa66d]/60 dark:bg-[#172b55]/30 dark:text-[#e7c998]" : "border-emerald-200 bg-emerald-50 text-emerald-800"}`}><Plus className="h-4 w-4" />{text("បន្ថែមជួរ", "Add row")}</button><button type="button" onClick={removeLast} aria-label={text("លុបជួរចុងក្រោយ", "Remove last row")} title={text("លុបជួរចុងក្រោយ", "Remove last row")} className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg border border-slate-200 px-2 py-2 text-red-700 hover:border-red-300 hover:bg-red-50 hover:text-red-800 dark:hover:border-red-800 dark:hover:bg-red-950/40 dark:hover:text-red-300"><X className="h-4 w-4" /></button></div></div>
         <div className="space-y-3 p-3">{rows.map((row, index) => <details key={row.id} open={Boolean(row.customer.trim())} className="group/row min-w-0 rounded-xl border border-slate-200 bg-white shadow-sm open:ring-2 open:ring-emerald-500/20 dark:border-slate-700 dark:bg-slate-900"><summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-3 px-4 py-2.5 [&::-webkit-details-marker]:hidden"><div className="flex min-w-0 items-center gap-3"><span className="w-6 shrink-0 text-center text-xs font-bold text-slate-400">{index + 1}</span><div className="min-w-0"><p className="truncate text-sm font-bold text-slate-900 dark:text-white">{row.customer.trim() || `${text("អតិថិជនថ្មី", "New customer")} ${index + 1}`}</p><p className="mt-0.5 truncate text-xs text-slate-500">{row.solution.trim() || row.assetType.trim() || text("បើកដើម្បីបំពេញព័ត៌មាន", "Open for full details")}</p></div></div><div className="flex shrink-0 items-center gap-3"><span className={`rounded-full px-2.5 py-1 text-xs font-bold ${pillClass}`}>{statusLabel}</span><strong className="tabular-nums text-sm text-emerald-700 dark:text-emerald-300">{operationCurrency(operationNumber(row.penalty) + operationNumber(row.principal) + operationNumber(row.interest))}</strong><ChevronDown className="h-4 w-4 text-slate-400 transition group-open/row:rotate-180" /></div></summary><div className="space-y-3 border-t border-slate-200 p-4 dark:border-slate-700"><Field label={text("ឈ្មោះអតិថិជន", "Customer Name")}><input list="operation-report-customer-options" value={row.customer} onBlur={(event) => onRememberField("customer", event.target.value)} onChange={(event) => updateRow(row.id, "customer", event.target.value)} className={inputClass} /></Field><Field label={text("ប្រភេទទ្រព្យ", "Asset Type")}><input list="operation-report-assetType-options" value={row.assetType} onBlur={(event) => { onRememberAssetType?.(event.target.value); onRememberField("assetType", event.target.value); }} onChange={(event) => updateRow(row.id, "assetType", event.target.value)} className={inputClass} /></Field><div className="grid grid-cols-1 gap-3 min-[390px]:grid-cols-3"><Field label={text("ពិន័យ", "Penalty")}><input type="number" min="0" inputMode="decimal" value={row.penalty} onChange={(event) => updateRow(row.id, "penalty", event.target.value)} className={inputClass} placeholder="0.00" /></Field><Field label={text("ប្រាក់ដើម", "Principal")}><input type="number" min="0" inputMode="decimal" value={row.principal} onChange={(event) => updateRow(row.id, "principal", event.target.value)} className={inputClass} placeholder="0.00" /></Field><Field label={text("ការប្រាក់", "Interest")}><input type="number" min="0" inputMode="decimal" value={row.interest} onChange={(event) => updateRow(row.id, "interest", event.target.value)} className={inputClass} placeholder="0.00" /></Field></div><Field label={text("ដំណោះស្រាយ និងរូបភាព", "Solution and photos")}><div className="space-y-2"><input list="operation-report-solution-options" value={row.solution} onBlur={(event) => onRememberField("solution", event.target.value)} onChange={(event) => updateRow(row.id, "solution", event.target.value)} className={inputClass} /><OperationReportImageCell images={row.images} imageUrl={row.imageUrl} imageName={row.imageName} onChange={(attachment) => onChange(rows.map((item) => item.id === row.id ? { ...item, ...attachment } : item))} /></div></Field></div></details>)}</div>
         <div className="grid grid-cols-3 gap-2 border-t-2 border-slate-900 bg-slate-100 px-3 py-3 text-center text-xs font-bold text-red-700 dark:bg-slate-800"><span>{text("ពិន័យ", "Penalty")}<strong className="mt-1 block text-sm">{operationCurrency(penaltyTotal)}</strong></span><span>{text("ប្រាក់ដើម", "Principal")}<strong className="mt-1 block text-sm">{operationCurrency(principalTotal)}</strong></span><span>{text("ការប្រាក់", "Interest")}<strong className="mt-1 block text-sm">{operationCurrency(interestTotal)}</strong></span></div>
       </section></details>
@@ -7577,7 +7635,7 @@ function ResolutionTable({ title, rows, onChange, onRememberAssetType, statusLab
   );
 }
 
-function DecisionTable({ title, rows, total, onChange, loans, statusGroup, showReason = false, onRememberType, onRememberField }: { title: string; rows: OperationReportLoanDecisionRow[]; total: number; onChange: (rows: OperationReportLoanDecisionRow[]) => void; loans: LoanEntity[]; statusGroup: "requested" | "approved" | "rejected"; showReason?: boolean; onRememberType: (value: string) => void; onRememberField: (field: string, value: string) => void }) {
+function DecisionTable({ title, rows, total, onChange, loans, statusGroup, showReason = false, onRememberType, onRememberField, senSok = false }: { title: string; rows: OperationReportLoanDecisionRow[]; total: number; onChange: (rows: OperationReportLoanDecisionRow[]) => void; loans: LoanEntity[]; statusGroup: "requested" | "approved" | "rejected"; showReason?: boolean; onRememberType: (value: string) => void; onRememberField: (field: string, value: string) => void; senSok?: boolean }) {
   const { language } = useLanguage();
   const text = (km: string, en: string) => language === "km" ? km : en;
   const loansForGroup = useMemo(() => {
@@ -7618,8 +7676,8 @@ function DecisionTable({ title, rows, total, onChange, loans, statusGroup, showR
   const statusMeta = statusGroup === "approved" ? { label: text("អនុម័ត", "Approved"), cls: "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200" } : statusGroup === "rejected" ? { label: text("បដិសេធ", "Rejected"), cls: "bg-red-100 text-red-800 dark:bg-red-950/40 dark:text-red-200" } : { label: text("ស្នើសុំ", "Request"), cls: "bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-200" };
   return (
     <>
-      <details open className="group min-w-0 rounded-2xl border border-slate-200 bg-white print:hidden dark:border-slate-700 dark:bg-slate-900"><summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 font-bold text-emerald-800 [&::-webkit-details-marker]:hidden dark:text-emerald-300"><span>{title}</span><ChevronDown className="h-4 w-4 transition group-open:rotate-180" /></summary><section className="border-t border-slate-200 [&_input]:min-h-11 [&_input]:text-base dark:border-slate-700">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-300 px-3 py-3"><h2 className="min-w-0 flex-1 font-bold leading-6 text-emerald-800 dark:text-emerald-300">{title}</h2><div className="flex shrink-0 items-center gap-2"><button type="button" onClick={addRow} className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-bold text-emerald-800"><Plus className="h-4 w-4" />{text("បន្ថែមជួរ", "Add row")}</button><button type="button" onClick={removeLast} aria-label={text("លុបជួរចុងក្រោយ", "Remove last row")} title={text("លុបជួរចុងក្រោយ", "Remove last row")} className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg border border-slate-200 px-2 py-2 text-red-700 hover:border-red-300 hover:bg-red-50 hover:text-red-800 dark:hover:border-red-800 dark:hover:bg-red-950/40 dark:hover:text-red-300"><X className="h-4 w-4" /></button></div></div>
+      <details open className="group min-w-0 rounded-2xl border border-slate-200 bg-white print:hidden dark:border-slate-700 dark:bg-slate-900"><summary className={`flex min-h-14 cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 font-bold [&::-webkit-details-marker]:hidden ${senSok ? "text-[#172b55] dark:text-[#d8b17e]" : "text-emerald-800 dark:text-emerald-300"}`}><span>{title}</span><ChevronDown className="h-4 w-4 transition group-open:rotate-180" /></summary><section className="border-t border-slate-200 [&_input]:min-h-11 [&_input]:text-base dark:border-slate-700">
+        <div className="flex flex-wrap items-center justify-end gap-3 border-b border-slate-300 px-3 py-3"><div className="flex shrink-0 items-center gap-2"><button type="button" onClick={addRow} className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-bold text-emerald-800"><Plus className="h-4 w-4" />{text("បន្ថែមជួរ", "Add row")}</button><button type="button" onClick={removeLast} aria-label={text("លុបជួរចុងក្រោយ", "Remove last row")} title={text("លុបជួរចុងក្រោយ", "Remove last row")} className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg border border-slate-200 px-2 py-2 text-red-700 hover:border-red-300 hover:bg-red-50 hover:text-red-800 dark:hover:border-red-800 dark:hover:bg-red-950/40 dark:hover:text-red-300"><X className="h-4 w-4" /></button></div></div>
         <div className="space-y-3 p-3">{rows.map((row, index) => <details key={row.id} open={Boolean(row.customer.trim())} className="group/row min-w-0 rounded-xl border border-slate-200 bg-white shadow-sm open:ring-2 open:ring-emerald-500/20 dark:border-slate-700 dark:bg-slate-900"><summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-3 px-4 py-2.5 [&::-webkit-details-marker]:hidden"><div className="flex min-w-0 items-center gap-3"><span className="w-6 shrink-0 text-center text-xs font-bold text-slate-400">{index + 1}</span><div className="min-w-0"><p className="truncate text-sm font-bold text-slate-900 dark:text-white">{row.customer.trim() || `${text("អតិថិជនថ្មី", "New customer")} ${index + 1}`}</p><p className="mt-0.5 truncate text-xs text-slate-500">{showReason && row.reason.trim() ? row.reason : row.type.trim() || text("បើកដើម្បីបំពេញព័ត៌មាន", "Open for full details")}</p></div></div><div className="flex shrink-0 items-center gap-3"><span className={`rounded-full px-2.5 py-1 text-xs font-bold ${statusMeta.cls}`}>{statusMeta.label}</span>{row.amount.trim() ? <strong className="tabular-nums text-sm text-emerald-700 dark:text-emerald-300">{operationCurrency(operationNumber(row.amount))}</strong> : null}<ChevronDown className="h-4 w-4 text-slate-400 transition group-open/row:rotate-180" /></div></summary><div className="space-y-3 border-t border-slate-200 p-4 dark:border-slate-700"><Field label={text("ឈ្មោះអតិថិជន", "Customer Name")}><input list="operation-report-customer-options" value={row.customer} onBlur={(event) => onRememberField("customer", event.target.value)} onChange={(event) => changeCustomer(row, event.target.value)} className={inputClass} /></Field><div className="grid grid-cols-1 gap-3 min-[390px]:grid-cols-2"><Field label={text("ប្រភេទ", "Type")}><input list="operation-report-type-options" value={row.type} onBlur={(event) => { onRememberType(event.target.value); onRememberField("type", event.target.value); }} onChange={(event) => updateRow(row.id, "type", event.target.value)} className={inputClass} /></Field><Field label={text("សាច់ប្រាក់", "Amount")}><input type="number" min="0" inputMode="decimal" value={row.amount} onBlur={(event) => onRememberField("amount", event.target.value)} onChange={(event) => updateRow(row.id, "amount", event.target.value)} className={inputClass} placeholder="0.00" /></Field></div>{showReason ? <Field label={text("មូលហេតុ", "Reason")}><input list="operation-report-reason-options" value={row.reason} onBlur={(event) => onRememberField("reason", event.target.value)} onChange={(event) => updateRow(row.id, "reason", event.target.value)} className={inputClass} /></Field> : null}<Field label={text("រូបភាព", "Photos")}><OperationReportImageCell images={row.images} imageUrl={row.imageUrl} imageName={row.imageName} onChange={(attachment) => onChange(rows.map((item) => item.id === row.id ? { ...item, ...attachment } : item))} /></Field></div></details>)}</div>
         <div className="flex items-center justify-between border-t-2 border-slate-900 bg-slate-100 px-4 py-3 font-bold text-red-700 dark:bg-slate-800"><span>{text("សរុប", "Total")}</span><span>{operationCurrency(total)}</span></div>
       </section></details>

@@ -1,15 +1,16 @@
 "use client";
 
-import { AlertTriangle, CalendarRange, ChartNoAxesCombined, ChevronDown, Plus, Settings2, Trash2, Users } from "lucide-react";
-import { useState } from "react";
+import { AlertTriangle, CalendarRange, ChartNoAxesCombined, ChevronDown, Database, Plus, Settings2, Trash2, Users } from "lucide-react";
+import { useEffect, useState } from "react";
 import { BM_KPIS, bmKpiValues, emptyBmAccountRow, emptyBmIssue, emptyBmKpis, emptyBmPeriods, emptyBmStaffRow, type BmPeriod, type BmWorksheet } from "../utils/bmWorksheet";
+import { normalizeCompanyBranch } from "@/shared/utils/branchNames";
 
-type Section = "overview" | "kpis" | "team" | "issues" | "periods";
-type Props = { reportDate: string; branch: string; reporterName: string; value: BmWorksheet; onChange: (value: BmWorksheet) => void; readOnly: boolean; isKhmer: boolean };
+type Section = "overview" | "kpis" | "team" | "issues" | "periods" | "sources";
+type Props = { reportDate: string; branch: string; reporterName: string; value: BmWorksheet; onChange: (value: BmWorksheet) => void; readOnly: boolean; isKhmer: boolean; validationFocusVersion?: number; invalidDailyField?: string };
 const fieldClass = "mt-1 min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 read-only:border-slate-200 read-only:bg-slate-50 dark:border-slate-700 dark:bg-slate-950 dark:read-only:bg-slate-900";
 
-function NumberField({ label, value, onChange, readOnly }: { label: string; value: string; onChange: (value: string) => void; readOnly: boolean }) {
-  return <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300">{label}<input aria-label={label} type="number" min={0} step="any" value={value} readOnly={readOnly} onChange={(event) => onChange(event.target.value)} className={fieldClass} /></label>;
+function NumberField({ label, value, onChange, readOnly, invalid = false }: { label: string; value: string; onChange: (value: string) => void; readOnly: boolean; invalid?: boolean }) {
+  return <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300">{label}<input aria-label={label} aria-invalid={invalid || undefined} type="number" min={0} step="any" value={value} readOnly={readOnly} onChange={(event) => onChange(event.target.value)} className={`${fieldClass} ${invalid ? "border-amber-500 bg-amber-50 focus:border-amber-600 focus:ring-amber-500/20 dark:border-amber-500 dark:bg-amber-950/25" : ""}`} /></label>;
 }
 
 function TextField({ label, value, onChange, readOnly, type = "text" }: { label: string; value: string; onChange: (value: string) => void; readOnly: boolean; type?: "text" | "date" }) {
@@ -42,7 +43,7 @@ const PERIOD_FIELDS: Record<string, [string, string]> = {
   accountReports: ["Account reports", "គណនេយ្យ"],
 };
 
-export default function BmReportEditor({ value, onChange, readOnly, isKhmer, reportDate, branch, reporterName }: Props) {
+export default function BmReportEditor({ value, onChange, readOnly, isKhmer, reportDate, branch, reporterName, validationFocusVersion = 0, invalidDailyField }: Props) {
   const [section, setSection] = useState<Section>("overview");
   const [kpiOpen, setKpiOpen] = useState<Record<string, boolean>>({});
   const [staffOpen, setStaffOpen] = useState<Record<number, boolean>>({});
@@ -50,6 +51,7 @@ export default function BmReportEditor({ value, onChange, readOnly, isKhmer, rep
   const [issueOpen, setIssueOpen] = useState<Record<number, boolean>>({});
   const [periodOpen, setPeriodOpen] = useState<Record<number, boolean>>({});
   const text = (en: string, km: string) => isKhmer ? km : en;
+  const isSenSok = normalizeCompanyBranch(branch) === "sen-sok";
   const kpis = value.kpis || emptyBmKpis();
   const issues = value.issues || [emptyBmIssue()];
   const periods = value.periods || emptyBmPeriods();
@@ -86,18 +88,27 @@ export default function BmReportEditor({ value, onChange, readOnly, isKhmer, rep
   // Reviewers need the complete submitted form, including empty sections, to
   // assess exactly what the BM did and did not report.
   const tabs: Array<[Section, string, typeof Users, string?]> = [
-    ["overview", text("Overview", "ទិដ្ឋភាពរួម"), ChartNoAxesCombined], ["kpis", "KPI", ChartNoAxesCombined, `${kpiCount}/${BM_KPIS.length}`],
-    ["team", text("Team Performance", "លទ្ធផលក្រុម"), Users, String(staffCount)], ["issues", text("Issues", "បញ្ហា"), AlertTriangle, String(openIssueCount)], ["periods", text("Periods", "រយៈពេល"), CalendarRange, `${periodsWithData}/${periods.length}`],
+    ["overview", text("Overview", "ទិដ្ឋភាពរួម"), ChartNoAxesCombined], ["kpis", text("Branch KPI", "KPI សាខា"), ChartNoAxesCombined, `${kpiCount}/${BM_KPIS.length}`],
+    ["team", text("Team Performance", "លទ្ធផលក្រុម"), Users, String(staffCount)], ["issues", text("Issues & Action Plan", "បញ្ហា និងផែនការ"), AlertTriangle, String(openIssueCount)], ["periods", text("Daily / Month / Year", "ថ្ងៃ / ខែ / ឆ្នាំ"), CalendarRange, `${periodsWithData}/${periods.length}`],
+    ["sources", text("Source Reports", "ប្រភពរបាយការណ៍"), Database, `${value.sourceReportIds.length + value.sourceAccountReportIds.length}`],
   ];
   const visibleTabs = tabs;
 
-  return <section className="space-y-5 p-3 text-slate-900 dark:text-slate-100 sm:p-5">
-    <header className="rounded-2xl bg-gradient-to-r from-emerald-700 to-teal-600 p-5 text-white shadow-sm">
-      <div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-xs font-semibold uppercase tracking-wider text-emerald-100">{value.mode === "generated" ? text("Generated report", "របាយការណ៍ស្វ័យប្រវត្តិ") : text("Manual report", "របាយការណ៍បញ្ចូលដោយដៃ")}</p><h2 className="mt-1 text-xl font-bold">{text("Branch Manager Report", "របាយការណ៍ប្រធានសាខា")}</h2></div>{readOnly ? <span className="rounded-full bg-white/15 px-3 py-1 text-xs font-semibold">{text("View only", "មើលតែប៉ុណ្ណោះ")}</span> : null}</div>
-      <div className="mt-4 grid gap-2 text-sm text-emerald-50 sm:grid-cols-3"><span>{reportDate}</span><span>{branch || "—"}</span><span>{reporterName || "—"}</span></div>
-    </header>
+  useEffect(() => {
+    if (!validationFocusVersion) return;
+    setSection("periods");
+    setPeriodOpen((current) => ({ ...current, 0: true }));
+    window.setTimeout(() => document.querySelector<HTMLInputElement>('[aria-invalid="true"]')?.focus({ preventScroll: false }), 0);
+  }, [validationFocusVersion]);
 
-    <nav aria-label={text("Report sections", "ផ្នែករបាយការណ៍")} className="sticky top-0 z-10 flex gap-1 overflow-x-auto rounded-xl border border-slate-200 bg-white p-1 shadow-sm dark:border-slate-700 dark:bg-slate-900 print:hidden">{visibleTabs.map(([id, label, Icon, count]) => <button key={id} type="button" aria-pressed={section === id} onClick={() => setSection(id)} className={`inline-flex min-h-11 shrink-0 items-center gap-2 rounded-lg px-3 text-sm font-semibold ${section === id ? "bg-emerald-600 text-white" : "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"}`}><Icon className="h-4 w-4" />{label}{count ? <span className={`rounded-full px-1.5 py-0.5 text-[11px] font-bold ${section === id ? "bg-white/20 text-white" : "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-300"}`}>{count}</span> : null}</button>)}</nav>
+  return <section className="space-y-5 p-3 text-slate-900 dark:text-slate-100 sm:p-5">
+    <header className={`rounded-2xl bg-gradient-to-r p-5 text-white shadow-sm ${isSenSok ? "from-[#172b55] to-[#304a79]" : "from-emerald-700 to-teal-600"}`}>
+      <div className="flex flex-wrap items-start justify-between gap-3"><div><p className={`text-xs font-semibold uppercase tracking-wider ${isSenSok ? "text-[#e7c998]" : "text-emerald-100"}`}>{value.mode === "generated" ? text("Generated report", "របាយការណ៍ស្វ័យប្រវត្តិ") : text("Manual report", "របាយការណ៍បញ្ចូលដោយដៃ")}</p><h2 className="mt-1 text-xl font-bold">{text("Branch Manager Report", "របាយការណ៍ប្រធានសាខា")}</h2></div>{readOnly ? <span className="rounded-full bg-white/15 px-3 py-1 text-xs font-semibold">{text("View only", "មើលតែប៉ុណ្ណោះ")}</span> : null}</div>
+      <div className={`mt-4 grid gap-2 text-sm sm:grid-cols-3 ${isSenSok ? "text-[#f7eedf]" : "text-emerald-50"}`}><span>{reportDate}</span><span>{branch || "—"}</span><span>{reporterName || "—"}</span></div>
+    </header>
+    {value.incompleteSourceReason?.trim() ? <section className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-100"><p className="font-bold">{text("Exception reason for incomplete LS/Acc data", "មូលហេតុទិន្នន័យ LS/Acc មិនទាន់គ្រប់")}</p><p className="mt-1 whitespace-pre-wrap">{value.incompleteSourceReason}</p></section> : null}
+
+    <nav aria-label={text("Report sections", "ផ្នែករបាយការណ៍")} className="sticky top-0 z-10 flex gap-1 overflow-x-auto rounded-xl border border-slate-200 bg-white p-1 shadow-sm dark:border-slate-700 dark:bg-slate-900 print:hidden">{visibleTabs.map(([id, label, Icon, count]) => <button key={id} type="button" aria-pressed={section === id} onClick={() => setSection(id)} className={`inline-flex min-h-11 shrink-0 items-center gap-2 rounded-lg px-3 text-sm font-semibold ${section === id ? isSenSok ? "bg-[#172b55] text-[#f7eedf]" : "bg-emerald-600 text-white" : "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"}`}><Icon className="h-4 w-4" />{label}{count ? <span className={`rounded-full px-1.5 py-0.5 text-[11px] font-bold ${section === id ? "bg-white/20 text-white" : "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-300"}`}>{count}</span> : null}</button>)}</nav>
 
     <div className={section === "overview" ? "space-y-5" : "hidden print:block"}>
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -184,7 +195,12 @@ export default function BmReportEditor({ value, onChange, readOnly, isKhmer, rep
         <Metric label={text("Approved", "អនុម័ត")} value={numText(row.approved)} helper={`$${numText(row.approvedAmount)}`} color="border-emerald-200 bg-emerald-50 text-emerald-900 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-200" />
         <Metric label={text("Collected", "ប្រមូលបាន")} value={`$${numText(row.collected)}`} helper={`${numText(row.paid)} ${text("payments", "ការបង់ប្រាក់")}`} color="border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200" />
       </div>
-      <div className={`mt-4 grid grid-cols-2 gap-3 ${open || generatedSourceReadOnly ? "" : "hidden print:grid print:gap-3"}`}>{Object.keys(PERIOD_FIELDS).map((key) => { const [en, km] = PERIOD_FIELDS[key]; const current = row[key as keyof BmPeriod]; return <NumberField key={key} label={isKhmer ? km : en} value={current} onChange={(next) => onChange({ ...value, periods: periods.map((item) => item.period === row.period ? { ...item, [key]: next } : item) })} readOnly={generatedSourceReadOnly} />; })}</div>
+      <div className={`mt-4 grid grid-cols-2 gap-3 ${open || generatedSourceReadOnly ? "" : "hidden print:grid print:gap-3"}`}>{Object.keys(PERIOD_FIELDS).map((key) => { const [en, km] = PERIOD_FIELDS[key]; const current = row[key as keyof BmPeriod]; return <NumberField key={key} label={isKhmer ? km : en} value={current} onChange={(next) => onChange({ ...value, periods: periods.map((item) => item.period === row.period ? { ...item, [key]: next } : item) })} readOnly={generatedSourceReadOnly} invalid={isManualReport && row.period === "daily" && invalidDailyField === key && current.trim() === ""} />; })}</div>
     </article>; })}</div>
+
+    <div className={section === "sources" ? "space-y-4" : "hidden print:block"}>
+      <section className="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-900"><div className="flex items-start gap-3"><span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"><Database className="h-5 w-5" /></span><div><h3 className="font-bold">{text("Where this report data came from", "ប្រភពទិន្នន័យរបាយការណ៍នេះ")}</h3><p className="mt-1 text-sm text-slate-500">{value.mode === "generated" ? text("Figures are generated only from linked, reviewed source reports. They cannot be edited in this BM report.", "លេខត្រូវបានបង្កើតពីប្រភពដែលបានភ្ជាប់ និងពិនិត្យរួចប៉ុណ្ណោះ។ មិនអាចកែលេខទាំងនេះក្នុង BM Report បានទេ។") : text("This is a manual BM report; it has no LS or Account source links.", "នេះជារបាយការណ៍ BM បញ្ចូលដោយដៃ ដូច្នេះមិនមានប្រភព LS ឬ Account ភ្ជាប់ទេ។")}</p></div></div><div className="mt-5 grid gap-3 sm:grid-cols-2"><Metric label={text("Reviewed LS reports", "LS បានពិនិត្យរួច")} value={String(value.sourceReportIds.length)} helper={text("Linked to this report", "បានភ្ជាប់ក្នុងរបាយការណ៍នេះ")} color="border-blue-200 bg-blue-50 text-blue-900 dark:border-blue-900 dark:bg-blue-950/30 dark:text-blue-200" /><Metric label={text("Reviewed Account reports", "Acc បានពិនិត្យរួច")} value={String(value.sourceAccountReportIds.length)} helper={text("Linked to this report", "បានភ្ជាប់ក្នុងរបាយការណ៍នេះ")} color="border-violet-200 bg-violet-50 text-violet-900 dark:border-violet-900 dark:bg-violet-950/30 dark:text-violet-200" /></div></section>
+      <section className="rounded-xl border border-slate-200 bg-slate-50 p-5 text-sm dark:border-slate-700 dark:bg-slate-900"><h3 className="font-bold">{text("How to read the KPI screen", "របៀបមើល KPI")}</h3><ul className="mt-3 space-y-2 text-slate-600 dark:text-slate-300"><li>{text("Auto data: collections, approvals, and report counts are calculated from linked reports.", "ទិន្នន័យស្វ័យប្រវត្តិ៖ ការប្រមូលប្រាក់ ការអនុម័ត និងចំនួនរបាយការណ៍ គណនាពីប្រភពដែលបានភ្ជាប់។")}</li><li>{text("BM confirmation: targets, notes, risk KPIs, and action plans need management input or a Loan System source.", "BM ត្រូវបញ្ជាក់៖ target, note, risk KPI និងផែនការ ត្រូវការទិន្នន័យពីអ្នកគ្រប់គ្រង ឬ Loan System។")}</li></ul></section>
+    </div>
   </section>;
 }

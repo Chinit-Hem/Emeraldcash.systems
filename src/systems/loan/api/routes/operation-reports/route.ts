@@ -264,6 +264,8 @@ export async function POST(request: NextRequest) {
       }
     }
     if (reportType === "bm" && status === "submitted" && !(validBmWorksheet(reportData.bmWorksheet) && reportData.bmWorksheet.mode === "manual")) {
+      const worksheet = reportData.bmWorksheet as { incompleteSourceReason?: unknown } | undefined;
+      const incompleteSourceReason = typeof worksheet?.incompleteSourceReason === "string" ? worksheet.incompleteSourceReason.trim() : "";
       const sourceReportIds = Array.isArray(reportData.sourceReportIds) ? reportData.sourceReportIds.map(String).filter((id) => /^[0-9a-f-]{36}$/i.test(id)) : [];
       if (!sourceReportIds.length) return NextResponse.json({ success: false, error: "A BM Report must include reviewed LS reports" }, { status: 400 });
       const eligibleSources = await queryWithRetry(async () => sql<Pick<ReportRow, "id" | "status">>`
@@ -278,7 +280,10 @@ export async function POST(request: NextRequest) {
       `, "validateBranchManagerReportSources");
       const eligibleSourceIds = eligibleSources.filter((source) => ["reviewed", "approved"].includes(source.status)).map((source) => source.id);
       const hasEveryEligibleSource = eligibleSourceIds.length === sourceReportIds.length && eligibleSourceIds.every((id) => sourceReportIds.includes(id));
-      if (eligibleSources.some((source) => !["reviewed", "approved"].includes(source.status)) || !hasEveryEligibleSource) {
+      if (!hasEveryEligibleSource) {
+        return NextResponse.json({ success: false, error: "Every reviewed LS report for this branch/date must be linked before BM submission" }, { status: 409 });
+      }
+      if (eligibleSources.some((source) => !["reviewed", "approved"].includes(source.status)) && !incompleteSourceReason) {
         return NextResponse.json({ success: false, error: "Every LS report for this branch/date must be reviewed and linked before BM submission" }, { status: 409 });
       }
       const sourceAccountReportIds = Array.isArray(reportData.sourceAccountReportIds) ? reportData.sourceAccountReportIds.map(String).filter((id) => /^[0-9a-f-]{36}$/i.test(id)) : [];
@@ -295,7 +300,10 @@ export async function POST(request: NextRequest) {
       `, "validateBranchManagerAccountReportSources");
       const eligibleAccountSourceIds = eligibleAccountSources.filter((source) => ["reviewed", "approved"].includes(source.status)).map((source) => source.id);
       const hasEveryEligibleAccountSource = eligibleAccountSourceIds.length === sourceAccountReportIds.length && eligibleAccountSourceIds.every((id) => sourceAccountReportIds.includes(id));
-      if (eligibleAccountSources.some((source) => !["reviewed", "approved"].includes(source.status)) || !hasEveryEligibleAccountSource) {
+      if (!hasEveryEligibleAccountSource) {
+        return NextResponse.json({ success: false, error: "Every reviewed Account Report for this branch/date must be linked before BM submission" }, { status: 409 });
+      }
+      if (eligibleAccountSources.some((source) => !["reviewed", "approved"].includes(source.status)) && !incompleteSourceReason) {
         return NextResponse.json({ success: false, error: "Every Account Report for this branch/date must be reviewed and linked before BM submission" }, { status: 409 });
       }
     }
