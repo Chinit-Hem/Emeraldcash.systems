@@ -268,7 +268,6 @@ export async function POST(request: NextRequest) {
       const incompleteSourceReason = typeof worksheet?.incompleteSourceReason === "string" ? worksheet.incompleteSourceReason.trim() : "";
       const incompleteSourcesAcknowledged = worksheet?.incompleteSourcesAcknowledged === true;
       const sourceReportIds = Array.isArray(reportData.sourceReportIds) ? reportData.sourceReportIds.map(String).filter((id) => /^[0-9a-f-]{36}$/i.test(id)) : [];
-      if (!sourceReportIds.length) return NextResponse.json({ success: false, error: "A BM Report must include reviewed LS reports" }, { status: 400 });
       const eligibleSources = await queryWithRetry(async () => sql<Pick<ReportRow, "id" | "status">>`
         SELECT id, status FROM operation_reports
         WHERE report_type = 'ls'
@@ -284,11 +283,10 @@ export async function POST(request: NextRequest) {
       if (!hasEveryEligibleSource) {
         return NextResponse.json({ success: false, error: "Every reviewed LS report for this branch/date must be linked before BM submission" }, { status: 409 });
       }
-      if (eligibleSources.some((source) => !["reviewed", "approved"].includes(source.status)) && (!incompleteSourceReason || !incompleteSourcesAcknowledged)) {
+      if ((!eligibleSourceIds.length || eligibleSources.some((source) => !["reviewed", "approved"].includes(source.status))) && (!incompleteSourceReason || !incompleteSourcesAcknowledged)) {
         return NextResponse.json({ success: false, error: "BM must mark incomplete LS reports as acknowledged and provide a reason before submission" }, { status: 409 });
       }
       const sourceAccountReportIds = Array.isArray(reportData.sourceAccountReportIds) ? reportData.sourceAccountReportIds.map(String).filter((id) => /^[0-9a-f-]{36}$/i.test(id)) : [];
-      if (!sourceAccountReportIds.length) return NextResponse.json({ success: false, error: "A BM Report must include a reviewed Account Report" }, { status: 400 });
       await ensureAccountReportsTable();
       const eligibleAccountSources = await queryWithRetry(async () => sql<{ id: string; status: string }>`
         SELECT id, status FROM account_reports
@@ -304,7 +302,7 @@ export async function POST(request: NextRequest) {
       if (!hasEveryEligibleAccountSource) {
         return NextResponse.json({ success: false, error: "Every reviewed Account Report for this branch/date must be linked before BM submission" }, { status: 409 });
       }
-      if (eligibleAccountSources.some((source) => !["reviewed", "approved"].includes(source.status)) && (!incompleteSourceReason || !incompleteSourcesAcknowledged)) {
+      if ((!eligibleAccountSourceIds.length || eligibleAccountSources.some((source) => !["reviewed", "approved"].includes(source.status))) && (!incompleteSourceReason || !incompleteSourcesAcknowledged)) {
         return NextResponse.json({ success: false, error: "BM must mark incomplete Account Reports as acknowledged and provide a reason before submission" }, { status: 409 });
       }
     }

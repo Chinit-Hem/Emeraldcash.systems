@@ -5882,7 +5882,12 @@ function OperationReportView({ loans, loading, canViewLoanData, onRefresh, onOpe
   const lsReportsNeedingSubmission = useMemo(() => Array.from(new Map(branchLoanSpecialistRecords.filter((record) => record.reportDate === reportDate && ["draft", "returned"].includes(record.status)).map((record) => [`${record.reporterUsername.trim().toLowerCase()}:${normalizeReportBranchLabel(record.branch)}`, record])).values()), [branchLoanSpecialistRecords, reportDate]);
   const submittedLsAwaitingReview = branchManagerRecords.filter((record) => record.status === "submitted").length;
   const submittedAccountsAwaitingReview = branchAccountRecords.filter((record) => record.status === "submitted").length;
-  const incompleteSourceCount = lsReportsNeedingSubmission.length + branchAccountReportsNeedingSubmission.length + submittedLsAwaitingReview + submittedAccountsAwaitingReview;
+  // A source type can be entirely absent (for example, Acc = 0). Treat that
+  // as incomplete too, so BM can generate available figures, then Mark Done
+  // and record a reason before submitting.
+  const noLsSourceForDate = !readyBranchManagerRecords.length && !branchManagerRecords.length && !lsReportsNeedingSubmission.length;
+  const noAccountSourceForDate = !readyBranchAccountRecords.length && !branchAccountRecords.length && !branchAccountReportsNeedingSubmission.length;
+  const incompleteSourceCount = lsReportsNeedingSubmission.length + branchAccountReportsNeedingSubmission.length + submittedLsAwaitingReview + submittedAccountsAwaitingReview + Number(noLsSourceForDate) + Number(noAccountSourceForDate);
   const hasIncompleteSources = incompleteSourceCount > 0;
   const hrFrom = searchParams.get("hrFrom") || "";
   const hrTo = searchParams.get("hrTo") || "";
@@ -5997,10 +6002,6 @@ function OperationReportView({ loans, loading, canViewLoanData, onRefresh, onOpe
     if (lsReportsNeedingSubmission.length) {
       setShowIncompleteLsPanel(true);
     }
-    if (!readyBranchManagerRecords.length || !readyBranchAccountRecords.length) {
-      toastError(opText("ត្រូវពិនិត្យ/អនុម័តរបាយការណ៍ LS និងគណនេយ្យសម្រាប់សាខា និងថ្ងៃនេះជាមុនសិន។", "Generate requires reviewed or approved LS and Account reports for the selected branch and date."));
-      return;
-    }
     if (hasBmWorksheetContent(bmWorksheet) && !window.confirm(opText("ជំនួសទិន្នន័យដែលបានបញ្ចូលដោយរបាយការណ៍ LS និងគណនេយ្យ?", "Replace the entered figures with LS and Account report results?"))) return;
     const periodSources = [
       [readyBranchManagerRecords, readyBranchAccountRecords],
@@ -6025,11 +6026,9 @@ function OperationReportView({ loans, loading, canViewLoanData, onRefresh, onOpe
     const generatedDraftKey = bmDraftKeyForMode("generated");
     setBmDrafts((current) => ({ ...current, [generatedDraftKey]: generatedWorksheet }));
     try { window.localStorage.setItem(generatedDraftKey, JSON.stringify(generatedWorksheet)); } catch { /* Saving to the server remains available. */ }
-    const pendingLs = branchManagerRecords.filter((record) => !["reviewed", "approved"].includes(record.status)).length;
-    const pendingAccounts = branchAccountRecords.filter((record) => !["reviewed", "approved"].includes(record.status)).length;
     toastSuccess(
-      pendingLs || pendingAccounts
-        ? opText(`បានបង្កើត Draft ពី LS ${readyBranchManagerRecords.length} និង Acc ${readyBranchAccountRecords.length} រួចរាល់។ នៅសល់ LS ${pendingLs} និង Acc ${pendingAccounts} ត្រូវពិនិត្យ មុនពេល Submit។`, `Draft generated from ${readyBranchManagerRecords.length} ready LS and ${readyBranchAccountRecords.length} ready Acc reports. ${pendingLs} LS and ${pendingAccounts} Acc report(s) still need review before submission.`)
+      hasIncompleteSources
+        ? opText(`បានបង្កើត KPI Overview ពី LS ${readyBranchManagerRecords.length} និង Acc ${readyBranchAccountRecords.length}។ សូម BM Mark Done និងបញ្ចូលមូលហេតុសម្រាប់ទិន្នន័យដែលខ្វះ មុនពេល Submit។`, `KPI Overview was generated from ${readyBranchManagerRecords.length} LS and ${readyBranchAccountRecords.length} Account report(s). BM must Mark Done and enter a reason for missing data before submitting.`)
         : opText(`បានបង្កើត Draft ពី LS ${readyBranchManagerRecords.length} និង Acc ${readyBranchAccountRecords.length} របាយការណ៍ដែលបានពិនិត្យរួច។`, `Draft generated from ${readyBranchManagerRecords.length} reviewed LS and ${readyBranchAccountRecords.length} reviewed Acc reports.`),
     );
     setReportPanel("form");
@@ -6652,8 +6651,6 @@ function OperationReportView({ loans, loading, canViewLoanData, onRefresh, onOpe
     !bmDailyPeriod?.collected.trim() ? opText("សូមបំពេញ រយៈពេលថ្ងៃនេះ៖ ប្រាក់ប្រមូលបាន", "Complete Today: Collected amount") : "",
   ].filter(Boolean) : [];
   const branchManagerSubmissionRequirements = isBranchManagerReport && bmWorksheet.mode === "generated" ? [
-    !readyBranchManagerRecords.length ? opText("មិនទាន់មានរបាយការណ៍ LS ដែលបានពិនិត្យ/អនុម័ត", "A reviewed or approved LS report is required") : "",
-    !readyBranchAccountRecords.length ? opText("មិនទាន់មានរបាយការណ៍គណនេយ្យដែលបានពិនិត្យ/អនុម័ត", "A reviewed or approved Account Report is required") : "",
     hasIncompleteSources && !bmWorksheet.incompleteSourcesAcknowledged ? opText("សូម Mark ថាទទួលស្គាល់របាយការណ៍ LS/Acc ដែលមិនទាន់គ្រប់", "Mark the incomplete LS/Account reports as acknowledged") : "",
     hasIncompleteSources && !bmWorksheet.incompleteSourceReason?.trim() ? opText("សូមបញ្ចូលមូលហេតុដែលទិន្នន័យ LS/Acc មិនទាន់គ្រប់", "Enter the reason why LS/Acc source data is incomplete") : "",
   ].filter(Boolean) : [];
