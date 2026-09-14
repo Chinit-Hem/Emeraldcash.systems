@@ -5838,6 +5838,18 @@ function OperationReportView({ loans, loading, canViewLoanData, onRefresh, onOpe
   const branchManagerYearRecords = useMemo(() => visibleSavedReports.filter((record) => record.reportDate.startsWith(reportDate.slice(0, 4)) && (!branch.trim() || normalizeReportBranchLabel(record.branch) === normalizeReportBranchLabel(branch)) && ["submitted", "reviewed", "approved"].includes(record.status)), [branch, reportDate, visibleSavedReports]);
   const branchAccountRecords = useMemo(() => accountReports.filter((record) => record.reportDate === reportDate && (!branch.trim() || normalizeReportBranchLabel(record.branch) === normalizeReportBranchLabel(branch)) && ["submitted", "reviewed", "approved"].includes(record.status)), [accountReports, branch, reportDate]);
   const branchAccountReportsNeedingSubmission = useMemo(() => accountReports.filter((record) => record.reportDate === reportDate && (!branch.trim() || normalizeReportBranchLabel(record.branch) === normalizeReportBranchLabel(branch)) && ["draft", "returned"].includes(record.status)), [accountReports, branch, reportDate]);
+  const bmCalendarDateMarkers = useMemo<Record<string, "ready" | "pending">>(() => {
+    const markers: Record<string, "ready" | "pending"> = {};
+    const addMarker = (record: { reportDate: string; branch: string; status: string }) => {
+      if (!record.reportDate || (branch.trim() && normalizeReportBranchLabel(record.branch) !== normalizeReportBranchLabel(branch))) return;
+      const ready = ["reviewed", "approved"].includes(record.status);
+      if (ready || !markers[record.reportDate]) markers[record.reportDate] = ready ? "ready" : "pending";
+    };
+    visibleSavedReports.forEach(addMarker);
+    accountReports.forEach(addMarker);
+    return markers;
+  }, [accountReports, branch, visibleSavedReports]);
+  const selectedBmDateMarker = bmCalendarDateMarkers[reportDate];
   // The API accepts only reviewed/approved sources in a generated BM report.
   // Keep submitted records visible for the BM review queue, but never advertise
   // them as ready for the auto-fill action.
@@ -6770,8 +6782,9 @@ function OperationReportView({ loans, loading, canViewLoanData, onRefresh, onOpe
       </section> : null}
 
       {isBranchManagerReport && !isHumanResources ? <div className="flex flex-wrap items-center gap-4 rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900 print:hidden">
-        <label className="text-sm font-semibold">{opText("កាលបរិច្ឆេទ", "Report date")}<DateInput title="BM report date" value={reportDate} disabled={Boolean(openedBmReport)} onChange={(value) => setReportDate(value)} className="mt-1 block min-h-11 rounded-lg border border-slate-300 bg-transparent px-3 dark:border-slate-700" /></label>
+        <label className="text-sm font-semibold">{opText("កាលបរិច្ឆេទ", "Report date")}<DateInput title="BM report date" value={reportDate} disabled={Boolean(openedBmReport)} onChange={(value) => setReportDate(value)} dateMarkers={bmCalendarDateMarkers} className="mt-1 block min-h-11 rounded-lg border border-slate-300 bg-transparent px-3 dark:border-slate-700" /><span className="mt-2 flex items-center gap-3 text-xs font-medium text-slate-500"><span className="inline-flex items-center gap-1.5"><i className="h-2 w-2 rounded-full bg-emerald-500" />{opText("ទិន្នន័យរួចរាល់", "Data ready")}</span><span className="inline-flex items-center gap-1.5"><i className="h-2 w-2 rounded-full bg-amber-500" />{opText("រង់ចាំពិនិត្យ", "Pending review")}</span></span></label>
         <div className="text-sm"><span className="font-semibold">{opText("សាខា", "Branch")}</span><p className="mt-2">{companyBranchName(branch, language)}</p></div>
+        {!reportsLoading && !selectedBmDateMarker ? <div role="status" className="w-full rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-950 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-100">{opText(`មិនមានទិន្នន័យ LS ឬ Acc សម្រាប់ថ្ងៃទី ${reportDate} ទេ។ អ្នកអាចជ្រើសថ្ងៃផ្សេង ឬចាប់ផ្ដើមរបាយការណ៍ទទេបាន។`, `No LS or Account data exists for ${reportDate}. Choose another date or start a blank report.`)}</div> : null}
       </div> : null}
 
       {isBranchManagerReport && (isHumanResources || (!isDirector && canManageReports)) && branchAccountReportsNeedingSubmission.length ? <section role="alert" className="flex flex-col gap-3 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-amber-950 sm:flex-row sm:items-center sm:justify-between dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-100 print:hidden"><div><p className="font-bold">{opText(`មានរបាយការណ៍គណនេយ្យ ${branchAccountReportsNeedingSubmission.length} មិនទាន់ដាក់ស្នើ`, `${branchAccountReportsNeedingSubmission.length} Account Report(s) have not been submitted`)}</p><p className="mt-1 text-sm">{Array.from(new Set(branchAccountReportsNeedingSubmission.map((record) => `${record.reporterName || record.reporterUsername} · ${companyBranchName(record.branch, language)} · ${operationReportStatusLabel(record.status, language)}`))).join(" | ")}</p></div><button type="button" onClick={openIncompleteAccountReports} className="min-h-10 shrink-0 rounded-lg border border-amber-400 bg-white px-3 text-sm font-semibold hover:bg-amber-100 dark:bg-slate-900 dark:hover:bg-amber-950">{opText("មើលរបាយការណ៍គណនេយ្យ", "View Account Reports")}</button></section> : null}
