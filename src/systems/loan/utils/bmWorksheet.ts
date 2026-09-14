@@ -51,7 +51,10 @@ export const emptyBmPeriods = (): BmPeriod[] => ["daily", "monthly", "yearly"].m
 export function bmKpiValues(rows: BmKpi[], row: BmKpi) {
   const collection = rows.find((entry) => entry.id === "collected");
   const rate = (value: string | undefined) => collection && Number(collection.target) > 0 && value !== "" && value !== undefined ? String(Number(value) / Number(collection.target) * 100) : "";
-  const daily = row.id === "collectionRate" ? rate(collection?.daily) : row.daily;
-  const monthly = row.id === "collectionRate" ? rate(collection?.monthly) : row.monthly;
+  // A blank collection-rate value remains an automatic calculation. If the BM
+  // enters a value, retain it as an explicit management override in the BM
+  // snapshot without changing any LS or Account source report.
+  const daily = row.id === "collectionRate" ? row.daily || rate(collection?.daily) : row.daily;
+  const monthly = row.id === "collectionRate" ? row.monthly || rate(collection?.monthly) : row.monthly;
   return { daily, monthly, achievement: monthly !== "" && Number(row.target) > 0 ? Number(monthly) / Number(row.target) : null };
 }

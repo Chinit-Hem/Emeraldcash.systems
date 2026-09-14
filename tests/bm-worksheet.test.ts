@@ -50,6 +50,12 @@ test("reference KPIs calculate achievement and collection rates with safe empty 
   rate.target = "97";
   assert.equal(Number(bmKpiValues(rows, rate).daily), 1087.75 / 21297 * 100);
   assert.equal(bmKpiValues(rows, rate).achievement, (3032.25 / 21297 * 100) / 97);
+  rate.daily = "7.5";
+  rate.monthly = "18.25";
+  assert.equal(bmKpiValues(rows, rate).daily, "7.5");
+  assert.equal(bmKpiValues(rows, rate).monthly, "18.25");
+  rate.daily = "";
+  rate.monthly = "";
   collected.target = "0";
   assert.equal(bmKpiValues(rows, rate).achievement, null);
   assert.equal(bmKpiValues(rows, rate).daily, "");
