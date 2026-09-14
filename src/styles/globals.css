@@ -165,9 +165,7 @@ body {
 /* Do not let a stale dynamic viewport shrink the application after a native
    file picker closes. This has occurred in Android WebView and Chromium too. */
 .app-shell-viewport {
-  height: 100vh;
   min-height: 100vh;
-  height: max(100vh, 100dvh, 100lvh);
   min-height: max(100vh, 100dvh, 100lvh);
 }
 

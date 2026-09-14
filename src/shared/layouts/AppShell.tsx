@@ -397,11 +397,11 @@ function AppShellContent({ children }: AppShellProps) {
   // viewport. The app-shell class uses the largest viewport unit, including a
   // stable `vh` fallback, so content never collapses into a blank lower area.
   return (
-    <div className={`app-shell-viewport flex min-w-0 flex-col overflow-hidden bg-transparent ${bottomPaddingClass} xl:pb-0`}>
+    <div className={`app-shell-viewport flex min-w-0 flex-col bg-transparent ${bottomPaddingClass} xl:pb-0`}>
       <AuthUserProvider user={user}>
         <MobileBackHandler isMenuOpen={isSidebarOpen} onCloseMenu={closeSidebar} />
 
-        <div className="flex min-h-0 flex-1 overflow-hidden">
+        <div className="flex min-h-0 flex-1">
           {/* Desktop sidebar (render ONLY once) */}
           {isDesktopSidebar && (
             <Suspense fallback={null}>
@@ -432,7 +432,7 @@ function AppShellContent({ children }: AppShellProps) {
             <main
               ref={mainRef}
               data-app-scroll-container="true"
-              className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden pt-0"
+              className="min-h-0 flex-1 overflow-x-hidden pt-0"
             >
               {children}
             </main>
