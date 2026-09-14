@@ -4707,6 +4707,14 @@ function createAccountResolutionRows(customers: string[] = [], count = 0): Accou
   return Array.from({ length: rowCount }, (_, index) => ({ id: index + 1, customer: index < count ? customers[index] || "" : "", assetType: "", interest: "", penalty: "", principal: "", note: "" }));
 }
 
+function keepOneEmptyDraftRow<T extends object>(rows: T[], createRows: () => T[]) {
+  const hasContent = rows.some((row) => Object.entries(row as Record<string, unknown>).some(([key, value]) => {
+    if (key === "id") return false;
+    return typeof value === "string" ? value.trim().length > 0 : Array.isArray(value) ? value.length > 0 : Boolean(value);
+  }));
+  return rows.length > 1 && !hasContent ? createRows() : rows;
+}
+
 function accountNumber(value: string) {
   return reportNumber(value);
 }
@@ -4718,31 +4726,35 @@ function accountReportDateInputValue() {
 function AccountCollectionCards({ title, rows, onChange, reasons, duplicateCustomers, accent = "green" }: { title: string; rows: AccountCollectionRow[]; onChange: (rows: AccountCollectionRow[]) => void; reasons: string[]; duplicateCustomers?: string[]; accent?: "green" | "red" }) {
   const { language } = useLanguage();
   const text = (km: string, en: string) => language === "km" ? km : en;
+  const [openRowIds, setOpenRowIds] = useState<Set<number>>(() => new Set());
+  const setRowOpen = (id: number, open: boolean) => setOpenRowIds((current) => { const next = new Set(current); if (open) next.add(id); else next.delete(id); return next; });
   const update = (id: number, key: keyof Omit<AccountCollectionRow, "id">, next: string) => onChange(rows.map((row) => row.id === id ? { ...row, [key]: next } : row));
   const createRow = (id: number) => ({ id, customer: "", amount: "", reason: "" });
-  const add = () => onChange([...rows, { id: Math.max(0, ...rows.map((row) => row.id)) + 1, customer: "", amount: "", reason: "" }]);
+  const add = () => { const id = Math.max(0, ...rows.map((row) => row.id)) + 1; setOpenRowIds(new Set([id])); onChange([...rows, { id, customer: "", amount: "", reason: "" }]); };
   const remove = (id: number) => onChange(rows.length > 1 ? rows.filter((row) => row.id !== id) : [{ id: 1, customer: "", amount: "", reason: "" }]);
   const removeLast = () => onChange(rows.length > 1 ? rows.slice(0, -1) : [{ id: 1, customer: "", amount: "", reason: "" }]);
   const onEnter = (event: ReactKeyboardEvent<HTMLInputElement>, index: number, field: keyof Omit<AccountCollectionRow, "id">) => appendAccountRowOnEnter(event, index, rows, onChange, createRow, field);
   const total = rows.reduce((sum, row) => sum + accountNumber(row.amount), 0);
   return <section className="rounded-2xl border border-slate-200 bg-slate-50/60 p-4 dark:border-slate-700 dark:bg-slate-900/50 print:hidden">
     <div className="flex flex-wrap items-center justify-between gap-3"><div><h3 className={`font-bold ${accent === "red" ? "text-red-700 dark:text-red-300" : "text-emerald-800 dark:text-emerald-300"}`}>{title}</h3><p className="mt-1 text-sm text-slate-500">{rows.filter((row) => row.customer.trim()).length} {text("កំណត់ត្រា", "records")} · {formatCurrency(total)}</p></div><div className="flex shrink-0 items-center gap-2"><button type="button" onClick={add} className={`inline-flex min-h-10 items-center gap-2 rounded-lg px-3 text-sm font-semibold text-white ${accent === "red" ? "bg-red-600 hover:bg-red-700" : "bg-emerald-600 hover:bg-emerald-700"}`}><Plus className="h-4 w-4" />{text("បន្ថែម", "Add")}</button><button type="button" onClick={removeLast} aria-label={text("លុបជួរចុងក្រោយ", "Remove last row")} title={text("លុបជួរចុងក្រោយ", "Remove last row")} className="inline-flex min-h-10 min-w-10 items-center justify-center rounded-lg border border-slate-200 px-2 text-red-700 hover:border-red-300 hover:bg-red-50 hover:text-red-800 dark:hover:border-red-800 dark:hover:bg-red-950/40 dark:hover:text-red-300"><X className="h-4 w-4" /></button></div></div>
-    <div className="mt-4 grid gap-3 lg:grid-cols-2">{rows.map((row, index) => { const isDuplicate = duplicateCustomers?.includes(row.customer.trim().toLocaleLowerCase()); return <details key={row.id} className={`group rounded-xl border bg-white shadow-sm open:ring-2 open:ring-emerald-500/20 dark:bg-slate-900 ${isDuplicate ? "border-amber-300 dark:border-amber-800" : "border-slate-200 dark:border-slate-700"}`}><summary className="flex min-h-16 cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 [&::-webkit-details-marker]:hidden"><div className="min-w-0"><p className="truncate font-semibold">{row.customer || `${text("កំណត់ត្រាថ្មី", "New entry")} ${index + 1}`}</p><p className="mt-1 truncate text-xs text-slate-500">{row.reason || text("ចុចដើម្បីបំពេញព័ត៌មាន", "Open for full details")}</p></div><div className="flex shrink-0 items-center gap-3">{isDuplicate ? <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-bold text-amber-800 dark:bg-amber-950/40 dark:text-amber-200">{text("អតិថិជនដដែល", "Duplicate")}</span> : null}<strong className="tabular-nums text-emerald-700">{formatCurrency(accountNumber(row.amount))}</strong><ChevronDown className="h-4 w-4 transition group-open:rotate-180" /></div></summary><div className="grid gap-3 border-t border-slate-200 p-4 sm:grid-cols-2 dark:border-slate-700"><Field label={text("ឈ្មោះអតិថិជន", "Customer name")}><input data-account-row={index} data-account-field="customer" value={row.customer} onKeyDown={(event) => onEnter(event, index, "customer")} onChange={(event) => update(row.id, "customer", event.target.value)} className={inputClass} /></Field><Field label={text("ចំនួនទឹកប្រាក់", "Amount")}><input data-account-row={index} data-account-field="amount" type="number" min="0" value={row.amount} onKeyDown={(event) => onEnter(event, index, "amount")} onChange={(event) => update(row.id, "amount", event.target.value)} className={inputClass} /></Field><Field label={text("មូលហេតុ", "Reason")} className="sm:col-span-2"><input data-account-row={index} data-account-field="reason" list="account-report-reasons" value={row.reason} onKeyDown={(event) => onEnter(event, index, "reason")} onChange={(event) => update(row.id, "reason", event.target.value)} className={inputClass} />{reasons.length ? <p className="mt-1 text-xs text-slate-400">{text("អាចជ្រើស ឬបញ្ចូលមូលហេតុថ្មី", "Select or enter a new reason")}</p> : null}</Field><div className="sm:col-span-2 flex justify-end"><button type="button" onClick={() => remove(row.id)} className="min-h-10 rounded-lg px-3 text-sm font-semibold text-red-700 hover:bg-red-50">{text("លុបកំណត់ត្រា", "Remove entry")}</button></div></div></details>; })}</div>
+    <div className="mt-4 grid gap-3 lg:grid-cols-2">{rows.map((row, index) => { const isDuplicate = duplicateCustomers?.includes(row.customer.trim().toLocaleLowerCase()); return <details key={row.id} open={openRowIds.has(row.id)} onToggle={(event) => setRowOpen(row.id, event.currentTarget.open)} className={`group rounded-xl border bg-white shadow-sm open:ring-2 open:ring-emerald-500/20 dark:bg-slate-900 ${isDuplicate ? "border-amber-300 dark:border-amber-800" : "border-slate-200 dark:border-slate-700"}`}><summary className="flex min-h-16 cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 [&::-webkit-details-marker]:hidden"><div className="min-w-0"><p className="truncate font-semibold">{row.customer || `${text("កំណត់ត្រាថ្មី", "New entry")} ${index + 1}`}</p><p className="mt-1 truncate text-xs text-slate-500">{row.reason || text("ចុចដើម្បីបំពេញព័ត៌មាន", "Open for full details")}</p></div><div className="flex shrink-0 items-center gap-3">{isDuplicate ? <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-bold text-amber-800 dark:bg-amber-950/40 dark:text-amber-200">{text("អតិថិជនដដែល", "Duplicate")}</span> : null}<strong className="tabular-nums text-emerald-700">{formatCurrency(accountNumber(row.amount))}</strong><ChevronDown className="h-4 w-4 transition group-open:rotate-180" /></div></summary><div className="grid gap-3 border-t border-slate-200 p-4 sm:grid-cols-2 dark:border-slate-700"><Field label={text("ឈ្មោះអតិថិជន", "Customer name")}><input data-account-row={index} data-account-field="customer" value={row.customer} onKeyDown={(event) => onEnter(event, index, "customer")} onChange={(event) => update(row.id, "customer", event.target.value)} className={inputClass} /></Field><Field label={text("ចំនួនទឹកប្រាក់", "Amount")}><input data-account-row={index} data-account-field="amount" type="number" min="0" value={row.amount} onKeyDown={(event) => onEnter(event, index, "amount")} onChange={(event) => update(row.id, "amount", event.target.value)} className={inputClass} /></Field><Field label={text("មូលហេតុ", "Reason")} className="sm:col-span-2"><input data-account-row={index} data-account-field="reason" list="account-report-reasons" value={row.reason} onKeyDown={(event) => onEnter(event, index, "reason")} onChange={(event) => update(row.id, "reason", event.target.value)} className={inputClass} />{reasons.length ? <p className="mt-1 text-xs text-slate-400">{text("អាចជ្រើស ឬបញ្ចូលមូលហេតុថ្មី", "Select or enter a new reason")}</p> : null}</Field><div className="sm:col-span-2 flex justify-end"><button type="button" onClick={() => remove(row.id)} className="min-h-10 rounded-lg px-3 text-sm font-semibold text-red-700 hover:bg-red-50">{text("លុបកំណត់ត្រា", "Remove entry")}</button></div></div></details>; })}</div>
   </section>;
 }
 
 function AccountResolutionCards({ title, rows, onChange, typeLabel, typeTone = "slate", duplicateCustomers }: { title: string; rows: AccountResolutionRow[]; onChange: (rows: AccountResolutionRow[]) => void; typeLabel?: string; typeTone?: "slate" | "blue" | "amber" | "red"; duplicateCustomers?: string[] }) {
   const { language } = useLanguage();
   const text = (km: string, en: string) => language === "km" ? km : en;
+  const [openRowIds, setOpenRowIds] = useState<Set<number>>(() => new Set());
+  const setRowOpen = (id: number, open: boolean) => setOpenRowIds((current) => { const next = new Set(current); if (open) next.add(id); else next.delete(id); return next; });
   const typePillClass = typeTone === "blue" ? "bg-blue-100 text-blue-800 dark:bg-blue-950/40 dark:text-blue-200" : typeTone === "amber" ? "bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-200" : typeTone === "red" ? "bg-red-100 text-red-800 dark:bg-red-950/40 dark:text-red-200" : "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300";
   const update = (id: number, key: AccountResolutionTextField, next: string) => onChange(rows.map((row) => row.id === id ? { ...row, [key]: next } : row));
   const createRow = (id: number) => ({ id, customer: "", assetType: "", interest: "", penalty: "", principal: "", note: "" });
-  const add = () => onChange([...rows, { id: Math.max(0, ...rows.map((row) => row.id)) + 1, customer: "", assetType: "", interest: "", penalty: "", principal: "", note: "" }]);
+  const add = () => { const id = Math.max(0, ...rows.map((row) => row.id)) + 1; setOpenRowIds(new Set([id])); onChange([...rows, { id, customer: "", assetType: "", interest: "", penalty: "", principal: "", note: "" }]); };
   const onEnter = (event: ReactKeyboardEvent<HTMLInputElement>, index: number, field: AccountResolutionTextField) => appendAccountRowOnEnter(event, index, rows, onChange, createRow, field);
   const remove = (id: number) => onChange(rows.length > 1 ? rows.filter((row) => row.id !== id) : createAccountResolutionRows().slice(0, 1));
   const removeLast = () => onChange(rows.length > 1 ? rows.slice(0, -1) : createAccountResolutionRows().slice(0, 1));
   const total = rows.reduce((sum, row) => sum + accountNumber(row.principal) + accountNumber(row.interest) + accountNumber(row.penalty), 0);
-  return <section className="rounded-2xl border border-slate-200 bg-slate-50/60 p-4 dark:border-slate-700 dark:bg-slate-900/50 print:hidden"><div className="flex flex-wrap items-center justify-between gap-3"><div><h3 className="font-bold">{title}</h3><p className="mt-1 text-sm text-slate-500">{rows.filter((row) => row.customer.trim()).length} {text("ករណី", "cases")} · {formatCurrency(total)}</p></div><div className="flex shrink-0 items-center gap-2"><button type="button" onClick={add} className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-emerald-600 px-3 text-sm font-semibold text-white"><Plus className="h-4 w-4" />{text("បន្ថែម", "Add")}</button><button type="button" onClick={removeLast} aria-label={text("លុបជួរចុងក្រោយ", "Remove last row")} title={text("លុបជួរចុងក្រោយ", "Remove last row")} className="inline-flex min-h-10 min-w-10 items-center justify-center rounded-lg border border-slate-200 px-2 text-red-700 hover:border-red-300 hover:bg-red-50 hover:text-red-800 dark:hover:border-red-800 dark:hover:bg-red-950/40 dark:hover:text-red-300"><X className="h-4 w-4" /></button></div></div><div className="mt-4 grid gap-3">{rows.map((row, index) => { const isDuplicate = duplicateCustomers?.includes(row.customer.trim().toLocaleLowerCase()); return <details key={row.id} className={`group rounded-xl border bg-white shadow-sm open:ring-2 open:ring-emerald-500/20 dark:bg-slate-900 ${isDuplicate ? "border-amber-300 dark:border-amber-800" : "border-slate-200 dark:border-slate-700"}`}><summary className="flex min-h-16 cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 [&::-webkit-details-marker]:hidden"><div className="min-w-0"><p className="truncate font-semibold">{row.customer || `${text("ករណីថ្មី", "New case")} ${index + 1}`}</p><p className="mt-1 truncate text-xs text-slate-500">{row.assetType || row.note || text("ចុចដើម្បីមើលព័ត៌មានពេញ", "Open for full details")}</p></div><div className="flex shrink-0 items-center gap-3">{typeLabel ? <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${typePillClass}`}>{typeLabel}</span> : null}{isDuplicate ? <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-bold text-amber-800 dark:bg-amber-950/40 dark:text-amber-200">{text("អតិថិជនដដែល", "Duplicate")}</span> : null}<strong className="tabular-nums text-emerald-700">{formatCurrency(accountNumber(row.principal))}</strong><ChevronDown className="h-4 w-4 transition group-open:rotate-180" /></div></summary><div className="grid gap-3 border-t border-slate-200 p-4 sm:grid-cols-2 lg:grid-cols-3 dark:border-slate-700"><Field label={text("ឈ្មោះអតិថិជន", "Customer name")}><input data-account-row={index} data-account-field="customer" value={row.customer} onKeyDown={(event) => onEnter(event, index, "customer")} onChange={(event) => update(row.id, "customer", event.target.value)} className={inputClass} /></Field><Field label={text("ប្រភេទទ្រព្យ", "Asset type")}><input data-account-row={index} data-account-field="assetType" list="account-report-asset-types" value={row.assetType} onKeyDown={(event) => onEnter(event, index, "assetType")} onChange={(event) => update(row.id, "assetType", event.target.value)} className={inputClass} /></Field><Field label={text("ប្រាក់ដើម", "Principal")}><input data-account-row={index} data-account-field="principal" type="number" min="0" value={row.principal} onKeyDown={(event) => onEnter(event, index, "principal")} onChange={(event) => update(row.id, "principal", event.target.value)} className={inputClass} /></Field><Field label={text("ការប្រាក់", "Interest")}><input data-account-row={index} data-account-field="interest" type="number" min="0" value={row.interest} onKeyDown={(event) => onEnter(event, index, "interest")} onChange={(event) => update(row.id, "interest", event.target.value)} className={inputClass} /></Field><Field label={text("ពិន័យ", "Penalty")}><input data-account-row={index} data-account-field="penalty" type="number" min="0" value={row.penalty} onKeyDown={(event) => onEnter(event, index, "penalty")} onChange={(event) => update(row.id, "penalty", event.target.value)} className={inputClass} /></Field><Field label={text("មូលហេតុ/កំណត់សម្គាល់", "Reason / note")}><input data-account-row={index} data-account-field="note" list="account-report-note-options" value={row.note} onKeyDown={(event) => onEnter(event, index, "note")} onChange={(event) => update(row.id, "note", event.target.value)} className={inputClass} /></Field><Field label={text("រូបភាពឯកសារ", "Document photos")} className="lg:col-span-3"><OperationReportImageCell images={row.images} imageUrl={row.imageUrl} imageName={row.imageName} onChange={(attachment) => onChange(rows.map((item) => item.id === row.id ? { ...item, ...attachment } : item))} /></Field><div className="lg:col-span-3 flex justify-end"><button type="button" onClick={() => remove(row.id)} className="min-h-10 rounded-lg px-3 text-sm font-semibold text-red-700 hover:bg-red-50">{text("លុបករណី", "Remove case")}</button></div></div></details>; })}</div></section>;
+  return <section className="rounded-2xl border border-slate-200 bg-slate-50/60 p-4 dark:border-slate-700 dark:bg-slate-900/50 print:hidden"><div className="flex flex-wrap items-center justify-between gap-3"><div><h3 className="font-bold">{title}</h3><p className="mt-1 text-sm text-slate-500">{rows.filter((row) => row.customer.trim()).length} {text("ករណី", "cases")} · {formatCurrency(total)}</p></div><div className="flex shrink-0 items-center gap-2"><button type="button" onClick={add} className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-emerald-600 px-3 text-sm font-semibold text-white"><Plus className="h-4 w-4" />{text("បន្ថែម", "Add")}</button><button type="button" onClick={removeLast} aria-label={text("លុបជួរចុងក្រោយ", "Remove last row")} title={text("លុបជួរចុងក្រោយ", "Remove last row")} className="inline-flex min-h-10 min-w-10 items-center justify-center rounded-lg border border-slate-200 px-2 text-red-700 hover:border-red-300 hover:bg-red-50 hover:text-red-800 dark:hover:border-red-800 dark:hover:bg-red-950/40 dark:hover:text-red-300"><X className="h-4 w-4" /></button></div></div><div className="mt-4 grid gap-3">{rows.map((row, index) => { const isDuplicate = duplicateCustomers?.includes(row.customer.trim().toLocaleLowerCase()); return <details key={row.id} open={openRowIds.has(row.id)} onToggle={(event) => setRowOpen(row.id, event.currentTarget.open)} className={`group rounded-xl border bg-white shadow-sm open:ring-2 open:ring-emerald-500/20 dark:bg-slate-900 ${isDuplicate ? "border-amber-300 dark:border-amber-800" : "border-slate-200 dark:border-slate-700"}`}><summary className="flex min-h-16 cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 [&::-webkit-details-marker]:hidden"><div className="min-w-0"><p className="truncate font-semibold">{row.customer || `${text("ករណីថ្មី", "New case")} ${index + 1}`}</p><p className="mt-1 truncate text-xs text-slate-500">{row.assetType || row.note || text("ចុចដើម្បីមើលព័ត៌មានពេញ", "Open for full details")}</p></div><div className="flex shrink-0 items-center gap-3">{typeLabel ? <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${typePillClass}`}>{typeLabel}</span> : null}{isDuplicate ? <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-bold text-amber-800 dark:bg-amber-950/40 dark:text-amber-200">{text("អតិថិជនដដែល", "Duplicate")}</span> : null}<strong className="tabular-nums text-emerald-700">{formatCurrency(accountNumber(row.principal))}</strong><ChevronDown className="h-4 w-4 transition group-open:rotate-180" /></div></summary><div className="grid gap-3 border-t border-slate-200 p-4 sm:grid-cols-2 lg:grid-cols-3 dark:border-slate-700"><Field label={text("ឈ្មោះអតិថិជន", "Customer name")}><input data-account-row={index} data-account-field="customer" value={row.customer} onKeyDown={(event) => onEnter(event, index, "customer")} onChange={(event) => update(row.id, "customer", event.target.value)} className={inputClass} /></Field><Field label={text("ប្រភេទទ្រព្យ", "Asset type")}><input data-account-row={index} data-account-field="assetType" list="account-report-asset-types" value={row.assetType} onKeyDown={(event) => onEnter(event, index, "assetType")} onChange={(event) => update(row.id, "assetType", event.target.value)} className={inputClass} /></Field><Field label={text("ប្រាក់ដើម", "Principal")}><input data-account-row={index} data-account-field="principal" type="number" min="0" value={row.principal} onKeyDown={(event) => onEnter(event, index, "principal")} onChange={(event) => update(row.id, "principal", event.target.value)} className={inputClass} /></Field><Field label={text("ការប្រាក់", "Interest")}><input data-account-row={index} data-account-field="interest" type="number" min="0" value={row.interest} onKeyDown={(event) => onEnter(event, index, "interest")} onChange={(event) => update(row.id, "interest", event.target.value)} className={inputClass} /></Field><Field label={text("ពិន័យ", "Penalty")}><input data-account-row={index} data-account-field="penalty" type="number" min="0" value={row.penalty} onKeyDown={(event) => onEnter(event, index, "penalty")} onChange={(event) => update(row.id, "penalty", event.target.value)} className={inputClass} /></Field><Field label={text("មូលហេតុ/កំណត់សម្គាល់", "Reason / note")}><input data-account-row={index} data-account-field="note" list="account-report-note-options" value={row.note} onKeyDown={(event) => onEnter(event, index, "note")} onChange={(event) => update(row.id, "note", event.target.value)} className={inputClass} /></Field><Field label={text("រូបភាពឯកសារ", "Document photos")} className="lg:col-span-3"><OperationReportImageCell images={row.images} imageUrl={row.imageUrl} imageName={row.imageName} onChange={(attachment) => onChange(rows.map((item) => item.id === row.id ? { ...item, ...attachment } : item))} /></Field><div className="lg:col-span-3 flex justify-end"><button type="button" onClick={() => remove(row.id)} className="min-h-10 rounded-lg px-3 text-sm font-semibold text-red-700 hover:bg-red-50">{text("លុបករណី", "Remove case")}</button></div></div></details>; })}</div></section>;
 }
 
 function isValidReportDateInput(value: string) {
@@ -4896,11 +4908,11 @@ function AccountReportView() {
         if (storedDraft.reportPanel === "records" || storedDraft.reportPanel === "form") setReportPanel(storedDraft.reportPanel);
         if (storedDraft.loadedStatus && ["draft", "submitted", "reviewed", "approved", "returned"].includes(storedDraft.loadedStatus)) setLoadedStatus(storedDraft.loadedStatus);
         if (typeof storedDraft.loadedReporterUsername === "string" && storedDraft.loadedReporterUsername) setLoadedReporterUsername(storedDraft.loadedReporterUsername);
-        if (Array.isArray(storedDraft.dueRows)) setDueRows(storedDraft.dueRows);
-        if (Array.isArray(storedDraft.paidRows)) setPaidRows(storedDraft.paidRows);
-        if (Array.isArray(storedDraft.dueNoticeRows)) setDueNoticeRows(storedDraft.dueNoticeRows);
-        if (Array.isArray(storedDraft.promiseRows)) setPromiseRows(storedDraft.promiseRows);
-        if (Array.isArray(storedDraft.closedRows)) setClosedRows(storedDraft.closedRows);
+        if (Array.isArray(storedDraft.dueRows)) setDueRows(keepOneEmptyDraftRow(storedDraft.dueRows, createAccountCollectionRows));
+        if (Array.isArray(storedDraft.paidRows)) setPaidRows(keepOneEmptyDraftRow(storedDraft.paidRows, createAccountCollectionRows));
+        if (Array.isArray(storedDraft.dueNoticeRows)) setDueNoticeRows(keepOneEmptyDraftRow(storedDraft.dueNoticeRows, createAccountResolutionRows));
+        if (Array.isArray(storedDraft.promiseRows)) setPromiseRows(keepOneEmptyDraftRow(storedDraft.promiseRows, createAccountResolutionRows));
+        if (Array.isArray(storedDraft.closedRows)) setClosedRows(keepOneEmptyDraftRow(storedDraft.closedRows, createAccountResolutionRows));
         if (typeof storedDraft.noActivityReason === "string") setNoActivityReason(storedDraft.noActivityReason);
         restoredLocalDraft.current = true;
       }
@@ -5656,6 +5668,10 @@ function createOperationResolutionRows() {
   return Array.from({ length: OPERATION_REPORT_DEFAULT_ROWS }, (_, index) => ({ id: index + 1, customer: "", assetType: "", interest: "", penalty: "", principal: "", solution: "" }));
 }
 
+function createOperationDecisionRows() {
+  return [{ id: 1, customer: "", type: "", amount: "", reason: "" }];
+}
+
 function operationNumber(value: string) {
   return reportNumber(value);
 }
@@ -5731,15 +5747,9 @@ function OperationReportView({ loans, loading, canViewLoanData, onRefresh, onOpe
   const [dueNoticeRows, setDueNoticeRows] = useState<OperationReportResolutionRow[]>(createOperationResolutionRows);
   const [followUpRows, setFollowUpRows] = useState<OperationReportResolutionRow[]>(createOperationResolutionRows);
   const [formalNoticeRows, setFormalNoticeRows] = useState<OperationReportResolutionRow[]>(createOperationResolutionRows);
-  const [requestedRows, setRequestedRows] = useState<OperationReportLoanDecisionRow[]>([
-    { id: 1, customer: "", type: "", amount: "", reason: "" },
-  ]);
-  const [approvedRows, setApprovedRows] = useState<OperationReportLoanDecisionRow[]>([
-    { id: 1, customer: "", type: "", amount: "", reason: "" },
-  ]);
-  const [rejectedRows, setRejectedRows] = useState<OperationReportLoanDecisionRow[]>([
-    { id: 1, customer: "", type: "", amount: "", reason: "" },
-  ]);
+  const [requestedRows, setRequestedRows] = useState<OperationReportLoanDecisionRow[]>(createOperationDecisionRows);
+  const [approvedRows, setApprovedRows] = useState<OperationReportLoanDecisionRow[]>(createOperationDecisionRows);
+  const [rejectedRows, setRejectedRows] = useState<OperationReportLoanDecisionRow[]>(createOperationDecisionRows);
   const [savedReports, setSavedReports] = useState<OperationReportRecord[]>([]);
   const [branchManagerReports, setBranchManagerReports] = useState<OperationReportRecord[]>([]);
   const [accountReports, setAccountReports] = useState<AccountReportRecord[]>([]);
@@ -6134,14 +6144,14 @@ function OperationReportView({ loans, loading, canViewLoanData, onRefresh, onOpe
         if (typeof stored.loadedReporterUsername === "string") setLoadedReporterUsername(stored.loadedReporterUsername);
         if (stored.loadedReportStatus && ["draft", "submitted", "reviewed", "approved", "returned"].includes(stored.loadedReportStatus)) setLoadedReportStatus(stored.loadedReportStatus);
         if (typeof stored.reviewComment === "string") setReviewComment(stored.reviewComment);
-        if (Array.isArray(stored.collectionDueRows)) setCollectionDueRows(stored.collectionDueRows);
-        if (Array.isArray(stored.collectionPaidRows)) setCollectionPaidRows(stored.collectionPaidRows);
-        if (Array.isArray(stored.dueNoticeRows)) setDueNoticeRows(stored.dueNoticeRows);
-        if (Array.isArray(stored.followUpRows)) setFollowUpRows(stored.followUpRows);
-        if (Array.isArray(stored.formalNoticeRows)) setFormalNoticeRows(stored.formalNoticeRows);
-        if (Array.isArray(stored.requestedRows)) setRequestedRows(stored.requestedRows);
-        if (Array.isArray(stored.approvedRows)) setApprovedRows(stored.approvedRows);
-        if (Array.isArray(stored.rejectedRows)) setRejectedRows(stored.rejectedRows);
+        if (Array.isArray(stored.collectionDueRows)) setCollectionDueRows(keepOneEmptyDraftRow(stored.collectionDueRows, createOperationCollectionRows));
+        if (Array.isArray(stored.collectionPaidRows)) setCollectionPaidRows(keepOneEmptyDraftRow(stored.collectionPaidRows, createOperationCollectionRows));
+        if (Array.isArray(stored.dueNoticeRows)) setDueNoticeRows(keepOneEmptyDraftRow(stored.dueNoticeRows, createOperationResolutionRows));
+        if (Array.isArray(stored.followUpRows)) setFollowUpRows(keepOneEmptyDraftRow(stored.followUpRows, createOperationResolutionRows));
+        if (Array.isArray(stored.formalNoticeRows)) setFormalNoticeRows(keepOneEmptyDraftRow(stored.formalNoticeRows, createOperationResolutionRows));
+        if (Array.isArray(stored.requestedRows)) setRequestedRows(keepOneEmptyDraftRow(stored.requestedRows, createOperationDecisionRows));
+        if (Array.isArray(stored.approvedRows)) setApprovedRows(keepOneEmptyDraftRow(stored.approvedRows, createOperationDecisionRows));
+        if (Array.isArray(stored.rejectedRows)) setRejectedRows(keepOneEmptyDraftRow(stored.rejectedRows, createOperationDecisionRows));
         if (typeof stored.noActivityReason === "string") setNoActivityReason(stored.noActivityReason);
       }
       const storedView = JSON.parse(window.localStorage.getItem(viewStorageKey) || "null") as { reportPanel?: string; activeForm?: string; reportMode?: string } | null;
@@ -7665,7 +7675,7 @@ function CollectionReportTable({ title, rows, onChange, accent = "green", status
   );
   const addRow = () => {
     const id = Math.max(0, ...rows.map((row) => row.id)) + 1;
-    setRowOpen(id, true);
+    setOpenRowIds(new Set([id]));
     onChange([...rows, { id, customer: "", amount: "", reason: "" }]);
   };
   const removeLast = () => onChange(rows.length > 1 ? rows.slice(0, -1) : createOperationCollectionRows().slice(0, 1));
@@ -7687,6 +7697,8 @@ function CollectionReportTable({ title, rows, onChange, accent = "green", status
 function ResolutionTable({ title, rows, onChange, onRememberAssetType, statusLabel, statusTone, onRememberField, senSok = false }: { title: string; rows: OperationReportResolutionRow[]; onChange: (rows: OperationReportResolutionRow[]) => void; onRememberAssetType?: (value: string) => void; statusLabel?: string; statusTone?: "emerald" | "amber" | "red"; onRememberField: (field: string, value: string) => void; senSok?: boolean }) {
   const { language } = useLanguage();
   const text = (km: string, en: string) => language === "km" ? km : en;
+  const [openRowIds, setOpenRowIds] = useState<Set<number>>(() => new Set());
+  const setRowOpen = (id: number, open: boolean) => setOpenRowIds((current) => { const next = new Set(current); if (open) next.add(id); else next.delete(id); return next; });
   const pillClass = statusTone === "amber" ? "bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-200" : statusTone === "red" ? "bg-red-100 text-red-800 dark:bg-red-950/40 dark:text-red-200" : "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200";
   const interestTotal = rows.reduce((sum, row) => sum + operationNumber(row.interest), 0);
   const penaltyTotal = rows.reduce((sum, row) => sum + operationNumber(row.penalty), 0);
@@ -7699,7 +7711,7 @@ function ResolutionTable({ title, rows, onChange, onRememberAssetType, statusLab
     (id) => ({ id, customer: "", assetType: "", interest: "", penalty: "", principal: "", solution: "" }),
     field
   );
-  const addRow = () => onChange([...rows, { id: Math.max(0, ...rows.map((row) => row.id)) + 1, customer: "", assetType: "", interest: "", penalty: "", principal: "", solution: "" }]);
+  const addRow = () => { const id = Math.max(0, ...rows.map((row) => row.id)) + 1; setOpenRowIds(new Set([id])); onChange([...rows, { id, customer: "", assetType: "", interest: "", penalty: "", principal: "", solution: "" }]); };
   const removeLast = () => onChange(rows.length > 1 ? rows.slice(0, -1) : createOperationResolutionRows().slice(0, 1));
   const updateRow = (id: number, field: keyof OperationReportResolutionRow, value: string) => onChange(rows.map((item) => item.id === id ? { ...item, [field]: value } : item));
   return (
@@ -7720,6 +7732,8 @@ function ResolutionTable({ title, rows, onChange, onRememberAssetType, statusLab
 function DecisionTable({ title, rows, total, onChange, loans, statusGroup, showReason = false, onRememberType, onRememberField, senSok = false }: { title: string; rows: OperationReportLoanDecisionRow[]; total: number; onChange: (rows: OperationReportLoanDecisionRow[]) => void; loans: LoanEntity[]; statusGroup: "requested" | "approved" | "rejected"; showReason?: boolean; onRememberType: (value: string) => void; onRememberField: (field: string, value: string) => void; senSok?: boolean }) {
   const { language } = useLanguage();
   const text = (km: string, en: string) => language === "km" ? km : en;
+  const [openRowIds, setOpenRowIds] = useState<Set<number>>(() => new Set());
+  const setRowOpen = (id: number, open: boolean) => setOpenRowIds((current) => { const next = new Set(current); if (open) next.add(id); else next.delete(id); return next; });
   const loansForGroup = useMemo(() => {
     const approvedStatuses = new Set<LoanEntity["repaymentStatus"]>(["Approved", "Progress", "Due Soon", "Overdue", "Closed", "Defaulted"]);
     return loans.filter((loan) => statusGroup === "rejected" ? loan.repaymentStatus === "Rejected" : statusGroup === "approved" ? approvedStatuses.has(loan.repaymentStatus) : true);
@@ -7752,7 +7766,7 @@ function DecisionTable({ title, rows, total, onChange, loans, statusGroup, showR
     (id) => ({ id, customer: "", type: "", amount: "", reason: "" }),
     field
   );
-  const addRow = () => onChange([...rows, { id: Math.max(0, ...rows.map((row) => row.id)) + 1, customer: "", type: "", amount: "", reason: "" }]);
+  const addRow = () => { const id = Math.max(0, ...rows.map((row) => row.id)) + 1; setOpenRowIds(new Set([id])); onChange([...rows, { id, customer: "", type: "", amount: "", reason: "" }]); };
   const removeLast = () => onChange(rows.length > 1 ? rows.slice(0, -1) : [{ id: 1, customer: "", type: "", amount: "", reason: "" }]);
   const updateRow = (id: number, field: keyof OperationReportLoanDecisionRow, value: string) => onChange(rows.map((item) => item.id === id ? { ...item, [field]: value } : item));
   const statusMeta = statusGroup === "approved" ? { label: text("អនុម័ត", "Approved"), cls: "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200" } : statusGroup === "rejected" ? { label: text("បដិសេធ", "Rejected"), cls: "bg-red-100 text-red-800 dark:bg-red-950/40 dark:text-red-200" } : { label: text("ស្នើសុំ", "Request"), cls: "bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-200" };
