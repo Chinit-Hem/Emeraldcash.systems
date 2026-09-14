@@ -77,6 +77,7 @@ function LoginForm() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [showPasswordHelp, setShowPasswordHelp] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -389,6 +390,19 @@ function LoginForm() {
                     )}
                   </button>
                 </div>
+                <button
+                  type="button"
+                  onClick={() => setShowPasswordHelp((current) => !current)}
+                  className="mt-2 text-xs font-medium text-emerald-700 underline-offset-2 hover:underline dark:text-emerald-300"
+                  aria-expanded={showPasswordHelp}
+                >
+                  {language === "km" ? "ភ្លេចពាក្យសម្ងាត់?" : "Forgot password?"}
+                </button>
+                {showPasswordHelp ? (
+                  <p role="status" className="mt-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs leading-5 text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-200">
+                    {language === "km" ? "សូមទាក់ទង IT ឬ Admin ដើម្បីកំណត់ពាក្យសម្ងាត់ថ្មីឲ្យអ្នក។" : "Please contact IT or an Admin to reset your password."}
+                  </p>
+                ) : null}
               </div>
 
               {/* t.rememberMe */}
@@ -465,9 +479,9 @@ function LoginForm() {
               <button
                 type="submit"
                 disabled={loading || (TURNSTILE_ENABLED && !turnstileToken)}
-                className="w-full py-3 px-4 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white font-medium rounded-xl hover:from-emerald-600 hover:to-emerald-700 transition-all shadow-lg shadow-emerald-500/25 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="inline-flex w-full items-center justify-center gap-2 px-4 py-3 font-medium text-white bg-gradient-to-r from-emerald-500 to-emerald-600 rounded-xl transition-all shadow-lg shadow-emerald-500/25 hover:from-emerald-600 hover:to-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                {loading ? t.signingIn : t.signIn}
+                {loading ? <><svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle className="opacity-25" cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="3" /><path className="opacity-90" d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" strokeWidth="3" strokeLinecap="round" /></svg>{t.signingIn}</> : t.signIn}
               </button>
             </form>
 
