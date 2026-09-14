@@ -13,6 +13,9 @@ export function setCachedUser(user: User | null): void {
 
 export function clearCachedUser(): void {
   cachedUser = null;
+  // The login form has no branch context. Reset a previous Sen Sok session so
+  // the shared sign-in screen always keeps the Emerald Cash identity.
+  if (typeof document !== "undefined") document.documentElement.removeAttribute("data-brand");
 }
 
 export function syncCachedUser(user: User): void {

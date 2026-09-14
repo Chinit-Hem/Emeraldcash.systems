@@ -86,6 +86,12 @@ function LoginForm() {
 
   const warmConnection = useConnectionWarmer();
 
+  // Login is shared by every branch, so it must use the Emerald Cash colours
+  // until a successful sign-in tells us which branch the user belongs to.
+  useEffect(() => {
+    document.documentElement.removeAttribute("data-brand");
+  }, []);
+
   // Load remembered username (client-side only)
   useEffect(() => {
     if (!isMounted) return;
