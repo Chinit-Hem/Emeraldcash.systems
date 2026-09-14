@@ -4,6 +4,7 @@ import type { User } from "@/shared/types/types";
 import type { ReactNode } from "react";
 import { createContext, useContext, useState, useCallback, useEffect } from "react";
 import { syncCachedUser } from "@/shared/utils/authCache";
+import { normalizeCompanyBranch } from "@/shared/utils/branchNames";
 
 interface AuthContextType {
   user: User | null;
@@ -27,6 +28,14 @@ export function AuthUserProvider({ user: initialUser, children }: { user: User; 
   useEffect(() => {
     setUser(initialUser);
   }, [initialUser]);
+
+  // Apply the company theme for every screen after the authenticated user's
+  // branch is known. The CSS tokens keep individual components branch-agnostic.
+  useEffect(() => {
+    const root = document.documentElement;
+    if (normalizeCompanyBranch(user?.branch || "") === "sen-sok") root.dataset.brand = "sen-sok";
+    else delete root.dataset.brand;
+  }, [user?.branch]);
 
   const updateProfile = useCallback(async (data: Partial<User>): Promise<{ success: boolean; error?: string }> => {
     try {

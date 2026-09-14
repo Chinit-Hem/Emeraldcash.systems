@@ -70,6 +70,50 @@
   --shadow-elevated: 0 8px 18px rgba(15, 23, 42, 0.08);
 }
 
+/* Sen Sok uses the Vimean Capital navy and gold identity throughout the app.
+   Tailwind colour utilities resolve through these tokens, so this also covers
+   existing buttons, badges, focus rings, text, borders, and backgrounds. */
+html[data-brand="sen-sok"] {
+  --color-emerald-50: #eff3f9;
+  --color-emerald-100: #dce5f2;
+  --color-emerald-200: #b7c9e3;
+  --color-emerald-300: #8faacd;
+  --color-emerald-400: #6689b3;
+  --color-emerald-500: #405f90;
+  --color-emerald-600: #172b55;
+  --color-emerald-700: #172b55;
+  --color-emerald-800: #102243;
+  --color-emerald-900: #0b1932;
+  --color-emerald-950: #071126;
+
+  --color-red-50: #f7eedf;
+  --color-red-100: #eedcbc;
+  --color-red-200: #e7c998;
+  --color-red-300: #d8b17e;
+  --color-red-400: #cfa66d;
+  --color-red-500: #cfa66d;
+  --color-red-600: #cfa66d;
+  --color-red-700: #b88950;
+  --color-red-800: #8d6537;
+  --color-red-900: #654720;
+  --color-red-950: #422d12;
+
+  --neu-green: #172b55;
+  --neu-green-dark: #102243;
+  --neu-green-light: #304a79;
+  --neu-red: #cfa66d;
+  --neu-red-dark: #b88950;
+  --neu-red-light: #e7c998;
+  --accent-green: #172b55;
+  --accent-green-hover: #102243;
+  --accent-green-active: #0b1932;
+  --accent-green-soft: #f7eedf;
+  --accent-red: #cfa66d;
+  --accent-red-hover: #b88950;
+  --accent-red-active: #8d6537;
+  --accent-red-soft: #f7eedf;
+}
+
 .dark,
 [data-theme="dark"] {
   color-scheme: dark;
