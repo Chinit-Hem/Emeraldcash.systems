@@ -7635,7 +7635,7 @@ function OperationReportImageCell({ images, imageUrl, imageName, onChange, compa
 
 function ReportRowHeaderActions({ onAdd, onRemove, text }: { onAdd: () => void; onRemove: () => void; text: (km: string, en: string) => string }) {
   return <span className="ml-auto flex shrink-0 items-center gap-2" onClick={(event) => event.stopPropagation()}>
-    <button type="button" onClick={onAdd} className="inline-flex min-h-9 items-center gap-1 rounded-md border border-emerald-200 bg-emerald-50 px-2.5 text-xs font-bold text-emerald-800 hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-300"><Plus className="h-3.5 w-3.5" />{text("បន្ថែមជួរ", "Add row")}</button>
+    <button type="button" onClick={(event) => { const section = event.currentTarget.closest("details"); if (section instanceof HTMLDetailsElement) section.open = true; onAdd(); }} className="inline-flex min-h-9 items-center gap-1 rounded-md border border-emerald-200 bg-emerald-50 px-2.5 text-xs font-bold text-emerald-800 hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-300"><Plus className="h-3.5 w-3.5" />{text("បន្ថែមជួរ", "Add row")}</button>
     <button type="button" onClick={onRemove} aria-label={text("លុបជួរចុងក្រោយ", "Remove last row")} title={text("លុបជួរចុងក្រោយ", "Remove last row")} className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-slate-200 text-red-700 hover:border-red-300 hover:bg-red-50 dark:border-slate-700 dark:text-red-300 dark:hover:border-red-800 dark:hover:bg-red-950/40"><X className="h-4 w-4" /></button>
   </span>;
 }
