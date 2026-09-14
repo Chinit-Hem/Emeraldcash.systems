@@ -5379,6 +5379,7 @@ function AccountReportRecordsDashboard({ records, loading, currentUsername, lang
   const [viewMode, setViewMode] = useState<"grid" | "list">("list");
   const [viewModeHydrated, setViewModeHydrated] = useState(false);
   const accountRecordsViewKey = `emeraldcash.account-report.records-view.${currentUsername}`;
+  const requestedAccountReportIds = useMemo(() => new Set((searchParams.get("accountReportIds") || "").split(",").map((id) => id.trim()).filter(Boolean)), [searchParams]);
   useEffect(() => {
     const requested = searchParams.get("accountRecordsView");
     if (requested === "grid" || requested === "list") setViewMode(requested);
@@ -5407,6 +5408,7 @@ function AccountReportRecordsDashboard({ records, loading, currentUsername, lang
         || (reportPeriod === "yearly" && record.reportDate.startsWith(`${periodValue}-`));
       return matchesSearch
         && matchesPeriod
+        && (!requestedAccountReportIds.size || requestedAccountReportIds.has(record.id))
         && (!fromDate || record.reportDate >= fromDate)
         && (!toDate || record.reportDate <= toDate)
         && (!reporter || record.reporterUsername === reporter)
@@ -5415,7 +5417,7 @@ function AccountReportRecordsDashboard({ records, loading, currentUsername, lang
         && (!positionFilter || record.reporterPosition === positionFilter)
         && (!statusFilter || record.status === statusFilter);
     });
-  }, [branchFilter, departmentFilter, fromDate, periodValue, positionFilter, query, records, reportPeriod, reporter, statusFilter, toDate]);
+  }, [branchFilter, departmentFilter, fromDate, periodValue, positionFilter, query, records, reportPeriod, reporter, requestedAccountReportIds, statusFilter, toDate]);
   const advancedFilterCount = [reportPeriod !== "all" ? reportPeriod : "", fromDate, toDate, reporter, branchFilter, departmentFilter, positionFilter, statusFilter].filter(Boolean).length;
   const changeReportPeriod = (period: "all" | "daily" | "monthly" | "yearly") => {
     const today = operationDateInputValue();
@@ -6463,7 +6465,19 @@ function OperationReportView({ loans, loading, canViewLoanData, onRefresh, onOpe
       const errors = submitRequirements;
       setBmValidationErrors(errors);
       if (errors.length) {
-        if (bmWorksheet.mode === "manual") setBmValidationFocusVersion((current) => current + 1);
+        setReportPanel("form");
+        if (bmWorksheet.mode === "manual") {
+          setBmValidationFocusVersion((current) => current + 1);
+        } else {
+          const selector = !bmWorksheet.incompleteSourcesAcknowledged
+            ? '[data-bm-validation-field="incomplete-sources-acknowledged"]'
+            : '[data-bm-validation-field="incomplete-source-reason"]';
+          window.setTimeout(() => {
+            const field = document.querySelector<HTMLElement>(selector);
+            field?.scrollIntoView({ behavior: "smooth", block: "center" });
+            field?.focus({ preventScroll: true });
+          }, 0);
+        }
         toastError(opText("សូមបំពេញប្រអប់ដែលមានសញ្ញាពណ៌ក្រហម មុនពេលដាក់ស្នើ។", "Complete the fields highlighted in red before submitting."));
         return;
       }
@@ -6627,10 +6641,30 @@ function OperationReportView({ loans, loading, canViewLoanData, onRefresh, onOpe
   const branchManagerSubmissionRequirements = isBranchManagerReport && bmWorksheet.mode === "generated" ? [
     !readyBranchManagerRecords.length ? opText("មិនទាន់មានរបាយការណ៍ LS ដែលបានពិនិត្យ/អនុម័ត", "A reviewed or approved LS report is required") : "",
     !readyBranchAccountRecords.length ? opText("មិនទាន់មានរបាយការណ៍គណនេយ្យដែលបានពិនិត្យ/អនុម័ត", "A reviewed or approved Account Report is required") : "",
+    hasIncompleteSources && !bmWorksheet.incompleteSourcesAcknowledged ? opText("សូម Mark ថាទទួលស្គាល់របាយការណ៍ LS/Acc ដែលមិនទាន់គ្រប់", "Mark the incomplete LS/Account reports as acknowledged") : "",
     hasIncompleteSources && !bmWorksheet.incompleteSourceReason?.trim() ? opText("សូមបញ្ចូលមូលហេតុដែលទិន្នន័យ LS/Acc មិនទាន់គ្រប់", "Enter the reason why LS/Acc source data is incomplete") : "",
   ].filter(Boolean) : [];
   const submitRequirements = isBranchManagerReport ? [...manualBmSubmissionRequirements, ...branchManagerSubmissionRequirements] : submissionRequirements;
   const reportSubmitDisabled = reportSaveDisabled;
+  const openIncompleteLsReports = () => {
+    const reportIds = lsReportsNeedingSubmission.map((record) => record.id).filter(Boolean);
+    const params = new URLSearchParams();
+    params.set("view", "operationReport");
+    params.set("reportPanel", "records");
+    params.set("operationForm", "summary");
+    params.set("operationMode", "operation");
+    params.set("operationReportIds", reportIds.join(","));
+    router.push(`${pathname}?${params.toString()}`);
+  };
+  const openIncompleteAccountReports = () => {
+    const reportIds = branchAccountReportsNeedingSubmission.map((record) => record.id).filter(Boolean);
+    const params = new URLSearchParams();
+    params.set("view", "accounting");
+    params.set("accountMode", "accountReport");
+    params.set("reportPanel", "records");
+    params.set("accountReportIds", reportIds.join(","));
+    router.push(`${pathname}?${params.toString()}`);
+  };
   const activeSaveAction = isBranchManagerReport ? savingBranchManagerReport : savingReport;
   const reportSaveState = activeSaveAction === "draft"
     ? opText("កំពុងរក្សាទុក…", "Saving…")
@@ -6740,17 +6774,19 @@ function OperationReportView({ loans, loading, canViewLoanData, onRefresh, onOpe
         <div className="text-sm"><span className="font-semibold">{opText("សាខា", "Branch")}</span><p className="mt-2">{companyBranchName(branch, language)}</p></div>
       </div> : null}
 
+      {isBranchManagerReport && (isHumanResources || (!isDirector && canManageReports)) && branchAccountReportsNeedingSubmission.length ? <section role="alert" className="flex flex-col gap-3 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-amber-950 sm:flex-row sm:items-center sm:justify-between dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-100 print:hidden"><div><p className="font-bold">{opText(`មានរបាយការណ៍គណនេយ្យ ${branchAccountReportsNeedingSubmission.length} មិនទាន់ដាក់ស្នើ`, `${branchAccountReportsNeedingSubmission.length} Account Report(s) have not been submitted`)}</p><p className="mt-1 text-sm">{Array.from(new Set(branchAccountReportsNeedingSubmission.map((record) => `${record.reporterName || record.reporterUsername} · ${companyBranchName(record.branch, language)} · ${operationReportStatusLabel(record.status, language)}`))).join(" | ")}</p></div><button type="button" onClick={openIncompleteAccountReports} className="min-h-10 shrink-0 rounded-lg border border-amber-400 bg-white px-3 text-sm font-semibold hover:bg-amber-100 dark:bg-slate-900 dark:hover:bg-amber-950">{opText("មើលរបាយការណ៍គណនេយ្យ", "View Account Reports")}</button></section> : null}
+
       {isBranchManagerReport && (isHumanResources || (!isDirector && canManageReports)) && lsReportsNeedingSubmission.length ? <section role="alert" className="flex flex-col gap-3 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-amber-950 sm:flex-row sm:items-center sm:justify-between dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-100 print:hidden">
         <div><p className="font-bold">{opText(`មាន LS ${lsReportsNeedingSubmission.length} នាក់មិនទាន់ដាក់ស្នើរបាយការណ៍`, `${lsReportsNeedingSubmission.length} LS report(s) have not been submitted`)}</p><p className="mt-1 text-sm">{Array.from(new Set(lsReportsNeedingSubmission.map((record) => `${record.reporterName || record.reporterUsername} · ${companyBranchName(record.branch, language)} · ${operationReportStatusLabel(record.status, language)}`))).join(" | ")}</p></div>
-        <button type="button" onClick={() => router.push("/loan?view=operationReport&reportPanel=records&operationForm=summary&operationMode=operation")} className="min-h-10 shrink-0 rounded-lg border border-amber-400 bg-white px-3 text-sm font-semibold hover:bg-amber-100 dark:bg-slate-900 dark:hover:bg-amber-950">{opText("មើលរបាយការណ៍ LS", "View LS Reports")}</button>
+        <button type="button" onClick={openIncompleteLsReports} className="min-h-10 shrink-0 rounded-lg border border-amber-400 bg-white px-3 text-sm font-semibold hover:bg-amber-100 dark:bg-slate-900 dark:hover:bg-amber-950">{opText("មើលរបាយការណ៍ LS", "View LS Reports")}</button>
       </section> : null}
 
       {isBranchManagerReport && !accountCategory && canManageReports ? <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900 print:hidden" aria-labelledby="bm-report-start-heading">
         <div className="mb-4"><h2 id="bm-report-start-heading" className="text-base font-bold text-slate-900 dark:text-slate-100">{opText("ជ្រើសរើសវិធីចាប់ផ្ដើមរបាយការណ៍ BM", "Choose how to start your BM report")}</h2><p className="mt-1 text-sm text-slate-500">{opText("ណែនាំឱ្យប្រើទិន្នន័យពី LS និង Acc ដើម្បីកាត់បន្ថយការបញ្ចូលដោយដៃ។", "Use submitted LS and Acc data when available to reduce manual entry.")}</p></div>
         <div className="grid gap-3 md:grid-cols-2">
-          <button type="button" disabled={reportSaveDisabled || reportsLoading} onClick={generateBmReport} className="group min-h-28 rounded-xl border-2 border-emerald-600 bg-emerald-600 p-4 text-left text-white shadow-sm transition hover:bg-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50">
+          <button type="button" disabled={reportSaveDisabled || reportsLoading} onClick={generateBmReport} className={`group min-h-28 rounded-xl border-2 p-4 text-left text-white shadow-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 ${isSenSokReport ? "border-[#172b55] bg-[#172b55] hover:bg-[#304a79] focus-visible:ring-[#cfa66d]" : "border-emerald-600 bg-emerald-600 hover:bg-emerald-700 focus-visible:ring-emerald-500"}`}>
             <span className="flex items-start justify-between gap-3"><span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white/15"><Download className="h-5 w-5" /></span><span className="rounded-full bg-white/15 px-2.5 py-1 text-xs font-bold">{opText("ណែនាំ", "RECOMMENDED")}</span></span>
-            <span className="mt-3 block font-bold">{opText("ចាប់ផ្ដើមដោយទិន្នន័យ LS និង Acc", "Start with LS & Acc data")}</span><span className="mt-1 block text-sm text-emerald-50">{reportsLoading ? opText("កំពុងផ្ទុករបាយការណ៍…", "Loading reports…") : opText(`បំពេញទិន្នន័យពី LS ${readyBranchManagerRecords.length} និង Acc ${readyBranchAccountRecords.length} របាយការណ៍ដែលបានពិនិត្យរួច`, `Auto-fill from ${readyBranchManagerRecords.length} reviewed LS and ${readyBranchAccountRecords.length} reviewed Acc report(s)`)}</span>
+            <span className="mt-3 block font-bold">{opText("ចាប់ផ្ដើមដោយទិន្នន័យ LS និង Acc", "Start with LS & Acc data")}</span><span className={`mt-1 block text-sm ${isSenSokReport ? "text-[#f7eedf]" : "text-emerald-50"}`}>{reportsLoading ? opText("កំពុងផ្ទុករបាយការណ៍…", "Loading reports…") : opText(`បំពេញទិន្នន័យពី LS ${readyBranchManagerRecords.length} និង Acc ${readyBranchAccountRecords.length} របាយការណ៍ដែលបានពិនិត្យរួច`, `Auto-fill from ${readyBranchManagerRecords.length} reviewed LS and ${readyBranchAccountRecords.length} reviewed Acc report(s)`)}</span>
           </button>
           <button type="button" disabled={reportSaveDisabled} onClick={openManualBmReport} className="group min-h-28 rounded-xl border border-slate-300 bg-white p-4 text-left text-slate-900 transition hover:border-slate-400 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:hover:bg-slate-800">
             <span className="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200"><Pencil className="h-5 w-5" /></span>
@@ -6778,16 +6814,16 @@ function OperationReportView({ loans, loading, canViewLoanData, onRefresh, onOpe
           </table>
         </div>
         <div className="mt-3 flex flex-wrap gap-2">
-          <button type="button" onClick={() => { setShowIncompleteLsPanel(false); router.push("/loan?view=operationReport&reportPanel=records&operationForm=summary&operationMode=operation"); }} className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-amber-400 bg-white px-3 text-sm font-semibold text-amber-800 hover:bg-amber-100 dark:border-amber-700 dark:bg-slate-900 dark:text-amber-200 dark:hover:bg-amber-950"><FileText className="h-4 w-4" />{opText("មើលរបាយការណ៍ LS", "View LS Reports")}</button>
+          <button type="button" onClick={() => { setShowIncompleteLsPanel(false); openIncompleteLsReports(); }} className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-amber-400 bg-white px-3 text-sm font-semibold text-amber-800 hover:bg-amber-100 dark:border-amber-700 dark:bg-slate-900 dark:text-amber-200 dark:hover:bg-amber-950"><FileText className="h-4 w-4" />{opText("មើលរបាយការណ៍ LS", "View LS Reports")}</button>
           <button type="button" onClick={() => setShowIncompleteLsPanel(false)} className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-slate-300 px-3 text-sm font-semibold hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800">{opText("បិទ", "Close")}</button>
         </div>
       </section> : null}
 
-      {isBranchManagerReport && reportPanel === "form" && (!openedBmReport || openedBmReportIsEditable) ? <div className={`rounded-xl border px-4 py-3 text-sm print:hidden ${bmWorksheet.mode === "generated" ? "border-emerald-200 bg-emerald-50 text-emerald-900 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-200" : "border-blue-200 bg-blue-50 text-blue-900 dark:border-blue-800 dark:bg-blue-950/30 dark:text-blue-200"}`}>
+      {isBranchManagerReport && reportPanel === "form" && (!openedBmReport || openedBmReportIsEditable) ? <div className={`rounded-xl border px-4 py-3 text-sm print:hidden ${bmWorksheet.mode === "generated" ? isSenSokReport ? "border-[#cfa66d] bg-[#f7eedf] text-[#172b55] dark:border-[#cfa66d]/70 dark:bg-[#172b55]/30 dark:text-[#e7c998]" : "border-emerald-200 bg-emerald-50 text-emerald-900 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-200" : "border-blue-200 bg-blue-50 text-blue-900 dark:border-blue-800 dark:bg-blue-950/30 dark:text-blue-200"}`}>
         <p className="font-bold">{bmWorksheet.mode === "generated" ? opText("របាយការណ៍បានបង្កើតដោយស្វ័យប្រវត្តិ", "Generated report is complete") : opText("របាយការណ៍ខ្ញុំបញ្ចូលដោយដៃ", "Manual My Report")}</p>
         <p className="mt-1">{bmWorksheet.mode === "generated" ? opText(`បានភ្ជាប់ប្រភព LS ${bmWorksheet.sourceReportIds.length} និង Acc ${bmWorksheet.sourceAccountReportIds.length} របាយការណ៍។ លេខពី LS និងគណនេយ្យត្រូវបានការពារ; អ្នកអាចបន្ថែម KPI note, Issues និង management notes មុនពេលដាក់ស្នើ។`, `Linked ${bmWorksheet.sourceReportIds.length} LS and ${bmWorksheet.sourceAccountReportIds.length} Acc source report(s). Source figures are protected; add KPI notes, issues, and management notes before submitting.`) : opText("សូមបំពេញទិន្នន័យរបាយការណ៍ដោយដៃ មុនពេលរក្សាទុក ឬដាក់ស្នើ។", "Complete the report fields manually before saving or submitting.")}</p>
       </div> : null}
-      {isBranchManagerReport && reportPanel === "form" && bmWorksheet.mode === "generated" && hasIncompleteSources && !reportSaveDisabled ? <section className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-100"><p className="font-bold">{opText(`ទិន្នន័យប្រភពមិនទាន់គ្រប់ (${incompleteSourceCount} របាយការណ៍)`, `${incompleteSourceCount} source report(s) are incomplete`)}</p><p className="mt-1">{opText("បើត្រូវដាក់ស្នើ BM Report មុន សូមបញ្ចូលមូលហេតុខាងក្រោម។ បើមិនទាន់ចង់ដាក់ស្នើ សូមត្រឡប់ទៅពិនិត្យ/បញ្ជូន LS ឬ Acc ឱ្យកែ ហើយ Generate ម្តងទៀត។", "To submit this BM Report now, enter an exception reason below. Otherwise, review/return the LS or Acc report for correction, then generate again.")}</p><label className="mt-3 block font-semibold">{opText("មូលហេតុទិន្នន័យមិនគ្រប់ (Required to submit)", "Reason for incomplete data (Required to submit)")}<textarea aria-label={opText("មូលហេតុទិន្នន័យមិនគ្រប់", "Reason for incomplete data")} rows={3} value={bmWorksheet.incompleteSourceReason || ""} onChange={(event) => updateBmWorksheet({ ...bmWorksheet, incompleteSourceReason: event.target.value })} className={`${inputClass} mt-1 ${bmValidationErrors.length && !bmWorksheet.incompleteSourceReason?.trim() ? "border-red-500 bg-red-50 dark:bg-red-950/20" : ""}`} placeholder={opText("ឧ. LS មិនទាន់ផ្តល់ព័ត៌មានដោយសារ...", "Example: LS information is pending because...")} /></label><div className="mt-3 flex flex-wrap gap-2"><button type="button" onClick={() => router.push("/loan?view=operationReport&reportPanel=records&operationForm=summary&operationMode=operation")} className="min-h-10 rounded-lg border border-amber-400 bg-white px-3 font-semibold text-amber-800 hover:bg-amber-100 dark:border-amber-700 dark:bg-slate-900 dark:text-amber-200">{opText("ពិនិត្យ LS", "Review LS")}</button><button type="button" onClick={() => router.push("/loan?view=accounting&accountMode=accountReport&reportPanel=records")} className="min-h-10 rounded-lg border border-amber-400 bg-white px-3 font-semibold text-amber-800 hover:bg-amber-100 dark:border-amber-700 dark:bg-slate-900 dark:text-amber-200">{opText("ពិនិត្យ Acc", "Review Acc")}</button></div></section> : null}
+      {isBranchManagerReport && reportPanel === "form" && bmWorksheet.mode === "generated" && hasIncompleteSources && !reportSaveDisabled ? <section className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-100"><p className="font-bold">{opText(`ទិន្នន័យប្រភពមិនទាន់គ្រប់ (${incompleteSourceCount} របាយការណ៍)`, `${incompleteSourceCount} source report(s) are incomplete`)}</p><p className="mt-1">{opText("បើបុគ្គលិកមិនទាន់ធ្វើ report សូម BM Mark Done និងបញ្ចូលមូលហេតុ។ បន្ទាប់មកអាច Submit បាន។", "If a staff report is not ready, the BM must mark it done and enter a reason before submitting.")}</p><label className={`mt-3 flex cursor-pointer items-start gap-3 rounded-lg border p-3 font-semibold ${bmValidationErrors.length && !bmWorksheet.incompleteSourcesAcknowledged ? "border-red-500 bg-red-50 dark:bg-red-950/20" : "border-amber-300 bg-white/70 dark:border-amber-700 dark:bg-slate-900/50"}`}><input data-bm-validation-field="incomplete-sources-acknowledged" aria-invalid={bmValidationErrors.length && !bmWorksheet.incompleteSourcesAcknowledged || undefined} type="checkbox" checked={Boolean(bmWorksheet.incompleteSourcesAcknowledged)} onChange={(event) => updateBmWorksheet({ ...bmWorksheet, incompleteSourcesAcknowledged: event.target.checked })} className="mt-0.5 h-4 w-4 shrink-0 accent-amber-600" /><span>{opText("BM Mark Done៖ ខ្ញុំទទួលស្គាល់ថារបាយការណ៍ខាងលើមិនទាន់គ្រប់ ហើយទទួលខុសត្រូវលើការដាក់ស្នើនេះ។", "BM Mark Done: I acknowledge the incomplete reports and accept responsibility for this submission.")}</span></label><label className="mt-3 block font-semibold">{opText("មូលហេតុទិន្នន័យមិនគ្រប់ (Required to submit)", "Reason for incomplete data (Required to submit)")}<textarea data-bm-validation-field="incomplete-source-reason" aria-label={opText("មូលហេតុទិន្នន័យមិនគ្រប់", "Reason for incomplete data")} rows={3} value={bmWorksheet.incompleteSourceReason || ""} onChange={(event) => updateBmWorksheet({ ...bmWorksheet, incompleteSourceReason: event.target.value })} className={`${inputClass} mt-1 ${bmValidationErrors.length && !bmWorksheet.incompleteSourceReason?.trim() ? "border-red-500 bg-red-50 dark:bg-red-950/20" : ""}`} placeholder={opText("ឧ. LS មិនទាន់ផ្តល់ព័ត៌មានដោយសារ...", "Example: LS information is pending because...")} /></label><div className="mt-3 flex flex-wrap gap-2"><button type="button" onClick={() => router.push("/loan?view=operationReport&reportPanel=records&operationForm=summary&operationMode=operation")} className="min-h-10 rounded-lg border border-amber-400 bg-white px-3 font-semibold text-amber-800 hover:bg-amber-100 dark:border-amber-700 dark:bg-slate-900 dark:text-amber-200">{opText("ពិនិត្យ LS", "Review LS")}</button><button type="button" onClick={() => router.push("/loan?view=accounting&accountMode=accountReport&reportPanel=records")} className="min-h-10 rounded-lg border border-amber-400 bg-white px-3 font-semibold text-amber-800 hover:bg-amber-100 dark:border-amber-700 dark:bg-slate-900 dark:text-amber-200">{opText("ពិនិត្យ Acc", "Review Acc")}</button></div></section> : null}
 
       <div className={`${reportPanel === "records" ? "hidden" : "sm:sticky"} top-0 z-40 space-y-2 border-b border-slate-200 bg-slate-50/95 pb-2 backdrop-blur-md dark:border-slate-800 dark:bg-slate-950/95 print:static print:border-0 print:bg-transparent print:pb-0`}>
       <section className="rounded-lg border border-slate-200 bg-white px-3 py-2 shadow-sm dark:border-slate-800 dark:bg-slate-900 print:hidden">
@@ -6801,7 +6837,7 @@ function OperationReportView({ loans, loading, canViewLoanData, onRefresh, onOpe
           <div className="flex flex-wrap items-center gap-2 sm:ml-auto [&>button]:min-h-11">
             <button type="button" onClick={() => { setReportPanel("records"); pushOperationReportLocation({ panel: "records" }); }} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"><List className="h-4 w-4" />{opText("កំណត់ត្រា", "Records")}</button>
             <button type="button" disabled={reportSaveDisabled} onClick={() => void (isBranchManagerReport ? saveBranchManagerReport("draft") : saveOperationReport("draft"))} className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300">{(isBranchManagerReport ? savingBranchManagerReport : savingReport) === "draft" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}{opText("រក្សាទុកព្រាង", "Save Draft")}</button>
-            <button type="button" disabled={reportSubmitDisabled} title={submitRequirements.length ? submitRequirements.join(" · ") : undefined} onClick={() => void (isBranchManagerReport ? saveBranchManagerReport("submitted") : saveOperationReport("submitted"))} className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50">{activeSaveAction === "submitted" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}{isBranchManagerReport ? opText("ដាក់ស្នើទៅនាយក", "Submit to Director") : opText("ដាក់ស្នើទៅ BM", "Submit to BM")}</button>
+            <button type="button" disabled={reportSubmitDisabled} title={submitRequirements.length ? submitRequirements.join(" · ") : undefined} onClick={() => void (isBranchManagerReport ? saveBranchManagerReport("submitted") : saveOperationReport("submitted"))} className={`inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50 ${isBranchManagerReport && isSenSokReport ? "bg-[#172b55] hover:bg-[#304a79]" : "bg-emerald-600 hover:bg-emerald-700"}`}>{activeSaveAction === "submitted" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}{isBranchManagerReport ? opText("ដាក់ស្នើទៅនាយក", "Submit to Director") : opText("ដាក់ស្នើទៅ BM", "Submit to BM")}</button>
             <details className="relative" onKeyDown={(event) => { if (event.key === "Escape") { event.currentTarget.open = false; event.currentTarget.querySelector("summary")?.focus(); } }}>
               <summary className="flex min-h-11 cursor-pointer list-none items-center justify-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800">{opText("បន្ថែម", "More")}<ChevronDown className="h-4 w-4" /></summary>
               <div className="absolute right-0 top-full z-50 mt-2 flex w-60 max-w-[calc(100vw-2rem)] flex-col gap-1 rounded-xl border border-slate-200 bg-white p-2 shadow-lg dark:border-slate-700 dark:bg-slate-900 [&>button]:min-h-11 [&>button]:w-full [&>button]:justify-start [&>button]:border-0 [&>button]:bg-transparent [&>button]:text-slate-600 dark:[&>button]:text-slate-300" onClick={(event) => { if ((event.target as HTMLElement).closest("button")) event.currentTarget.closest("details")?.removeAttribute("open"); }}>
@@ -6876,7 +6912,7 @@ function OperationReportView({ loans, loading, canViewLoanData, onRefresh, onOpe
             </Card>
           ) : isBranchManagerReport ? (
             <>
-              {isHumanResources || isDirector ? <BranchManagerWorkflowPanel onRefresh={() => void loadSavedReports()} sourceRecords={branchManagerRecords} sourceReportHistory={branchLoanSpecialistRecords} accountRecords={branchAccountRecords} accountReportHistory={branchAccountReportHistory} submissions={isHumanResources ? hrBmReports : branchManagerReports} reportDate={reportDate} branch={branch} currentUsername={user.username} reviewingAction={reviewingAction} canReviewSources={false} canReviewAsHr={isHumanResources} canApproveAsDirector={isDirector} onOpen={(record) => openSavedReport(record, true)} onOpenAccount={(record) => router.push(`/loan?view=accounting&accountMode=accountReport&reportPanel=form&accountReportId=${encodeURIComponent(record.id)}&accountReadOnly=1`)} onReview={(record, action) => void reviewBranchManagerSubmission(record, action)} /> : <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+              {isHumanResources || isDirector ? <BranchManagerWorkflowPanel onRefresh={() => void loadSavedReports()} sourceRecords={branchManagerRecords} sourceReportHistory={branchLoanSpecialistRecords} accountRecords={branchAccountRecords} accountReportHistory={branchAccountReportHistory} submissions={isHumanResources ? hrBmReports : branchManagerReports} reportDate={reportDate} branch={branch} currentUsername={user.username} reviewingAction={reviewingAction} canReviewSources={false} canReviewAsHr={isHumanResources} canApproveAsDirector={isDirector || isHumanResources} onOpen={(record) => openSavedReport(record, true)} onOpenAccount={(record) => router.push(`/loan?view=accounting&accountMode=accountReport&reportPanel=form&accountReportId=${encodeURIComponent(record.id)}&accountReadOnly=1`)} onReview={(record, action) => void reviewBranchManagerSubmission(record, action)} /> : <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
                 <div className="flex flex-col gap-2 border-b border-slate-200 px-5 py-5 sm:flex-row sm:items-center sm:justify-between dark:border-slate-800">
                   <div><p className="text-sm font-semibold text-emerald-700 dark:text-emerald-300">{opText("សង្ខេបសម្រាប់ថ្ងៃដែលបានជ្រើស", "Selected date overview")}</p><h2 className="mt-1 text-xl font-bold">{opText("ទិន្នន័យសម្រាប់របាយការណ៍ខ្ញុំ", "Data for My Report")}</h2><p className="mt-1 text-sm text-slate-500">{reportDate} · {companyBranchName(branch, language)}</p></div>
                   <div className="flex flex-wrap items-center gap-2">
@@ -7043,6 +7079,7 @@ function OperationReportRecordsDashboard({ records, loading, currentUsername, ca
   const [viewMode, setViewMode] = useState<"grid" | "list">("list");
   const [viewModeHydrated, setViewModeHydrated] = useState(false);
   const viewModeStorageKey = `emeraldcash.operation-report.records-view.${currentUsername}`;
+  const requestedReportIds = useMemo(() => new Set((searchParams.get("operationReportIds") || "").split(",").map((id) => id.trim()).filter(Boolean)), [searchParams]);
   useEffect(() => {
     const requested = searchParams.get("operationRecordsView");
     if (requested === "grid" || requested === "list") setViewMode(requested);
@@ -7063,6 +7100,7 @@ function OperationReportRecordsDashboard({ records, loading, currentUsername, ca
     router.push(`${pathname}?${params.toString()}`, { scroll: false });
   };
   const specialistOptions = useMemo(() => Array.from(new Map(records.map((record) => [record.reporterUsername, record.reporterName || record.reporterUsername])).entries()).sort((a, b) => a[1].localeCompare(b[1])), [records]);
+  const attentionReporterNames = useMemo(() => records.filter((record) => requestedReportIds.has(record.id)).map((record) => record.reporterName || record.reporterUsername).filter((name, index, values) => values.indexOf(name) === index), [records, requestedReportIds]);
   const branchOptions = useMemo(() => Array.from(new Set(records.map((record) => record.branch).filter(Boolean))).sort(), [records]);
   const departmentOptions = useMemo(() => Array.from(new Set(records.map((record) => record.department).filter(Boolean))).sort(), [records]);
   const positionOptions = useMemo(() => Array.from(new Set(records.map((record) => record.reporterPosition).filter(Boolean))).sort(), [records]);
@@ -7077,6 +7115,7 @@ function OperationReportRecordsDashboard({ records, loading, currentUsername, ca
         || (reportPeriod === "yearly" && record.reportDate.startsWith(`${periodValue}-`));
       return matchesSearch
         && matchesPeriod
+        && (!requestedReportIds.size || requestedReportIds.has(record.id))
         && (!fromDate || record.reportDate >= fromDate)
         && (!toDate || record.reportDate <= toDate)
         && (!specialist || record.reporterUsername === specialist)
@@ -7085,7 +7124,15 @@ function OperationReportRecordsDashboard({ records, loading, currentUsername, ca
         && (!positionFilter || record.reporterPosition === positionFilter)
         && (!statusFilter || record.status === statusFilter);
     });
-  }, [branchFilter, departmentFilter, fromDate, periodValue, positionFilter, query, records, reportPeriod, specialist, statusFilter, toDate]);
+  }, [branchFilter, departmentFilter, fromDate, periodValue, positionFilter, query, records, reportPeriod, requestedReportIds, specialist, statusFilter, toDate]);
+  useEffect(() => {
+    if (!requestedReportIds.size || !filtered.length) return;
+    const focusTimer = window.setTimeout(() => {
+      const recordsSection = document.getElementById("operation-report-problem-records");
+      recordsSection?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 150);
+    return () => window.clearTimeout(focusTimer);
+  }, [filtered.length, requestedReportIds]);
   const advancedFilterCount = [reportPeriod !== "all" ? reportPeriod : "", fromDate, toDate, specialist, branchFilter, departmentFilter, positionFilter, statusFilter].filter(Boolean).length;
   const changeReportPeriod = (period: "all" | "daily" | "monthly" | "yearly") => {
     const today = operationDateInputValue();
@@ -7127,11 +7174,12 @@ function OperationReportRecordsDashboard({ records, loading, currentUsername, ca
   };
 
   return (
-    <section className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+    <section id="operation-report-problem-records" className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
       <div className="flex flex-col gap-3 border-b border-slate-200 px-5 py-4 dark:border-slate-800 sm:flex-row sm:items-center sm:justify-between">
         <div><p className="text-sm font-semibold text-emerald-700">{canViewAllReports ? text("អ្នកឯកទេសផ្ដល់កម្ចីទាំងអស់", "All Loan Specialists") : text("របាយការណ៍របស់ខ្ញុំ", "My LS Reports")}</p><h2 className="mt-1 text-xl font-bold text-slate-900 dark:text-white">{text("កំណត់ត្រារបាយការណ៍ LS ប្រចាំថ្ងៃ / ខែ / ឆ្នាំ", "Daily / Monthly / Yearly LS Report Records")}</h2></div>
         {canCreate ? <button type="button" onClick={onCreate} className="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-700"><FilePlus2 className="h-4 w-4" />{text("របាយការណ៍ថ្មី", "New Report")}</button> : null}
       </div>
+      {requestedReportIds.size ? <div role="alert" className="flex items-center gap-2 border-b border-red-200 bg-red-50 px-5 py-3 text-sm font-semibold text-red-800 dark:border-red-900 dark:bg-red-950/30 dark:text-red-200"><AlertTriangle className="h-4 w-4 shrink-0" />{text(`របាយការណ៍ត្រូវតាមដាន៖ ${attentionReporterNames.join(" · ") || `${requestedReportIds.size} នាក់`}។ មិនទាន់បាន Submit ឬត្រូវកែតម្រូវ។`, `Reports needing attention: ${attentionReporterNames.join(" · ") || `${requestedReportIds.size} staff member(s)`}. They are not submitted or need correction.`)}</div> : null}
       <div className="grid border-b border-slate-200 sm:grid-cols-2 xl:grid-cols-4 dark:border-slate-800">
         {[[text("កំណត់ត្រាសរុប", "Total Records"), filtered.length], [text("បានដាក់ស្នើ", "Submitted"), submitted], [text("អ្នកឯកទេសផ្កល់កម្ចី", "Loan Specialists"), specialists], [text("បានរាយការណ៍ថ្ងៃនេះ", "Reported Today"), todayReports]].map(([label, value]) => <div key={label} className="border-b border-slate-200 px-5 py-4 last:border-b-0 sm:border-r xl:border-b-0 dark:border-slate-800"><p className="text-xs font-semibold text-slate-500">{label}</p><p className="mt-1 text-2xl font-bold text-slate-900 dark:text-white">{value}</p></div>)}
       </div>
@@ -7163,7 +7211,7 @@ function OperationReportRecordsDashboard({ records, loading, currentUsername, ca
         <table className="min-w-[920px] w-full text-left text-sm">
           <thead className="sticky top-0 z-10 bg-slate-100 text-slate-600 dark:bg-slate-950 dark:text-slate-300"><tr><th className="px-4 py-3">{text("ថ្ងៃ", "Date")}</th><th className="px-4 py-3">{text("អ្នកឯកទេសផ្កល់កម្ចី", "Loan Specialist")}</th><th className="px-4 py-3">{text("សាខា", "Branch")}</th><th className="px-4 py-3 text-center">{text("ត្រូវបង់", "Due")}</th><th className="px-4 py-3 text-center">{text("បានបង់", "Paid")}</th><th className="px-4 py-3 text-center">{text("អត្រាប្រមូល", "Collection Rate")}</th><th className="px-4 py-3 text-center">{text("សំណើ", "Requests")}</th><th className="px-4 py-3">{text("ស្ថានភាព", "Status")}</th><th className="min-w-32 px-3 py-3 text-right sm:min-w-56 sm:px-4">{text("សកម្មភាព", "Actions")}</th></tr></thead>
           <tbody>{loading ? <tr><td colSpan={9} className="px-4 py-10 text-center text-slate-500"><Loader2 className="mr-2 inline h-4 w-4 animate-spin" />{text("កំពុងផ្ទុកកំណត់ត្រា...", "Loading records...")}</td></tr> : filtered.length ? filtered.map((record) => {
-            const isLate = record.reportDate < operationDateInputValue() && ["draft", "submitted", "returned"].includes(record.status); const ownsRecord = record.reporterUsername.trim().toLocaleLowerCase() === currentUsername.trim().toLocaleLowerCase();
+            const needsAttention = requestedReportIds.has(record.id); const isLate = needsAttention || (record.reportDate < operationDateInputValue() && ["draft", "submitted", "returned"].includes(record.status)); const ownsRecord = record.reporterUsername.trim().toLocaleLowerCase() === currentUsername.trim().toLocaleLowerCase();
             const canEdit = ownsRecord && ["draft", "returned"].includes(record.status);
             const dueCount = rowCount(record, "collectionDueRows");
             const paidCount = rowCount(record, "collectionPaidRows");

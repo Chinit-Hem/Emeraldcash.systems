@@ -264,8 +264,9 @@ export async function POST(request: NextRequest) {
       }
     }
     if (reportType === "bm" && status === "submitted" && !(validBmWorksheet(reportData.bmWorksheet) && reportData.bmWorksheet.mode === "manual")) {
-      const worksheet = reportData.bmWorksheet as { incompleteSourceReason?: unknown } | undefined;
+      const worksheet = reportData.bmWorksheet as { incompleteSourceReason?: unknown; incompleteSourcesAcknowledged?: unknown } | undefined;
       const incompleteSourceReason = typeof worksheet?.incompleteSourceReason === "string" ? worksheet.incompleteSourceReason.trim() : "";
+      const incompleteSourcesAcknowledged = worksheet?.incompleteSourcesAcknowledged === true;
       const sourceReportIds = Array.isArray(reportData.sourceReportIds) ? reportData.sourceReportIds.map(String).filter((id) => /^[0-9a-f-]{36}$/i.test(id)) : [];
       if (!sourceReportIds.length) return NextResponse.json({ success: false, error: "A BM Report must include reviewed LS reports" }, { status: 400 });
       const eligibleSources = await queryWithRetry(async () => sql<Pick<ReportRow, "id" | "status">>`
@@ -283,8 +284,8 @@ export async function POST(request: NextRequest) {
       if (!hasEveryEligibleSource) {
         return NextResponse.json({ success: false, error: "Every reviewed LS report for this branch/date must be linked before BM submission" }, { status: 409 });
       }
-      if (eligibleSources.some((source) => !["reviewed", "approved"].includes(source.status)) && !incompleteSourceReason) {
-        return NextResponse.json({ success: false, error: "Every LS report for this branch/date must be reviewed and linked before BM submission" }, { status: 409 });
+      if (eligibleSources.some((source) => !["reviewed", "approved"].includes(source.status)) && (!incompleteSourceReason || !incompleteSourcesAcknowledged)) {
+        return NextResponse.json({ success: false, error: "BM must mark incomplete LS reports as acknowledged and provide a reason before submission" }, { status: 409 });
       }
       const sourceAccountReportIds = Array.isArray(reportData.sourceAccountReportIds) ? reportData.sourceAccountReportIds.map(String).filter((id) => /^[0-9a-f-]{36}$/i.test(id)) : [];
       if (!sourceAccountReportIds.length) return NextResponse.json({ success: false, error: "A BM Report must include a reviewed Account Report" }, { status: 400 });
@@ -303,8 +304,8 @@ export async function POST(request: NextRequest) {
       if (!hasEveryEligibleAccountSource) {
         return NextResponse.json({ success: false, error: "Every reviewed Account Report for this branch/date must be linked before BM submission" }, { status: 409 });
       }
-      if (eligibleAccountSources.some((source) => !["reviewed", "approved"].includes(source.status)) && !incompleteSourceReason) {
-        return NextResponse.json({ success: false, error: "Every Account Report for this branch/date must be reviewed and linked before BM submission" }, { status: 409 });
+      if (eligibleAccountSources.some((source) => !["reviewed", "approved"].includes(source.status)) && (!incompleteSourceReason || !incompleteSourcesAcknowledged)) {
+        return NextResponse.json({ success: false, error: "BM must mark incomplete Account Reports as acknowledged and provide a reason before submission" }, { status: 409 });
       }
     }
     serializedData = JSON.stringify(reportData);
@@ -368,7 +369,9 @@ export async function PATCH(request: NextRequest) {
     `, "findOperationReportForReview");
     if (!current[0]) return NextResponse.json({ success: false, error: "Report not found" }, { status: 404 });
     const branchAccess = await getReportBranchAccess(session);
-    if (branchAccess.isHumanResources) return NextResponse.json({ success: false, error: "HR report access is view-only" }, { status: 403 });
+    // HR represents Director for BM-report approval, but remains view-only for
+    // LS source reports.
+    if (branchAccess.isHumanResources && current[0].report_type !== "bm") return NextResponse.json({ success: false, error: "HR can review Branch Manager Reports only" }, { status: 403 });
     if (!canAccessReportBranch(branchAccess, current[0].branch)) {
       return NextResponse.json({ success: false, error: "You can only review reports from your assigned branches" }, { status: 403 });
     }
@@ -376,11 +379,11 @@ export async function PATCH(request: NextRequest) {
     const director = branchAccess.isDirector;
     const humanResources = branchAccess.isHumanResources;
     if (current[0].report_type === "bm") {
-      if (!humanResources && !director) return NextResponse.json({ success: false, error: "Only Director can approve BM Reports" }, { status: 403 });
+      if (!humanResources && !director) return NextResponse.json({ success: false, error: "Only Director or HR can approve BM Reports" }, { status: 403 });
     } else if ((!branchAccess.isBranchManager && !branchAccess.isAdministrator) || humanResources || director && !branchAccess.isAdministrator) {
       return NextResponse.json({ success: false, error: "Only the assigned Branch Manager can review LS Reports" }, { status: 403 });
     }
-    const actor = current[0].report_type === "ls" ? "branchManager" : director ? "director" : "humanResources";
+    const actor = current[0].report_type === "ls" ? "branchManager" : director || humanResources ? "director" : "humanResources";
     const allowed = isReportWorkflowTransitionAllowed(current[0].report_type === "bm" ? "branchManager" : "source", actor, current[0].status, action as "reviewed" | "approved" | "returned");
     if (!allowed) return NextResponse.json({ success: false, error: `This report cannot be marked ${action} from its current status` }, { status: 409 });
 
