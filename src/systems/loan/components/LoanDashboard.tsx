@@ -5295,7 +5295,7 @@ function AccountReportView() {
             {!viewOnly ? <>
             <div className="relative flex min-h-28 flex-col items-center justify-center gap-2 border-b border-slate-300 bg-white px-4 py-4 dark:border-slate-700 dark:bg-slate-950 sm:min-h-36 sm:px-0 sm:py-0">
               <div className="flex items-center justify-center sm:absolute sm:inset-y-0 sm:left-0 sm:p-4"><ReportBrandLogo branch={branch} className="h-auto w-28 object-contain sm:w-44" /></div>
-              <div className={`font-khmer-muol-light w-full px-2 text-center text-xl leading-relaxed sm:px-32 sm:text-3xl ${isSenSokReport ? "text-[#172b55]" : "text-red-700"}`}>{usesVimeanReportInfo ? "ក្រុមហ៊ុន វិមាន ខាប់ភីថល ផន ឯ.ក" : "ក្រុមហ៊ុន អេមើរ៉ល ឃែស ឯ.ក"}</div>
+              <div className={`font-khmer-muol-light w-full px-2 text-center text-xl leading-relaxed sm:px-32 sm:text-3xl ${isSenSokReport ? "text-[#172b55]" : "text-red-700"}`}>{isSenSokReport ? "ក្រុមហ៊ុន វិមាន ខាប់ភីថល ផន ឯ.ក" : "ក្រុមហ៊ុន អេមើរ៉ល ឃែស ឯ.ក"}</div>
             </div>
             <div className={`font-khmer-muol-light border-b border-slate-300 px-3 py-3 text-center text-lg leading-relaxed dark:border-slate-700 sm:text-2xl ${isSenSokReport ? "text-[#cfa66d]" : "text-emerald-700"}`}>{language === "km" ? `របាយការណ៍គណនេយ្យប្រចាំថ្ងៃ ${companyBranchName(branch, "km")}` : `Daily Account Report — ${companyBranchName(branch, "en")}`}</div>
             <div className="grid grid-cols-1 border-b border-slate-300 dark:border-slate-700 lg:grid-cols-[1fr_180px_1.4fr_1fr]">
