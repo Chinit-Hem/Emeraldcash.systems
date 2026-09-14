@@ -4155,7 +4155,7 @@ function LoanDetailPanel({
     </style></head><body>
       <section class="page">
         <h1>${escapeHtml(documentTitle === "Contract" ? "កិច្ចសន្យាខ្ចីប្រាក់" : documentTitle)}</h1>
-        <p class="topline">ក្រុមហ៊ុន វីមាន ខាប់ភីថល ឯ.ក លេខបញ្ជី 85E ផ្លូវលេខ១៩៨០ សង្កាត់ភ្នំពេញថ្មី ខណ្ឌសែនសុខ រាជធានីភ្នំពេញ ហៅកាត់ថា ភាគី “ក” ម្ចាស់បំណុល។</p>
+        <p class="topline">ក្រុមហ៊ុន វិមាន ខាប់ភីថល ឯ.ក លេខបញ្ជី 85E ផ្លូវលេខ១៩៨០ សង្កាត់ភ្នំពេញថ្មី ខណ្ឌសែនសុខ រាជធានីភ្នំពេញ ហៅកាត់ថា ភាគី “ក” ម្ចាស់បំណុល។</p>
         <h2>និង</h2>
         <p>ឈ្មោះ ${escapeHtml(borrower.fullName)} កាន់អត្តសញ្ញាណបណ្ណលេខ ${escapeHtml(borrowerId)} សញ្ជាតិ Cambodian ភេទ ប្រុស អាសយដ្ឋាន ${escapeHtml(borrowerAddress)} ហៅកាត់ថា ភាគី “ខ” ជាកូនបំណុល។</p>
         <p><strong>ភាគី “ក” និងភាគី “ខ” បានព្រមព្រៀង ការប្រកាន់ខ្ជាប់ដោយ៖</strong></p>
@@ -4181,7 +4181,7 @@ function LoanDetailPanel({
         <div class="date-line">ថ្ងៃទី ${date(new Date().toISOString())}</div>
         <div class="signatures">
           <div><div class="signature-title">ភាគី “ខ”</div><div class="signature-name">${escapeHtml(borrower.fullName)}</div></div>
-          <div><div class="signature-title">ភាគី “ក”</div><div class="signature-name">វីមាន ខាប់ភីថល ឯ.ក</div></div>
+          <div><div class="signature-title">ភាគី “ក”</div><div class="signature-name">វិមាន ខាប់ភីថល ឯ.ក</div></div>
           <div><div class="signature-title">សាក្សីភាគី “ក”</div><div class="signature-name">&nbsp;</div></div>
         </div>
         <div class="footer">Page: 2 / 2</div>
@@ -5288,7 +5288,7 @@ function AccountReportView() {
             {!viewOnly ? <>
             <div className="relative flex min-h-28 flex-col items-center justify-center gap-2 border-b border-slate-300 bg-white px-4 py-4 dark:border-slate-700 dark:bg-slate-950 sm:min-h-36 sm:px-0 sm:py-0">
               <div className="flex items-center justify-center sm:absolute sm:inset-y-0 sm:left-0 sm:p-4"><ReportBrandLogo branch={branch} className="h-auto w-28 object-contain sm:w-44" /></div>
-              <div className={`font-khmer-muol-light w-full px-2 text-center text-xl leading-relaxed sm:px-32 sm:text-3xl ${isSenSokReport ? "text-[#172b55]" : "text-red-700"}`}>{isSenSokReport ? "ក្រុមហ៊ុន វីមាន ខេពីតាល់" : "ក្រុមហ៊ុន អេមើរ៉ល ឃែស ឯ.ក"}</div>
+              <div className={`font-khmer-muol-light w-full px-2 text-center text-xl leading-relaxed sm:px-32 sm:text-3xl ${isSenSokReport ? "text-[#172b55]" : "text-red-700"}`}>{isSenSokReport ? "ក្រុមហ៊ុន វិមាន ខាប់ភីថល" : "ក្រុមហ៊ុន អេមើរ៉ល ឃែស ឯ.ក"}</div>
             </div>
             <div className={`font-khmer-muol-light border-b border-slate-300 px-3 py-3 text-center text-lg leading-relaxed dark:border-slate-700 sm:text-2xl ${isSenSokReport ? "text-[#cfa66d]" : "text-emerald-700"}`}>{language === "km" ? `របាយការណ៍គណនេយ្យប្រចាំថ្ងៃ ${companyBranchName(branch, "km")}` : `Daily Account Report — ${companyBranchName(branch, "en")}`}</div>
             <div className="grid grid-cols-1 border-b border-slate-300 dark:border-slate-700 lg:grid-cols-[1fr_180px_1.4fr_1fr]">
@@ -6564,7 +6564,7 @@ function OperationReportView({ loans, loading, canViewLoanData, onRefresh, onOpe
     <>
       <div className="relative flex min-h-28 flex-col items-center justify-center gap-2 border-b border-slate-300 bg-white px-4 py-4 dark:border-slate-700 dark:bg-slate-950 sm:min-h-36 sm:px-0 sm:py-0">
         <div className="flex items-center justify-center sm:absolute sm:inset-y-0 sm:left-0 sm:p-4"><ReportBrandLogo branch={branch} className="h-auto w-28 object-contain sm:w-44" /></div>
-        <div className={`font-khmer-muol-light w-full px-2 text-center text-xl leading-relaxed sm:px-32 sm:text-3xl ${isSenSokReport ? "text-[#172b55]" : "text-red-700"}`}>{isSenSokReport ? "ក្រុមហ៊ុន វីមាន ខេពីតាល់" : "ក្រុមហ៊ុន អេមើរ៉ល ឃែស ឯ.ក"}</div>
+        <div className={`font-khmer-muol-light w-full px-2 text-center text-xl leading-relaxed sm:px-32 sm:text-3xl ${isSenSokReport ? "text-[#172b55]" : "text-red-700"}`}>{isSenSokReport ? "ក្រុមហ៊ុន វិមាន ខាប់ភីថល" : "ក្រុមហ៊ុន អេមើរ៉ល ឃែស ឯ.ក"}</div>
       </div>
       <div className={`font-khmer-muol-light flex items-center justify-center border-b border-slate-300 px-3 py-3 text-center text-lg leading-relaxed dark:border-slate-700 sm:text-2xl ${isSenSokReport ? "text-[#cfa66d]" : "text-emerald-700"}`}>{opText(`របាយការណ៍លទ្ធផលប្រចាំថ្ងៃ ${companyBranchName(branch, "km")}`, `Daily Performance Report — ${companyBranchName(branch, "en")}`)}</div>
       <div className="grid grid-cols-1 border-b border-slate-300 dark:border-slate-700 lg:grid-cols-[1fr_180px_1.4fr_1fr]">
@@ -6602,7 +6602,7 @@ function OperationReportView({ loans, loading, canViewLoanData, onRefresh, onOpe
   const branchManagerBrandHeader = (
     <div className="grid min-h-28 grid-cols-1 border-b border-slate-300 bg-white px-4 py-4 dark:border-slate-700 dark:bg-slate-950 sm:grid-cols-[220px_1fr] sm:px-0 sm:py-0">
       <div className="flex items-center justify-center sm:p-4"><ReportBrandLogo branch={branch} className="h-auto w-28 object-contain sm:w-44" /></div>
-      <div className={`font-khmer-muol-light flex items-center justify-center px-3 text-center text-xl leading-relaxed sm:px-5 sm:text-3xl ${isSenSokReport ? "text-[#172b55]" : "text-emerald-800 dark:text-emerald-300"}`}>{isSenSokReport ? "ក្រុមហ៊ុន វីមាន ខេពីតាល់" : "ក្រុមហ៊ុន អេមើរ៉ល ឃែស ឯ.ក"}</div>
+      <div className={`font-khmer-muol-light flex items-center justify-center px-3 text-center text-xl leading-relaxed sm:px-5 sm:text-3xl ${isSenSokReport ? "text-[#172b55]" : "text-emerald-800 dark:text-emerald-300"}`}>{isSenSokReport ? "ក្រុមហ៊ុន វិមាន ខាប់ភីថល" : "ក្រុមហ៊ុន អេមើរ៉ល ឃែស ឯ.ក"}</div>
     </div>
   );
   const branchManagerReportSheetHeader = activeForm === "collection" ? (
