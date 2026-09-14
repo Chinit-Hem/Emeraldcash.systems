@@ -4699,11 +4699,12 @@ const ACCOUNT_REPORT_RESOLUTION_REASONS = ["បានប្រគល់លិខ
 const ACCOUNT_REPORT_REUSABLE_FIELDS = ["branch", "reporterName", "reporterRole", "department", "customer", "amount", "reason", "assetType", "interest", "penalty", "principal", "note"] as const;
 
 function createAccountCollectionRows(customers: string[] = []): AccountCollectionRow[] {
-  return Array.from({ length: 10 }, (_, index) => ({ id: index + 1, customer: customers[index] || "", amount: "", reason: "" }));
+  return Array.from({ length: 1 }, (_, index) => ({ id: index + 1, customer: customers[index] || "", amount: "", reason: "" }));
 }
 
 function createAccountResolutionRows(customers: string[] = [], count = 0): AccountResolutionRow[] {
-  return Array.from({ length: 10 }, (_, index) => ({ id: index + 1, customer: index < count ? customers[index] || "" : "", assetType: "", interest: "", penalty: "", principal: "", note: "" }));
+  const rowCount = Math.max(1, count, customers.length);
+  return Array.from({ length: rowCount }, (_, index) => ({ id: index + 1, customer: index < count ? customers[index] || "" : "", assetType: "", interest: "", penalty: "", principal: "", note: "" }));
 }
 
 function accountNumber(value: string) {
@@ -5645,7 +5646,7 @@ const OPERATION_COLLECTION_REASONS = ["យឺត ៣ថ្ងៃ", "យឺត �
 const OPERATION_RESOLUTION_OPTIONS = ["បានបង់ផ្តាច់", "បង់តែការប្រាក់", "សុំពន្យារពេល", "សន្យាបង់", "ត្រូវតាមដានបន្ត"];
 const OPERATION_REJECTION_REASONS = ["ឯកសារមិនគ្រប់គ្រាន់", "ចំណូលមិនគ្រប់គ្រាន់", "ប្រវត្តិឥណទានមិនល្អ", "ទ្រព្យធានាមិនគ្រប់គ្រាន់", "មិនបំពេញតាមលក្ខខណ្ឌឥណទាន"];
 const OPERATION_REPORT_REUSABLE_FIELDS = ["branch", "reporterName", "reporterRole", "department", "customer", "amount", "reason", "assetType", "interest", "penalty", "principal", "solution", "type"] as const;
-const OPERATION_REPORT_DEFAULT_ROWS = 5;
+const OPERATION_REPORT_DEFAULT_ROWS = 1;
 
 function createOperationCollectionRows() {
   return Array.from({ length: OPERATION_REPORT_DEFAULT_ROWS }, (_, index) => ({ id: index + 1, customer: "", amount: "", reason: "" }));
@@ -5732,7 +5733,6 @@ function OperationReportView({ loans, loading, canViewLoanData, onRefresh, onOpe
   const [formalNoticeRows, setFormalNoticeRows] = useState<OperationReportResolutionRow[]>(createOperationResolutionRows);
   const [requestedRows, setRequestedRows] = useState<OperationReportLoanDecisionRow[]>([
     { id: 1, customer: "", type: "", amount: "", reason: "" },
-    { id: 2, customer: "", type: "", amount: "", reason: "" },
   ]);
   const [approvedRows, setApprovedRows] = useState<OperationReportLoanDecisionRow[]>([
     { id: 1, customer: "", type: "", amount: "", reason: "" },
