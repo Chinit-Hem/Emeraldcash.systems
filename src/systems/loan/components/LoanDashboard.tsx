@@ -7011,7 +7011,7 @@ function BranchManagerWorkflowPanel({ sourceRecords, sourceReportHistory, accoun
             <td className="px-4 py-3"><span className={`rounded-md px-2 py-1 text-xs font-semibold ${operationReportStatusClass(record.status)}`}>{operationReportStatusLabel(record.status, language)}</span></td>
             <td className="px-4 py-3" onClick={(event) => event.stopPropagation()}><div className="flex flex-wrap gap-2">
               <button type="button" onClick={() => onOpen(record)} className="min-h-10 rounded-lg border border-slate-300 px-3 dark:border-slate-700">{text("មើល", "View")}</button>
-
+              {canApproveAsDirector && ["submitted", "reviewed"].includes(record.status) ? <><button type="button" disabled={Boolean(reviewingAction)} onClick={() => onReview(record, "approved")} className="min-h-10 rounded-lg bg-emerald-600 px-3 text-sm font-bold text-white hover:bg-emerald-700 disabled:opacity-50"><Check className="mr-1.5 inline h-4 w-4" />{text("អនុម័ត", "Approve")}</button><ReportReturnMenu disabled={Boolean(reviewingAction)} onReturn={() => onReview(record, "returned")} label={text("បញ្ជូនត្រឡប់", "Return")} /></> : null}
             </div></td>
           </tr>;
         })}
