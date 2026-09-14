@@ -367,8 +367,7 @@ export async function PATCH(request: NextRequest) {
     `, "findOperationReportForReview");
     if (!current[0]) return NextResponse.json({ success: false, error: "Report not found" }, { status: 404 });
     const branchAccess = await getReportBranchAccess(session);
-    // HR represents Director for BM-report approval, but remains view-only for
-    // LS source reports.
+    // HR can approve BM reports, but remains view-only for LS source reports.
     if (branchAccess.isHumanResources && current[0].report_type !== "bm") return NextResponse.json({ success: false, error: "HR can review Branch Manager Reports only" }, { status: 403 });
     if (!canAccessReportBranch(branchAccess, current[0].branch)) {
       return NextResponse.json({ success: false, error: "You can only review reports from your assigned branches" }, { status: 403 });
@@ -381,7 +380,11 @@ export async function PATCH(request: NextRequest) {
     } else if ((!branchAccess.isBranchManager && !branchAccess.isAdministrator) || humanResources || director && !branchAccess.isAdministrator) {
       return NextResponse.json({ success: false, error: "Only the assigned Branch Manager can review LS Reports" }, { status: 403 });
     }
-    const actor = current[0].report_type === "ls" ? "branchManager" : director || humanResources ? "director" : "humanResources";
+    const actor = current[0].report_type === "ls"
+      ? "branchManager"
+      : director
+        ? "director"
+        : "humanResources";
     const allowed = isReportWorkflowTransitionAllowed(current[0].report_type === "bm" ? "branchManager" : "source", actor, current[0].status, action as "reviewed" | "approved" | "returned");
     if (!allowed) return NextResponse.json({ success: false, error: `This report cannot be marked ${action} from its current status` }, { status: 409 });
 

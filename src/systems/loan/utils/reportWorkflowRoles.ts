@@ -57,7 +57,11 @@ export function isReportWorkflowTransitionAllowed(
   status: ReportWorkflowStatus,
   action: ReportWorkflowAction,
 ) {
-  if (actor === "humanResources") return false;
+  // HR is the designated approver for Branch Manager reports. This permission
+  // deliberately does not extend to LS or Account source reports.
+  if (actor === "humanResources") {
+    return report === "branchManager" && ["submitted", "reviewed"].includes(status) && (action === "approved" || action === "returned");
+  }
   if (report === "source") {
     return actor === "branchManager" && status === "submitted" && (action === "approved" || action === "returned");
   }

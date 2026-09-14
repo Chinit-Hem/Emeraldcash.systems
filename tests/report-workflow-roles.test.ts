@@ -19,7 +19,7 @@ test("report preparers are limited to LS and Accounting identities", () => {
   assert.equal(canPrepareAccountReport("Loan Specialist"), false);
 });
 
-test("workflow transitions enforce BM review and Director approval with HR view-only", () => {
+test("workflow transitions enforce BM review and HR or Director approval", () => {
   assert.equal(isReportWorkflowTransitionAllowed("source", "branchManager", "submitted", "approved"), true);
   assert.equal(isReportWorkflowTransitionAllowed("source", "branchManager", "submitted", "returned"), true);
   assert.equal(isReportWorkflowTransitionAllowed("source", "branchManager", "submitted", "reviewed"), false);
@@ -27,6 +27,10 @@ test("workflow transitions enforce BM review and Director approval with HR view-
   assert.equal(isReportWorkflowTransitionAllowed("source", "branchManager", "reviewed", "returned"), false);
   assert.equal(isReportWorkflowTransitionAllowed("source", "branchManager", "draft", "reviewed"), false);
   assert.equal(isReportWorkflowTransitionAllowed("branchManager", "humanResources", "submitted", "reviewed"), false);
+  assert.equal(isReportWorkflowTransitionAllowed("branchManager", "humanResources", "submitted", "approved"), true);
+  assert.equal(isReportWorkflowTransitionAllowed("branchManager", "humanResources", "reviewed", "approved"), true);
+  assert.equal(isReportWorkflowTransitionAllowed("branchManager", "humanResources", "submitted", "returned"), true);
+  assert.equal(isReportWorkflowTransitionAllowed("source", "humanResources", "submitted", "approved"), false);
   assert.equal(isReportWorkflowTransitionAllowed("branchManager", "director", "submitted", "approved"), true);
   assert.equal(isReportWorkflowTransitionAllowed("branchManager", "director", "reviewed", "approved"), true);
 });
@@ -59,10 +63,9 @@ test("short HR role and position labels receive HR report access", () => {
   assert.equal(isHumanResourcesReportActor("Staff", "Assistant"), false);
 });
 
-test("HR cannot change any report status", () => {
+test("HR can only change eligible BM reports", () => {
   for (const report of ["source", "branchManager"] as const) {
-    for (const status of ["draft", "submitted", "reviewed", "approved", "returned"] as const) {
-      for (const action of ["reviewed", "approved", "returned"] as const) assert.equal(isReportWorkflowTransitionAllowed(report, "humanResources", status, action), false);
-    }
+    assert.equal(isReportWorkflowTransitionAllowed(report, "humanResources", "draft", "approved"), false);
+    assert.equal(isReportWorkflowTransitionAllowed(report, "humanResources", "approved", "returned"), false);
   }
 });

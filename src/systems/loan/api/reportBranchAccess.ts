@@ -43,7 +43,9 @@ export function parseAssignedReportBranches(value: string | null | undefined) {
 }
 
 export function canAccessReportBranch(access: ReportBranchAccess, branch: string) {
-  if (!access.isBranchManager && !access.isHumanResources) return true;
+  // HR is authorized to approve BM reports company-wide. The routes still
+  // explicitly deny HR any status changes to LS and Account source reports.
+  if (access.isHumanResources || !access.isBranchManager) return true;
   return access.branches.some((assignedBranch) => branchesMatch(branch, assignedBranch));
 }
 
