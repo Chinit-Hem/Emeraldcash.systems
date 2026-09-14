@@ -142,7 +142,7 @@ export function SidebarItem({
     </Link>
   );
 
-  if (item.id === "loan-operation-report") return <OperationReportMenu>{link}</OperationReportMenu>;
+  if (item.id === "loan-operation-report") return <OperationReportMenu onNavigate={onNavigate}>{link}</OperationReportMenu>;
 
   return collapsed ? <SidebarTooltip label={item.label}>{link}</SidebarTooltip> : link;
 }

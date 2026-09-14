@@ -7,7 +7,7 @@ import { useAuthUser } from "@/shared/hooks/AuthContext";
 import { useLanguage } from "@/shared/hooks/LanguageContext";
 import { getReportNavigation } from "@/systems/loan/utils/reportNavigation";
 
-export function OperationReportMenu({ children }: { children: ReactNode }) {
+export function OperationReportMenu({ children, onNavigate }: { children: ReactNode; onNavigate?: (href: string) => void }) {
   const user = useAuthUser();
   const { language } = useLanguage();
   const { links } = getReportNavigation(user, language);
@@ -21,7 +21,7 @@ export function OperationReportMenu({ children }: { children: ReactNode }) {
         <ChevronDown className="h-4 w-4" aria-hidden="true" />
       </button>
       {open ? <nav id={id} aria-label={language === "km" ? "ជម្រើសរបាយការណ៍" : "Report shortcuts"} className="relative z-50 mt-1 rounded-xl border border-slate-200 bg-white p-1 shadow-lg dark:border-slate-700 dark:bg-slate-900">
-        {links.map((link) => <Link key={link.href} href={link.href} onClick={() => setOpen(false)} className="block rounded-lg px-3 py-2.5 text-sm font-medium text-slate-700 hover:bg-emerald-50 hover:text-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 dark:text-slate-200 dark:hover:bg-emerald-950">{link.label}</Link>)}
+        {links.map((link) => <Link key={link.href} href={link.href} onClick={() => { setOpen(false); onNavigate?.(link.href); }} className="block rounded-lg px-3 py-2.5 text-sm font-medium text-slate-700 hover:bg-emerald-50 hover:text-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 dark:text-slate-200 dark:hover:bg-emerald-950">{link.label}</Link>)}
       </nav> : null}
     </div>
   );
