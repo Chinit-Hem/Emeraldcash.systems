@@ -6,6 +6,9 @@ if (keystorePropertiesFile.exists()) {
     keystorePropertiesFile.withInputStream { keystoreProperties.load(it) }
 }
 
+def isReleaseSigningConfigured = keystorePropertiesFile.exists() &&
+    ['storeFile', 'storePassword', 'keyAlias', 'keyPassword'].every { keystoreProperties[it] }
+
 android {
     namespace = "com.emeraldcash.vms"
     compileSdk = rootProject.ext.compileSdkVersion
@@ -24,7 +27,7 @@ android {
     }
     signingConfigs {
         release {
-            if (keystorePropertiesFile.exists()) {
+            if (isReleaseSigningConfigured) {
                 storeFile rootProject.file(keystoreProperties['storeFile'])
                 storePassword keystoreProperties['storePassword']
                 keyAlias keystoreProperties['keyAlias']
@@ -34,12 +37,26 @@ android {
     }
     buildTypes {
         release {
-            if (keystorePropertiesFile.exists()) {
+            if (isReleaseSigningConfigured) {
                 signingConfig signingConfigs.release
             }
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
+    }
+}
+
+// A production artifact must never be generated unsigned by mistake.
+gradle.taskGraph.whenReady { graph ->
+    def isReleaseBuild = graph.allTasks.any { task ->
+        task.path.startsWith(':app:') && task.name.toLowerCase().contains('release')
+    }
+
+    if (isReleaseBuild && !isReleaseSigningConfigured) {
+        throw new GradleException(
+            'Release signing is not configured. Create android/keystore.properties from ' +
+            'android/keystore.properties.example and keep the release keystore private.'
+        )
     }
 }
 

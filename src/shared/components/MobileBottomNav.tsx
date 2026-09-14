@@ -88,6 +88,13 @@ export default function MobileBottomNav({
       navItems.push({ id: "sms", label: "SMS", labelKm: "SMS", href: "/sms/assets", icon: Boxes });
     }
 
+    // Keep Loan available from Home as well as inside the Loan workspace.
+    // Previously this item was added only after navigating to /loan, so Android
+    // users could not enter the Loan system from the first Home screen.
+    if (hasAppPermission(user.role, "loans:view")) {
+      navItems.push({ id: "loan", label: "Loan", labelKm: "កម្ចី", href: "/loan", icon: Landmark });
+    }
+
     navItems.push({
       id: "settings",
       label: "Settings",
@@ -96,7 +103,6 @@ export default function MobileBottomNav({
       icon: Settings,
     });
 
-    if (selectedSystem === "loan-management" && hasAppPermission(user.role, "loans:view")) navItems.push({ id: "loan", label: "Loan", labelKm: "កម្ចី", href: "/loan", icon: Landmark });
     if (selectedSystem === "human-resources" && hasAppPermission(user.role, "settings:view")) navItems.push({ id: "hr", label: "HR", labelKm: "ធនធានមនុស្ស", href: "/hr", icon: Users });
     return navItems.filter((item) => !selectedSystem || item.id === "home" || getSystemForPath(item.href) === selectedSystem).map((item) => ({
       ...item,

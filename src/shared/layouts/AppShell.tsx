@@ -393,8 +393,12 @@ function AppShellContent({ children }: AppShellProps) {
     return null;
   }
 
+  // Keep the application shell at least as tall as the browser viewport.
+  // Some Chromium/WebView sessions report a temporarily short dynamic viewport
+  // after closing the native file picker. 100vh is the stable fallback while
+  // 100dvh remains the preferred mobile measurement.
   return (
-    <div className={`flex h-dvh max-h-dvh min-h-0 min-w-0 flex-col overflow-hidden bg-transparent ${bottomPaddingClass} xl:pb-0`}>
+    <div className={`flex h-dvh min-h-screen min-h-dvh min-w-0 flex-col overflow-hidden bg-transparent ${bottomPaddingClass} xl:pb-0`}>
       <AuthUserProvider user={user}>
         <MobileBackHandler isMenuOpen={isSidebarOpen} onCloseMenu={closeSidebar} />
 
