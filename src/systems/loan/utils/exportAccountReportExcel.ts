@@ -1,5 +1,5 @@
 import ExcelJS from "exceljs";
-import { companyBranchName } from "@/shared/utils/branchNames";
+import { companyBranchName, normalizeCompanyBranch } from "@/shared/utils/branchNames";
 
 export type AccountReportCollectionRow = { id: number; customer: string; amount: string; reason: string };
 export type AccountReportResolutionRow = { id: number; customer: string; assetType: string; interest: string; penalty: string; principal: string; note: string };
@@ -18,12 +18,20 @@ export type AccountReportExcelData = {
   closedRows: AccountReportResolutionRow[];
 };
 
-const GREEN = "007025";
-const RED = "C00000";
+let GREEN = "007025";
+let RED = "C00000";
+let LOGO_PATH = "/logo-horizontal.png";
 const LIGHT = "E9EEF0";
 const BORDER = "D6D9DD";
 const TITLE_FONT = "Khmer OS Muol Light";
 const BODY_FONT = "Khmer OS Battambang";
+
+function setExcelBrand(branch: string) {
+  const isSenSok = normalizeCompanyBranch(branch) === "sen-sok";
+  GREEN = isSenSok ? "172B55" : "007025";
+  RED = isSenSok ? "CFA66D" : "C00000";
+  LOGO_PATH = isSenSok ? "/sen-sok-logo.png" : "/logo-horizontal.png";
+}
 
 function numberValue(value: string) {
   return Number(value.replace(/[^\d.-]/g, "")) || 0;
@@ -67,7 +75,7 @@ function styleRange(sheet: ExcelJS.Worksheet, fromRow: number, toRow: number, fr
 
 async function addLogo(workbook: ExcelJS.Workbook, sheet: ExcelJS.Worksheet) {
   try {
-    const response = await fetch("/logo-horizontal.png");
+    const response = await fetch(LOGO_PATH);
     if (!response.ok) return;
     const bytes = new Uint8Array(await response.arrayBuffer());
     let binary = "";
@@ -292,6 +300,7 @@ function addSummaryTable(sheet: ExcelJS.Worksheet, data: AccountReportExcelData)
 }
 
 export async function exportAccountReportExcel(data: AccountReportExcelData) {
+  setExcelBrand(data.branch);
   const workbook = new ExcelJS.Workbook();
   workbook.creator = "Emerald Cash Account Report";
   workbook.created = new Date();

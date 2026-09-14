@@ -1,6 +1,10 @@
 import { BM_KPIS, bmKpiValues, emptyBmKpis, emptyBmPeriods, type BmWorksheet } from "./bmWorksheet.ts";
+import { normalizeCompanyBranch } from "@/shared/utils/branchNames";
 
 export async function exportBmWorksheet(data: BmWorksheet, report: { reportDate: string; branch: string; reporterName: string; department?: string }) {
+  const isSenSok = normalizeCompanyBranch(report.branch) === "sen-sok";
+  const primary = isSenSok ? "FF172B55" : "FF087323";
+  const accent = isSenSok ? "FFCFA66D" : "FFDC2626";
   const ExcelJS = await import("exceljs");
   const workbook = new ExcelJS.Workbook();
   const sheet = workbook.addWorksheet("សង្ខេបប្រចាំសាខា (Dashboard)");
@@ -9,7 +13,7 @@ export async function exportBmWorksheet(data: BmWorksheet, report: { reportDate:
     target.mergeCells(row, 1, row, width);
     const cell = target.getCell(row, 1);
     cell.value = title;
-    cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF087323" } };
+    cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: primary } };
     cell.font = { name: "Khmer OS Battambang", bold: true, color: { argb: "FFFFFFFF" }, size: 12 };
     target.getRow(row).height = 38;
   };
@@ -62,15 +66,15 @@ export async function exportBmWorksheet(data: BmWorksheet, report: { reportDate:
   periods.mergeCells("A11:J11"); periods.getCell("A11").value = "រយៈពេលទាំងនេះត្រួតគ្នា — មិនបូកសរុបចូលគ្នា។";
   for (const r of [8, 21, issuesStart + 1]) {
     sheet.getRow(r).height = 52;
-    sheet.getRow(r).eachCell((cell) => { cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF087323" } }; cell.font = { name: "Khmer OS Battambang", bold: true, color: { argb: "FFFFFFFF" }, size: 11 }; });
+    sheet.getRow(r).eachCell((cell) => { cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: primary } }; cell.font = { name: "Khmer OS Battambang", bold: true, color: { argb: "FFFFFFFF" }, size: 11 }; });
   }
   for (let r = 22; r <= totalRow; r++) {
     [3, 4, 5, 6].forEach((column) => { sheet.getCell(r, column).numFmt = '"$"#,##0.00'; });
     sheet.getCell(r, 7).numFmt = "#,##0";
   }
-  sheet.getRow(totalRow).eachCell((cell) => { cell.font = { name: "Khmer OS Battambang", bold: true, color: { argb: "FFDC2626" } }; cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFE8EEF0" } }; });
+  sheet.getRow(totalRow).eachCell((cell) => { cell.font = { name: "Khmer OS Battambang", bold: true, color: { argb: accent } }; cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFE8EEF0" } }; });
   periods.getRow(6).height = 52;
-  periods.getRow(6).eachCell((cell) => { cell.font = { name: "Khmer OS Battambang", bold: true, color: { argb: "FFFFFFFF" } }; cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF087323" } }; });
+  periods.getRow(6).eachCell((cell) => { cell.font = { name: "Khmer OS Battambang", bold: true, color: { argb: "FFFFFFFF" } }; cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: primary } }; });
   workbook.eachSheet((target) => {
     target.pageSetup = { paperSize: 9, orientation: "landscape", fitToPage: true, fitToWidth: 1, fitToHeight: 0 };
     target.eachRow((row) => { row.height = row.height || 32; row.eachCell((cell) => { cell.alignment = { vertical: "middle", wrapText: true }; if (!cell.font) cell.font = { name: "Khmer OS Battambang", size: 11 }; cell.border = { top: { style: "thin", color: { argb: "FFD1D5DB" } }, bottom: { style: "thin", color: { argb: "FFD1D5DB" } }, left: { style: "thin", color: { argb: "FFD1D5DB" } }, right: { style: "thin", color: { argb: "FFD1D5DB" } } }; }); });

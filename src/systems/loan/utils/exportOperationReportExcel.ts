@@ -1,5 +1,5 @@
 import ExcelJS from "exceljs";
-import { companyBranchName } from "@/shared/utils/branchNames";
+import { companyBranchName, normalizeCompanyBranch } from "@/shared/utils/branchNames";
 
 type Attachment = { imageUrl?: string; imageName?: string };
 type CollectionRow = Attachment & { id: number; customer: string; amount: string; reason: string };
@@ -57,11 +57,19 @@ export type BranchManagerOperationReportExcelData = OperationReportExcelData & {
   loans: LoanForBranchManagerExcel[];
 };
 
-const GREEN = "006B2D";
-const RED = "C00000";
+let GREEN = "006B2D";
+let RED = "C00000";
+let LOGO_PATH = "/logo-horizontal.png";
 const LIGHT = "E9EEF0";
 const BORDER = "D6D9DD";
 const KHMER_FONT = "Khmer OS Battambang";
+
+function setExcelBrand(branch: string) {
+  const isSenSok = normalizeCompanyBranch(branch) === "sen-sok";
+  GREEN = isSenSok ? "172B55" : "006B2D";
+  RED = isSenSok ? "CFA66D" : "C00000";
+  LOGO_PATH = isSenSok ? "/sen-sok-logo.png" : "/logo-horizontal.png";
+}
 
 function numberValue(value: string) {
   return Number(value.replace(/[^\d.-]/g, "")) || 0;
@@ -110,7 +118,7 @@ async function addBrandHeader(workbook: ExcelJS.Workbook, sheet: ExcelJS.Workshe
   sheet.getRow(3).height = 30;
 
   try {
-    const logoResponse = await fetch("/logo-horizontal.png");
+    const logoResponse = await fetch(LOGO_PATH);
     if (logoResponse.ok) {
       const bytes = new Uint8Array(await logoResponse.arrayBuffer());
       let binary = "";
@@ -157,7 +165,7 @@ async function addBranchManagerHeader(workbook: ExcelJS.Workbook, sheet: ExcelJS
   sheet.getRow(3).height = consolidated ? 18 : 30;
 
   try {
-    const logoResponse = await fetch("/logo-horizontal.png");
+    const logoResponse = await fetch(LOGO_PATH);
     if (logoResponse.ok) {
       const bytes = new Uint8Array(await logoResponse.arrayBuffer());
       let binary = "";
@@ -388,6 +396,7 @@ function branchManagerStaffRows(records: OperationReportRecordForExcel[]) {
 }
 
 export async function buildBranchManagerOperationReportWorkbook(data: BranchManagerOperationReportExcelData) {
+  setExcelBrand(data.branch);
   const workbook = new ExcelJS.Workbook();
   workbook.creator = "Emerald Cash Branch Manager Daily Report";
   workbook.created = new Date();
@@ -534,6 +543,7 @@ export async function exportBranchManagerOperationReportExcel(data: BranchManage
 }
 
 export async function exportOperationReportExcel(data: OperationReportExcelData) {
+  setExcelBrand(data.branch);
   const workbook = new ExcelJS.Workbook();
   workbook.creator = "Emerald Cash Operation Report";
   workbook.created = new Date();

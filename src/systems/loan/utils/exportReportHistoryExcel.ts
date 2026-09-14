@@ -1,4 +1,5 @@
 import ExcelJS from "exceljs";
+import { normalizeCompanyBranch } from "@/shared/utils/branchNames";
 
 type HistoryRow = {
   customer: string;
@@ -46,9 +47,13 @@ export type LsHistoryRecord = ReportRecordBase & {
   };
 };
 
-const GREEN = "087323";
+let GREEN = "087323";
 const BORDER = "CBD5E1";
 const FONT = "Khmer OS Battambang";
+
+function setExcelBrand(branch: string) {
+  GREEN = normalizeCompanyBranch(branch) === "sen-sok" ? "172B55" : "087323";
+}
 
 function filled(rows: HistoryRow[] | undefined) {
   return (rows || []).filter((row) => row.customer?.trim());
@@ -120,6 +125,7 @@ function safeFilename(value: string) {
 }
 
 export async function exportAccountReportHistoryExcel(records: AccountHistoryRecord[], periodLabel: string) {
+  setExcelBrand(records[0]?.branch || "");
   const workbook = new ExcelJS.Workbook();
   workbook.creator = "Emerald Cash Account Reports";
   workbook.created = new Date();
@@ -148,6 +154,7 @@ export async function exportAccountReportHistoryExcel(records: AccountHistoryRec
 }
 
 export async function exportLsReportHistoryExcel(records: LsHistoryRecord[], periodLabel: string) {
+  setExcelBrand(records[0]?.branch || "");
   const workbook = new ExcelJS.Workbook();
   workbook.creator = "Emerald Cash LS Reports";
   workbook.created = new Date();
