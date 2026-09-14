@@ -165,6 +165,13 @@ body {
 /* Do not let a stale dynamic viewport shrink the application after a native
    file picker closes. This has occurred in Android WebView and Chromium too. */
 .app-shell-viewport {
+  /* The document is intentionally locked while the app is open; make this a
+     real, finite viewport so the <main> flex child can own vertical scrolling.
+     With only min-height, Android WebView lets the shell grow with its content
+     and the locked document leaves lower system cards (including Loan) stuck
+     below the visible area. */
+  height: 100vh;
+  height: max(100vh, 100dvh, 100lvh);
   min-height: 100vh;
   min-height: max(100vh, 100dvh, 100lvh);
 }
