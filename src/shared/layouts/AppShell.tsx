@@ -432,7 +432,7 @@ function AppShellContent({ children }: AppShellProps) {
             <main
               ref={mainRef}
               data-app-scroll-container="true"
-              className="min-h-0 flex-1 overflow-x-hidden pt-0"
+              className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden pt-0"
             >
               {children}
             </main>
