@@ -5847,8 +5847,9 @@ function OperationReportView({ loans, loading, canViewLoanData, onRefresh, onOpe
     };
     visibleSavedReports.forEach(addMarker);
     accountReports.forEach(addMarker);
+    branchManagerReports.forEach(addMarker);
     return markers;
-  }, [accountReports, branch, visibleSavedReports]);
+  }, [accountReports, branch, branchManagerReports, visibleSavedReports]);
   const selectedBmDateMarker = bmCalendarDateMarkers[reportDate];
   // The API accepts only reviewed/approved sources in a generated BM report.
   // Keep submitted records visible for the BM review queue, but never advertise
