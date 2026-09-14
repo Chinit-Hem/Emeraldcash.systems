@@ -393,12 +393,11 @@ function AppShellContent({ children }: AppShellProps) {
     return null;
   }
 
-  // Keep the application shell at least as tall as the largest browser viewport.
-  // Android WebView can retain a temporarily short dynamic viewport after a
-  // native file picker closes; 100lvh prevents the app from collapsing into a
-  // half-height layout with a blank area underneath.
+  // A native file picker can leave `dvh` temporarily shorter than the browser
+  // viewport. The app-shell class uses the largest viewport unit, including a
+  // stable `vh` fallback, so content never collapses into a blank lower area.
   return (
-    <div className={`flex h-dvh min-h-screen min-h-dvh min-h-[100lvh] min-w-0 flex-col overflow-hidden bg-transparent ${bottomPaddingClass} xl:pb-0`}>
+    <div className={`app-shell-viewport flex min-w-0 flex-col overflow-hidden bg-transparent ${bottomPaddingClass} xl:pb-0`}>
       <AuthUserProvider user={user}>
         <MobileBackHandler isMenuOpen={isSidebarOpen} onCloseMenu={closeSidebar} />
 
