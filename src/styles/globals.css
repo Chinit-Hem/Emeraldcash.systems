@@ -176,6 +176,20 @@ body {
   min-height: max(100vh, 100dvh, 100lvh, var(--app-shell-stable-height, 0px));
 }
 
+@media (max-width: 1279px) {
+  /* MagicOS can leave every viewport unit at the picker height. Let the
+     document grow with the form so the remaining fields stay reachable. */
+  .app-shell-viewport {
+    height: auto;
+    min-height: 100vh;
+  }
+
+  .app-shell-viewport .app-shell-main {
+    min-height: auto;
+    overflow: visible;
+  }
+}
+
 .dark .ec-dark-scope,
 [data-theme="dark"] .ec-dark-scope {
   color: var(--text-primary);

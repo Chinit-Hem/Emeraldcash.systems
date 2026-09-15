@@ -4688,7 +4688,7 @@ type AccountReportLocalDraft = AccountReportSavedData & { reportDate: string; re
 function scrollLoanWorkspaceToTop(behavior: ScrollBehavior = "smooth") {
   window.requestAnimationFrame(() => {
     const appScroller = document.querySelector<HTMLElement>("[data-app-scroll-container='true']");
-    if (appScroller) appScroller.scrollTo({ top: 0, behavior });
+    if (appScroller && window.matchMedia("(min-width: 1280px)").matches) appScroller.scrollTo({ top: 0, behavior });
     else window.scrollTo({ top: 0, behavior });
   });
 }

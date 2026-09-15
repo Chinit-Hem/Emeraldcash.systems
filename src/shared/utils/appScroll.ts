@@ -8,6 +8,7 @@ const APP_SHELL_SCROLL_STORAGE_PREFIX = "vms_scroll:";
 
 export function getAppScrollContainer() {
   if (typeof document === "undefined") return null;
+  if (typeof window !== "undefined" && window.matchMedia("(max-width: 1279px)").matches) return null;
 
   return document.querySelector<HTMLElement>(APP_SCROLL_CONTAINER_SELECTOR);
 }

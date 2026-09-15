@@ -63,10 +63,16 @@ function AppShellContent({ children }: AppShellProps) {
   useEffect(() => {
     const previousHtmlOverflow = document.documentElement.style.overflow;
     const previousBodyOverflow = document.body.style.overflow;
-    document.documentElement.style.overflow = "hidden";
-    document.body.style.overflow = "hidden";
+    const mobile = window.matchMedia("(max-width: 1279px)");
+    const updateOverflow = () => {
+      document.documentElement.style.overflow = mobile.matches ? "auto" : "hidden";
+      document.body.style.overflow = mobile.matches ? "auto" : "hidden";
+    };
+    updateOverflow();
+    mobile.addEventListener("change", updateOverflow);
 
     return () => {
+      mobile.removeEventListener("change", updateOverflow);
       document.documentElement.style.overflow = previousHtmlOverflow;
       document.body.style.overflow = previousBodyOverflow;
     };
@@ -312,6 +318,16 @@ function AppShellContent({ children }: AppShellProps) {
   useEffect(() => {
     const el = mainRef.current;
     if (!el) return;
+    const documentScroller = window.matchMedia("(max-width: 1279px)").matches;
+    const getScrollTop = () => documentScroller ? window.scrollY : el.scrollTop;
+    const setScrollTop = (top: number) => {
+      if (documentScroller) window.scrollTo({ top, behavior: "auto" });
+      else el.scrollTop = top;
+    };
+    const getMaximumScrollTop = () => documentScroller
+      ? Math.max(0, document.documentElement.scrollHeight - window.innerHeight)
+      : Math.max(0, el.scrollHeight - el.clientHeight);
+    const scrollTarget: HTMLElement | Window = documentScroller ? window : el;
 
     let pendingFrame: number | null = null;
     let restoreTimer: number | null = null;
@@ -332,7 +348,7 @@ function AppShellContent({ children }: AppShellProps) {
     const saveScrollPosition = () => {
       if (!restored || filePickerScrollTop !== null) return;
       try {
-        sessionStorage.setItem(scrollKey, String(el.scrollTop));
+        sessionStorage.setItem(scrollKey, String(getScrollTop()));
       } catch {
         // ignore quota/session errors
       }
@@ -346,7 +362,7 @@ function AppShellContent({ children }: AppShellProps) {
       });
     };
 
-    el.addEventListener("scroll", onScroll, { passive: true });
+    scrollTarget.addEventListener("scroll", onScroll, { passive: true });
 
     // Android's native photo picker can resize the WebView and clamp the
     // nested scroller. Keep its position until the picker and layout settle.
@@ -354,12 +370,12 @@ function AppShellContent({ children }: AppShellProps) {
       if (filePickerScrollTop === null) return;
       const target = filePickerScrollTop;
       window.requestAnimationFrame(() => {
-        el.scrollTop = target;
-        window.requestAnimationFrame(() => { el.scrollTop = target; });
+        setScrollTop(target);
+        window.requestAnimationFrame(() => { setScrollTop(target); });
       });
       if (filePickerTimer !== null) window.clearTimeout(filePickerTimer);
       filePickerTimer = window.setTimeout(() => {
-        el.scrollTop = target;
+        setScrollTop(target);
         filePickerScrollTop = null;
         filePickerTimer = null;
         saveScrollPosition();
@@ -368,7 +384,7 @@ function AppShellContent({ children }: AppShellProps) {
 
     const onFilePickerOpen = (event: MouseEvent) => {
       if (event.target instanceof HTMLInputElement && event.target.type === "file") {
-        filePickerScrollTop = el.scrollTop;
+        filePickerScrollTop = getScrollTop();
         if (filePickerTimer !== null) window.clearTimeout(filePickerTimer);
       }
     };
@@ -386,16 +402,13 @@ function AppShellContent({ children }: AppShellProps) {
     // tall enough before restoring, otherwise the browser clamps scrollTop to 0.
     const restoreScrollPosition = () => {
       restoreAttempts += 1;
-      const maximumScrollTop = Math.max(0, el.scrollHeight - el.clientHeight);
+      const maximumScrollTop = getMaximumScrollTop();
       if (maximumScrollTop < savedScrollTop && restoreAttempts < 150) {
         restoreTimer = window.setTimeout(restoreScrollPosition, 100);
         return;
       }
 
-      el.scrollTo({
-        top: Math.min(savedScrollTop, maximumScrollTop),
-        behavior: "auto",
-      });
+      setScrollTop(Math.min(savedScrollTop, maximumScrollTop));
       restored = true;
     };
 
@@ -409,7 +422,7 @@ function AppShellContent({ children }: AppShellProps) {
       if (pendingFrame !== null) {
         window.cancelAnimationFrame(pendingFrame);
       }
-      el.removeEventListener("scroll", onScroll);
+      scrollTarget.removeEventListener("scroll", onScroll);
       el.removeEventListener("click", onFilePickerOpen, true);
       el.removeEventListener("change", onFilePickerChange, true);
       window.removeEventListener("focus", onWindowFocus);
@@ -502,7 +515,7 @@ function AppShellContent({ children }: AppShellProps) {
             <main
               ref={mainRef}
               data-app-scroll-container="true"
-              className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden pt-0"
+              className="app-shell-main min-h-0 flex-1 overflow-y-auto overflow-x-hidden pt-0"
             >
               {children}
             </main>
