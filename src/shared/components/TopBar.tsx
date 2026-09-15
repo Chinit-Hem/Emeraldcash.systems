@@ -61,12 +61,25 @@ function FloatingTopBarMenu({ open, anchorRef, menuRef, children }: FloatingTopB
       const bounds = anchorRef.current?.getBoundingClientRect();
       if (!bounds) return;
       const viewportPadding = 8;
+      const visualViewport = window.visualViewport;
+      const visibleLeft = visualViewport?.offsetLeft ?? 0;
+      const visibleTop = visualViewport?.offsetTop ?? 0;
+      const visibleWidth = visualViewport?.width ?? window.innerWidth;
+      const visibleHeight = visualViewport?.height ?? window.innerHeight;
+      const availableWidth = Math.max(0, visibleWidth - viewportPadding * 2);
+      const menuWidth = Math.min(menuRef.current?.firstElementChild?.getBoundingClientRect().width ?? availableWidth, availableWidth);
+      const left = Math.max(visibleLeft + viewportPadding, Math.min(bounds.left, visibleLeft + visibleWidth - menuWidth - viewportPadding));
+      const top = Math.min(
+        Math.max(visibleTop + viewportPadding, bounds.bottom + 12),
+        Math.max(visibleTop + viewportPadding, visibleTop + visibleHeight - 88),
+      );
       setStyle({
         position: "fixed",
-        top: bounds.bottom + 12,
-        right: Math.max(viewportPadding, window.innerWidth - bounds.right),
-        maxWidth: `calc(100vw - ${viewportPadding * 2}px)`,
-        maxHeight: `calc(100dvh - ${bounds.bottom + 20}px)`,
+        top,
+        left,
+        width: menuWidth,
+        maxWidth: availableWidth,
+        maxHeight: Math.max(80, visibleTop + visibleHeight - top - viewportPadding),
         overflowY: "auto",
         overscrollBehavior: "contain",
         zIndex: 1000,
@@ -77,9 +90,13 @@ function FloatingTopBarMenu({ open, anchorRef, menuRef, children }: FloatingTopB
     updatePosition();
     window.addEventListener("resize", updatePosition);
     window.addEventListener("scroll", updatePosition, true);
+    window.visualViewport?.addEventListener("resize", updatePosition);
+    window.visualViewport?.addEventListener("scroll", updatePosition);
     return () => {
       window.removeEventListener("resize", updatePosition);
       window.removeEventListener("scroll", updatePosition, true);
+      window.visualViewport?.removeEventListener("resize", updatePosition);
+      window.visualViewport?.removeEventListener("scroll", updatePosition);
     };
   }, [anchorRef, open]);
 
@@ -196,10 +213,11 @@ export default function TopBar({
 
   useEffect(() => {
     const media = window.matchMedia("(max-width: 639px)");
-    const updateViewport = () => setIsCompactViewport(media.matches);
+    const updateViewport = () => setIsCompactViewport(media.matches || Math.min(screen.width, screen.height) <= 639);
     updateViewport();
     media.addEventListener("change", updateViewport);
-    return () => media.removeEventListener("change", updateViewport);
+    window.addEventListener("resize", updateViewport);
+    return () => { media.removeEventListener("change", updateViewport); window.removeEventListener("resize", updateViewport); };
   }, []);
 
   useEffect(() => {
@@ -497,7 +515,7 @@ export default function TopBar({
   };
 
   return (
-    <header className="sticky left-0 right-0 top-0 z-40 h-[calc(4rem+env(safe-area-inset-top))] border-b border-slate-200 bg-white/95 pt-[env(safe-area-inset-top)] backdrop-blur-xl transition-colors duration-200 dark:border-slate-800 dark:bg-slate-950/95 print:hidden">
+    <header data-compact-viewport={isCompactViewport} className="sticky left-0 right-0 top-0 z-40 h-[calc(4rem+env(safe-area-inset-top))] border-b border-slate-200 bg-white/95 pt-[env(safe-area-inset-top)] backdrop-blur-xl transition-colors duration-200 dark:border-slate-800 dark:bg-slate-950/95 print:hidden">
       <div className="flex h-full w-full items-center gap-3 pl-[max(0.5rem,env(safe-area-inset-left))] pr-[max(0.5rem,env(safe-area-inset-right))] sm:px-5">
           <div className="flex min-w-0 items-center gap-3">
             {showBack ? (
@@ -549,7 +567,7 @@ export default function TopBar({
 
           </div>
 
-          <div className="hidden min-w-0 xl:block">
+          <div className="topbar-desktop-title hidden min-w-0 xl:block">
             {resolvedTitle ? (
               <div className="space-y-1">
                 <h1 className="truncate text-lg font-semibold text-slate-900 dark:text-white">
@@ -574,15 +592,15 @@ export default function TopBar({
                 ref={searchButtonRef}
                 type="button"
                 onClick={() => toggleTopBarMenu("search")}
-                className="inline-flex h-11 w-11 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white text-slate-600 transition hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40 sm:h-9 sm:w-9 sm:rounded-lg xl:w-44 xl:justify-start xl:px-3 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:border-emerald-700 dark:hover:bg-emerald-950/30"
+                className="topbar-compact-button inline-flex h-11 w-11 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white text-slate-600 transition hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40 sm:h-9 sm:w-9 sm:rounded-lg xl:w-44 xl:justify-start xl:px-3 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:border-emerald-700 dark:hover:bg-emerald-950/30"
                 aria-label={language === "km" ? "ស្វែងរកក្នុងប្រព័ន្ធ" : "Search the system"}
                 aria-expanded={isSearchOpen}
                 aria-haspopup="dialog"
                 title={language === "km" ? "ស្វែងរក (Ctrl/⌘ + K)" : "Search (Ctrl/⌘ + K)"}
               >
                 <Search className="h-4.5 w-4.5" />
-                <span className="hidden flex-1 text-left text-xs font-medium xl:block">{language === "km" ? "ស្វែងរក..." : "Search..."}</span>
-                <kbd className="hidden rounded border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[10px] font-medium text-slate-400 xl:inline dark:border-slate-700 dark:bg-slate-800">⌘K</kbd>
+                <span className="topbar-desktop-label hidden flex-1 text-left text-xs font-medium xl:block">{language === "km" ? "ស្វែងរក..." : "Search..."}</span>
+                <kbd className="topbar-desktop-label hidden rounded border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[10px] font-medium text-slate-400 xl:inline dark:border-slate-700 dark:bg-slate-800">⌘K</kbd>
               </button>
               <FloatingTopBarMenu open={isSearchOpen} anchorRef={searchButtonRef} menuRef={searchMenuRef}>
                 <div role="dialog" aria-label={language === "km" ? "ស្វែងរកក្នុងប្រព័ន្ធ" : "Search the system"} className="w-[min(30rem,calc(100vw-1rem))] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl shadow-slate-900/15 dark:border-slate-700 dark:bg-slate-900 dark:shadow-black/40">
@@ -610,7 +628,7 @@ export default function TopBar({
               </FloatingTopBarMenu>
             </div>
 
-            {(!selectedSystem || selectedSystem === "loan-management") && hasAppPermission(user?.role, "loans:create") ? <button type="button" onClick={() => router.push("/loan?view=loans&newLoan=1")} className="hidden h-11 w-11 items-center justify-center gap-1.5 rounded-xl bg-emerald-600 text-xs font-semibold text-white transition hover:bg-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40 focus-visible:ring-offset-2 min-[360px]:inline-flex sm:h-9 sm:w-auto sm:rounded-lg sm:px-3" title={language === "km" ? "បង្កើតកម្ចីថ្មី" : "Quick create loan"} aria-label={language === "km" ? "បង្កើតកម្ចីថ្មី" : "Quick create loan"}><Plus className="h-4 w-4" /><span className="hidden xl:inline">{language === "km" ? "បង្កើតថ្មី" : "Create"}</span></button> : null}
+            {(!selectedSystem || selectedSystem === "loan-management") && hasAppPermission(user?.role, "loans:create") ? <button type="button" onClick={() => router.push("/loan?view=loans&newLoan=1")} className="topbar-compact-button hidden h-11 w-11 items-center justify-center gap-1.5 rounded-xl bg-emerald-600 text-xs font-semibold text-white transition hover:bg-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40 focus-visible:ring-offset-2 min-[360px]:inline-flex sm:h-9 sm:w-auto sm:rounded-lg sm:px-3" title={language === "km" ? "បង្កើតកម្ចីថ្មី" : "Quick create loan"} aria-label={language === "km" ? "បង្កើតកម្ចីថ្មី" : "Quick create loan"}><Plus className="h-4 w-4" /><span className="topbar-desktop-label hidden xl:inline">{language === "km" ? "បង្កើតថ្មី" : "Create"}</span></button> : null}
 
             {systems.length > 0 ? (
               <div className="relative">
@@ -618,13 +636,13 @@ export default function TopBar({
                   ref={systemsButtonRef}
                   type="button"
                   onClick={() => toggleTopBarMenu("systems")}
-                  className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-600 transition hover:border-slate-300 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40 sm:h-9 sm:w-auto sm:gap-2 sm:rounded-lg sm:px-3 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+                  className="topbar-compact-button inline-flex h-11 w-11 items-center justify-center rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-600 transition hover:border-slate-300 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40 sm:h-9 sm:w-auto sm:gap-2 sm:rounded-lg sm:px-3 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
                   aria-label={language === "km" ? "ម៉ឺនុយប្រព័ន្ធ" : "Systems menu"}
                   aria-expanded={isSystemsMenuOpen}
                   aria-haspopup="menu"
                 >
                   <Grid2X2 className="h-4 w-4 text-emerald-600 dark:text-emerald-300" aria-hidden="true" />
-                  <span className="hidden max-w-36 truncate xl:inline">{currentSystem?.label || (language === "km" ? "ប្រព័ន្ធ" : "Systems")}</span>
+                  <span className="topbar-desktop-label hidden max-w-36 truncate xl:inline">{currentSystem?.label || (language === "km" ? "ប្រព័ន្ធ" : "Systems")}</span>
                   <ChevronDown className={`hidden h-3.5 w-3.5 text-slate-400 transition-transform sm:block ${isSystemsMenuOpen ? "rotate-180" : ""}`} aria-hidden="true" />
                 </button>
 
@@ -656,7 +674,7 @@ export default function TopBar({
               </div>
             ) : null}
 
-            <div className="relative hidden lg:block">
+              <div className="topbar-date-control relative hidden lg:block">
               <button
                 ref={dateButtonRef}
                 type="button"
@@ -676,7 +694,7 @@ export default function TopBar({
             <button
               type="button"
               onClick={toggleLanguage}
-              className="inline-flex h-11 w-11 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white text-slate-600 transition hover:border-slate-300 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40 sm:h-9 sm:w-9 sm:rounded-lg xl:w-auto xl:px-3 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+              className="topbar-language-button inline-flex h-11 w-11 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white text-slate-600 transition hover:border-slate-300 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40 sm:h-9 sm:w-9 sm:rounded-lg xl:w-auto xl:px-3 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
               aria-label={language === "km" ? "Switch to English" : "ប្ដូរទៅភាសាខ្មែរ"}
               title={language === "km" ? "Switch to English" : "ប្ដូរទៅភាសាខ្មែរ"}
             >
@@ -684,7 +702,7 @@ export default function TopBar({
               <span className="hidden text-xs font-semibold xl:inline">{language === "km" ? "ខ្មែរ" : "EN"}</span>
             </button>
 
-            <div className="relative hidden sm:block">
+            <div className="topbar-chat-control relative hidden sm:block">
               <button
                 ref={chatButtonRef}
                 type="button"
@@ -739,7 +757,7 @@ export default function TopBar({
                       priority
                     />
                   </div>
-                  <div className="hidden min-w-0 max-w-[130px] flex-col truncate lg:flex">
+                  <div className="topbar-account-name hidden min-w-0 max-w-[130px] flex-col truncate lg:flex">
                     <span className="truncate text-xs font-semibold leading-4 text-slate-900 dark:text-white">
                       {displayUserName}
                     </span>
