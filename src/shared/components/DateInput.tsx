@@ -143,7 +143,9 @@ export function DateInput({ value, onChange, type = "date", className = "", id, 
       const placeAbove = spaceBelow < height + gap && spaceAbove > spaceBelow;
       const desiredTop = placeAbove ? bounds.top - height - gap : bounds.bottom + gap;
       const top = Math.max(viewportPadding, Math.min(desiredTop, window.innerHeight - height - viewportPadding));
-      const left = Math.max(viewportPadding, Math.min(bounds.right - width, window.innerWidth - width - viewportPadding));
+      const fitsFromLeft = bounds.left + width <= window.innerWidth - viewportPadding;
+      const desiredLeft = fitsFromLeft ? bounds.left : bounds.right - width;
+      const left = Math.max(viewportPadding, Math.min(desiredLeft, window.innerWidth - width - viewportPadding));
 
       setOpenAbove(placeAbove);
       setCalendarStyle({
