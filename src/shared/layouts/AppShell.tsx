@@ -288,6 +288,8 @@ function AppShellContent({ children }: AppShellProps) {
     let restoreAttempts = 0;
     let restored = false;
     let savedScrollTop = 0;
+    let filePickerScrollTop: number | null = null;
+    let filePickerTimer: number | null = null;
 
     try {
       const saved = sessionStorage.getItem(scrollKey);
@@ -298,7 +300,7 @@ function AppShellContent({ children }: AppShellProps) {
     }
 
     const saveScrollPosition = () => {
-      if (!restored) return;
+      if (!restored || filePickerScrollTop !== null) return;
       try {
         sessionStorage.setItem(scrollKey, String(el.scrollTop));
       } catch {
@@ -315,6 +317,40 @@ function AppShellContent({ children }: AppShellProps) {
     };
 
     el.addEventListener("scroll", onScroll, { passive: true });
+
+    // Android's native photo picker can resize the WebView and clamp the
+    // nested scroller. Keep its position until the picker and layout settle.
+    const restoreFilePickerScroll = () => {
+      if (filePickerScrollTop === null) return;
+      const target = filePickerScrollTop;
+      window.requestAnimationFrame(() => {
+        el.scrollTop = target;
+        window.requestAnimationFrame(() => { el.scrollTop = target; });
+      });
+      if (filePickerTimer !== null) window.clearTimeout(filePickerTimer);
+      filePickerTimer = window.setTimeout(() => {
+        el.scrollTop = target;
+        filePickerScrollTop = null;
+        filePickerTimer = null;
+        saveScrollPosition();
+      }, 800);
+    };
+
+    const onFilePickerOpen = (event: MouseEvent) => {
+      if (event.target instanceof HTMLInputElement && event.target.type === "file") {
+        filePickerScrollTop = el.scrollTop;
+        if (filePickerTimer !== null) window.clearTimeout(filePickerTimer);
+      }
+    };
+    const onFilePickerChange = (event: Event) => {
+      if (event.target instanceof HTMLInputElement && event.target.type === "file") restoreFilePickerScroll();
+    };
+    const onWindowFocus = () => {
+      if (filePickerScrollTop !== null) restoreFilePickerScroll();
+    };
+    el.addEventListener("click", onFilePickerOpen, true);
+    el.addEventListener("change", onFilePickerChange, true);
+    window.addEventListener("focus", onWindowFocus);
 
     // Reports and grids load asynchronously. Wait until the nested content is
     // tall enough before restoring, otherwise the browser clamps scrollTop to 0.
@@ -344,6 +380,10 @@ function AppShellContent({ children }: AppShellProps) {
         window.cancelAnimationFrame(pendingFrame);
       }
       el.removeEventListener("scroll", onScroll);
+      el.removeEventListener("click", onFilePickerOpen, true);
+      el.removeEventListener("change", onFilePickerChange, true);
+      window.removeEventListener("focus", onWindowFocus);
+      if (filePickerTimer !== null) window.clearTimeout(filePickerTimer);
       window.removeEventListener("pagehide", saveScrollPosition);
       window.removeEventListener("beforeunload", saveScrollPosition);
     };
