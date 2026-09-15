@@ -263,6 +263,36 @@ function AppShellContent({ children }: AppShellProps) {
   }, [router, user?.username]);
 
   const mainRef = useRef<HTMLElement | null>(null);
+  const shellRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const shell = shellRef.current;
+    if (!shell) return;
+
+    // Some MagicOS WebViews keep all viewport CSS units at the photo picker's
+    // reduced height after it closes. Remember the full shell height in pixels
+    // so the main scroll area cannot remain cut short.
+    let stableHeight = shell.getBoundingClientRect().height;
+    let orientation = screen.orientation?.type || `${window.innerWidth > window.innerHeight}`;
+    const updateHeight = () => {
+      const nextOrientation = screen.orientation?.type || `${window.innerWidth > window.innerHeight}`;
+      if (nextOrientation !== orientation) {
+        orientation = nextOrientation;
+        stableHeight = 0;
+      }
+      stableHeight = Math.max(stableHeight, window.innerHeight);
+      shell.style.setProperty("--app-shell-stable-height", `${stableHeight}px`);
+    };
+    updateHeight();
+    window.addEventListener("resize", updateHeight);
+    window.addEventListener("focus", updateHeight);
+    document.addEventListener("visibilitychange", updateHeight);
+    return () => {
+      window.removeEventListener("resize", updateHeight);
+      window.removeEventListener("focus", updateHeight);
+      document.removeEventListener("visibilitychange", updateHeight);
+    };
+  }, [user]);
 
   const scrollKey = useMemo(() => {
     const sp = searchParams?.toString?.() || "";
@@ -437,7 +467,7 @@ function AppShellContent({ children }: AppShellProps) {
   // viewport. The app-shell class uses the largest viewport unit, including a
   // stable `vh` fallback, so content never collapses into a blank lower area.
   return (
-    <div className={`app-shell-viewport flex min-w-0 flex-col bg-transparent ${bottomPaddingClass} xl:pb-0`}>
+    <div ref={shellRef} className={`app-shell-viewport flex min-w-0 flex-col bg-transparent ${bottomPaddingClass} xl:pb-0`}>
       <AuthUserProvider user={user}>
         <MobileBackHandler isMenuOpen={isSidebarOpen} onCloseMenu={closeSidebar} />
 

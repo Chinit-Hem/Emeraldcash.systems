@@ -171,9 +171,9 @@ body {
      and the locked document leaves lower system cards (including Loan) stuck
      below the visible area. */
   height: 100vh;
-  height: max(100vh, 100dvh, 100lvh);
+  height: max(100vh, 100dvh, 100lvh, var(--app-shell-stable-height, 0px));
   min-height: 100vh;
-  min-height: max(100vh, 100dvh, 100lvh);
+  min-height: max(100vh, 100dvh, 100lvh, var(--app-shell-stable-height, 0px));
 }
 
 .dark .ec-dark-scope,
