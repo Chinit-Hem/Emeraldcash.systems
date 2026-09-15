@@ -4720,7 +4720,21 @@ function accountNumber(value: string) {
 }
 
 function accountReportDateInputValue() {
-  return new Date().toISOString().slice(0, 10);
+  return phnomPenhReportDateInputValue();
+}
+
+function ReportDateDialog({ value, onChange, onCancel, onConfirm, language, title }: { value: string; onChange: (value: string) => void; onCancel: () => void; onConfirm: (date: string) => void; language: Language; title: string }) {
+  return createPortal(
+    <div role="dialog" aria-modal="true" aria-labelledby="new-report-date-title" className="fixed inset-0 z-[1000] flex items-center justify-center bg-slate-950/55 p-4">
+      <form onSubmit={(event) => { event.preventDefault(); onConfirm(value.trim()); }} className="w-full max-w-md rounded-2xl bg-white p-5 shadow-2xl dark:bg-slate-900">
+        <h2 id="new-report-date-title" className="text-base font-bold text-slate-900 dark:text-white">{title}</h2>
+        <label className="mt-4 block text-sm font-semibold text-slate-600 dark:text-slate-300">{language === "km" ? "កាលបរិច្ឆេទ (YYYY-MM-DD)" : "Report date (YYYY-MM-DD)"}
+          <input type="text" inputMode="numeric" value={value} onChange={(event) => onChange(event.target.value)} className="mt-2 min-h-12 w-full rounded-xl border border-slate-300 bg-white px-3 text-base text-slate-900 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 dark:border-slate-700 dark:bg-slate-950 dark:text-white" />
+        </label>
+        <div className="mt-5 flex justify-end gap-2"><button type="button" onClick={onCancel} className="min-h-11 rounded-xl px-4 text-sm font-semibold text-slate-600 dark:text-slate-300">{language === "km" ? "បោះបង់" : "Cancel"}</button><button type="submit" className="min-h-11 rounded-xl bg-emerald-600 px-5 text-sm font-bold text-white">{language === "km" ? "យល់ព្រម" : "OK"}</button></div>
+      </form>
+    </div>, document.body,
+  );
 }
 
 function AccountCollectionCards({ title, rows, onChange, reasons, duplicateCustomers, accent = "green" }: { title: string; rows: AccountCollectionRow[]; onChange: (rows: AccountCollectionRow[]) => void; reasons: string[]; duplicateCustomers?: string[]; accent?: "green" | "red" }) {
@@ -4801,6 +4815,7 @@ function AccountReportView() {
   const { language } = useLanguage();
   const { success: toastSuccess, error: toastError } = useToast();
   const [reportDate, setReportDate] = useState(accountReportDateInputValue());
+  const [newReportDateDraft, setNewReportDateDraft] = useState<string | null>(null);
   const [reporterName, setReporterName] = useState(user.full_name || user.username || "");
   const [reporterRole, setReporterRole] = useState(user.position || "Assistant Accountant");
   const [department, setDepartment] = useState(user.department || "Accountant");
@@ -5084,7 +5099,10 @@ function AccountReportView() {
 
   const startNewAccountReport = () => {
     if (!canPrepareOwnAccountReport) return;
-    const nextDate = window.prompt(language === "km" ? "បញ្ចូលកាលបរិច្ឆេទសម្រាប់របាយការណ៍ថ្មី (YYYY-MM-DD)" : "Enter the date for the new report (YYYY-MM-DD)", accountReportDateInputValue())?.trim() || "";
+    setNewReportDateDraft(accountReportDateInputValue());
+  };
+
+  const createNewAccountReport = (nextDate: string) => {
     if (!isValidReportDateInput(nextDate)) {
       toastError(language === "km" ? "សូមបញ្ចូលកាលបរិច្ឆេទត្រឹមត្រូវ។" : "Enter a valid report date.");
       return;
@@ -5110,6 +5128,7 @@ function AccountReportView() {
     setActiveSheet("collection");
     setViewOnly(false);
     setReportPanel("form");
+    setNewReportDateDraft(null);
     replaceAccountReportLocation("form", { sheet: "collection" });
     toastSuccess(language === "km" ? "បានចាប់ផ្ដើមរបាយការណ៍គណនេយ្យថ្មី។ កំណត់ត្រាចាស់មិនត្រូវបានលុបទេ។" : "New Account Report started. Existing report records were not deleted.");
   };
@@ -5246,6 +5265,7 @@ function AccountReportView() {
 
   return (
     <div className="min-w-0 space-y-4 lg:[zoom:0.9]">
+      {newReportDateDraft !== null ? <ReportDateDialog value={newReportDateDraft} onChange={setNewReportDateDraft} onCancel={() => setNewReportDateDraft(null)} onConfirm={createNewAccountReport} language={language} title={language === "km" ? "ជ្រើសរើសកាលបរិច្ឆេទសម្រាប់របាយការណ៍ថ្មី" : "Choose a date for the new report"} /> : null}
       <div className={`${reportPanel === "records" ? "hidden" : "sm:sticky"} top-0 z-40 space-y-2 border-b border-slate-200 bg-slate-50/95 pb-2 backdrop-blur-md dark:border-slate-800 dark:bg-slate-950/95 print:static print:border-0 print:bg-transparent print:pb-0`}>
       <div className="rounded-lg border border-slate-200 bg-white px-3 py-2 shadow-sm dark:border-slate-800 dark:bg-slate-900 print:hidden">
         <div className="flex flex-wrap items-center gap-2 [&_button]:min-h-11">
@@ -5681,7 +5701,12 @@ function operationCurrency(value: string | number) {
 }
 
 function operationDateInputValue() {
-  return new Date().toISOString().slice(0, 10);
+  return phnomPenhReportDateInputValue();
+}
+
+function phnomPenhReportDateInputValue() {
+  // Cambodia stays at UTC+7, so UTC's calendar date can be yesterday before 7 AM.
+  return new Date(Date.now() + 7 * 60 * 60 * 1000).toISOString().slice(0, 10);
 }
 
 function operationReportStatusLabel(status: OperationReportStatus, language: Language) {
@@ -5735,6 +5760,7 @@ function OperationReportView({ loans, loading, canViewLoanData, onRefresh, onOpe
   const [reportPanel, setReportPanel] = useState<"records" | "form">("records");
   const [viewOnly, setViewOnly] = useState(false);
   const [reportDate, setReportDate] = useState(operationDateInputValue());
+  const [newReportDateDraft, setNewReportDateDraft] = useState<string | null>(null);
   const [branch, setBranch] = useState(isReportAdministrator(user.role) ? "" : assignedReportBranches[0] || "Boeung Keng Kang");
   const [reporterName, setReporterName] = useState(user.full_name || user.username || "");
   const [reporterRole, setReporterRole] = useState(user.position || user.role || "Loan Specialist");
@@ -6484,9 +6510,14 @@ function OperationReportView({ loans, loading, canViewLoanData, onRefresh, onOpe
     if (!canPrepareLsReport) return;
     const today = operationDateInputValue();
     const todayExists = savedReports.some((record) => record.reporterUsername === user.username && record.reportDate === today);
-    const nextDate = todayExists
-      ? window.prompt(opText("មានរបាយការណ៍សម្រាប់ថ្ងៃនេះរួចហើយ។ បញ្ចូលកាលបរិច្ឆេទថ្មី (YYYY-MM-DD)", "A report already exists for today. Enter a new report date (YYYY-MM-DD)"), today)?.trim() || ""
-      : today;
+    if (todayExists) {
+      setNewReportDateDraft(today);
+      return;
+    }
+    createNewOperationReport(today);
+  };
+
+  const createNewOperationReport = (nextDate: string) => {
     if (!isValidReportDateInput(nextDate)) {
       toastError(opText("សូមបញ្ចូលកាលបរិច្ឆេទត្រឹមត្រូវ។", "Enter a valid report date."));
       return;
@@ -6497,6 +6528,7 @@ function OperationReportView({ loans, loading, canViewLoanData, onRefresh, onOpe
       return;
     }
     startOwnReport(nextDate, "collection");
+    setNewReportDateDraft(null);
     setSavedValuesOpen(false);
     toastSuccess(opText("បានចាប់ផ្ដើមរបាយការណ៍ថ្មី។ កំណត់ត្រាចាស់មិនត្រូវបានលុបទេ។", "New report started. Existing report records were not deleted."));
   };
@@ -6734,6 +6766,7 @@ function OperationReportView({ loans, loading, canViewLoanData, onRefresh, onOpe
 
   return (
     <div className={`min-w-0 space-y-4 pb-10 lg:[zoom:0.9] ${isBranchManagerReport && !accountCategory ? "[&>section]:mx-3 sm:[&>section]:mx-5" : ""}`}>
+      {newReportDateDraft !== null ? <ReportDateDialog value={newReportDateDraft} onChange={setNewReportDateDraft} onCancel={() => setNewReportDateDraft(null)} onConfirm={createNewOperationReport} language={language} title={opText("មានរបាយការណ៍សម្រាប់ថ្ងៃនេះរួចហើយ។ ជ្រើសរើសកាលបរិច្ឆេទថ្មី", "A report already exists for today. Choose a new report date")} /> : null}
       {datalist}
       {loanTypeDatalist}
       {assetTypeDatalist}
