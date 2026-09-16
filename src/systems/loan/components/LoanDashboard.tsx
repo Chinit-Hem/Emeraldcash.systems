@@ -6336,7 +6336,7 @@ function OperationReportView({ loans, loading, canViewLoanData, onRefresh, onOpe
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id: record.id, action, comment }),
       });
-      toastSuccess(action === "approved" ? opText("Director បានអនុម័តរបាយការណ៍ BM", "BM Report approved by Director.") : action === "reviewed" ? opText("HR បានពិនិត្យ និងបញ្ជូនរបាយការណ៍ BM ទៅ Director", "BM Report reviewed by HR and sent to Director.") : opText("បានបញ្ជូនរបាយការណ៍ BM ត្រឡប់ឱ្យកែតម្រូវ", "BM Report returned for correction."));
+      toastSuccess(action === "approved" ? opText("បានអនុម័តរបាយការណ៍ BM", "BM Report approved.") : action === "reviewed" ? opText("បានពិនិត្យរបាយការណ៍ BM", "BM Report reviewed.") : opText("បានបញ្ជូនរបាយការណ៍ BM ត្រឡប់ឱ្យកែតម្រូវ", "BM Report returned for correction."));
       await loadSavedReports();
     } catch (caught) {
       toastError(caught instanceof Error ? caught.message : opText("មិនអាចធ្វើបច្ចុប្បន្នភាពរបាយការណ៍ BM", "Could not update BM Report"));
@@ -7043,7 +7043,16 @@ function BranchManagerWorkflowPanel({ sourceRecords, sourceReportHistory, accoun
         <div><h2 className="text-lg font-bold">{text("របាយការណ៍ BM", "BM Reports")}</h2><p className="mt-1 text-sm text-slate-500">{text("មើលរបាយការណ៍ BM និងប្រភព LS / គណនេយ្យ។", "View BM reports and their linked LS / Account sources.")}</p></div>
         <button type="button" onClick={onRefresh} className="min-h-11 rounded-lg border border-slate-300 px-3 text-sm font-semibold dark:border-slate-700">{text("ផ្ទុកឡើងវិញ", "Refresh")}</button>
       </div>
-      <div className="overflow-x-auto"><table className="w-full min-w-[850px] text-left text-sm">
+      <div className="grid gap-3 p-4 sm:hidden">{submittedReports.map((record) => <article key={record.id} className="rounded-xl border border-slate-200 p-4 dark:border-slate-700">
+        <div className="flex items-start justify-between gap-2"><div className="min-w-0"><p className="font-bold">{record.reporterName || record.reporterUsername}</p><p className="mt-1 text-sm text-slate-500">{record.branch} · {record.reportDate}</p></div><span className={`shrink-0 rounded-md px-2 py-1 text-xs font-semibold ${operationReportStatusClass(record.status)}`}>{operationReportStatusLabel(record.status, language)}</span></div>
+        <p className="mt-3 text-sm text-slate-500">{bmSourceLabel(record)}</p>
+        {record.reviewComment ? <p className="mt-2 rounded-lg bg-slate-50 p-2 text-sm dark:bg-slate-800">{record.reviewComment}</p> : null}
+        <div className="mt-4 flex flex-wrap gap-2"><button type="button" onClick={() => onOpen(record)} className="min-h-11 rounded-lg border border-slate-300 px-4 text-sm font-semibold dark:border-slate-700">{text("មើលទិន្នន័យ", "View data")}</button>
+          {canApproveAsDirector && ["submitted", "reviewed"].includes(record.status) ? <button type="button" disabled={Boolean(reviewingAction)} onClick={() => onReview(record, "approved")} className="min-h-11 rounded-lg bg-emerald-600 px-4 text-sm font-bold text-white disabled:opacity-50">{text("អនុម័ត", "Approve")}</button> : null}
+          {canApproveAsDirector && (["submitted", "reviewed"].includes(record.status) || canReviewAsHr && record.status === "approved" && record.reviewedBy === currentUsername) ? <button type="button" disabled={Boolean(reviewingAction)} onClick={() => onReview(record, "returned")} className="min-h-11 rounded-lg border border-red-300 px-4 text-sm font-bold text-red-700 disabled:opacity-50 dark:text-red-300">{record.status === "approved" ? text("Return ក្រោយអនុម័ត", "Return after approval") : text("បញ្ជូនត្រឡប់", "Return")}</button> : null}
+        </div>
+      </article>)}{!submittedReports.length ? <p className="py-8 text-center text-sm text-slate-500">{text("មិនទាន់មានរបាយការណ៍ BM", "No BM reports match the filters")}</p> : null}</div>
+      <div className="hidden overflow-x-auto sm:block"><table className="w-full min-w-[850px] text-left text-sm">
         <thead className="bg-slate-100 text-slate-600 dark:bg-slate-950 dark:text-slate-300"><tr>{[text("ថ្ងៃ", "Date"), text("អ្នករាយការណ៍ BM", "BM reporter"), text("សាខា", "Branch"), text("ប្រភពរបាយការណ៍", "Source reports"), text("ស្ថានភាព", "Status"), text("សកម្មភាព", "Actions")].map((label) => <th key={label} className="px-4 py-3">{label}</th>)}</tr></thead>
         <tbody>{submittedReports.map((record) => {
           const isManualReport = record.data.bmWorksheet?.mode === "manual";
@@ -7067,7 +7076,8 @@ function BranchManagerWorkflowPanel({ sourceRecords, sourceReportHistory, accoun
             <td className="px-4 py-3"><span className={`rounded-md px-2 py-1 text-xs font-semibold ${operationReportStatusClass(record.status)}`}>{operationReportStatusLabel(record.status, language)}</span></td>
             <td className="px-4 py-3" onClick={(event) => event.stopPropagation()}><div className="flex flex-wrap gap-2">
               <button type="button" onClick={() => onOpen(record)} className="min-h-10 rounded-lg border border-slate-300 px-3 dark:border-slate-700">{text("មើល", "View")}</button>
-              {canApproveAsDirector && ["submitted", "reviewed"].includes(record.status) ? <><button type="button" disabled={Boolean(reviewingAction)} onClick={() => onReview(record, "approved")} className="min-h-10 rounded-lg bg-emerald-600 px-3 text-sm font-bold text-white hover:bg-emerald-700 disabled:opacity-50"><Check className="mr-1.5 inline h-4 w-4" />{text("អនុម័ត", "Approve")}</button><ReportReturnMenu disabled={Boolean(reviewingAction)} onReturn={() => onReview(record, "returned")} label={text("បញ្ជូនត្រឡប់", "Return")} /></> : null}
+              {canApproveAsDirector && ["submitted", "reviewed"].includes(record.status) ? <button type="button" disabled={Boolean(reviewingAction)} onClick={() => onReview(record, "approved")} className="min-h-10 rounded-lg bg-emerald-600 px-3 text-sm font-bold text-white hover:bg-emerald-700 disabled:opacity-50"><Check className="mr-1.5 inline h-4 w-4" />{text("អនុម័ត", "Approve")}</button> : null}
+              {canApproveAsDirector && (["submitted", "reviewed"].includes(record.status) || canReviewAsHr && record.status === "approved" && record.reviewedBy === currentUsername) ? <ReportReturnMenu disabled={Boolean(reviewingAction)} onReturn={() => onReview(record, "returned")} label={record.status === "approved" ? text("បញ្ជូនត្រឡប់ក្រោយអនុម័ត", "Return after approval") : text("បញ្ជូនត្រឡប់", "Return")} /> : null}
             </div></td>
           </tr>;
         })}

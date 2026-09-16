@@ -362,8 +362,8 @@ export async function PATCH(request: NextRequest) {
     if (!["reviewed", "approved", "returned"].includes(action)) return NextResponse.json({ success: false, error: "Invalid review action" }, { status: 400 });
     if (action === "returned" && !comment) return NextResponse.json({ success: false, error: "Add a correction comment before returning the report" }, { status: 400 });
 
-    const current = await queryWithRetry(async () => sql<Pick<ReportRow, "status" | "reporter_username" | "report_type" | "report_date" | "branch">>`
-      SELECT status, reporter_username, report_type, report_date, branch FROM operation_reports WHERE id = ${id}::uuid LIMIT 1
+    const current = await queryWithRetry(async () => sql<Pick<ReportRow, "status" | "reporter_username" | "report_type" | "report_date" | "branch" | "reviewed_by">>`
+      SELECT status, reporter_username, report_type, report_date, branch, reviewed_by FROM operation_reports WHERE id = ${id}::uuid LIMIT 1
     `, "findOperationReportForReview");
     if (!current[0]) return NextResponse.json({ success: false, error: "Report not found" }, { status: 404 });
     const branchAccess = await getReportBranchAccess(session);
@@ -387,6 +387,9 @@ export async function PATCH(request: NextRequest) {
         : "humanResources";
     const allowed = isReportWorkflowTransitionAllowed(current[0].report_type === "bm" ? "branchManager" : "source", actor, current[0].status, action as "reviewed" | "approved" | "returned");
     if (!allowed) return NextResponse.json({ success: false, error: `This report cannot be marked ${action} from its current status` }, { status: 409 });
+    if (current[0].status === "approved" && action === "returned" && current[0].reviewed_by !== session.username) {
+      return NextResponse.json({ success: false, error: "Only the HR approver who approved this BM Report can return it for correction" }, { status: 403 });
+    }
 
     const rows = await queryWithRetry(async () => sql<ReportRow>`
       UPDATE operation_reports SET
@@ -395,9 +398,10 @@ export async function PATCH(request: NextRequest) {
         reviewed_at = CURRENT_TIMESTAMP,
         review_comment = ${comment},
         updated_at = CURRENT_TIMESTAMP
-      WHERE id = ${id}::uuid
+      WHERE id = ${id}::uuid AND status = ${current[0].status}
       RETURNING *
     `, "reviewOperationReport");
+    if (!rows[0]) return NextResponse.json({ success: false, error: "Report status changed. Refresh and try again" }, { status: 409 });
     const report = mapReport(rows[0]);
     const recipientUsernames = current[0].report_type === "bm" && action === "reviewed"
       ? await getReportNotificationRecipients(current[0].branch, "director", session.username)
