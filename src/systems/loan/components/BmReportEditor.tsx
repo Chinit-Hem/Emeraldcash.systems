@@ -55,6 +55,15 @@ function EditToggle({ open, onClick, label, labelOpen }: { open: boolean; onClic
 
 const numText = (value: string) => value.trim() === "" ? "0" : Number(value).toLocaleString();
 const dash = (value: string) => value.trim() === "" ? "—" : Number(value).toLocaleString();
+// Keep large monetary values compact so metric cards remain readable on phones.
+const moneyText = (value: string) => {
+  if (value.trim() === "") return "0";
+  const amount = Number(value);
+  if (!Number.isFinite(amount)) return value;
+  if (Math.abs(amount) >= 1_000_000) return `${(amount / 1_000_000).toFixed(amount % 1_000_000 === 0 ? 0 : 1)}M`;
+  if (Math.abs(amount) >= 1_000) return `${(amount / 1_000).toFixed(amount % 1_000 === 0 ? 0 : 1)}K`;
+  return amount.toLocaleString();
+};
 const friendlyDate = (value: string) => { const [year, month, day] = value.split("-").map(Number); if (!year || !month || !day) return value; return new Date(year, month - 1, day).toLocaleDateString("en-US", { weekday: "short", day: "numeric", month: "short" }); };
 const PERIOD_FIELDS: Record<string, [string, string]> = {
   requested: ["Requests", "សំណើ"],
@@ -154,7 +163,7 @@ export default function BmReportEditor({ value, onChange, readOnly, isKhmer, rep
 
     <div className={section === "overview" ? "space-y-5" : "hidden print:block"}>
       <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900"><h3 className="text-lg font-bold">{text("Key figures", "សូចនាករសំខាន់")}</h3><div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <Metric icon={CircleDollarSign} label={text("Collected", "ប្រាក់ប្រមូលបាន")} value={`$${numText(overviewCollected)}`} helper={text("Today", "ថ្ងៃនេះ")} color="bg-emerald-100 text-emerald-600 dark:bg-emerald-950 dark:text-emerald-300" />
+        <Metric icon={CircleDollarSign} label={text("Collected", "ប្រាក់ប្រមូលបាន")} value={`$${moneyText(overviewCollected)}`} helper={text("Today", "ថ្ងៃនេះ")} color="bg-emerald-100 text-emerald-600 dark:bg-emerald-950 dark:text-emerald-300" />
         <Metric icon={Users} label={text("Due customers", "អតិថិជនត្រូវបង់")} value={numText(daily.due)} helper={text("Today", "ថ្ងៃនេះ")} color="bg-amber-100 text-amber-600 dark:bg-amber-950 dark:text-amber-300" />
         <Metric icon={UserCheck} label={text("Paid customers", "អតិថិជនបានបង់")} value={numText(overviewPaid)} helper={text("Today", "ថ្ងៃនេះ")} color="bg-emerald-100 text-emerald-600 dark:bg-emerald-950 dark:text-emerald-300" />
         <Metric icon={PieChart} label={text("Collection rate", "អត្រាប្រមូល")} value={`${Number(daily.due) ? ((Number(overviewPaid) / Number(daily.due)) * 100).toFixed(1) : "0.0"}%`} helper={text("Paid ÷ due", "បានបង់ ÷ ត្រូវបង់")} color="bg-emerald-100 text-emerald-600 dark:bg-emerald-950 dark:text-emerald-300" />
@@ -181,9 +190,9 @@ export default function BmReportEditor({ value, onChange, readOnly, isKhmer, rep
     <div className={section === "team" ? "space-y-6" : "hidden print:block"}>
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Metric label={text("Approved (team)", "អនុម័ត (ក្រុម)")} value={numText(String(staffApproved))} helper={`${staffCount} ${text("specialists", "មន្ត្រី")}`} color="border-emerald-200 bg-emerald-50 text-emerald-900 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-200" />
-        <Metric label={text("Collected (team)", "ប្រមូលបាន (ក្រុម)")} value={`$${numText(String(staffCollected))}`} helper={`${staffContacts} ${text("contacts", "ទំនាក់ទំនង")}`} color="border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200" />
+        <Metric label={text("Collected (team)", "ប្រមូលបាន (ក្រុម)")} value={`$${moneyText(String(staffCollected))}`} helper={`${staffContacts} ${text("contacts", "ទំនាក់ទំនង")}`} color="border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200" />
         <Metric label={text("Contacts (team)", "អតិថិជនដោះស្រាយ (ក្រុម)")} value={numText(String(staffContacts))} helper={text("All specialists", "គ្រប់មន្ត្រី")} color="border-blue-200 bg-blue-50 text-blue-900 dark:border-blue-900 dark:bg-blue-950/30 dark:text-blue-200" />
-        <Metric label={text("Account collected", "គណនេយ្យប្រមូល")} value={`$${numText(String(accountCollected))}`} helper={`${accountCount} ${text("contributors", "បុគ្គលិក")}`} color="border-violet-200 bg-violet-50 text-violet-900 dark:border-violet-900 dark:bg-violet-950/30 dark:text-violet-200" />
+        <Metric label={text("Account collected", "គណនេយ្យប្រមូល")} value={`$${moneyText(String(accountCollected))}`} helper={`${accountCount} ${text("contributors", "បុគ្គលិក")}`} color="border-violet-200 bg-violet-50 text-violet-900 dark:border-violet-900 dark:bg-violet-950/30 dark:text-violet-200" />
       </div>
       <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-4 py-4 sm:px-5 dark:border-slate-800">
@@ -214,7 +223,7 @@ export default function BmReportEditor({ value, onChange, readOnly, isKhmer, rep
       </div>
       {issues.map((row, index) => { const isNew = !row.issue.trim(); const isOverdue = Boolean(row.deadline && !isNew && row.deadline < todayIso); const open = Boolean(issueOpen[index]); const dotClass = isOverdue ? "bg-red-500" : isNew ? "bg-slate-300 dark:bg-slate-600" : "bg-emerald-500"; return <article key={index} className={`rounded-xl border p-4 ${isOverdue ? "border-red-300 bg-red-50/60 dark:border-red-900 dark:bg-red-950/20" : "border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900"}`}>
         <div className="flex items-center justify-between gap-3">
-          <div className="min-w-0"><div className="flex items-center gap-2"><span className={`h-2.5 w-2.5 shrink-0 rounded-full ${dotClass}`} /><h3 className="truncate font-bold">{row.issue || `${text("Issue", "បញ្ហា")} ${index + 1}`}</h3></div><p className="mt-1 truncate text-xs text-slate-500">{row.deadline ? friendlyDate(row.deadline) : text("No deadline set", "គ្មានកំណត់កាល")}{row.owner.trim() ? ` · ${row.owner}` : ""}{row.principal.trim() ? ` · $${numText(row.principal)}` : ""}</p></div>
+          <div className="min-w-0"><div className="flex items-center gap-2"><span className={`h-2.5 w-2.5 shrink-0 rounded-full ${dotClass}`} /><h3 className="truncate font-bold">{row.issue || `${text("Issue", "បញ្ហា")} ${index + 1}`}</h3></div><p className="mt-1 truncate text-xs text-slate-500">{row.deadline ? friendlyDate(row.deadline) : text("No deadline set", "គ្មានកំណត់កាល")}{row.owner.trim() ? ` · ${row.owner}` : ""}{row.principal.trim() ? ` · $${moneyText(row.principal)}` : ""}</p></div>
           <div className="flex shrink-0 items-center gap-2">{isNew ? null : <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${isOverdue ? "bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-300" : "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"}`}>{isOverdue ? text("Overdue", "ហួសកំណត់") : text("Open", "បើក")}</span>}{!readOnly ? <EditToggle open={open} onClick={() => toggle(setIssueOpen, index)} label={text("Edit", "កែ")} labelOpen={text("Done", "រួចរាល់")} /> : null}{!readOnly ? <button type="button" aria-label={text("Remove", "លុប")} onClick={() => onChange({ ...value, issues: issues.filter((_, rowIndex) => rowIndex !== index) })} className="flex h-10 w-10 items-center justify-center rounded-lg text-red-600 hover:bg-red-50"><Trash2 className="h-4 w-4" /></button> : null}</div>
         </div>
         <div className={`mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 ${open || readOnly ? "" : "hidden print:grid print:gap-3"}`}><TextField label={text("Issue / overdue case", "បញ្ហា / ករណីយឺតយ៉ាវ")} value={row.issue} onChange={(next) => updateIssue(index, "issue", next)} readOnly={readOnly} /><TextField label={text("Customer / staff", "អតិថិជន / បុគ្គលិក")} value={row.name} onChange={(next) => updateIssue(index, "name", next)} readOnly={readOnly} /><NumberField label={text("Principal", "ប្រាក់ដើម")} value={row.principal} onChange={(next) => updateIssue(index, "principal", next)} readOnly={readOnly} /><TextField label={text("Solution", "ដំណោះស្រាយ")} value={row.action} onChange={(next) => updateIssue(index, "action", next)} readOnly={readOnly} /><TextField label={text("Responsible person", "អ្នកទទួលខុសត្រូវ")} value={row.owner} onChange={(next) => updateIssue(index, "owner", next)} readOnly={readOnly} /><TextField label={text("Deadline", "ថ្ងៃកំណត់")} value={row.deadline} onChange={(next) => updateIssue(index, "deadline", next)} readOnly={readOnly} type="date" /></div>
@@ -228,8 +237,8 @@ export default function BmReportEditor({ value, onChange, readOnly, isKhmer, rep
       <div className="mt-4 grid grid-cols-2 gap-3">
         <Metric label={text("LS reports", "របាយការណ៍ LS")} value={numText(row.lsReports)} helper={text("Submitted", "បានដាក់")} color="border-blue-200 bg-blue-50 text-blue-900 dark:border-blue-900 dark:bg-blue-950/30 dark:text-blue-200" />
         <Metric label={text("Account", "គណនេយ្យ")} value={numText(row.accountReports)} helper={text("reports", "របាយការណ៍")} color="border-violet-200 bg-violet-50 text-violet-900 dark:border-violet-900 dark:bg-violet-950/30 dark:text-violet-200" />
-        <Metric label={text("Approved", "អនុម័ត")} value={numText(row.approved)} helper={`$${numText(row.approvedAmount)}`} color="border-emerald-200 bg-emerald-50 text-emerald-900 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-200" />
-        <Metric label={text("Collected", "ប្រមូលបាន")} value={`$${numText(row.collected)}`} helper={`${numText(row.paid)} ${text("payments", "ការបង់ប្រាក់")}`} color="border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200" />
+        <Metric label={text("Approved", "អនុម័ត")} value={numText(row.approved)} helper={`$${moneyText(row.approvedAmount)}`} color="border-emerald-200 bg-emerald-50 text-emerald-900 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-200" />
+        <Metric label={text("Collected", "ប្រមូលបាន")} value={`$${moneyText(row.collected)}`} helper={`${numText(row.paid)} ${text("payments", "ការបង់ប្រាក់")}`} color="border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200" />
       </div>
       <div className={`mt-4 grid grid-cols-2 gap-3 ${open || generatedSourceReadOnly ? "" : "hidden print:grid print:gap-3"}`}>{Object.keys(PERIOD_FIELDS).map((key) => { const [en, km] = PERIOD_FIELDS[key]; const current = row[key as keyof BmPeriod]; return <NumberField key={key} label={isKhmer ? km : en} value={current} onChange={(next) => onChange({ ...value, periods: periods.map((item) => item.period === row.period ? { ...item, [key]: next } : item) })} readOnly={generatedSourceReadOnly} invalid={isManualReport && row.period === "daily" && invalidDailyField === key && current.trim() === ""} />; })}</div>
     </article>; })}</div>
