@@ -81,6 +81,7 @@ export default function BmReportEditor({ value, onChange, readOnly, isKhmer, rep
   const [overviewEditing, setOverviewEditing] = useState(false);
   const [issueOpen, setIssueOpen] = useState<Record<number, boolean>>({});
   const [periodOpen, setPeriodOpen] = useState<Record<number, boolean>>({});
+  const [periodIndex, setPeriodIndex] = useState(0);
   const moreActionsRef = useRef<HTMLDetailsElement>(null);
   const closeMoreActions = () => { if (moreActionsRef.current) moreActionsRef.current.open = false; };
   const text = (en: string, km: string) => isKhmer ? km : en;
@@ -231,7 +232,9 @@ export default function BmReportEditor({ value, onChange, readOnly, isKhmer, rep
       {!readOnly ? <button type="button" onClick={() => onChange({ ...value, issues: [...issues, emptyBmIssue()] })} className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-emerald-300 px-4 font-semibold text-emerald-700 hover:bg-emerald-50"><Plus className="h-4 w-4" />{text("Add issue", "បន្ថែមបញ្ហា")}</button> : null}
     </div>
 
-    <div className={section === "periods" ? "grid gap-4 lg:grid-cols-3" : "hidden print:grid print:gap-4"}>{periods.map((row, index) => { const open = Boolean(periodOpen[index]); return <article key={row.period} className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900">
+    <div className={section === "periods" ? "space-y-4" : "hidden print:block"}>
+      <div className="grid grid-cols-3 gap-2 rounded-xl border border-slate-200 bg-white p-1 dark:border-slate-700 dark:bg-slate-900">{[text("Today", "ថ្ងៃនេះ"), text("This month", "ខែនេះ"), text("This year", "ឆ្នាំនេះ")].map((label, index) => <button key={label} type="button" onClick={() => setPeriodIndex(index)} className={`min-h-11 rounded-lg px-2 text-sm font-semibold transition ${periodIndex === index ? "bg-emerald-600 text-white shadow-sm" : "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"}`}>{label}</button>)}</div>
+      {[periods[periodIndex] || periods[0]].map((row) => { const index = periodIndex; const open = Boolean(periodOpen[index]); return <article key={row.period} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900 sm:p-5">
       <div className="flex items-center justify-between gap-3"><h3 className="font-bold">{[text("Today", "ថ្ងៃនេះ"), text("This month", "ខែនេះ"), text("This year", "ឆ្នាំនេះ")][index]}</h3>{!generatedSourceReadOnly ? <EditToggle open={open} onClick={() => toggle(setPeriodOpen, index)} label={text("Edit", "កែ")} labelOpen={text("Done", "រួចរាល់")} /> : null}</div>
       <p className="mt-1 text-xs text-slate-500">{reportDate.slice(0, [10, 7, 4][index])}</p>
       <div className="mt-4 grid grid-cols-2 gap-3">
